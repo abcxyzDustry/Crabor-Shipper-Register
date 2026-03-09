@@ -24,7 +24,13 @@ res.sendFile(path.join(__dirname, ‘public/shipper-register.html’));
 // ══════════════════════════════════════
 //   MONGODB CONNECTION
 // ══════════════════════════════════════
+// ⚠️  KHÔNG hardcode credentials ở đây
+// Điền vào file .env: MONGODB_URI=mongodb+srv://…
 const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+console.error(‘❌ Thiếu MONGODB_URI trong file .env’);
+process.exit(1);
+}
 
 mongoose.connect(MONGODB_URI, {
 useNewUrlParser: true,
