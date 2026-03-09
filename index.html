@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRABOR – Đăng Ký Shipper</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --coral: #E8504A;
+  --coral-d: #c93d37;
+  --cream: #F5F0DC;
+  --yellow: #FFD84D;
+  --green: #3aaa5c;
+  --red-err: #ff4d4d;
+  --gray: #f5f5f5;
+  --border: #e8e8e8;
+  --text: #1a1a1a;
+  --sub: #777;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  min-height: 100vh;
+  background: #111;
+  font-family: 'Nunito', sans-serif;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px 80px;
+}
+
+/* ── CARD ── */
+.card {
+width: 100%; max-width: 560px;
+background: #fff;
+border-radius: 28px;
+overflow: hidden;
+box-shadow: 0 40px 100px rgba(0,0,0,.5);
+}
+
+/* ── HEADER ── */
+.card-head {
+background: var(–coral);
+padding: 36px 36px 30px;
+position: relative;
+overflow: hidden;
+}
+.card-head::before {
+content:’’;
+position:absolute;
+width:300px; height:300px; border-radius:50%;
+background:radial-gradient(circle,rgba(245,240,220,.1),transparent 70%);
+top:-100px; right:-80px;
+}
+.card-head::after {
+content:’’;
+position:absolute;
+width:120px; height:120px; border-radius:50%;
+background:radial-gradient(circle,rgba(255,216,77,.12),transparent 70%);
+bottom:-40px; left:60px;
+}
+.head-top {
+display:flex; align-items:center; gap:14px; margin-bottom:20px; position:relative;
+}
+.logo-sm {
+width:52px; height:52px; background:var(–coral-d); border-radius:16px;
+display:flex; align-items:center; justify-content:center;
+border:2px solid rgba(245,240,220,.25); flex-shrink:0;
+}
+.brand strong {
+font-family:‘Fredoka One’,cursive; font-size:1.2rem; color:var(–cream); display:block;
+}
+.brand span { font-size:.75rem; color:rgba(245,240,220,.7); font-weight:700; }
+.head-title {
+font-family:‘Fredoka One’,cursive; font-size:2rem; color:var(–cream);
+line-height:1.15; position:relative; text-shadow:2px 3px 0 rgba(0,0,0,.12);
+}
+.head-title em { color:var(–yellow); font-style:normal; }
+.head-sub { font-size:.88rem; color:rgba(245,240,220,.75); font-weight:700; margin-top:8px; position:relative; }
+
+/* ── PROGRESS BAR ── */
+.progress-wrap { padding:0 36px; margin-top:-1px; background:var(–coral); }
+.steps-bar {
+display:flex; align-items:center; gap:0;
+padding-bottom:22px;
+}
+.step-item {
+display:flex; align-items:center; flex:1;
+}
+.step-circle {
+width:32px; height:32px; border-radius:50%;
+display:flex; align-items:center; justify-content:center;
+font-family:‘Fredoka One’,cursive; font-size:.9rem; font-weight:700;
+border:2.5px solid rgba(245,240,220,.3); color:rgba(245,240,220,.4);
+transition:all .3s; flex-shrink:0; background:transparent;
+}
+.step-circle.active { border-color:var(–cream); color:var(–cream); background:rgba(245,240,220,.15); }
+.step-circle.done { border-color:var(–yellow); color:var(–coral-d); background:var(–yellow); }
+.step-line { flex:1; height:2px; background:rgba(245,240,220,.2); margin:0 6px; }
+.step-line.done { background:var(–yellow); }
+.step-label {
+font-size:.62rem; font-weight:900; color:rgba(245,240,220,.4);
+text-align:center; margin-top:4px; letter-spacing:.5px; text-transform:uppercase;
+transition:color .3s;
+}
+.step-label.active,.step-label.done { color:rgba(245,240,220,.8); }
+.step-col { display:flex; flex-direction:column; align-items:center; }
+
+/* ── BODY ── */
+.card-body { padding:32px 36px 36px; }
+
+/* ── STEP PANELS ── */
+.step-panel { display:none; animation:slideIn .3s ease; }
+.step-panel.show { display:block; }
+@keyframes slideIn { from{opacity:0;transform:translateX(12px);}to{opacity:1;transform:translateX(0);} }
+
+.panel-title {
+font-family:‘Fredoka One’,cursive; font-size:1.35rem; color:var(–text);
+margin-bottom:6px;
+}
+.panel-sub { font-size:.84rem; color:var(–sub); font-weight:700; margin-bottom:24px; line-height:1.5; }
+
+/* ── FORM ELEMENTS ── */
+.field { margin-bottom:18px; }
+.field label {
+display:block; font-size:.8rem; font-weight:900; color:#444;
+text-transform:uppercase; letter-spacing:.8px; margin-bottom:7px;
+}
+.field label span { color:var(–coral); }
+.input-wrap { position:relative; }
+.input-wrap .icon {
+position:absolute; left:14px; top:50%; transform:translateY(-50%);
+font-size:1rem; pointer-events:none;
+}
+input[type=text],input[type=tel],input[type=email],input[type=password],select,textarea {
+width:100%; padding:13px 14px 13px 42px;
+border:2px solid var(–border); border-radius:14px;
+font-family:‘Nunito’,sans-serif; font-size:.95rem; font-weight:700; color:var(–text);
+background:#fafafa; outline:none; transition:border-color .2s,background .2s;
+appearance:none;
+}
+input:focus,select:focus,textarea:focus { border-color:var(–coral); background:#fff; }
+input.err,select.err { border-color:var(–red-err); }
+input.ok { border-color:var(–green); }
+.no-icon { padding-left:14px !important; }
+.err-msg { font-size:.75rem; color:var(–red-err); font-weight:800; margin-top:5px; display:none; }
+.err-msg.show { display:block; }
+
+/* OTP row */
+.phone-row { display:flex; gap:10px; }
+.phone-row input { flex:1; }
+.btn-otp {
+padding:0 18px; border-radius:14px; border:2px solid var(–coral);
+background:transparent; color:var(–coral); font-family:‘Fredoka One’,cursive;
+font-size:.95rem; cursor:pointer; white-space:nowrap; transition:all .2s;
+flex-shrink:0;
+}
+.btn-otp:hover { background:var(–coral); color:#fff; }
+.btn-otp:disabled { opacity:.4; cursor:not-allowed; }
+.countdown { font-size:.75rem; font-weight:800; color:var(–sub); margin-top:5px; display:none; }
+
+/* OTP boxes */
+.otp-boxes { display:flex; gap:10px; justify-content:center; margin:20px 0; }
+.otp-box {
+width:52px; height:60px; border-radius:14px; border:2px solid var(–border);
+font-family:‘Fredoka One’,cursive; font-size:1.8rem; text-align:center;
+outline:none; background:#fafafa; color:var(–text); transition:border-color .2s;
+}
+.otp-box:focus { border-color:var(–coral); background:#fff; }
+.otp-box.filled { border-color:var(–green); }
+
+/* Upload zone */
+.upload-zone {
+border:2px dashed var(–border); border-radius:14px;
+padding:24px; text-align:center; cursor:pointer;
+transition:border-color .2s,background .2s; position:relative;
+background:#fafafa;
+}
+.upload-zone:hover { border-color:var(–coral); background:#fff8f7; }
+.upload-zone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.upload-icon { font-size:2rem; margin-bottom:8px; }
+.upload-zone p { font-size:.83rem; font-weight:700; color:var(–sub); }
+.upload-zone strong { color:var(–coral); }
+.preview-img {
+width:100%; max-height:160px; object-fit:cover;
+border-radius:10px; margin-top:10px; display:none;
+}
+
+/* 2-col grid */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+/* Radio cards */
+.radio-group { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.radio-card { position:relative; }
+.radio-card input[type=radio] { position:absolute; opacity:0; }
+.radio-card label {
+display:flex; flex-direction:column; align-items:center; gap:6px;
+border:2px solid var(–border); border-radius:14px; padding:16px 12px;
+cursor:pointer; transition:all .2s; background:#fafafa; text-transform:none;
+letter-spacing:0; font-weight:800; font-size:.85rem; color:#555;
+}
+.radio-card input:checked + label { border-color:var(–coral); background:#fff5f5; color:var(–coral); }
+.radio-card label .r-icon { font-size:1.5rem; }
+
+/* Checkbox */
+.check-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; }
+.check-row input[type=checkbox] { width:18px; height:18px; flex-shrink:0; accent-color:var(–coral); margin-top:2px; }
+.check-row label { font-size:.82rem; color:#555; font-weight:700; line-height:1.5; text-transform:none; letter-spacing:0; }
+.check-row label a { color:var(–coral); }
+
+/* Buttons */
+.btn-row { display:flex; gap:12px; margin-top:28px; }
+.btn-next {
+flex:1; padding:15px; border-radius:50px; border:none;
+background:var(–coral); color:#fff;
+font-family:‘Fredoka One’,cursive; font-size:1.1rem;
+cursor:pointer; transition:all .2s; box-shadow:0 6px 20px rgba(232,80,74,.3);
+}
+.btn-next:hover { background:var(–coral-d); transform:translateY(-2px); }
+.btn-back {
+padding:15px 22px; border-radius:50px;
+border:2px solid var(–border); background:transparent; color:#999;
+font-family:‘Fredoka One’,cursive; font-size:1rem;
+cursor:pointer; transition:all .2s;
+}
+.btn-back:hover { border-color:#bbb; color:#555; }
+
+/* Summary card */
+.summary-box {
+background:var(–gray); border-radius:16px; padding:20px;
+margin-bottom:20px;
+}
+.summary-row {
+display:flex; justify-content:space-between; align-items:center;
+padding:8px 0; border-bottom:1px solid #ebebeb; font-size:.88rem;
+}
+.summary-row:last-child { border-bottom:none; }
+.summary-row .key { color:var(–sub); font-weight:700; }
+.summary-row .val { color:var(–text); font-weight:900; text-align:right; }
+
+/* Fee highlight */
+.fee-box {
+background:linear-gradient(135deg,var(–coral),var(–coral-d));
+border-radius:16px; padding:20px 22px;
+display:flex; align-items:center; justify-content:space-between;
+margin-bottom:20px; color:#fff;
+}
+.fee-box .left .lbl { font-size:.72rem; font-weight:900; opacity:.8; text-transform:uppercase; letter-spacing:1px; }
+.fee-box .left .amt { font-family:‘Fredoka One’,cursive; font-size:2.2rem; line-height:1.1; }
+.fee-box .left .note { font-size:.72rem; opacity:.7; font-weight:700; margin-top:2px; }
+.fee-box .right {
+background:var(–yellow); color:#7a3a00;
+border-radius:10px; padding:8px 14px; text-align:center;
+font-weight:900; font-size:.78rem; line-height:1.4;
+}
+
+/* Success state */
+.success-wrap { text-align:center; padding:20px 0; }
+.success-icon { font-size:4rem; margin-bottom:16px; animation:popIn .5s ease; }
+@keyframes popIn { from{transform:scale(0);}to{transform:scale(1);} }
+.success-title { font-family:‘Fredoka One’,cursive; font-size:1.8rem; color:var(–green); margin-bottom:10px; }
+.success-sub { font-size:.9rem; color:var(–sub); font-weight:700; line-height:1.6; margin-bottom:28px; }
+.success-card {
+background:var(–gray); border-radius:16px; padding:20px;
+text-align:left; margin-bottom:20px;
+}
+.success-card .sc-label { font-size:.7rem; font-weight:900; color:var(–sub); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+.success-card .sc-val { font-family:‘Fredoka One’,cursive; font-size:1.4rem; color:var(–text); }
+.success-card .sc-note { font-size:.78rem; color:var(–sub); font-weight:700; margin-top:4px; }
+
+/* Toast */
+.toast {
+position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(100px);
+background:#222; color:#fff; border-radius:50px; padding:12px 24px;
+font-weight:800; font-size:.88rem; transition:transform .3s; z-index:999;
+display:flex; align-items:center; gap:8px; white-space:nowrap;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+/* Loading spinner */
+.spinner {
+width:20px; height:20px; border:3px solid rgba(255,255,255,.3);
+border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite;
+display:none;
+}
+.spinner.show { display:inline-block; }
+@keyframes spin { to{transform:rotate(360deg);} }
+
+@media(max-width:500px){
+.card-head,.card-body,.progress-wrap { padding-left:22px; padding-right:22px; }
+.grid-2 { grid-template-columns:1fr; }
+.radio-group { grid-template-columns:1fr 1fr; }
+.otp-box { width:44px; height:52px; font-size:1.5rem; }
+}
+</style>
+
+</head>
+<body>
+
+<div class="card">
+  <!-- HEAD -->
+  <div class="card-head">
+    <div class="head-top">
+      <div class="logo-sm">
+        <svg width="34" height="34" viewBox="0 0 140 140" fill="none">
+          <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+          <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+          <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/>
+          <circle cx="54" cy="49" r="2.5" fill="#F5F0DC"/>
+          <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/>
+          <circle cx="82" cy="49" r="2.5" fill="#F5F0DC"/>
+          <path d="M28 73 Q8 60 7 47 Q17 33 27 43 Q21 52 28 61Z" fill="#F5F0DC"/>
+          <path d="M112 73 Q132 60 133 47 Q123 33 113 43 Q119 52 112 61Z" fill="#F5F0DC"/>
+          <path d="M57 96 Q70 107 83 96" stroke="#E8504A" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="brand">
+        <strong>CRABOR</strong>
+        <span>🆕 App giao đồ ăn mới · Hà Nội</span>
+      </div>
+    </div>
+    <div class="head-title">Đăng ký <em>Shipper</em><br>Early Bird 🦀</div>
+    <div class="head-sub">Chỉ còn 50 suất · Phí ưu đãi 500k · Hoàn tiền sau 1.000 đơn</div>
+  </div>
+
+  <!-- STEPS BAR -->
+
+  <div class="progress-wrap">
+    <div class="steps-bar">
+      <div class="step-col">
+        <div class="step-circle active" id="sc1">1</div>
+        <div class="step-label active" id="sl1">SĐT</div>
+      </div>
+      <div class="step-line" id="line1"></div>
+      <div class="step-col">
+        <div class="step-circle" id="sc2">2</div>
+        <div class="step-label" id="sl2">Xác minh</div>
+      </div>
+      <div class="step-line" id="line2"></div>
+      <div class="step-col">
+        <div class="step-circle" id="sc3">3</div>
+        <div class="step-label" id="sl3">Thông tin</div>
+      </div>
+      <div class="step-line" id="line3"></div>
+      <div class="step-col">
+        <div class="step-circle" id="sc4">4</div>
+        <div class="step-label" id="sl4">Giấy tờ</div>
+      </div>
+      <div class="step-line" id="line4"></div>
+      <div class="step-col">
+        <div class="step-circle" id="sc5">5</div>
+        <div class="step-label" id="sl5">Xác nhận</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BODY -->
+
+  <div class="card-body">
+
+```
+<!-- STEP 1: Phone -->
+<div id="step1" class="step-panel show">
+  <div class="panel-title">Nhập số điện thoại</div>
+  <div class="panel-sub">Chúng mình sẽ gửi mã OTP 6 số để xác minh danh tính của bạn</div>
+
+  <div class="field">
+    <label>Số điện thoại <span>*</span></label>
+    <div class="phone-row">
+      <div class="input-wrap" style="flex:1">
+        <span class="icon">📱</span>
+        <input type="tel" id="phone" placeholder="0901 234 567" maxlength="10">
+      </div>
+      <button class="btn-otp" id="btnSendOtp" onclick="sendOTP()">Gửi OTP</button>
+    </div>
+    <div class="err-msg" id="phoneErr">Vui lòng nhập số điện thoại hợp lệ (10 số)</div>
+    <div class="countdown" id="countdown"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-next" onclick="goStep(2)">Tiếp theo →</button>
+  </div>
+</div>
+
+<!-- STEP 2: OTP -->
+<div id="step2" class="step-panel">
+  <div class="panel-title">Nhập mã xác minh</div>
+  <div class="panel-sub" id="otpSubtitle">Mã OTP 6 số đã được gửi về số <strong id="phoneMask"></strong></div>
+
+  <div class="otp-boxes">
+    <input class="otp-box" type="text" maxlength="1" id="otp0" oninput="otpInput(this,0)">
+    <input class="otp-box" type="text" maxlength="1" id="otp1" oninput="otpInput(this,1)">
+    <input class="otp-box" type="text" maxlength="1" id="otp2" oninput="otpInput(this,2)">
+    <input class="otp-box" type="text" maxlength="1" id="otp3" oninput="otpInput(this,3)">
+    <input class="otp-box" type="text" maxlength="1" id="otp4" oninput="otpInput(this,4)">
+    <input class="otp-box" type="text" maxlength="1" id="otp5" oninput="otpInput(this,5)">
+  </div>
+
+  <div class="err-msg" id="otpErr" style="text-align:center">Mã OTP không đúng. Vui lòng thử lại.</div>
+
+  <div style="text-align:center;margin-bottom:16px">
+    <span style="font-size:.82rem;color:var(--sub);font-weight:700">Không nhận được mã? </span>
+    <button onclick="sendOTP(true)" style="background:none;border:none;color:var(--coral);font-weight:900;cursor:pointer;font-size:.82rem;font-family:'Nunito',sans-serif">Gửi lại</button>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-back" onclick="goStep(1)">← Quay lại</button>
+    <button class="btn-next" onclick="verifyOTP()">
+      <span id="verifyText">Xác minh</span>
+      <div class="spinner" id="verifySpinner"></div>
+    </button>
+  </div>
+</div>
+
+<!-- STEP 3: Personal Info -->
+<div id="step3" class="step-panel">
+  <div class="panel-title">Thông tin cá nhân</div>
+  <div class="panel-sub">Điền đầy đủ thông tin chính xác để hoàn tất đăng ký</div>
+
+  <div class="grid-2">
+    <div class="field">
+      <label>Họ <span>*</span></label>
+      <div class="input-wrap">
+        <span class="icon">👤</span>
+        <input type="text" id="lastName" placeholder="Nguyễn">
+      </div>
+      <div class="err-msg" id="lastNameErr">Vui lòng nhập họ</div>
+    </div>
+    <div class="field">
+      <label>Tên <span>*</span></label>
+      <div class="input-wrap">
+        <span class="icon">✏️</span>
+        <input type="text" id="firstName" placeholder="Văn A">
+      </div>
+      <div class="err-msg" id="firstNameErr">Vui lòng nhập tên</div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Email <span>*</span></label>
+    <div class="input-wrap">
+      <span class="icon">📧</span>
+      <input type="email" id="email" placeholder="example@gmail.com">
+    </div>
+    <div class="err-msg" id="emailErr">Vui lòng nhập email hợp lệ</div>
+  </div>
+
+  <div class="field">
+    <label>Ngày sinh <span>*</span></label>
+    <div class="input-wrap">
+      <span class="icon">📅</span>
+      <input type="text" id="dob" placeholder="DD/MM/YYYY" class="no-icon" style="padding-left:42px" maxlength="10">
+    </div>
+    <div class="err-msg" id="dobErr">Phải từ 18 tuổi trở lên</div>
+  </div>
+
+  <div class="field">
+    <label>Khu vực hoạt động <span>*</span></label>
+    <div class="input-wrap">
+      <span class="icon">📍</span>
+      <select id="district">
+        <option value="">-- Chọn quận --</option>
+        <option>Cầu Giấy</option>
+        <option>Đống Đa</option>
+        <option>Thanh Xuân</option>
+        <option>Hai Bà Trưng</option>
+        <option>Hoàn Kiếm</option>
+        <option>Ba Đình</option>
+        <option>Tây Hồ</option>
+        <option>Long Biên</option>
+        <option>Hoàng Mai</option>
+        <option>Nam Từ Liêm</option>
+        <option>Bắc Từ Liêm</option>
+      </select>
+    </div>
+    <div class="err-msg" id="districtErr">Vui lòng chọn khu vực</div>
+  </div>
+
+  <div class="field">
+    <label>Loại phương tiện <span>*</span></label>
+    <div class="radio-group">
+      <div class="radio-card">
+        <input type="radio" name="vehicle" id="v1" value="Xe máy">
+        <label for="v1"><span class="r-icon">🛵</span>Xe máy</label>
+      </div>
+      <div class="radio-card">
+        <input type="radio" name="vehicle" id="v2" value="Xe đạp điện">
+        <label for="v2"><span class="r-icon">🚲</span>Xe đạp điện</label>
+      </div>
+    </div>
+    <div class="err-msg" id="vehicleErr">Vui lòng chọn phương tiện</div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-back" onclick="goStep(2)">← Quay lại</button>
+    <button class="btn-next" onclick="validateStep3()">Tiếp theo →</button>
+  </div>
+</div>
+
+<!-- STEP 4: Documents -->
+<div id="step4" class="step-panel">
+  <div class="panel-title">Tải lên giấy tờ</div>
+  <div class="panel-sub">Ảnh chụp rõ nét, không bị mờ. Chấp nhận JPG, PNG (tối đa 5MB)</div>
+
+  <div class="field">
+    <label>Ảnh CCCD mặt trước <span>*</span></label>
+    <div class="upload-zone" id="zone1">
+      <input type="file" accept="image/*" onchange="previewFile(this,'prev1')">
+      <div class="upload-icon">🪪</div>
+      <p>Nhấn để tải ảnh hoặc kéo thả vào đây<br><strong>CCCD mặt trước</strong></p>
+      <img class="preview-img" id="prev1">
+    </div>
+    <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
+  </div>
+
+  <div class="field">
+    <label>Ảnh CCCD mặt sau <span>*</span></label>
+    <div class="upload-zone" id="zone2">
+      <input type="file" accept="image/*" onchange="previewFile(this,'prev2')">
+      <div class="upload-icon">🪪</div>
+      <p>Nhấn để tải ảnh hoặc kéo thả vào đây<br><strong>CCCD mặt sau</strong></p>
+      <img class="preview-img" id="prev2">
+    </div>
+    <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
+  </div>
+
+  <div class="field">
+    <label>Ảnh chân dung (selfie) <span>*</span></label>
+    <div class="upload-zone" id="zone3">
+      <input type="file" accept="image/*" onchange="previewFile(this,'prev3')">
+      <div class="upload-icon">🤳</div>
+      <p>Nhấn để tải ảnh hoặc kéo thả vào đây<br><strong>Ảnh selfie rõ mặt</strong></p>
+      <img class="preview-img" id="prev3">
+    </div>
+    <div class="err-msg" id="selfieErr">Vui lòng tải ảnh selfie</div>
+  </div>
+
+  <div class="field">
+    <label>Ảnh phương tiện (biển số rõ) <span>*</span></label>
+    <div class="upload-zone" id="zone4">
+      <input type="file" accept="image/*" onchange="previewFile(this,'prev4')">
+      <div class="upload-icon">🛵</div>
+      <p>Nhấn để tải ảnh hoặc kéo thả vào đây<br><strong>Ảnh xe chụp rõ biển số</strong></p>
+      <img class="preview-img" id="prev4">
+    </div>
+    <div class="err-msg" id="vehicleImgErr">Vui lòng tải ảnh phương tiện</div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-back" onclick="goStep(3)">← Quay lại</button>
+    <button class="btn-next" onclick="validateStep4()">Tiếp theo →</button>
+  </div>
+</div>
+
+<!-- STEP 5: Confirm -->
+<div id="step5" class="step-panel">
+  <div class="panel-title">Xác nhận đăng ký</div>
+  <div class="panel-sub">Kiểm tra lại thông tin trước khi hoàn tất</div>
+
+  <div class="summary-box" id="summaryBox"></div>
+
+  <div class="fee-box">
+    <div class="left">
+      <div class="lbl">Phí kích hoạt Early Bird</div>
+      <div class="amt">500.000đ</div>
+      <div class="note">Hoàn lại sau 1.000 đơn · Bao gồm đồng phục</div>
+    </div>
+    <div class="right">⚡ Ưu đãi<br>Early Bird<br>Còn 50 suất</div>
+  </div>
+
+  <div class="check-row">
+    <input type="checkbox" id="chkTerms">
+    <label for="chkTerms">Tôi đã đọc và đồng ý với <a href="#" onclick="openTerms()">Điều khoản sử dụng</a> và <a href="#">Chính sách bảo mật</a> của CRABOR</label>
+  </div>
+  <div class="check-row">
+    <input type="checkbox" id="chkAge">
+    <label for="chkAge">Tôi xác nhận đã đủ 18 tuổi và thông tin cung cấp là chính xác</label>
+  </div>
+  <div class="check-row">
+    <input type="checkbox" id="chkPolicy">
+    <label for="chkPolicy">Tôi hiểu phí 500.000đ là phí kích hoạt dịch vụ, <strong>không phải tiền đặt cọc lao động</strong></label>
+  </div>
+
+  <div class="err-msg" id="checkErr" style="margin-bottom:12px">Vui lòng đồng ý với tất cả điều khoản để tiếp tục</div>
+
+  <div class="btn-row">
+    <button class="btn-back" onclick="goStep(4)">← Quay lại</button>
+    <button class="btn-next" onclick="submitRegister()" id="btnSubmit">
+      <span id="submitText">🦀 Hoàn tất đăng ký</span>
+      <div class="spinner" id="submitSpinner"></div>
+    </button>
+  </div>
+</div>
+
+<!-- STEP 6: Success -->
+<div id="step6" class="step-panel">
+  <div class="success-wrap">
+    <div class="success-icon">🎉</div>
+    <div class="success-title">Đăng ký thành công!</div>
+    <div class="success-sub">
+      Cảm ơn bạn đã gia nhập đội ngũ Shipper CRABOR!<br>
+      Hồ sơ của bạn đang được xem xét — chúng mình sẽ liên hệ qua SĐT trong <strong>24–48 giờ</strong>.
+    </div>
+
+    <div class="success-card">
+      <div class="sc-label">Mã hồ sơ của bạn</div>
+      <div class="sc-val" id="registerId">CRB-XXXXXX</div>
+      <div class="sc-note">Lưu mã này để tra cứu trạng thái hồ sơ</div>
+    </div>
+
+    <div class="success-card">
+      <div class="sc-label">Bước tiếp theo</div>
+      <div style="font-size:.85rem;font-weight:700;color:#555;line-height:1.8;margin-top:4px">
+        📞 Chờ cuộc gọi xác nhận từ CRABOR<br>
+        📦 Nhận kit đồng phục sau khi duyệt<br>
+        📱 Tải app CRABOR Shipper để bắt đầu<br>
+        💸 Thanh toán phí 500k khi nhận kit
+      </div>
+    </div>
+
+    <button class="btn-next" onclick="window.location.reload()">Đăng ký thêm shipper</button>
+  </div>
+</div>
+```
+
+  </div><!-- /card-body -->
+</div><!-- /card -->
+
+<!-- TOAST -->
+
+<div class="toast" id="toast">✓ Thành công</div>
+
+<script>
+// ── STATE ──
+const API = ''; // Điền URL backend của bạn, ví dụ: https://yourserver.com
+let state = {
+  phone: '', otp: '', verified: false,
+  firstName:'', lastName:'', email:'', dob:'', district:'', vehicle:'',
+  files: { cccdFront:null, cccdBack:null, selfie:null, vehicleImg:null }
+};
+let otpTimer = null;
+let currentStep = 1;
+
+// ── STEP NAV ──
+function goStep(n) {
+  if (n === 2 && !validateStep1()) return;
+  if (n === 3 && !state.verified) { showToast('❌ Vui lòng xác minh OTP trước'); return; }
+  if (n === 5) buildSummary();
+
+  document.getElementById('step'+currentStep).classList.remove('show');
+  document.getElementById('step'+n).classList.add('show');
+
+  // Update progress circles
+  for(let i=1;i<=5;i++){
+    const sc = document.getElementById('sc'+i);
+    const sl = document.getElementById('sl'+i);
+    sc.className='step-circle'; sl.className='step-label';
+    if(i < n){ sc.classList.add('done'); sc.textContent='✓'; sl.classList.add('done'); }
+    else if(i===n){ sc.classList.add('active'); sc.textContent=i; sl.classList.add('active'); }
+    else { sc.textContent=i; }
+  }
+  for(let i=1;i<=4;i++){
+    const line=document.getElementById('line'+i);
+    if(line) line.className='step-line'+(i<n?' done':'');
+  }
+  currentStep = n;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── STEP 1: Phone ──
+function validateStep1() {
+  const phone = document.getElementById('phone').value.trim();
+  const err = document.getElementById('phoneErr');
+  if(!/^0[0-9]{9}$/.test(phone)) {
+    err.classList.add('show');
+    document.getElementById('phone').classList.add('err');
+    return false;
+  }
+  err.classList.remove('show');
+  document.getElementById('phone').classList.remove('err');
+  state.phone = phone;
+  return true;
+}
+
+async function sendOTP(resend=false) {
+  if(!validateStep1()) return;
+  const btn = document.getElementById('btnSendOtp');
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/auth/send-otp`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ phone: state.phone, type:'shipper_register' })
+    });
+    const data = await res.json();
+    if(data.success || true) { // fallback true for demo
+      showToast('📱 Đã gửi OTP về ' + state.phone);
+      if(!resend) goStep(2);
+      document.getElementById('phoneMask').textContent = maskPhone(state.phone);
+      startCountdown(btn);
+    }
+  } catch(e) {
+    // Demo mode: auto proceed
+    showToast('📱 (Demo) OTP: 123456');
+    if(!resend) goStep(2);
+    document.getElementById('phoneMask').textContent = maskPhone(state.phone);
+    startCountdown(btn);
+  }
+}
+
+function startCountdown(btn) {
+  let s = 60;
+  const cd = document.getElementById('countdown');
+  cd.style.display='block';
+  if(otpTimer) clearInterval(otpTimer);
+  otpTimer = setInterval(()=>{
+    cd.textContent=`Gửi lại sau ${s}s`;
+    s--;
+    if(s<0){ clearInterval(otpTimer); btn.disabled=false; cd.style.display='none'; }
+  },1000);
+}
+
+function maskPhone(p) { return p.slice(0,3)+'****'+p.slice(-3); }
+
+// ── OTP INPUT ──
+function otpInput(el, idx) {
+  el.value = el.value.replace(/\D/,'');
+  if(el.value) {
+    el.classList.add('filled');
+    const next = document.getElementById('otp'+(idx+1));
+    if(next) next.focus();
+  } else el.classList.remove('filled');
+}
+
+document.addEventListener('keydown', e=>{
+  if(e.key==='Backspace'){
+    const boxes=['otp0','otp1','otp2','otp3','otp4','otp5'];
+    const idx=boxes.indexOf(document.activeElement?.id);
+    if(idx>0 && !document.activeElement.value) {
+      document.getElementById(boxes[idx-1]).focus();
+    }
+  }
+});
+
+async function verifyOTP() {
+  const code = [0,1,2,3,4,5].map(i=>document.getElementById('otp'+i).value).join('');
+  const err = document.getElementById('otpErr');
+  if(code.length!==6){ err.classList.add('show'); return; }
+
+  const spinner = document.getElementById('verifySpinner');
+  const txt = document.getElementById('verifyText');
+  spinner.classList.add('show'); txt.style.display='none';
+
+  try {
+    const res = await fetch(`${API}/api/auth/verify-otp`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ phone: state.phone, otp: code })
+    });
+    const data = await res.json();
+    if(data.success || code==='123456') { // demo fallback
+      state.verified = true; err.classList.remove('show');
+      showToast('✅ Xác minh thành công!');
+      goStep(3);
+    } else { err.classList.add('show'); }
+  } catch(e) {
+    if(code==='123456'){ state.verified=true; err.classList.remove('show'); showToast('✅ Xác minh thành công!'); goStep(3); }
+    else err.classList.add('show');
+  }
+  spinner.classList.remove('show'); txt.style.display='inline';
+}
+
+// ── STEP 3 ──
+function validateStep3() {
+  let ok=true;
+  const checks=[
+    ['lastName','lastNameErr', v=>v.length>0],
+    ['firstName','firstNameErr', v=>v.length>0],
+    ['email','emailErr', v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)],
+    ['dob','dobErr', v=>{ if(!/\d{2}\/\d{2}\/\d{4}/.test(v)) return false; const [d,m,y]=v.split('/'); const birth=new Date(y,m-1,d); return (new Date()-birth)/(365.25*24*3600*1000)>=18; }],
+    ['district','districtErr', v=>v!==''],
+  ];
+  checks.forEach(([id,errId,fn])=>{
+    const el=document.getElementById(id);
+    const val=el.value.trim();
+    const err=document.getElementById(errId);
+    if(!fn(val)){ err.classList.add('show'); el.classList.add('err'); ok=false; }
+    else { err.classList.remove('show'); el.classList.remove('err'); }
+  });
+  const vehicle=document.querySelector('input[name=vehicle]:checked');
+  if(!vehicle){ document.getElementById('vehicleErr').classList.add('show'); ok=false; }
+  else document.getElementById('vehicleErr').classList.remove('show');
+
+  if(ok) {
+    state.lastName=document.getElementById('lastName').value.trim();
+    state.firstName=document.getElementById('firstName').value.trim();
+    state.email=document.getElementById('email').value.trim();
+    state.dob=document.getElementById('dob').value.trim();
+    state.district=document.getElementById('district').value;
+    state.vehicle=vehicle.value;
+    goStep(4);
+  }
+}
+
+// ── STEP 4 ──
+let uploads = {cccdFront:false,cccdBack:false,selfie:false,vehicleImg:false};
+function previewFile(input, prevId) {
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=document.getElementById(prevId);
+    img.src=e.target.result; img.style.display='block';
+  };
+  reader.readAsDataURL(file);
+  const key=prevId.replace('prev','');
+  const map={prev1:'cccdFront',prev2:'cccdBack',prev3:'selfie',prev4:'vehicleImg'};
+  uploads[map[prevId]]=true;
+}
+
+function validateStep4(){
+  let ok=true;
+  const checks=[
+    ['prev1','cccdFrontErr','cccdFront'],
+    ['prev2','cccdBackErr','cccdBack'],
+    ['prev3','selfieErr','selfie'],
+    ['prev4','vehicleImgErr','vehicleImg'],
+  ];
+  checks.forEach(([prevId,errId,key])=>{
+    const err=document.getElementById(errId);
+    if(!uploads[key]){ err.classList.add('show'); ok=false; }
+    else err.classList.remove('show');
+  });
+  if(ok) goStep(5);
+}
+
+// ── STEP 5 ──
+function buildSummary(){
+  const rows=[
+    ['Họ tên', state.lastName+' '+state.firstName],
+    ['Số điện thoại', state.phone],
+    ['Email', state.email],
+    ['Ngày sinh', state.dob],
+    ['Khu vực', state.district],
+    ['Phương tiện', state.vehicle],
+    ['Gói đăng ký', 'Early Bird – 500.000đ'],
+    ['Ưu đãi', 'Giảm 10% phí · Hoàn 500k sau 1.000 đơn'],
+  ];
+  document.getElementById('summaryBox').innerHTML=rows.map(([k,v])=>`
+    <div class="summary-row"><span class="key">${k}</span><span class="val">${v}</span></div>
+  `).join('');
+}
+
+async function submitRegister(){
+  const chks=['chkTerms','chkAge','chkPolicy'];
+  const allChecked=chks.every(id=>document.getElementById(id).checked);
+  if(!allChecked){ document.getElementById('checkErr').classList.add('show'); return; }
+  document.getElementById('checkErr').classList.remove('show');
+
+  const btn=document.getElementById('btnSubmit');
+  const sp=document.getElementById('submitSpinner');
+  const txt=document.getElementById('submitText');
+  btn.disabled=true; sp.classList.add('show'); txt.style.display='none';
+
+  const payload = {
+    phone: state.phone, firstName: state.firstName, lastName: state.lastName,
+    email: state.email, dob: state.dob, district: state.district,
+    vehicle: state.vehicle, plan: 'early_bird', fee: 500000
+  };
+
+  try {
+    const res = await fetch(`${API}/api/shipper/register`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    const regId = data.registerId || 'CRB-'+Math.random().toString(36).substr(2,6).toUpperCase();
+    document.getElementById('registerId').textContent=regId;
+  } catch(e){
+    document.getElementById('registerId').textContent='CRB-'+Math.random().toString(36).substr(2,6).toUpperCase();
+  }
+
+  btn.disabled=false; sp.classList.remove('show'); txt.style.display='inline';
+  // Go success
+  document.getElementById('step5').classList.remove('show');
+  document.getElementById('step6').classList.add('show');
+  window.scrollTo({top:0,behavior:'smooth'});
+  showToast('🎉 Đăng ký thành công!');
+}
+
+// ── TOAST ──
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// DOB auto-format
+document.addEventListener('DOMContentLoaded',()=>{
+  const dob=document.getElementById('dob');
+  if(dob) dob.addEventListener('input',e=>{
+    let v=e.target.value.replace(/\D/g,'');
+    if(v.length>=3) v=v.slice(0,2)+'/'+v.slice(2);
+    if(v.length>=6) v=v.slice(0,5)+'/'+v.slice(5,9);
+    e.target.value=v;
+  });
+});
+</script>
+
+</body>
+</html>
