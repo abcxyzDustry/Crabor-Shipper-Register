@@ -16,15 +16,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve shipper registration form
-app.get('/shipper/register', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/shipper-register.html'));
+// Serve main registration form
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+// Serve admin panel
+app.get('/admin.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 
 // ══════════════════════════════════════
 //   MONGODB CONNECTION
 // ══════════════════════════════════════
-// Sử dụng MongoDB URI trực tiếp từ database của bạn
 const MONGODB_URI = 'mongodb+srv://123456789a:haideptre@cluster0.fs703g5.mongodb.net/crabor?retryWrites=true&w=majority&appName=Cluster0';
 
 mongoose.connect(MONGODB_URI, {
@@ -73,9 +77,9 @@ const shipperSchema = new mongoose.Schema({
     vehicleImg: String
   },
   earlyBird: {
-    discountRate:    { type: Number, default: 10 },  // 10% giảm phí
-    ordersCompleted: { type: Number, default: 0 },   // đơn đã hoàn thành
-    refundTarget:    { type: Number, default: 1000 }, // hoàn tiền sau 1000 đơn
+    discountRate:    { type: Number, default: 10 },
+    ordersCompleted: { type: Number, default: 0 },
+    refundTarget:    { type: Number, default: 1000 },
     refunded:        { type: Boolean, default: false }
   },
   verifiedPhone: { type: Boolean, default: false },
@@ -85,7 +89,6 @@ const shipperSchema = new mongoose.Schema({
   updatedAt:     Date
 });
 
-// Auto-generate registerId
 shipperSchema.pre('save', async function(next) {
   if (!this.registerId) {
     const prefix = 'CRB';
@@ -102,25 +105,25 @@ const Shipper = mongoose.model('Shipper', shipperSchema);
 // Partner Schema (Giặt Là, Giúp Việc, China Shop)
 const partnerSchema = new mongoose.Schema({
   registerId:  { type: String, unique: true },
-  type:        { type: String, enum: ['gl', 'gv', 'cs'], required: true }, // gl: giặt là, gv: giúp việc, cs: china shop
+  type:        { type: String, enum: ['gl', 'gv', 'cs'], required: true },
   phone:       { type: String, required: true, unique: true },
   firstName:   { type: String, required: true },
   lastName:    { type: String, required: true },
   fullName:    String,
-  bizName:     String, // Tên cơ sở / thương hiệu
+  bizName:     String,
   email:       { type: String, required: true },
-  dob:         String, // Cho giúp việc
+  dob:         String,
   address:     String,
   district:    String,
-  source:      String, // Nguồn hàng (cho China Shop)
-  exp:         String, // Kinh nghiệm (cho giúp việc)
-  bizYear:     Number, // Năm thành lập (cho giặt là)
-  services:    [String], // Dịch vụ cung cấp
-  pricePerKg:  Number, // Giá giặt (cho giặt là)
-  turnaround:  String, // Thời gian hoàn thành
-  shifts:      [String], // Ca làm việc (cho giúp việc)
-  categories:  [String], // Danh mục sản phẩm (cho China Shop)
-  commission:  { type: Number, default: 18 }, // Hoa hồng %
+  source:      String,
+  exp:         String,
+  bizYear:     Number,
+  services:    [String],
+  pricePerKg:  Number,
+  turnaround:  String,
+  shifts:      [String],
+  categories:  [String],
+  commission:  { type: Number, default: 18 },
   status:      {
     type: String,
     enum: ['pending', 'reviewing', 'approved', 'rejected', 'active', 'suspended'],
@@ -158,7 +161,7 @@ const Partner = mongoose.model('Partner', partnerSchema);
 // Admin User Schema
 const adminSchema = new mongoose.Schema({
   username:  { type: String, unique: true, required: true },
-  password:  { type: String, required: true }, // đã hash bcrypt
+  password:  { type: String, required: true },
   role:      { type: String, enum: ['superadmin', 'admin', 'staff'], default: 'staff' },
   name:      String,
   lastLogin: Date,
@@ -170,14 +173,10 @@ const Admin = mongoose.model('Admin', adminSchema);
 //   HELPERS
 // ══════════════════════════════════════
 
-// Tạo OTP 6 số
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Gửi SMS OTP qua ESMS.vn
-// Docs: https://developers.esms.vn
-// SmsType 8 = Tin Cố định giá rẻ (OTP)
 async function sendSMS(phone, message, options = {}) {
   const ESMS_URL = 'https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/';
   
@@ -186,41 +185,33 @@ async function sendSMS(phone, message, options = {}) {
     SecretKey: process.env.ESMS_SECRET_KEY,
     Phone:     phone,
     Content:   message,
-    SmsType:   '8',          // Tin cố định giá rẻ — dùng cho OTP
-    IsUnicode: 0,            // 0 = không dấu (OTP không cần dấu, rẻ hơn)
+    SmsType:   '8',
+    IsUnicode: 0,
     Sandbox:   process.env.NODE_ENV !== 'production' ? 1 : 0,
-    // RequestId giúp chặn gửi trùng trong 24h
     RequestId: options.requestId || `CRB-${Date.now()}-${phone.slice(-4)}`,
-    // CallbackUrl nếu bạn muốn nhận kết quả gửi tin (tuỳ chọn)
     ...(process.env.ESMS_CALLBACK_URL && { CallbackUrl: process.env.ESMS_CALLBACK_URL }),
   };
 
   try {
     const res = await axios.post(ESMS_URL, body, {
       headers: { 'Content-Type': 'application/json' },
-      timeout: 10000 // 10 giây timeout
+      timeout: 10000
     });
 
     const data = res.data;
     console.log(`📱 ESMS response [${phone}]:`, data);
 
-    // CodeResult '100' = thành công
     if (data.CodeResult !== '100') {
       throw new Error(`ESMS lỗi ${data.CodeResult}: ${data.ErrorMessage}`);
     }
 
-    return {
-      success: true,
-      smsId: data.SMSID,
-      codeResult: data.CodeResult
-    };
+    return { success: true, smsId: data.SMSID, codeResult: data.CodeResult };
   } catch (err) {
     console.error('❌ sendSMS error:', err.message);
     throw new Error('Không thể gửi SMS: ' + err.message);
   }
 }
 
-// Rate limiter đơn giản (in-memory, dùng Redis nếu production)
 const rateLimitMap = new Map();
 function rateLimit(key, maxAttempts = 3, windowMs = 10 * 60 * 1000) {
   const now = Date.now();
@@ -235,31 +226,24 @@ function rateLimit(key, maxAttempts = 3, windowMs = 10 * 60 * 1000) {
 //   ROUTES: OTP
 // ══════════════════════════════════════
 
-// POST /api/auth/send-otp
 app.post('/api/auth/send-otp', async (req, res) => {
   try {
     const { phone, type = 'shipper_register' } = req.body;
 
-    // Validate phone
     if (!/^0[0-9]{9}$/.test(phone)) {
       return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
     }
 
-    // Rate limit: tối đa 3 lần/10 phút
     if (!rateLimit(`otp:${phone}`, 3)) {
       return res.status(429).json({ success: false, message: 'Quá nhiều yêu cầu. Thử lại sau 10 phút.' });
     }
 
-    // Xóa OTP cũ
     await OTP.deleteMany({ phone, type });
 
-    // Tạo OTP mới
     const otp = generateOTP();
     await OTP.create({ phone, otp, type });
 
-    // Nội dung OTP không dấu để dùng SmsType 8 (giá rẻ)
     const message = `[CRABOR] Ma xac minh: ${otp}. Hieu luc 10 phut. Khong chia se ma nay.`;
-    // RequestId chặn ESMS gửi trùng trong 24h
     const requestId = `CRB-${phone}-${Date.now()}`;
 
     try {
@@ -269,7 +253,6 @@ app.post('/api/auth/send-otp', async (req, res) => {
       return res.status(503).json({ success: false, message: 'Không thể gửi SMS. Thử lại sau.' });
     }
 
-    // Dev mode: Sandbox=1 nên không tốn tiền SMS thật
     if (process.env.NODE_ENV !== 'production') {
       console.log(`📱 [DEV] OTP cho ${phone}: ${otp}`);
     }
@@ -285,7 +268,6 @@ app.post('/api/auth/send-otp', async (req, res) => {
   }
 });
 
-// POST /api/auth/verify-otp
 app.post('/api/auth/verify-otp', async (req, res) => {
   try {
     const { phone, otp, type = 'shipper_register' } = req.body;
@@ -294,7 +276,6 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Thiếu thông tin' });
     }
 
-    // Giới hạn 5 lần nhập sai
     if (!rateLimit(`verify:${phone}`, 5)) {
       return res.status(429).json({ success: false, message: 'Quá nhiều lần thử. Yêu cầu OTP mới.' });
     }
@@ -310,7 +291,6 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Mã OTP không đúng' });
     }
 
-    // OTP hợp lệ → xóa đi
     await OTP.deleteOne({ _id: record._id });
 
     res.json({ success: true, message: 'Xác minh thành công', phone });
@@ -324,23 +304,19 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 //   ROUTES: SHIPPER REGISTRATION
 // ══════════════════════════════════════
 
-// POST /api/shipper/register
 app.post('/api/shipper/register', async (req, res) => {
   try {
     const { phone, firstName, lastName, email, dob, district, vehicle, plan, fee } = req.body;
 
-    // Validate required fields
     if (!phone || !firstName || !lastName || !email) {
       return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc' });
     }
 
-    // Check duplicate phone
     const exists = await Shipper.findOne({ phone });
     if (exists) {
       return res.status(409).json({ success: false, message: 'Số điện thoại này đã đăng ký' });
     }
 
-    // Tạo shipper mới
     const shipper = await Shipper.create({
       phone, firstName, lastName, email, dob, district, vehicle,
       plan: plan || 'early_bird',
@@ -366,7 +342,6 @@ app.post('/api/shipper/register', async (req, res) => {
 //   ROUTES: PARTNER REGISTRATION
 // ══════════════════════════════════════
 
-// POST /api/partner/register
 app.post('/api/partner/register', async (req, res) => {
   try {
     const { 
@@ -375,23 +350,19 @@ app.post('/api/partner/register', async (req, res) => {
       pricePerKg, turnaround, shifts, categories 
     } = req.body;
 
-    // Validate required fields
     if (!type || !phone || !firstName || !lastName || !email || !district) {
       return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc' });
     }
 
-    // Check duplicate phone
     const exists = await Partner.findOne({ phone });
     if (exists) {
       return res.status(409).json({ success: false, message: 'Số điện thoại này đã đăng ký' });
     }
 
-    // Xác định hoa hồng theo loại đối tác
-    let commission = 18; // Mặc định giặt là 18%
-    if (type === 'gv') commission = 15; // Giúp việc 15%
-    if (type === 'cs') commission = 12; // China Shop 12%
+    let commission = 18;
+    if (type === 'gv') commission = 15;
+    if (type === 'cs') commission = 12;
 
-    // Tạo partner mới
     const partner = await Partner.create({
       type, phone, firstName, lastName, bizName, email, dob,
       address, district, source, exp, bizYear, services,
@@ -414,7 +385,10 @@ app.post('/api/partner/register', async (req, res) => {
   }
 });
 
-// GET /api/status/:registerId
+// ══════════════════════════════════════
+//   ROUTES: STATUS CHECK
+// ══════════════════════════════════════
+
 app.get('/api/status/:registerId', async (req, res) => {
   try {
     let record = await Shipper.findOne({ registerId: req.params.registerId });
@@ -444,22 +418,20 @@ app.get('/api/status/:registerId', async (req, res) => {
 //   ROUTES: ADMIN
 // ══════════════════════════════════════
 
-// Middleware xác thực admin đơn giản (dùng API key)
 function adminAuth(req, res, next) {
   const key = req.headers['x-admin-key'];
-  if (key !== process.env.ADMIN_SECRET_KEY) {
+  if (key !== 'crabor-admin-secret-2025') {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   next();
 }
 
-// GET /api/admin/shippers — Danh sách shipper
 app.get('/api/admin/shippers', adminAuth, async (req, res) => {
   try {
     const { status, district, page = 1, limit = 20 } = req.query;
     const filter = {};
-    if (status) filter.status = status;
-    if (district) filter.district = district;
+    if (status && status !== 'all') filter.status = status;
+    if (district && district !== 'all') filter.district = district;
 
     const total = await Shipper.countDocuments(filter);
     const shippers = await Shipper.find(filter)
@@ -470,22 +442,23 @@ app.get('/api/admin/shippers', adminAuth, async (req, res) => {
 
     res.json({
       success: true,
-      total, page: Number(page), limit: Number(limit),
-      data: shippers
+      data: shippers,
+      total,
+      page: Number(page),
+      limit: Number(limit)
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// GET /api/admin/partners — Danh sách partner
 app.get('/api/admin/partners', adminAuth, async (req, res) => {
   try {
     const { type, status, district, page = 1, limit = 20 } = req.query;
     const filter = {};
-    if (type) filter.type = type;
-    if (status) filter.status = status;
-    if (district) filter.district = district;
+    if (type && type !== 'all') filter.type = type;
+    if (status && status !== 'all') filter.status = status;
+    if (district && district !== 'all') filter.district = district;
 
     const total = await Partner.countDocuments(filter);
     const partners = await Partner.find(filter)
@@ -496,15 +469,83 @@ app.get('/api/admin/partners', adminAuth, async (req, res) => {
 
     res.json({
       success: true,
-      total, page: Number(page), limit: Number(limit),
-      data: partners
+      data: partners,
+      total,
+      page: Number(page),
+      limit: Number(limit)
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// GET /api/admin/registrations/:id — Chi tiết 1 registration
+app.get('/api/admin/registrations/search', adminAuth, async (req, res) => {
+  try {
+    const { q, type, status, district, page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let shipperResults = [];
+    let partnerResults = [];
+    let total = 0;
+
+    const searchFilter = {};
+    if (q) {
+      searchFilter.$or = [
+        { registerId: new RegExp(q, 'i') },
+        { phone: new RegExp(q, 'i') },
+        { email: new RegExp(q, 'i') },
+        { firstName: new RegExp(q, 'i') },
+        { lastName: new RegExp(q, 'i') },
+        { fullName: new RegExp(q, 'i') },
+        { bizName: new RegExp(q, 'i') }
+      ];
+    }
+    if (status && status !== 'all') searchFilter.status = status;
+    if (district && district !== 'all') searchFilter.district = district;
+
+    if (!type || type === 'all' || type === 'shipper') {
+      shipperResults = await Shipper.find(searchFilter)
+        .sort({ registeredAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean();
+      
+      const shipperCount = await Shipper.countDocuments(searchFilter);
+      total += shipperCount;
+    }
+
+    if (!type || type === 'all' || ['gl', 'gv', 'cs'].includes(type)) {
+      const partnerFilter = { ...searchFilter };
+      if (type && type !== 'all' && ['gl', 'gv', 'cs'].includes(type)) {
+        partnerFilter.type = type;
+      }
+      
+      partnerResults = await Partner.find(partnerFilter)
+        .sort({ registeredAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean();
+      
+      const partnerCount = await Partner.countDocuments(partnerFilter);
+      total += partnerCount;
+    }
+
+    const allResults = [...shipperResults, ...partnerResults]
+      .sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt))
+      .slice(0, parseInt(limit));
+
+    res.json({
+      success: true,
+      data: allResults,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 app.get('/api/admin/registrations/:id', adminAuth, async (req, res) => {
   try {
     let record = await Shipper.findById(req.params.id);
@@ -518,7 +559,6 @@ app.get('/api/admin/registrations/:id', adminAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/admin/registrations/:id/status — Cập nhật trạng thái
 app.patch('/api/admin/registrations/:id/status', adminAuth, async (req, res) => {
   try {
     const { status, adminNotes } = req.body;
@@ -542,7 +582,6 @@ app.patch('/api/admin/registrations/:id/status', adminAuth, async (req, res) => 
 
     const updated = await model.findByIdAndUpdate(req.params.id, update, { new: true });
 
-    // Gửi SMS thông báo
     if (updated && process.env.ESMS_API_KEY) {
       const notifId = `CRB-NOTIF-${updated._id}-${status}-${Date.now()}`;
       if (status === 'approved') {
@@ -566,7 +605,6 @@ app.patch('/api/admin/registrations/:id/status', adminAuth, async (req, res) => 
   }
 });
 
-// GET /api/admin/stats — Thống kê tổng quan
 app.get('/api/admin/stats', adminAuth, async (req, res) => {
   try {
     const [totalShippers, totalPartners, pending, approved, active, todayCount] = await Promise.all([
@@ -582,14 +620,12 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
       })
     ]);
 
-    // Thống kê theo loại partner
     const partnersByType = {
       gl: await Partner.countDocuments({ type: 'gl' }),
       gv: await Partner.countDocuments({ type: 'gv' }),
       cs: await Partner.countDocuments({ type: 'cs' })
     };
 
-    // Đếm Early Bird còn lại
     const earlyBirdUsed = await Shipper.countDocuments({ plan: 'early_bird' });
     const earlyBirdLeft = Math.max(0, 50 - earlyBirdUsed);
 
@@ -620,13 +656,13 @@ async function setupDefaultAdmin() {
     if (count === 0) {
       await Admin.create({
         username: 'admin',
-        password: process.env.ADMIN_DEFAULT_PASS || 'Crabor@2025',
+        password: 'Crabor@2025',
         role: 'superadmin',
         name: 'CRABOR Admin'
       });
       console.log('👑 Tài khoản admin mặc định đã được tạo');
       console.log('   Username: admin');
-      console.log('   Password: ' + (process.env.ADMIN_DEFAULT_PASS || 'Crabor@2025'));
+      console.log('   Password: Crabor@2025');
       console.log('   ⚠️  Vui lòng đổi mật khẩu ngay sau lần đăng nhập đầu tiên!');
     }
   } catch (err) {
@@ -642,7 +678,8 @@ app.listen(PORT, async () => {
   console.log(`\n🦀 CRABOR Registration Server`);
   console.log(`🚀 Running on port ${PORT}`);
   console.log(`📦 Database: MongoDB Atlas (crabor)`);
-  console.log(`📋 Shipper form:  http://localhost:${PORT}/shipper/register`);
+  console.log(`📋 Main form:     http://localhost:${PORT}/`);
+  console.log(`👑 Admin panel:   http://localhost:${PORT}/admin.html`);
   console.log(`🔑 Admin API:     http://localhost:${PORT}/api/admin/`);
   console.log(`📊 Stats:         http://localhost:${PORT}/api/admin/stats`);
   console.log(`🌍 Environment:   ${process.env.NODE_ENV || 'development'}\n`);
