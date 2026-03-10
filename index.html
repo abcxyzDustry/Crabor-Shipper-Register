@@ -5,6 +5,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CRABOR – Đăng Ký Shipper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -23,7 +25,7 @@
 body {
   min-height: 100vh;
   background: #111;
-  font-family: 'Nunito', sans-serif;
+  font-family: 'Nunito', 'Segoe UI', Arial, sans-serif;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -41,7 +43,7 @@ box-shadow: 0 40px 100px rgba(0,0,0,.5);
 
 /* ── HEADER ── */
 .card-head {
-background: var(–coral);
+background: #E8504A;
 padding: 36px 36px 30px;
 position: relative;
 overflow: hidden;
@@ -64,23 +66,23 @@ bottom:-40px; left:60px;
 display:flex; align-items:center; gap:14px; margin-bottom:20px; position:relative;
 }
 .logo-sm {
-width:52px; height:52px; background:var(–coral-d); border-radius:16px;
+width:52px; height:52px; background:#c93d37; border-radius:16px;
 display:flex; align-items:center; justify-content:center;
 border:2px solid rgba(245,240,220,.25); flex-shrink:0;
 }
 .brand strong {
-font-family:‘Fredoka One’,cursive; font-size:1.2rem; color:var(–cream); display:block;
+font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:1.2rem; color:#F5F0DC; display:block;
 }
 .brand span { font-size:.75rem; color:rgba(245,240,220,.7); font-weight:700; }
 .head-title {
-font-family:‘Fredoka One’,cursive; font-size:2rem; color:var(–cream);
+font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:2rem; color:#F5F0DC;
 line-height:1.15; position:relative; text-shadow:2px 3px 0 rgba(0,0,0,.12);
 }
-.head-title em { color:var(–yellow); font-style:normal; }
+.head-title em { color:#FFD84D; font-style:normal; }
 .head-sub { font-size:.88rem; color:rgba(245,240,220,.75); font-weight:700; margin-top:8px; position:relative; }
 
 /* ── PROGRESS BAR ── */
-.progress-wrap { padding:0 36px; margin-top:-1px; background:var(–coral); }
+.progress-wrap { padding:0 36px; margin-top:-1px; background:#E8504A; }
 .steps-bar {
 display:flex; align-items:center; gap:0;
 padding-bottom:22px;
@@ -91,14 +93,14 @@ display:flex; align-items:center; flex:1;
 .step-circle {
 width:32px; height:32px; border-radius:50%;
 display:flex; align-items:center; justify-content:center;
-font-family:‘Fredoka One’,cursive; font-size:.9rem; font-weight:700;
+font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:.9rem; font-weight:700;
 border:2.5px solid rgba(245,240,220,.3); color:rgba(245,240,220,.4);
 transition:all .3s; flex-shrink:0; background:transparent;
 }
-.step-circle.active { border-color:var(–cream); color:var(–cream); background:rgba(245,240,220,.15); }
-.step-circle.done { border-color:var(–yellow); color:var(–coral-d); background:var(–yellow); }
+.step-circle.active { border-color:#F5F0DC; color:#F5F0DC; background:rgba(245,240,220,.15); }
+.step-circle.done { border-color:#FFD84D; color:#c93d37; background:#FFD84D; }
 .step-line { flex:1; height:2px; background:rgba(245,240,220,.2); margin:0 6px; }
-.step-line.done { background:var(–yellow); }
+.step-line.done { background:#FFD84D; }
 .step-label {
 font-size:.62rem; font-weight:900; color:rgba(245,240,220,.4);
 text-align:center; margin-top:4px; letter-spacing:.5px; text-transform:uppercase;
@@ -116,10 +118,10 @@ transition:color .3s;
 @keyframes slideIn { from{opacity:0;transform:translateX(12px);}to{opacity:1;transform:translateX(0);} }
 
 .panel-title {
-font-family:‘Fredoka One’,cursive; font-size:1.35rem; color:var(–text);
+font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:1.35rem; color:#1a1a1a;
 margin-bottom:6px;
 }
-.panel-sub { font-size:.84rem; color:var(–sub); font-weight:700; margin-bottom:24px; line-height:1.5; }
+.panel-sub { font-size:.84rem; color:#777; font-weight:700; margin-bottom:24px; line-height:1.5; }
 
 /* ── FORM ELEMENTS ── */
 .field { margin-bottom:18px; }
@@ -127,7 +129,7 @@ margin-bottom:6px;
 display:block; font-size:.8rem; font-weight:900; color:#444;
 text-transform:uppercase; letter-spacing:.8px; margin-bottom:7px;
 }
-.field label span { color:var(–coral); }
+.field label span { color:#E8504A; }
 .input-wrap { position:relative; }
 .input-wrap .icon {
 position:absolute; left:14px; top:50%; transform:translateY(-50%);
@@ -135,53 +137,53 @@ font-size:1rem; pointer-events:none;
 }
 input[type=text],input[type=tel],input[type=email],input[type=password],select,textarea {
 width:100%; padding:13px 14px 13px 42px;
-border:2px solid var(–border); border-radius:14px;
-font-family:‘Nunito’,sans-serif; font-size:.95rem; font-weight:700; color:var(–text);
+border:2px solid #e8e8e8; border-radius:14px;
+font-family:‘Nunito’,‘Segoe UI’,Arial,sans-serif; font-size:.95rem; font-weight:700; color:#1a1a1a;
 background:#fafafa; outline:none; transition:border-color .2s,background .2s;
 appearance:none;
 }
-input:focus,select:focus,textarea:focus { border-color:var(–coral); background:#fff; }
-input.err,select.err { border-color:var(–red-err); }
-input.ok { border-color:var(–green); }
+input:focus,select:focus,textarea:focus { border-color:#E8504A; background:#fff; }
+input.err,select.err { border-color:#ff4d4d; }
+input.ok { border-color:#3aaa5c; }
 .no-icon { padding-left:14px !important; }
-.err-msg { font-size:.75rem; color:var(–red-err); font-weight:800; margin-top:5px; display:none; }
+.err-msg { font-size:.75rem; color:#ff4d4d; font-weight:800; margin-top:5px; display:none; }
 .err-msg.show { display:block; }
 
 /* OTP row */
 .phone-row { display:flex; gap:10px; }
 .phone-row input { flex:1; }
 .btn-otp {
-padding:0 18px; border-radius:14px; border:2px solid var(–coral);
-background:transparent; color:var(–coral); font-family:‘Fredoka One’,cursive;
+padding:0 18px; border-radius:14px; border:2px solid #E8504A;
+background:transparent; color:#E8504A; font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive;
 font-size:.95rem; cursor:pointer; white-space:nowrap; transition:all .2s;
 flex-shrink:0;
 }
-.btn-otp:hover { background:var(–coral); color:#fff; }
+.btn-otp:hover { background:#E8504A; color:#fff; }
 .btn-otp:disabled { opacity:.4; cursor:not-allowed; }
-.countdown { font-size:.75rem; font-weight:800; color:var(–sub); margin-top:5px; display:none; }
+.countdown { font-size:.75rem; font-weight:800; color:#777; margin-top:5px; display:none; }
 
 /* OTP boxes */
 .otp-boxes { display:flex; gap:10px; justify-content:center; margin:20px 0; }
 .otp-box {
-width:52px; height:60px; border-radius:14px; border:2px solid var(–border);
-font-family:‘Fredoka One’,cursive; font-size:1.8rem; text-align:center;
-outline:none; background:#fafafa; color:var(–text); transition:border-color .2s;
+width:52px; height:60px; border-radius:14px; border:2px solid #e8e8e8;
+font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:1.8rem; text-align:center;
+outline:none; background:#fafafa; color:#1a1a1a; transition:border-color .2s;
 }
-.otp-box:focus { border-color:var(–coral); background:#fff; }
-.otp-box.filled { border-color:var(–green); }
+.otp-box:focus { border-color:#E8504A; background:#fff; }
+.otp-box.filled { border-color:#3aaa5c; }
 
 /* Upload zone */
 .upload-zone {
-border:2px dashed var(–border); border-radius:14px;
+border:2px dashed #e8e8e8; border-radius:14px;
 padding:24px; text-align:center; cursor:pointer;
 transition:border-color .2s,background .2s; position:relative;
 background:#fafafa;
 }
-.upload-zone:hover { border-color:var(–coral); background:#fff8f7; }
+.upload-zone:hover { border-color:#E8504A; background:#fff8f7; }
 .upload-zone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; }
 .upload-icon { font-size:2rem; margin-bottom:8px; }
-.upload-zone p { font-size:.83rem; font-weight:700; color:var(–sub); }
-.upload-zone strong { color:var(–coral); }
+.upload-zone p { font-size:.83rem; font-weight:700; color:#777; }
+.upload-zone strong { color:#E8504A; }
 .preview-img {
 width:100%; max-height:160px; object-fit:cover;
 border-radius:10px; margin-top:10px; display:none;
@@ -196,39 +198,39 @@ border-radius:10px; margin-top:10px; display:none;
 .radio-card input[type=radio] { position:absolute; opacity:0; }
 .radio-card label {
 display:flex; flex-direction:column; align-items:center; gap:6px;
-border:2px solid var(–border); border-radius:14px; padding:16px 12px;
+border:2px solid #e8e8e8; border-radius:14px; padding:16px 12px;
 cursor:pointer; transition:all .2s; background:#fafafa; text-transform:none;
 letter-spacing:0; font-weight:800; font-size:.85rem; color:#555;
 }
-.radio-card input:checked + label { border-color:var(–coral); background:#fff5f5; color:var(–coral); }
+.radio-card input:checked + label { border-color:#E8504A; background:#fff5f5; color:#E8504A; }
 .radio-card label .r-icon { font-size:1.5rem; }
 
 /* Checkbox */
 .check-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; }
-.check-row input[type=checkbox] { width:18px; height:18px; flex-shrink:0; accent-color:var(–coral); margin-top:2px; }
+.check-row input[type=checkbox] { width:18px; height:18px; flex-shrink:0; accent-color:#E8504A; margin-top:2px; }
 .check-row label { font-size:.82rem; color:#555; font-weight:700; line-height:1.5; text-transform:none; letter-spacing:0; }
-.check-row label a { color:var(–coral); }
+.check-row label a { color:#E8504A; }
 
 /* Buttons */
 .btn-row { display:flex; gap:12px; margin-top:28px; }
 .btn-next {
 flex:1; padding:15px; border-radius:50px; border:none;
-background:var(–coral); color:#fff;
-font-family:‘Fredoka One’,cursive; font-size:1.1rem;
+background:#E8504A; color:#fff;
+font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:1.1rem;
 cursor:pointer; transition:all .2s; box-shadow:0 6px 20px rgba(232,80,74,.3);
 }
-.btn-next:hover { background:var(–coral-d); transform:translateY(-2px); }
+.btn-next:hover { background:#c93d37; transform:translateY(-2px); }
 .btn-back {
 padding:15px 22px; border-radius:50px;
-border:2px solid var(–border); background:transparent; color:#999;
-font-family:‘Fredoka One’,cursive; font-size:1rem;
+border:2px solid #e8e8e8; background:transparent; color:#999;
+font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:1rem;
 cursor:pointer; transition:all .2s;
 }
 .btn-back:hover { border-color:#bbb; color:#555; }
 
 /* Summary card */
 .summary-box {
-background:var(–gray); border-radius:16px; padding:20px;
+background:#f5f5f5; border-radius:16px; padding:20px;
 margin-bottom:20px;
 }
 .summary-row {
@@ -236,21 +238,21 @@ display:flex; justify-content:space-between; align-items:center;
 padding:8px 0; border-bottom:1px solid #ebebeb; font-size:.88rem;
 }
 .summary-row:last-child { border-bottom:none; }
-.summary-row .key { color:var(–sub); font-weight:700; }
-.summary-row .val { color:var(–text); font-weight:900; text-align:right; }
+.summary-row .key { color:#777; font-weight:700; }
+.summary-row .val { color:#1a1a1a; font-weight:900; text-align:right; }
 
 /* Fee highlight */
 .fee-box {
-background:linear-gradient(135deg,var(–coral),var(–coral-d));
+background:linear-gradient(135deg,#E8504A,#c93d37);
 border-radius:16px; padding:20px 22px;
 display:flex; align-items:center; justify-content:space-between;
 margin-bottom:20px; color:#fff;
 }
 .fee-box .left .lbl { font-size:.72rem; font-weight:900; opacity:.8; text-transform:uppercase; letter-spacing:1px; }
-.fee-box .left .amt { font-family:‘Fredoka One’,cursive; font-size:2.2rem; line-height:1.1; }
+.fee-box .left .amt { font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:2.2rem; line-height:1.1; }
 .fee-box .left .note { font-size:.72rem; opacity:.7; font-weight:700; margin-top:2px; }
 .fee-box .right {
-background:var(–yellow); color:#7a3a00;
+background:#FFD84D; color:#7a3a00;
 border-radius:10px; padding:8px 14px; text-align:center;
 font-weight:900; font-size:.78rem; line-height:1.4;
 }
@@ -259,15 +261,15 @@ font-weight:900; font-size:.78rem; line-height:1.4;
 .success-wrap { text-align:center; padding:20px 0; }
 .success-icon { font-size:4rem; margin-bottom:16px; animation:popIn .5s ease; }
 @keyframes popIn { from{transform:scale(0);}to{transform:scale(1);} }
-.success-title { font-family:‘Fredoka One’,cursive; font-size:1.8rem; color:var(–green); margin-bottom:10px; }
-.success-sub { font-size:.9rem; color:var(–sub); font-weight:700; line-height:1.6; margin-bottom:28px; }
+.success-title { font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:1.8rem; color:#3aaa5c; margin-bottom:10px; }
+.success-sub { font-size:.9rem; color:#777; font-weight:700; line-height:1.6; margin-bottom:28px; }
 .success-card {
-background:var(–gray); border-radius:16px; padding:20px;
+background:#f5f5f5; border-radius:16px; padding:20px;
 text-align:left; margin-bottom:20px;
 }
-.success-card .sc-label { font-size:.7rem; font-weight:900; color:var(–sub); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
-.success-card .sc-val { font-family:‘Fredoka One’,cursive; font-size:1.4rem; color:var(–text); }
-.success-card .sc-note { font-size:.78rem; color:var(–sub); font-weight:700; margin-top:4px; }
+.success-card .sc-label { font-size:.7rem; font-weight:900; color:#777; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+.success-card .sc-val { font-family:‘Fredoka One’,‘Arial Black’, Arial, cursive; font-size:1.4rem; color:#1a1a1a; }
+.success-card .sc-note { font-size:.78rem; color:#777; font-weight:700; margin-top:4px; }
 
 /* Toast */
 .toast {
@@ -400,8 +402,8 @@ display:none;
   <div class="err-msg" id="otpErr" style="text-align:center">Mã OTP không đúng. Vui lòng thử lại.</div>
 
   <div style="text-align:center;margin-bottom:16px">
-    <span style="font-size:.82rem;color:var(--sub);font-weight:700">Không nhận được mã? </span>
-    <button onclick="sendOTP(true)" style="background:none;border:none;color:var(--coral);font-weight:900;cursor:pointer;font-size:.82rem;font-family:'Nunito',sans-serif">Gửi lại</button>
+    <span style="font-size:.82rem;color:#777;font-weight:700">Không nhận được mã? </span>
+    <button onclick="sendOTP(true)" style="background:none;border:none;color:#E8504A;font-weight:900;cursor:pointer;font-size:.82rem;font-family:'Nunito',sans-serif">Gửi lại</button>
   </div>
 
   <div class="btn-row">
