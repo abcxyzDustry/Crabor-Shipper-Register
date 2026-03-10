@@ -221,58 +221,6 @@ body {
   font-weight: 700;
 }
 
-/* ── MODULE PICKER (GIỮ NGUYÊN NHƯNG TO HƠN) ── */
-.mod-picker {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  justify-content: center;
-  background: rgba(255, 255, 255, .05);
-  padding: 15px 20px;
-  border-radius: 60px;
-  border: 1px solid rgba(255, 255, 255, .08);
-  backdrop-filter: blur(10px);
-  max-width: 900px;
-  width: 100%;
-}
-
-.mod-picker.hide {
-  display: none;
-}
-
-.mod-btn {
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 1.1rem;
-  padding: 12px 28px;
-  border-radius: 40px;
-  border: 2px solid rgba(255, 255, 255, .12);
-  color: rgba(255, 255, 255, .4);
-  background: transparent;
-  cursor: pointer;
-  transition: all .25s;
-}
-
-.mod-btn:hover {
-  color: rgba(255, 255, 255, .8);
-  border-color: rgba(255, 255, 255, .3);
-}
-
-.mod-btn.on-gl { background: #2d3d7a; border-color: #6495ed; color: #c0d8ff; }
-.mod-btn.on-gv { background: #2d5a2d; border-color: #3aaa5c; color: #a8f0be; }
-.mod-btn.on-cs { background: #c93d37; border-color: #E8504A; color: #F5F0DC; }
-.mod-btn.on-sp { background: #E8504A; border-color: #FFD84D; color: #F5F0DC; }
-
-.mod-hint {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, .3);
-  font-weight: 700;
-  text-align: center;
-}
-
-.mod-hint.hide {
-  display: none;
-}
-
 /* ── CARD (TO HƠN) ── */
 .card {
   width: 100%;
@@ -1230,15 +1178,6 @@ textarea {
   </div>
 </div>
 
-<!-- MODULE SELECTOR (Ẩn ban đầu) -->
-<div class="mod-picker hide" id="modPicker">
-  <button class="mod-btn on-gl" onclick="switchModule('gl',this)">👕 Giặt là</button>
-  <button class="mod-btn" onclick="switchModule('gv',this)">🧹 Giúp việc</button>
-  <button class="mod-btn" onclick="switchModule('cs',this)">🛍️ China Shop</button>
-  <button class="mod-btn" onclick="switchModule('sp',this)">🛵 Shipper</button>
-</div>
-<div class="mod-hint hide" id="modHint">Chọn module để đăng ký làm đối tác CRABOR</div>
-
 <!-- CARD (Ẩn ban đầu) -->
 <div class="card hide" id="card">
   <!-- HEAD (dynamic) -->
@@ -1871,24 +1810,11 @@ function startRegistration(module) {
   // Ẩn màn hình chào mừng
   document.getElementById('welcomeScreen').classList.add('hide');
   
-  // Hiện module picker và hint
-  document.getElementById('modPicker').classList.remove('hide');
-  document.getElementById('modHint').classList.remove('hide');
-  
   // Hiện card đăng ký
   document.getElementById('card').classList.remove('hide');
   
-  // Set active button trong module picker
-  const buttons = document.querySelectorAll('.mod-btn');
-  buttons.forEach(btn => {
-    btn.classList.remove('on-' + module);
-    if (btn.textContent.includes(getModuleName(module))) {
-      btn.classList.add('on-' + module);
-    }
-  });
-  
   // Khởi tạo module
-  switchModule(module, document.querySelector(`.mod-btn.on-${module}`));
+  switchModule(module);
 }
 
 function getModuleName(module) {
@@ -1902,11 +1828,8 @@ function getModuleName(module) {
 }
 
 // ── SWITCH MODULE ──
-function switchModule(m, btn) {
+function switchModule(m) {
   mod = m;
-  document.querySelectorAll('.mod-btn').forEach(b => b.className = 'mod-btn');
-  btn.classList.add('on-' + m);
-
   const cfg = MODULES[m];
 
   // Head
