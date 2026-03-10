@@ -2,8 +2,8 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CRABOR – Đăng Ký Đối Tác & Shipper</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+<title>CRABOR – Đăng Ký Đối Tác</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -21,67 +21,247 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 36px 16px 80px;
-  gap: 24px;
+  padding: 20px 16px 40px;
 }
 
-/* ── MODULE PICKER ── */
-.mod-picker {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-  background: rgba(255, 255, 255, .05);
-  padding: 12px 16px;
-  border-radius: 60px;
-  border: 1px solid rgba(255, 255, 255, .08);
-  backdrop-filter: blur(10px);
-  max-width: 750px;
+/* ── PAGES ── */
+.page {
   width: 100%;
+  max-width: 450px;
+  display: none;
+  animation: fadeIn 0.3s ease;
 }
 
-.mod-btn {
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: .9rem;
-  padding: 10px 22px;
-  border-radius: 40px;
-  border: 2px solid rgba(255, 255, 255, .12);
-  color: rgba(255, 255, 255, .4);
-  background: transparent;
-  cursor: pointer;
-  transition: all .25s;
+.page.active {
+  display: block;
 }
 
-.mod-btn:hover {
-  color: rgba(255, 255, 255, .8);
-  border-color: rgba(255, 255, 255, .3);
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.mod-btn.on-gl { background: #2d3d7a; border-color: #6495ed; color: #c0d8ff; }
-.mod-btn.on-gv { background: #2d5a2d; border-color: #3aaa5c; color: #a8f0be; }
-.mod-btn.on-cs { background: #c93d37; border-color: #E8504A; color: #F5F0DC; }
-.mod-btn.on-sp { background: #E8504A; border-color: #FFD84D; color: #F5F0DC; }
+/* ── WELCOME PAGE (TRANG CHÀO) ── */
+.welcome-card {
+  background: #fff;
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
 
-.mod-hint {
-  font-size: .75rem;
-  color: rgba(255, 255, 255, .3);
-  font-weight: 700;
+.welcome-header {
+  background: linear-gradient(135deg, #E8504A, #c93d37);
+  padding: 40px 24px 30px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-header::before {
+  content: '🦀';
+  position: absolute;
+  font-size: 120px;
+  opacity: 0.1;
+  bottom: -20px;
+  right: -20px;
+  transform: rotate(15deg);
+}
+
+.welcome-header::after {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.2), transparent 70%);
+  top: -50px;
+  left: -50px;
+  border-radius: 50%;
+}
+
+.welcome-logo {
+  width: 80px;
+  height: 80px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  border: 3px solid rgba(255,255,255,0.3);
+  backdrop-filter: blur(5px);
+}
+
+.welcome-logo span {
+  font-size: 48px;
+}
+
+.welcome-header h1 {
+  font-family: 'Fredoka One', 'Arial Black', cursive;
+  font-size: 2rem;
+  color: #F5F0DC;
+  margin-bottom: 8px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+}
+
+.welcome-header p {
+  color: rgba(245, 240, 220, 0.9);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.welcome-body {
+  padding: 30px 20px 40px;
+  background: #fff;
+}
+
+.welcome-body h2 {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.5rem;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.welcome-body h2 span {
+  color: #E8504A;
+}
+
+.welcome-sub {
+  text-align: center;
+  color: #777;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 30px;
+  padding: 0 20px;
+}
+
+.module-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 25px;
+}
+
+.module-item {
+  background: #f8f8f8;
+  border: 2px solid #e8e8e8;
+  border-radius: 20px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.module-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+}
+
+.module-item.active {
+  border-color: #E8504A;
+  background: #fff5f5;
+}
+
+.module-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.icon-gl { background: #e6ecff; color: #2d3d7a; }
+.icon-gv { background: #e6ffe6; color: #2d5a2d; }
+.icon-cs { background: #fff0f0; color: #c93d37; }
+.icon-sp { background: #fff0f0; color: #c93d37; }
+
+.module-info {
+  flex: 1;
+}
+
+.module-info h3 {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.1rem;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+}
+
+.module-info p {
+  font-size: 0.75rem;
+  color: #777;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge {
+  background: #E8504A;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: inline-block;
+}
+
+.badge-green {
+  background: #3aaa5c;
+}
+
+.badge-blue {
+  background: #6495ed;
+}
+
+.welcome-btn {
+  width: 100%;
+  padding: 18px;
+  border-radius: 30px;
+  border: none;
+  background: #E8504A;
+  color: #fff;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 6px 20px rgba(232, 80, 74, 0.35);
+  margin-top: 10px;
+}
+
+.welcome-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.welcome-footer {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #aaa;
+  font-weight: 700;
 }
 
 /* ── CARD ── */
 .card {
   width: 100%;
-  max-width: 650px;
+  max-width: 450px;
   background: #fff;
   border-radius: 28px;
   overflow: hidden;
-  box-shadow: 0 40px 100px rgba(0, 0, 0, .55);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  margin-bottom: 20px;
 }
 
 /* ── HEADER ── */
 .card-head {
-  padding: 36px 36px 30px;
+  padding: 28px 22px 24px;
   position: relative;
   overflow: hidden;
 }
@@ -89,43 +269,26 @@ body {
 .card-head::before {
   content: '';
   position: absolute;
-  width: 300px;
-  height: 300px;
+  width: 250px;
+  height: 250px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(245, 240, 220, .1), transparent 70%);
   top: -100px;
   right: -80px;
 }
 
-.card-head::after {
-  content: '';
-  position: absolute;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 216, 77, .12), transparent 70%);
-  bottom: -40px;
-  left: 60px;
-}
-
-/* theme colors */
-.head-gl { background: linear-gradient(135deg, #2d3d7a, #1a2040); }
-.head-gv { background: linear-gradient(135deg, #2d5a2d, #1a2f1a); }
-.head-cs { background: linear-gradient(135deg, #E8504A, #c93d37); }
-.head-sp { background: linear-gradient(135deg, #E8504A, #c93d37); }
-
 .head-top {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 16px;
   position: relative;
 }
 
 .logo-sm {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -133,29 +296,24 @@ body {
   flex-shrink: 0;
 }
 
-.logo-gl { background: #1a2040; }
-.logo-gv { background: #1a2f1a; }
-.logo-cs { background: #c93d37; }
-.logo-sp { background: #c93d37; }
-
 .brand strong {
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 1.2rem;
+  font-family: 'Fredoka One', 'Arial Black', cursive;
+  font-size: 1.1rem;
   color: #F5F0DC;
   display: block;
 }
 
 .brand span {
-  font-size: .75rem;
+  font-size: 0.7rem;
   color: rgba(245, 240, 220, .7);
   font-weight: 700;
 }
 
 .head-title {
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 2rem;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.6rem;
   color: #F5F0DC;
-  line-height: 1.15;
+  line-height: 1.2;
   position: relative;
   text-shadow: 2px 3px 0 rgba(0, 0, 0, .14);
 }
@@ -166,16 +324,27 @@ body {
 }
 
 .head-sub {
-  font-size: .88rem;
+  font-size: 0.8rem;
   color: rgba(245, 240, 220, .75);
   font-weight: 700;
-  margin-top: 8px;
+  margin-top: 6px;
   position: relative;
 }
 
-/* ── PROGRESS BAR ── */
+/* theme colors */
+.head-gl { background: linear-gradient(135deg, #2d3d7a, #1a2040); }
+.head-gv { background: linear-gradient(135deg, #2d5a2d, #1a2f1a); }
+.head-cs { background: linear-gradient(135deg, #E8504A, #c93d37); }
+.head-sp { background: linear-gradient(135deg, #E8504A, #c93d37); }
+
+.logo-gl { background: #1a2040; }
+.logo-gv { background: #1a2f1a; }
+.logo-cs { background: #c93d37; }
+.logo-sp { background: #c93d37; }
+
+/* ── PROGRESS ── */
 .progress-wrap {
-  padding: 0 36px 22px;
+  padding: 0 22px 18px;
 }
 
 .prog-gl { background: linear-gradient(135deg, #2d3d7a, #1a2040); }
@@ -186,23 +355,31 @@ body {
 .steps-bar {
   display: flex;
   align-items: center;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: none;
+}
+
+.steps-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .step-col {
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-width: 50px;
 }
 
 .step-circle {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: .9rem;
+  font-family: 'Fredoka One', cursive;
+  font-size: 0.8rem;
   border: 2.5px solid rgba(245, 240, 220, .3);
   color: rgba(245, 240, 220, .4);
   transition: all .3s;
@@ -224,9 +401,10 @@ body {
 
 .step-line {
   flex: 1;
+  min-width: 12px;
   height: 2px;
   background: rgba(245, 240, 220, .2);
-  margin: 0 6px;
+  margin: 0 4px;
 }
 
 .step-line.done {
@@ -234,14 +412,14 @@ body {
 }
 
 .step-label {
-  font-size: .58rem;
+  font-size: 0.5rem;
   font-weight: 900;
   color: rgba(245, 240, 220, .35);
   text-align: center;
   margin-top: 4px;
   letter-spacing: .4px;
   text-transform: uppercase;
-  transition: color .3s;
+  white-space: nowrap;
 }
 
 .step-label.active,
@@ -251,7 +429,7 @@ body {
 
 /* ── BODY ── */
 .card-body {
-  padding: 32px 36px 36px;
+  padding: 24px 22px 28px;
 }
 
 .step-panel {
@@ -264,44 +442,38 @@ body {
 }
 
 @keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .panel-title {
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 1.35rem;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.25rem;
   color: #1a1a1a;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .panel-sub {
-  font-size: .84rem;
+  font-size: 0.8rem;
   color: #777;
   font-weight: 700;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   line-height: 1.5;
 }
 
 /* ── FIELDS ── */
 .field {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .field label {
   display: block;
-  font-size: .78rem;
+  font-size: 0.7rem;
   font-weight: 900;
   color: #444;
   text-transform: uppercase;
-  letter-spacing: .8px;
-  margin-bottom: 7px;
+  letter-spacing: .6px;
+  margin-bottom: 6px;
 }
 
 .req {
@@ -314,11 +486,12 @@ body {
 
 .input-wrap .icon {
   position: absolute;
-  left: 14px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
   font-size: 1rem;
   pointer-events: none;
+  z-index: 1;
 }
 
 input[type=text],
@@ -329,17 +502,17 @@ input[type=password],
 select,
 textarea {
   width: 100%;
-  padding: 13px 14px 13px 42px;
+  padding: 12px 12px 12px 38px;
   border: 2px solid #e8e8e8;
   border-radius: 14px;
-  font-family: 'Nunito', 'Segoe UI', Arial, sans-serif;
-  font-size: .93rem;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.9rem;
   font-weight: 700;
   color: #1a1a1a;
   background: #fafafa;
   outline: none;
-  transition: border-color .2s, background .2s;
-  appearance: none;
+  transition: border-color .2s;
+  -webkit-appearance: none;
 }
 
 input:focus,
@@ -349,48 +522,21 @@ textarea:focus {
   background: #fff;
 }
 
-.field-gl input:focus,
-.field-gl select:focus {
-  border-color: #6495ed;
-}
-
-.field-gv input:focus,
-.field-gv select:focus {
-  border-color: #3aaa5c;
-}
-
-.field-cs input:focus,
-.field-cs select:focus,
-.field-sp input:focus,
-.field-sp select:focus {
-  border-color: #E8504A;
-}
-
 input.err,
 select.err,
 textarea.err {
   border-color: #ff4d4d;
 }
 
-input.ok {
-  border-color: #3aaa5c;
-}
-
 .no-icon {
-  padding-left: 14px !important;
-}
-
-textarea {
-  padding: 13px 14px;
-  resize: vertical;
-  min-height: 90px;
+  padding-left: 12px !important;
 }
 
 .err-msg {
-  font-size: .73rem;
+  font-size: 0.7rem;
   color: #ff4d4d;
   font-weight: 800;
-  margin-top: 5px;
+  margin-top: 4px;
   display: none;
 }
 
@@ -401,7 +547,7 @@ textarea {
 /* OTP row */
 .phone-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .phone-row input {
@@ -409,127 +555,63 @@ textarea {
 }
 
 .btn-otp {
-  padding: 0 16px;
+  padding: 0 12px;
   border-radius: 14px;
   border: 2px solid #E8504A;
   background: transparent;
   color: #E8504A;
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: .88rem;
+  font-family: 'Fredoka One', cursive;
+  font-size: 0.8rem;
   cursor: pointer;
   white-space: nowrap;
   transition: all .2s;
   flex-shrink: 0;
+  min-width: 80px;
 }
 
-.btn-otp-gl {
-  border-color: #6495ed;
-  color: #6495ed;
-}
-
-.btn-otp-gv {
-  border-color: #3aaa5c;
-  color: #3aaa5c;
-}
-
-.btn-otp-cs,
-.btn-otp-sp {
-  border-color: #E8504A;
-  color: #E8504A;
-}
-
-.btn-otp:hover {
-  color: #fff;
-}
-
-.btn-otp-gl:hover {
-  background: #6495ed;
-}
-
-.btn-otp-gv:hover {
-  background: #3aaa5c;
-}
-
-.btn-otp-cs:hover,
-.btn-otp-sp:hover {
-  background: #E8504A;
-}
-
-.btn-otp:disabled {
-  opacity: .4;
-  cursor: not-allowed;
-}
-
-.countdown {
-  font-size: .73rem;
-  font-weight: 800;
-  color: #777;
-  margin-top: 5px;
-  display: none;
+.btn-otp:active {
+  transform: scale(0.95);
 }
 
 /* OTP boxes */
 .otp-boxes {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   justify-content: center;
-  margin: 20px 0;
+  margin: 16px 0;
 }
 
 .otp-box {
-  width: 52px;
-  height: 60px;
-  border-radius: 14px;
+  width: 42px;
+  height: 50px;
+  border-radius: 12px;
   border: 2px solid #e8e8e8;
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 1.8rem;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.5rem;
   text-align: center;
   outline: none;
   background: #fafafa;
   color: #1a1a1a;
-  transition: border-color .2s;
 }
 
 .otp-box:focus {
   border-color: #E8504A;
-  background: #fff;
-}
-
-.otp-box.filled {
-  border-color: #3aaa5c;
 }
 
 /* Upload */
 .upload-zone {
   border: 2px dashed #e8e8e8;
   border-radius: 14px;
-  padding: 22px;
+  padding: 16px;
   text-align: center;
   cursor: pointer;
   transition: all .2s;
-  position: relative;
   background: #fafafa;
+  position: relative;
 }
 
-.upload-zone:hover {
-  border-color: #E8504A;
-  background: #fff8f7;
-}
-
-.upload-zone-gl:hover {
-  border-color: #6495ed;
-  background: #f5f7ff;
-}
-
-.upload-zone-gv:hover {
-  border-color: #3aaa5c;
-  background: #f5fff8;
-}
-
-.upload-zone-cs:hover,
-.upload-zone-sp:hover {
-  border-color: #E8504A;
-  background: #fff8f7;
+.upload-zone:active {
+  background: #f0f0f0;
 }
 
 .upload-zone input[type=file] {
@@ -540,22 +622,22 @@ textarea {
 }
 
 .upload-icon {
-  font-size: 1.8rem;
-  margin-bottom: 7px;
+  font-size: 1.5rem;
+  margin-bottom: 4px;
 }
 
 .upload-zone p {
-  font-size: .8rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #777;
 }
 
 .preview-img {
   width: 100%;
-  max-height: 140px;
+  max-height: 120px;
   object-fit: cover;
-  border-radius: 10px;
-  margin-top: 9px;
+  border-radius: 8px;
+  margin-top: 8px;
   display: none;
 }
 
@@ -563,24 +645,14 @@ textarea {
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.grid-3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
 }
 
 /* Radio cards */
 .radio-group {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.radio-group-3 {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
 }
 
 .radio-card {
@@ -596,18 +668,17 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   border: 2px solid #e8e8e8;
   border-radius: 14px;
-  padding: 14px 10px;
+  padding: 12px 6px;
   cursor: pointer;
   transition: all .2s;
   background: #fafafa;
-  text-transform: none;
-  letter-spacing: 0;
   font-weight: 800;
-  font-size: .83rem;
+  font-size: 0.75rem;
   color: #555;
+  text-align: center;
 }
 
 .rc-gl input:checked+label {
@@ -630,379 +701,24 @@ textarea {
 }
 
 .r-icon {
-  font-size: 1.4rem;
+  font-size: 1.2rem;
 }
 
-/* Checkbox */
-.check-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 13px;
-}
-
-.check-row input[type=checkbox] {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  accent-color: #E8504A;
-  margin-top: 2px;
-}
-
-.check-row-gl input[type=checkbox] {
-  accent-color: #6495ed;
-}
-
-.check-row-gv input[type=checkbox] {
-  accent-color: #3aaa5c;
-}
-
-.check-row label {
-  font-size: .81rem;
-  color: #555;
-  font-weight: 700;
-  line-height: 1.5;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-.check-row label a {
-  color: #E8504A;
-}
-
-.check-row-gl label a {
-  color: #6495ed;
-}
-
-.check-row-gv label a {
-  color: #3aaa5c;
-}
-
-/* Buttons */
-.btn-row {
-  display: flex;
-  gap: 12px;
-  margin-top: 28px;
-}
-
-.btn-next {
-  flex: 1;
-  padding: 15px;
-  border-radius: 50px;
-  border: none;
-  color: #fff;
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 1.1rem;
-  cursor: pointer;
-  transition: all .2s;
-}
-
-.btn-next:hover {
-  transform: translateY(-2px);
-}
-
-.btn-gl {
-  background: #6495ed;
-  box-shadow: 0 6px 20px rgba(100, 149, 237, .35);
-}
-
-.btn-gl:hover {
-  background: #4a7fd4;
-}
-
-.btn-gv {
-  background: #3aaa5c;
-  box-shadow: 0 6px 20px rgba(58, 170, 92, .35);
-}
-
-.btn-gv:hover {
-  background: #2d8f4a;
-}
-
-.btn-cs,
-.btn-sp {
-  background: #E8504A;
-  box-shadow: 0 6px 20px rgba(232, 80, 74, .35);
-}
-
-.btn-cs:hover,
-.btn-sp:hover {
-  background: #c93d37;
-}
-
-.btn-back {
-  padding: 15px 22px;
-  border-radius: 50px;
-  border: 2px solid #e8e8e8;
-  background: transparent;
-  color: #999;
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all .2s;
-}
-
-.btn-back:hover {
-  border-color: #bbb;
-  color: #555;
-}
-
-/* Info box */
-.info-box {
-  border-radius: 13px;
-  padding: 14px 16px;
-  margin-bottom: 18px;
-  font-size: .82rem;
-  font-weight: 700;
-  line-height: 1.6;
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-.info-gl {
-  background: #f0f4ff;
-  border: 1.5px solid #c8d8ff;
-  color: #2d3d7a;
-}
-
-.info-gv {
-  background: #f0fff5;
-  border: 1.5px solid #b8f0cc;
-  color: #2d5a2d;
-}
-
-.info-cs,
-.info-sp {
-  background: #fff5f5;
-  border: 1.5px solid #fcc;
-  color: #c93d37;
-}
-
-/* Summary */
-.summary-box {
-  background: #f5f5f5;
-  border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #ebebeb;
-  font-size: .87rem;
-}
-
-.summary-row:last-child {
-  border-bottom: none;
-}
-
-.summary-row .key {
-  color: #777;
-  font-weight: 700;
-}
-
-.summary-row .val {
-  color: #1a1a1a;
-  font-weight: 900;
-  text-align: right;
-  max-width: 60%;
-}
-
-/* Fee box */
-.fee-box {
-  border-radius: 16px;
-  padding: 20px 22px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  color: #fff;
-}
-
-.fee-gl {
-  background: linear-gradient(135deg, #2d3d7a, #1a2040);
-}
-
-.fee-gv {
-  background: linear-gradient(135deg, #2d5a2d, #1a2f1a);
-}
-
-.fee-cs,
-.fee-sp {
-  background: linear-gradient(135deg, #E8504A, #c93d37);
-}
-
-.fee-box .fl .lbl {
-  font-size: .7rem;
-  font-weight: 900;
-  opacity: .8;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.fee-box .fl .amt {
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 2.2rem;
-  line-height: 1.1;
-}
-
-.fee-box .fl .nt {
-  font-size: .7rem;
-  opacity: .65;
-  font-weight: 700;
-  margin-top: 2px;
-}
-
-.fee-box .fr {
-  background: #FFD84D;
-  color: #7a3a00;
-  border-radius: 10px;
-  padding: 8px 14px;
-  text-align: center;
-  font-weight: 900;
-  font-size: .75rem;
-  line-height: 1.5;
-}
-
-/* Spinner */
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(255, 255, 255, .3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
-  display: none;
-}
-
-.spinner.show {
-  display: inline-block;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%) translateY(100px);
-  background: #222;
-  color: #fff;
-  border-radius: 50px;
-  padding: 12px 24px;
-  font-weight: 800;
-  font-size: .87rem;
-  transition: transform .3s;
-  z-index: 999;
-  white-space: nowrap;
-}
-
-.toast.show {
-  transform: translateX(-50%) translateY(0);
-}
-
-/* Success */
-.success-wrap {
-  text-align: center;
-  padding: 20px 0;
-}
-
-.success-icon {
-  font-size: 4rem;
-  margin-bottom: 16px;
-  animation: popIn .5s ease;
-}
-
-@keyframes popIn {
-  from {
-    transform: scale(0);
-  }
-  to {
-    transform: scale(1);
-  }
-}
-
-.success-title {
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 1.8rem;
-  margin-bottom: 10px;
-}
-
-.success-title-gl {
-  color: #6495ed;
-}
-
-.success-title-gv {
-  color: #3aaa5c;
-}
-
-.success-title-cs,
-.success-title-sp {
-  color: #E8504A;
-}
-
-.success-sub {
-  font-size: .9rem;
-  color: #777;
-  font-weight: 700;
-  line-height: 1.65;
-  margin-bottom: 26px;
-}
-
-.success-card {
-  background: #f5f5f5;
-  border-radius: 16px;
-  padding: 18px 20px;
-  text-align: left;
-  margin-bottom: 16px;
-}
-
-.sc-label {
-  font-size: .68rem;
-  font-weight: 900;
-  color: #999;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 4px;
-}
-
-.sc-val {
-  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
-  font-size: 1.4rem;
-  color: #1a1a1a;
-}
-
-.sc-note {
-  font-size: .76rem;
-  color: #777;
-  font-weight: 700;
-  margin-top: 3px;
-}
-
-/* Tag chip */
+/* Chip group */
 .chip-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   border: 2px solid #e8e8e8;
-  border-radius: 28px;
-  padding: 7px 13px;
-  font-size: .78rem;
+  border-radius: 24px;
+  padding: 6px 10px;
+  font-size: 0.7rem;
   font-weight: 800;
   color: #555;
   cursor: pointer;
@@ -1030,6 +746,249 @@ textarea {
   color: #E8504A;
 }
 
+/* Checkbox */
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.check-row input[type=checkbox] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: #E8504A;
+  margin-top: 2px;
+}
+
+.check-row label {
+  font-size: 0.75rem;
+  color: #555;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* Buttons */
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.btn-next {
+  flex: 1;
+  padding: 14px;
+  border-radius: 40px;
+  border: none;
+  color: #fff;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.btn-next:active {
+  transform: translateY(-2px);
+}
+
+.btn-gl { background: #6495ed; }
+.btn-gv { background: #3aaa5c; }
+.btn-cs,
+.btn-sp { background: #E8504A; }
+
+.btn-back {
+  padding: 14px 18px;
+  border-radius: 40px;
+  border: 2px solid #e8e8e8;
+  background: transparent;
+  color: #999;
+  font-family: 'Fredoka One', cursive;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-back:active {
+  border-color: #bbb;
+  color: #555;
+}
+
+/* Info box */
+.info-box {
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.5;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.info-gl {
+  background: #f0f4ff;
+  border: 1.5px solid #c8d8ff;
+  color: #2d3d7a;
+}
+
+.info-gv {
+  background: #f0fff5;
+  border: 1.5px solid #b8f0cc;
+  color: #2d5a2d;
+}
+
+.info-cs,
+.info-sp {
+  background: #fff5f5;
+  border: 1.5px solid #fcc;
+  color: #c93d37;
+}
+
+/* Summary */
+.summary-box {
+  background: #f5f5f5;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #ebebeb;
+  font-size: 0.8rem;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+}
+
+.summary-row .key {
+  color: #777;
+  font-weight: 700;
+}
+
+.summary-row .val {
+  color: #1a1a1a;
+  font-weight: 900;
+  text-align: right;
+  max-width: 55%;
+}
+
+/* Fee box */
+.fee-box {
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  color: #fff;
+}
+
+.fee-gl { background: linear-gradient(135deg, #2d3d7a, #1a2040); }
+.fee-gv { background: linear-gradient(135deg, #2d5a2d, #1a2f1a); }
+.fee-cs,
+.fee-sp { background: linear-gradient(135deg, #E8504A, #c93d37); }
+
+.fee-box .fl .lbl {
+  font-size: 0.65rem;
+  font-weight: 900;
+  opacity: .8;
+  text-transform: uppercase;
+}
+
+.fee-box .fl .amt {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.8rem;
+  line-height: 1.1;
+}
+
+.fee-box .fl .nt {
+  font-size: 0.65rem;
+  opacity: .65;
+  font-weight: 700;
+}
+
+.fee-box .fr {
+  background: #FFD84D;
+  color: #7a3a00;
+  border-radius: 8px;
+  padding: 6px 10px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+/* Success */
+.success-wrap {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.success-icon {
+  font-size: 3.5rem;
+  margin-bottom: 12px;
+  animation: popIn .5s ease;
+}
+
+@keyframes popIn {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+.success-title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.success-title-gl { color: #6495ed; }
+.success-title-gv { color: #3aaa5c; }
+.success-title-cs,
+.success-title-sp { color: #E8504A; }
+
+.success-sub {
+  font-size: 0.85rem;
+  color: #777;
+  font-weight: 700;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.success-card {
+  background: #f5f5f5;
+  border-radius: 16px;
+  padding: 16px;
+  text-align: left;
+  margin-bottom: 14px;
+}
+
+.sc-label {
+  font-size: 0.6rem;
+  font-weight: 900;
+  color: #999;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.sc-val {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.3rem;
+  color: #1a1a1a;
+  word-break: break-word;
+}
+
+.sc-note {
+  font-size: 0.7rem;
+  color: #777;
+  font-weight: 700;
+}
+
 /* Range input */
 input[type=range] {
   width: 100%;
@@ -1039,708 +998,519 @@ input[type=range] {
 .range-row {
   display: flex;
   justify-content: space-between;
-  font-size: .75rem;
+  font-size: 0.7rem;
   font-weight: 800;
   color: #999;
   margin-top: 4px;
 }
 
-@media(max-width:500px) {
+/* Back to home button */
+.back-home {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: rgba(245, 240, 220, 0.8);
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  border-radius: 30px;
+  background: rgba(0,0,0,0.2);
+}
+
+.back-home span {
+  font-size: 1rem;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  transform: translateY(100px);
+  background: #222;
+  color: #fff;
+  border-radius: 50px;
+  padding: 12px 20px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  transition: transform .3s;
+  z-index: 999;
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.toast.show {
+  transform: translateY(0);
+}
+
+@media(max-width:380px) {
   .card-head,
   .card-body,
   .progress-wrap {
-    padding-left: 22px;
-    padding-right: 22px;
+    padding-left: 18px;
+    padding-right: 18px;
   }
-  .grid-2,
-  .grid-3 {
+  
+  .otp-box {
+    width: 38px;
+    height: 46px;
+    font-size: 1.3rem;
+  }
+  
+  .grid-2 {
     grid-template-columns: 1fr;
   }
-  .radio-group,
-  .radio-group-3 {
-    grid-template-columns: 1fr 1fr;
+  
+  .radio-group {
+    grid-template-columns: 1fr;
   }
-  .otp-box {
-    width: 44px;
-    height: 52px;
-    font-size: 1.5rem;
-  }
-  .mod-picker {
-    border-radius: 20px;
+  
+  .head-title {
+    font-size: 1.4rem;
   }
 }
 </style>
 </head>
-
 <body>
 
-<!-- MODULE SELECTOR -->
-<div class="mod-picker">
-  <button class="mod-btn on-gl" onclick="switchModule('gl',this)">👕 Giặt là</button>
-  <button class="mod-btn" onclick="switchModule('gv',this)">🧹 Giúp việc</button>
-  <button class="mod-btn" onclick="switchModule('cs',this)">🛍️ China Shop</button>
-  <button class="mod-btn" onclick="switchModule('sp',this)">🛵 Shipper</button>
+<!-- PAGE 1: WELCOME (TRANG CHÀO) -->
+<div id="pageWelcome" class="page active">
+  <div class="welcome-card">
+    <div class="welcome-header">
+      <div class="welcome-logo">
+        <span>🦀</span>
+      </div>
+      <h1>CRABOR</h1>
+      <p>Đối tác giao hàng & dịch vụ</p>
+    </div>
+    <div class="welcome-body">
+      <h2>Chào bạn! <span>👋</span></h2>
+      <div class="welcome-sub">
+        Bạn muốn đăng ký dịch vụ nào?<br>Chọn 1 trong 4 hình thức hợp tác bên dưới
+      </div>
+      
+      <div class="module-grid" id="moduleGrid">
+        <!-- Giặt là -->
+        <div class="module-item" data-module="gl" onclick="selectModule('gl')">
+          <div class="module-icon icon-gl">👕</div>
+          <div class="module-info">
+            <h3>Đối tác Giặt Là</h3>
+            <p>🏪 Tiệm giặt là · Hoa hồng 18% <span class="badge badge-blue">Phổ biến</span></p>
+          </div>
+        </div>
+        
+        <!-- Giúp việc -->
+        <div class="module-item" data-module="gv" onclick="selectModule('gv')">
+          <div class="module-icon icon-gv">🧹</div>
+          <div class="module-info">
+            <h3>Người Giúp Việc</h3>
+            <p>✨ Tự do chọn ca · Thu nhập 200k-350k/ca <span class="badge badge-green">Mới</span></p>
+          </div>
+        </div>
+        
+        <!-- China Shop -->
+        <div class="module-item" data-module="cs" onclick="selectModule('cs')">
+          <div class="module-icon icon-cs">🛍️</div>
+          <div class="module-info">
+            <h3>China Shop</h3>
+            <p>🇨🇳 Nhập hàng Trung Quốc · Hoa hồng 12%</p>
+          </div>
+        </div>
+        
+        <!-- Shipper -->
+        <div class="module-item" data-module="sp" onclick="selectModule('sp')">
+          <div class="module-icon icon-sp">🛵</div>
+          <div class="module-info">
+            <h3>Shipper CRABOR</h3>
+            <p>⚡ Giao đồ ăn · Early Bird 500k <span class="badge">Còn 50 suất</span></p>
+          </div>
+        </div>
+      </div>
+      
+      <button class="welcome-btn" id="startRegisterBtn" onclick="startRegistration()" disabled>Bắt đầu đăng ký →</button>
+      
+      <div class="welcome-footer">
+        CRABOR 2025 · Đối tác chính thức
+      </div>
+    </div>
+  </div>
 </div>
-<div class="mod-hint">Chọn module để đăng ký làm đối tác CRABOR</div>
 
-<!-- CARD -->
-<div class="card">
-
-  <!-- HEAD (dynamic) -->
-  <div class="card-head head-gl" id="cardHead">
-    <div class="head-top">
-      <div class="logo-sm logo-gl" id="logoSm">
-        <svg id="logoSvg" width="34" height="34" viewBox="0 0 140 140" fill="none">
-          <!-- GL icon: washing machine -->
-          <rect x="22" y="22" width="96" height="96" rx="14" fill="#F5F0DC"/>
-          <rect x="22" y="22" width="96" height="28" rx="14" fill="#6495ed" opacity=".8"/>
-          <rect x="22" y="42" width="96" height="8" fill="#6495ed" opacity=".8"/>
-          <circle cx="70" cy="88" r="30" fill="#6495ed" opacity=".35"/>
-          <circle cx="70" cy="88" r="22" fill="#F5F0DC"/>
-          <circle cx="70" cy="88" r="14" fill="#6495ed" opacity=".3"/>
-          <circle cx="38" cy="34" r="6" fill="#E8504A"/>
-          <circle cx="56" cy="34" r="6" fill="#FFD84D"/>
-        </svg>
-      </div>
-      <div class="brand">
-        <strong>CRABOR</strong>
-        <span id="headBadge">👕 Đối tác Giặt Là · Hà Nội</span>
-      </div>
-    </div>
-    <div class="head-title" id="headTitle">Đăng ký đối tác<br><em id="headModule">Giặt Là</em> 🫧</div>
-    <div class="head-sub" id="headSub">Kết nối tiệm giặt của bạn với hàng nghìn khách qua app CRABOR</div>
-  </div>
-
-  <!-- PROGRESS (dynamic steps) -->
-  <div class="progress-wrap prog-gl" id="progWrap">
-    <div class="steps-bar" id="stepsBar">
-      <!-- Rendered by JS -->
-    </div>
-  </div>
-
-  <!-- BODY -->
-  <div class="card-body">
-
-    <!-- STEP 1: SĐT (Dùng chung cho tất cả) -->
-    <div id="step1" class="step-panel show">
-      <div class="panel-title">Nhập số điện thoại</div>
-      <div class="panel-sub">Chúng mình sẽ gửi mã OTP 6 số để xác minh danh tính của bạn</div>
-      <div class="field">
-        <label>Số điện thoại <span class="req">*</span></label>
-        <div class="phone-row">
-          <div class="input-wrap" style="flex:1">
-            <span class="icon">📱</span>
-            <input type="tel" id="phone" placeholder="0901 234 567" maxlength="10">
-          </div>
-          <button class="btn-otp btn-otp-gl" id="btnOtp" onclick="sendOTP()">Gửi OTP</button>
+<!-- PAGE 2: REGISTRATION FORM (ĐĂNG KÝ) -->
+<div id="pageRegister" class="page">
+  <!-- CARD -->
+  <div class="card">
+    <!-- HEAD (dynamic) -->
+    <div class="card-head head-gl" id="cardHead">
+      <button class="back-home" onclick="goToWelcome()">
+        <span>←</span> Quay lại chọn dịch vụ
+      </button>
+      <div class="head-top">
+        <div class="logo-sm logo-gl" id="logoSm">
+          <svg id="logoSvg" width="34" height="34" viewBox="0 0 140 140" fill="none"></svg>
         </div>
-        <div class="err-msg" id="phoneErr">Vui lòng nhập số điện thoại hợp lệ (10 số bắt đầu bằng 0)</div>
-        <div class="countdown" id="countdown"></div>
+        <div class="brand">
+          <strong>CRABOR</strong>
+          <span id="headBadge">👕 Đối tác Giặt Là · Hà Nội</span>
+        </div>
       </div>
-      <div class="info-box info-gl" id="moduleInfoBox">
-        💡 <div>Bạn đang đăng ký làm <strong>đối tác Giặt Là</strong>. Hoa hồng <strong>18%/đơn</strong>. Shipper CRABOR sẽ lấy và trả đồ tận nơi cho bạn.</div>
-      </div>
-      <div class="btn-row">
-        <button class="btn-next btn-gl" id="btn1Next" onclick="step1Next()">Tiếp theo →</button>
-      </div>
+      <div class="head-title" id="headTitle">Đăng ký đối tác<br><em id="headModule">Giặt Là</em> 🫧</div>
+      <div class="head-sub" id="headSub">Kết nối tiệm giặt của bạn với hàng nghìn khách qua app CRABOR</div>
     </div>
 
-    <!-- STEP 2: OTP (Dùng chung) -->
-    <div id="step2" class="step-panel">
-      <div class="panel-title">Nhập mã xác minh</div>
-      <div class="panel-sub">Mã OTP 6 số đã được gửi về số <strong id="phoneMask"></strong></div>
-      <div class="otp-boxes">
-        <input class="otp-box" type="text" maxlength="1" id="o0" oninput="otpIn(this,0)">
-        <input class="otp-box" type="text" maxlength="1" id="o1" oninput="otpIn(this,1)">
-        <input class="otp-box" type="text" maxlength="1" id="o2" oninput="otpIn(this,2)">
-        <input class="otp-box" type="text" maxlength="1" id="o3" oninput="otpIn(this,3)">
-        <input class="otp-box" type="text" maxlength="1" id="o4" oninput="otpIn(this,4)">
-        <input class="otp-box" type="text" maxlength="1" id="o5" oninput="otpIn(this,5)">
-      </div>
-      <div class="err-msg" id="otpErr" style="text-align:center;">Mã OTP không đúng. Vui lòng thử lại.</div>
-      <div style="text-align:center;margin-bottom:16px;">
-        <span style="font-size:.82rem;color:#777;font-weight:700;">Không nhận được mã? </span>
-        <button onclick="sendOTP(true)" style="background:none;border:none;color:#E8504A;font-weight:900;cursor:pointer;font-size:.82rem;font-family:'Nunito',sans-serif;" id="resendBtn">Gửi lại</button>
-      </div>
-      <div class="btn-row">
-        <button class="btn-back" onclick="goStep(1)">← Quay lại</button>
-        <button class="btn-next btn-gl" id="btnVerify" onclick="verifyOTP()">
-          <span id="verifyTxt">Xác minh</span>
-          <div class="spinner" id="verifySpin"></div>
-        </button>
-      </div>
+    <!-- PROGRESS (dynamic) -->
+    <div class="progress-wrap prog-gl" id="progWrap">
+      <div class="steps-bar" id="stepsBar"></div>
     </div>
 
-    <!-- STEP 3: THÔNG TIN (Module-specific) -->
-    <div id="step3" class="step-panel">
-      <div class="panel-title" id="step3Title">Thông tin cơ sở</div>
-      <div class="panel-sub" id="step3Sub">Điền thông tin chính xác về cơ sở kinh doanh của bạn</div>
-
-      <div class="grid-2">
+    <!-- BODY -->
+    <div class="card-body">
+      <!-- STEP 1: SĐT -->
+      <div id="step1" class="step-panel show">
+        <div class="panel-title">Nhập số điện thoại</div>
+        <div class="panel-sub">Chúng mình sẽ gửi mã OTP 6 số để xác minh danh tính của bạn</div>
         <div class="field">
-          <label id="lastNameLabel">Họ <span class="req">*</span></label>
-          <div class="input-wrap"><span class="icon">👤</span>
-            <input type="text" id="lastName" placeholder="Nguyễn">
+          <label>Số điện thoại <span class="req">*</span></label>
+          <div class="phone-row">
+            <div class="input-wrap" style="flex:1">
+              <span class="icon">📱</span>
+              <input type="tel" id="phone" placeholder="0901 234 567" maxlength="10" inputmode="numeric">
+            </div>
+            <button class="btn-otp btn-otp-gl" id="btnOtp" onclick="sendOTP()">Gửi OTP</button>
           </div>
-          <div class="err-msg" id="lastNameErr">Vui lòng nhập họ</div>
+          <div class="err-msg" id="phoneErr">Vui lòng nhập số điện thoại hợp lệ (10 số bắt đầu bằng 0)</div>
+          <div class="countdown" id="countdown"></div>
         </div>
+        <div class="info-box info-gl" id="moduleInfoBox">
+          💡 <div>Bạn đang đăng ký làm <strong>đối tác Giặt Là</strong>. Hoa hồng <strong>18%/đơn</strong>. Shipper CRABOR sẽ lấy và trả đồ tận nơi cho bạn.</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-next btn-gl" id="btn1Next" onclick="step1Next()">Tiếp theo →</button>
+        </div>
+      </div>
+
+      <!-- STEP 2: OTP -->
+      <div id="step2" class="step-panel">
+        <div class="panel-title">Nhập mã xác minh</div>
+        <div class="panel-sub">Mã OTP 6 số đã được gửi về số <strong id="phoneMask"></strong></div>
+        <div class="otp-boxes">
+          <input class="otp-box" type="text" maxlength="1" id="o0" oninput="otpIn(this,0)" inputmode="numeric">
+          <input class="otp-box" type="text" maxlength="1" id="o1" oninput="otpIn(this,1)" inputmode="numeric">
+          <input class="otp-box" type="text" maxlength="1" id="o2" oninput="otpIn(this,2)" inputmode="numeric">
+          <input class="otp-box" type="text" maxlength="1" id="o3" oninput="otpIn(this,3)" inputmode="numeric">
+          <input class="otp-box" type="text" maxlength="1" id="o4" oninput="otpIn(this,4)" inputmode="numeric">
+          <input class="otp-box" type="text" maxlength="1" id="o5" oninput="otpIn(this,5)" inputmode="numeric">
+        </div>
+        <div class="err-msg" id="otpErr" style="text-align:center;">Mã OTP không đúng. Vui lòng thử lại.</div>
+        <div style="text-align:center;margin-bottom:14px;">
+          <span style="font-size:.75rem;color:#777;font-weight:700;">Không nhận được mã? </span>
+          <button onclick="sendOTP(true)" style="background:none;border:none;color:#E8504A;font-weight:900;cursor:pointer;font-size:.75rem;">Gửi lại</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn-back" onclick="goStep(1)">← Quay lại</button>
+          <button class="btn-next btn-gl" id="btnVerify" onclick="verifyOTP()">
+            <span id="verifyTxt">Xác minh</span>
+            <div class="spinner" id="verifySpin"></div>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: THÔNG TIN -->
+      <div id="step3" class="step-panel">
+        <div class="panel-title" id="step3Title">Thông tin cơ sở</div>
+        <div class="panel-sub" id="step3Sub">Điền thông tin chính xác về cơ sở kinh doanh của bạn</div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label id="lastNameLabel">Họ <span class="req">*</span></label>
+            <div class="input-wrap"><span class="icon">👤</span>
+              <input type="text" id="lastName" placeholder="Nguyễn">
+            </div>
+            <div class="err-msg" id="lastNameErr">Vui lòng nhập họ</div>
+          </div>
+          <div class="field">
+            <label id="firstNameLabel">Tên <span class="req">*</span></label>
+            <div class="input-wrap"><span class="icon">✏️</span>
+              <input type="text" id="firstName" placeholder="Văn A">
+            </div>
+            <div class="err-msg" id="firstNameErr">Vui lòng nhập tên</div>
+          </div>
+        </div>
+
+        <div class="field" id="bizNameField">
+          <label id="bizNameLabel">Tên cơ sở / thương hiệu <span class="req">*</span></label>
+          <div class="input-wrap"><span class="icon">🏪</span>
+            <input type="text" id="bizName" placeholder="Tiệm giặt Minh Tú">
+          </div>
+          <div class="err-msg" id="bizNameErr">Vui lòng nhập tên cơ sở</div>
+        </div>
+
         <div class="field">
-          <label id="firstNameLabel">Tên <span class="req">*</span></label>
-          <div class="input-wrap"><span class="icon">✏️</span>
-            <input type="text" id="firstName" placeholder="Văn A">
+          <label>Email liên hệ <span class="req">*</span></label>
+          <div class="input-wrap"><span class="icon">📧</span>
+            <input type="email" id="email" placeholder="example@gmail.com" inputmode="email">
           </div>
-          <div class="err-msg" id="firstNameErr">Vui lòng nhập tên</div>
+          <div class="err-msg" id="emailErr">Email không hợp lệ</div>
+        </div>
+
+        <div class="field" id="addressField">
+          <label id="addressLabel">Địa chỉ cơ sở <span class="req">*</span></label>
+          <div class="input-wrap"><span class="icon">📍</span>
+            <input type="text" id="address" placeholder="123 Nguyễn Trãi, Thanh Xuân">
+          </div>
+          <div class="err-msg" id="addressErr">Vui lòng nhập địa chỉ</div>
+        </div>
+
+        <div class="field">
+          <label id="districtLabel">Quận / Huyện <span class="req">*</span></label>
+          <div class="input-wrap"><span class="icon">🗺️</span>
+            <select id="district">
+              <option value="">-- Chọn quận --</option>
+              <option>Cầu Giấy</option><option>Đống Đa</option><option>Thanh Xuân</option>
+              <option>Hai Bà Trưng</option><option>Hoàn Kiếm</option><option>Ba Đình</option>
+              <option>Tây Hồ</option><option>Long Biên</option><option>Hoàng Mai</option>
+              <option>Nam Từ Liêm</option><option>Bắc Từ Liêm</option>
+            </select>
+          </div>
+          <div class="err-msg" id="districtErr">Vui lòng chọn quận</div>
+        </div>
+
+        <div id="step3Extra"></div>
+
+        <div class="btn-row">
+          <button class="btn-back" onclick="goStep(2)">← Quay lại</button>
+          <button class="btn-next btn-gl" id="btn3Next" onclick="validateStep3()">Tiếp theo →</button>
         </div>
       </div>
 
-      <div class="field" id="bizNameField">
-        <label id="bizNameLabel">Tên cơ sở / thương hiệu <span class="req">*</span></label>
-        <div class="input-wrap"><span class="icon">🏪</span>
-          <input type="text" id="bizName" placeholder="Tiệm giặt Minh Tú">
+      <!-- STEP 4: DỊCH VỤ / KỸ NĂNG -->
+      <div id="step4" class="step-panel">
+        <div class="panel-title" id="step4Title">Chi tiết dịch vụ</div>
+        <div class="panel-sub" id="step4Sub">Thông tin về dịch vụ bạn cung cấp</div>
+        <div id="step4Content"></div>
+        <div class="btn-row">
+          <button class="btn-back" onclick="goStep(3)">← Quay lại</button>
+          <button class="btn-next btn-gl" id="btn4Next" onclick="validateStep4()">Tiếp theo →</button>
         </div>
-        <div class="err-msg" id="bizNameErr">Vui lòng nhập tên cơ sở</div>
       </div>
 
-      <div class="field">
-        <label>Email liên hệ <span class="req">*</span></label>
-        <div class="input-wrap"><span class="icon">📧</span>
-          <input type="email" id="email" placeholder="example@gmail.com">
+      <!-- STEP 5: GIẤY TỜ -->
+      <div id="step5" class="step-panel">
+        <div class="panel-title">Tải lên giấy tờ</div>
+        <div class="panel-sub">Ảnh chụp rõ nét, không mờ. Chấp nhận JPG, PNG</div>
+        <div id="step5Content"></div>
+        <div class="btn-row">
+          <button class="btn-back" onclick="goStep(4)">← Quay lại</button>
+          <button class="btn-next btn-gl" id="btn5Next" onclick="validateStep5()">Tiếp theo →</button>
         </div>
-        <div class="err-msg" id="emailErr">Email không hợp lệ</div>
       </div>
 
-      <div class="field" id="addressField">
-        <label id="addressLabel">Địa chỉ cơ sở <span class="req">*</span></label>
-        <div class="input-wrap"><span class="icon">📍</span>
-          <input type="text" id="address" placeholder="123 Nguyễn Trãi, Thanh Xuân">
+      <!-- STEP 6: XÁC NHẬN -->
+      <div id="step6" class="step-panel">
+        <div class="panel-title">Xác nhận đăng ký</div>
+        <div class="panel-sub">Kiểm tra lại toàn bộ thông tin trước khi hoàn tất</div>
+        <div class="summary-box" id="summaryBox"></div>
+        <div class="fee-box fee-gl" id="feeBox">
+          <div class="fl">
+            <div class="lbl" id="feeLbl">Hoa hồng CRABOR</div>
+            <div class="amt" id="feeAmt">18%</div>
+            <div class="nt" id="feeNote">Mỗi đơn thành công · Không phí đăng ký</div>
+          </div>
+          <div class="fr" id="feeBadge">✅ Đăng ký<br>Miễn phí</div>
         </div>
-        <div class="err-msg" id="addressErr">Vui lòng nhập địa chỉ</div>
+        <div class="check-row check-row-gl" id="chkRow1">
+          <input type="checkbox" id="chkTerms">
+          <label for="chkTerms">Tôi đồng ý với <a href="#">Điều khoản đối tác</a> của CRABOR</label>
+        </div>
+        <div class="check-row check-row-gl" id="chkRow2">
+          <input type="checkbox" id="chkInfo">
+          <label for="chkInfo">Tôi xác nhận thông tin trên là chính xác</label>
+        </div>
+        <div class="check-row check-row-gl" id="chkRow3">
+          <input type="checkbox" id="chkService">
+          <label for="chkService" id="chkServiceLabel">Tôi cam kết duy trì chất lượng dịch vụ theo tiêu chuẩn CRABOR</label>
+        </div>
+        <div class="err-msg" id="checkErr">Vui lòng đồng ý với tất cả điều khoản</div>
+        <div class="btn-row">
+          <button class="btn-back" onclick="goStep(5)">← Quay lại</button>
+          <button class="btn-next btn-gl" id="btnSubmit" onclick="submitForm()">
+            <span id="submitTxt">🦀 Hoàn tất đăng ký</span>
+            <div class="spinner" id="submitSpin"></div>
+          </button>
+        </div>
       </div>
 
-      <div class="field">
-        <label id="districtLabel">Quận / Huyện <span class="req">*</span></label>
-        <div class="input-wrap"><span class="icon">🗺️</span>
-          <select id="district">
-            <option value="">-- Chọn quận --</option>
-            <option>Cầu Giấy</option><option>Đống Đa</option><option>Thanh Xuân</option>
-            <option>Hai Bà Trưng</option><option>Hoàn Kiếm</option><option>Ba Đình</option>
-            <option>Tây Hồ</option><option>Long Biên</option><option>Hoàng Mai</option>
-            <option>Nam Từ Liêm</option><option>Bắc Từ Liêm</option>
-          </select>
+      <!-- STEP 7: THÀNH CÔNG -->
+      <div id="step7" class="step-panel">
+        <div class="success-wrap">
+          <div class="success-icon" id="successIcon">🎉</div>
+          <div class="success-title success-title-gl" id="successTitle">Đăng ký thành công!</div>
+          <div class="success-sub" id="successSub">Hồ sơ của bạn đang được xem xét — chúng mình sẽ liên hệ qua SĐT trong 24–48 giờ.</div>
+          <div class="success-card">
+            <div class="sc-label">Mã hồ sơ</div>
+            <div class="sc-val" id="registerId">CRB-P-XXXXXX</div>
+          </div>
+          <div class="success-card" id="nextStepsCard">
+            <div class="sc-label">Bước tiếp theo</div>
+            <div id="nextStepsContent" style="font-size:.8rem;font-weight:700;color:#555;line-height:1.8;"></div>
+          </div>
+          <button class="btn-next btn-gl" id="btnRestart" onclick="goToWelcome()">← Đăng ký dịch vụ khác</button>
         </div>
-        <div class="err-msg" id="districtErr">Vui lòng chọn quận</div>
-      </div>
-
-      <!-- MODULE-SPECIFIC SECTION 3 -->
-      <div id="step3Extra"></div>
-
-      <div class="btn-row">
-        <button class="btn-back" onclick="goStep(2)">← Quay lại</button>
-        <button class="btn-next btn-gl" id="btn3Next" onclick="validateStep3()">Tiếp theo →</button>
       </div>
     </div>
-
-    <!-- STEP 4: DỊCH VỤ CHI TIẾT / KỸ NĂNG / SẢN PHẨM -->
-    <div id="step4" class="step-panel">
-      <div class="panel-title" id="step4Title">Chi tiết dịch vụ</div>
-      <div class="panel-sub" id="step4Sub">Thông tin về dịch vụ bạn cung cấp</div>
-      <div id="step4Content"></div>
-      <div class="btn-row">
-        <button class="btn-back" onclick="goStep(3)">← Quay lại</button>
-        <button class="btn-next btn-gl" id="btn4Next" onclick="validateStep4()">Tiếp theo →</button>
-      </div>
-    </div>
-
-    <!-- STEP 5: GIẤY TỜ -->
-    <div id="step5" class="step-panel">
-      <div class="panel-title">Tải lên giấy tờ</div>
-      <div class="panel-sub">Ảnh chụp rõ nét, không mờ. Chấp nhận JPG, PNG (tối đa 5MB/ảnh)</div>
-      <div id="step5Content"></div>
-      <div class="btn-row">
-        <button class="btn-back" onclick="goStep(4)">← Quay lại</button>
-        <button class="btn-next btn-gl" id="btn5Next" onclick="validateStep5()">Tiếp theo →</button>
-      </div>
-    </div>
-
-    <!-- STEP 6: XÁC NHẬN -->
-    <div id="step6" class="step-panel">
-      <div class="panel-title">Xác nhận đăng ký</div>
-      <div class="panel-sub">Kiểm tra lại toàn bộ thông tin trước khi hoàn tất</div>
-      <div class="summary-box" id="summaryBox"></div>
-      <div class="fee-box fee-gl" id="feeBox">
-        <div class="fl">
-          <div class="lbl" id="feeLbl">Hoa hồng CRABOR</div>
-          <div class="amt" id="feeAmt">18%</div>
-          <div class="nt" id="feeNote">Mỗi đơn thành công · Không phí đăng ký</div>
-        </div>
-        <div class="fr" id="feeBadge">✅ Đăng ký<br>Miễn phí<br>100%</div>
-      </div>
-      <div class="check-row check-row-gl" id="chkRow1">
-        <input type="checkbox" id="chkTerms">
-        <label for="chkTerms">Tôi đã đọc và đồng ý với <a href="#">Điều khoản đối tác</a> và <a href="#">Chính sách hoa hồng</a> của CRABOR</label>
-      </div>
-      <div class="check-row check-row-gl" id="chkRow2">
-        <input type="checkbox" id="chkInfo">
-        <label for="chkInfo">Tôi xác nhận thông tin trên là chính xác và chịu trách nhiệm về độ chính xác</label>
-      </div>
-      <div class="check-row check-row-gl" id="chkRow3">
-        <input type="checkbox" id="chkService">
-        <label for="chkService" id="chkServiceLabel">Tôi cam kết duy trì chất lượng dịch vụ theo tiêu chuẩn CRABOR</label>
-      </div>
-      <div class="err-msg" id="checkErr" style="margin-bottom:12px;">Vui lòng đồng ý với tất cả điều khoản</div>
-      <div class="btn-row">
-        <button class="btn-back" onclick="goStep(5)">← Quay lại</button>
-        <button class="btn-next btn-gl" id="btnSubmit" onclick="submitForm()">
-          <span id="submitTxt">🦀 Hoàn tất đăng ký</span>
-          <div class="spinner" id="submitSpin"></div>
-        </button>
-      </div>
-    </div>
-
-    <!-- STEP 7: THÀNH CÔNG -->
-    <div id="step7" class="step-panel">
-      <div class="success-wrap">
-        <div class="success-icon" id="successIcon">🎉</div>
-        <div class="success-title success-title-gl" id="successTitle">Đăng ký thành công!</div>
-        <div class="success-sub" id="successSub">Hồ sơ của bạn đang được xem xét — chúng mình sẽ liên hệ qua SĐT trong <strong>24–48 giờ</strong>.</div>
-        <div class="success-card">
-          <div class="sc-label">Mã hồ sơ đối tác</div>
-          <div class="sc-val" id="registerId">CRB-P-XXXXXX</div>
-          <div class="sc-note">Lưu mã này để tra cứu trạng thái hồ sơ</div>
-        </div>
-        <div class="success-card" id="nextStepsCard">
-          <div class="sc-label">Bước tiếp theo</div>
-          <div id="nextStepsContent" style="font-size:.85rem;font-weight:700;color:#555;line-height:1.9;margin-top:4px;"></div>
-        </div>
-        <button class="btn-next btn-gl" id="btnRestart" onclick="window.location.reload()">Đăng ký thêm đối tác</button>
-      </div>
-    </div>
-
-  </div><!-- /card-body -->
-</div><!-- /card -->
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const API = ''; // URL backend của bạn
-
-// ── MODULE CONFIG ──
+// MODULE CONFIG
 const MODULES = {
   gl: {
-    type: 'partner',
     name: 'Giặt Là',
     emoji: '🫧',
     badge: '👕 Đối tác Giặt Là · Hà Nội',
     title: 'Đăng ký đối tác<br><em>Giặt Là</em> 🫧',
     sub: 'Kết nối tiệm giặt của bạn với hàng nghìn khách qua app CRABOR',
     info: 'Bạn đang đăng ký làm <strong>đối tác Giặt Là</strong>. Hoa hồng <strong>18%/đơn</strong>. Shipper CRABOR sẽ lấy và trả đồ tận nơi cho bạn.',
-    infoClass: 'info-gl',
-    headClass: 'head-gl',
-    logoClass: 'logo-gl',
-    progClass: 'prog-gl',
-    btnClass: 'btn-gl',
-    chkClass: 'check-row-gl',
     feeAmt: '18%',
     feeNote: 'Mỗi đơn thành công · Miễn phí đăng ký',
-    feeBadge: '✅ Đăng ký<br>Miễn phí<br>100%',
-    feeClass: 'fee-gl',
+    feeBadge: '✅ Đăng ký<br>Miễn phí',
     steps: ['SĐT', 'Xác minh', 'Cơ sở', 'Dịch vụ', 'Giấy tờ', 'Xác nhận'],
     successIcon: '👕',
-    successClass: 'success-title-gl',
-    nextSteps: '📞 Chờ cuộc gọi xác nhận từ CRABOR<br>🤝 Ký hợp đồng đối tác<br>📱 Nhận tài khoản đăng nhập app quản lý<br>🛵 Bắt đầu nhận đơn từ khách hàng',
-    step3Extra: `
-      <div class="field">
-        <label>Năm thành lập tiệm</label>
-        <div class="input-wrap"><span class="icon">📅</span>
-          <input type="number" id="bizYear" placeholder="2020" min="1990" max="2025">
-        </div>
-      </div>`,
-    step4Title: 'Chi tiết dịch vụ giặt là',
-    step4Sub: 'Cho chúng mình biết tiệm bạn cung cấp những dịch vụ gì',
-    step4Content: `
-      <div class="field">
-        <label>Dịch vụ cung cấp <span class="req">*</span> <small style="color:#999;font-weight:600;text-transform:none;letter-spacing:0">(chọn nhiều)</small></label>
-        <div class="chip-group" id="serviceChips">
-          <div class="chip" onclick="toggleChip(this,'on-gl')">👕 Giặt thường</div>
-          <div class="chip" onclick="toggleChip(this,'on-gl')">🔥 Giặt ủi</div>
-          <div class="chip" onclick="toggleChip(this,'on-gl')">✨ Giặt khô</div>
-          <div class="chip" onclick="toggleChip(this,'on-gl')">🛏️ Chăn màn</div>
-          <div class="chip" onclick="toggleChip(this,'on-gl')">🪟 Rèm cửa</div>
-          <div class="chip" onclick="toggleChip(this,'on-gl')">👔 Veston/Áo vest</div>
-          <div class="chip" onclick="toggleChip(this,'on-gl')">👘 Áo dài</div>
-          <div class="chip" onclick="toggleChip(this,'on-gl')">👟 Giày dép</div>
-        </div>
-        <div class="err-msg" id="servicesErr">Vui lòng chọn ít nhất 1 dịch vụ</div>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label>Giá giặt cơ bản (kg) <span class="req">*</span></label>
-          <div class="input-wrap"><span class="icon">💰</span>
-            <input type="number" id="pricePerKg" placeholder="20000" min="5000">
-          </div>
-          <div class="err-msg" id="priceErr">Vui lòng nhập giá</div>
-        </div>
-        <div class="field">
-          <label>Sức chứa (kg/ngày)</label>
-          <div class="input-wrap"><span class="icon">⚖️</span>
-            <input type="number" id="capacity" placeholder="50" min="5">
-          </div>
-        </div>
-      </div>
-      <div class="field">
-        <label>Thời gian hoàn thành đơn <span class="req">*</span></label>
-        <div class="radio-group rc-gl">
-          <div class="radio-card"><input type="radio" name="turnaround" id="t1" value="same-day"><label for="t1"><span class="r-icon">⚡</span>Trong ngày</label></div>
-          <div class="radio-card"><input type="radio" name="turnaround" id="t2" value="24h"><label for="t2"><span class="r-icon">🕐</span>24 giờ</label></div>
-          <div class="radio-card"><input type="radio" name="turnaround" id="t3" value="48h"><label for="t3"><span class="r-icon">🕑</span>2 ngày</label></div>
-          <div class="radio-card"><input type="radio" name="turnaround" id="t4" value="express"><label for="t4"><span class="r-icon">🚀</span>Express</label></div>
-        </div>
-        <div class="err-msg" id="turnaroundErr">Vui lòng chọn thời gian hoàn thành</div>
-      </div>
-      <div class="field">
-        <label>Giờ hoạt động</label>
-        <div class="grid-2">
-          <div class="input-wrap"><span class="icon">🌅</span><input type="text" id="openTime" placeholder="07:00"></div>
-          <div class="input-wrap"><span class="icon">🌆</span><input type="text" id="closeTime" placeholder="21:00"></div>
-        </div>
-      </div>`,
-    step5Content: `
-      <div class="field">
-        <label>Ảnh mặt trước CCCD chủ cơ sở <span class="req">*</span></label>
-        <div class="upload-zone upload-zone-gl" id="z1"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt trước</strong></p><img class="preview-img" id="p1"></div>
-        <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
-      </div>
-      <div class="field">
-        <label>Ảnh mặt sau CCCD <span class="req">*</span></label>
-        <div class="upload-zone upload-zone-gl" id="z2"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt sau</strong></p><img class="preview-img" id="p2"></div>
-        <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
-      </div>
-      <div class="field">
-        <label>Ảnh mặt tiền tiệm giặt <span class="req">*</span></label>
-        <div class="upload-zone upload-zone-gl" id="z3"><input type="file" accept="image/*" onchange="prevFile(this,'p3','shopFront')"><div class="upload-icon">🏪</div><p>Ảnh <strong>mặt tiền tiệm</strong> rõ bảng hiệu</p><img class="preview-img" id="p3"></div>
-        <div class="err-msg" id="shopFrontErr">Vui lòng tải ảnh mặt tiền tiệm</div>
-      </div>
-      <div class="field">
-        <label>Ảnh khu vực giặt / máy giặt <span class="req">*</span></label>
-        <div class="upload-zone upload-zone-gl" id="z4"><input type="file" accept="image/*" onchange="prevFile(this,'p4','shopInside')"><div class="upload-icon">🫧</div><p>Ảnh <strong>bên trong tiệm</strong> / máy giặt</p><img class="preview-img" id="p4"></div>
-        <div class="err-msg" id="shopInsideErr">Vui lòng tải ảnh bên trong tiệm</div>
-      </div>`
+    nextSteps: '📞 Chờ cuộc gọi xác nhận<br>🤝 Ký hợp đồng đối tác<br>📱 Nhận tài khoản app quản lý',
+    step3Extra: '<div class="field"><label>Năm thành lập</label><div class="input-wrap"><span class="icon">📅</span><input type="number" id="bizYear" placeholder="2020"></div></div>',
+    step4Content: `<div class="field"><label>Dịch vụ cung cấp <span class="req">*</span></label><div class="chip-group" id="serviceChips"><div class="chip" onclick="toggleChip(this,'on-gl')">👕 Giặt thường</div><div class="chip" onclick="toggleChip(this,'on-gl')">🔥 Giặt ủi</div><div class="chip" onclick="toggleChip(this,'on-gl')">✨ Giặt khô</div><div class="chip" onclick="toggleChip(this,'on-gl')">🛏️ Chăn màn</div></div><div class="err-msg" id="servicesErr">Chọn ít nhất 1 dịch vụ</div></div><div class="grid-2"><div class="field"><label>Giá/kg</label><div class="input-wrap"><span class="icon">💰</span><input type="number" id="pricePerKg" placeholder="20000"></div></div><div class="field"><label>Sức chứa kg/ngày</label><div class="input-wrap"><span class="icon">⚖️</span><input type="number" id="capacity" placeholder="50"></div></div></div>`,
+    step5Content: `<div class="field"><label>CCCD mặt trước *</label><div class="upload-zone upload-zone-gl"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>Mặt trước</p><img class="preview-img" id="p1"></div><div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh</div></div><div class="field"><label>CCCD mặt sau *</label><div class="upload-zone upload-zone-gl"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>Mặt sau</p><img class="preview-img" id="p2"></div><div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh</div></div><div class="field"><label>Ảnh mặt tiền *</label><div class="upload-zone upload-zone-gl"><input type="file" accept="image/*" onchange="prevFile(this,'p3','shopFront')"><div class="upload-icon">🏪</div><p>Mặt tiền tiệm</p><img class="preview-img" id="p3"></div><div class="err-msg" id="shopFrontErr">Vui lòng tải ảnh</div></div>`
   },
-
   gv: {
-    type: 'partner',
     name: 'Giúp Việc',
-    emoji: '✨',
+    emoji: '🧹',
     badge: '🧹 Đối tác Giúp Việc · Hà Nội',
     title: 'Đăng ký làm<br><em>Người Giúp Việc</em> 🧹',
-    sub: 'Tự chọn lịch — nhận tiền ngay — khách hàng đã xác minh 100%',
-    info: 'Bạn đang đăng ký làm <strong>người giúp việc CRABOR</strong>. Thu nhập <strong>200k–350k/ca</strong>. Phí nền tảng <strong>15%</strong>. Miễn phí đăng ký.',
-    infoClass: 'info-gv',
-    headClass: 'head-gv',
-    logoClass: 'logo-gv',
-    progClass: 'prog-gv',
-    btnClass: 'btn-gv',
-    chkClass: 'check-row-gv',
+    sub: 'Tự chọn lịch — nhận tiền ngay — khách hàng đã xác minh',
+    info: 'Bạn đang đăng ký làm <strong>người giúp việc CRABOR</strong>. Thu nhập <strong>200k–350k/ca</strong>. Phí nền tảng <strong>15%</strong>.',
     feeAmt: '15%',
-    feeNote: 'Phí nền tảng · Giữ lại 85% · Nhận tiền ngay',
-    feeBadge: '🆓 Đăng ký<br>Miễn Phí<br>Hoàn Toàn',
-    feeClass: 'fee-gv',
+    feeNote: 'Phí nền tảng · Giữ lại 85%',
+    feeBadge: '🆓 Miễn phí',
     steps: ['SĐT', 'Xác minh', 'Bản thân', 'Kỹ năng', 'Giấy tờ', 'Xác nhận'],
     successIcon: '🧹',
-    successClass: 'success-title-gv',
-    nextSteps: '📞 Chờ cuộc gọi xác nhận từ CRABOR<br>📋 Hoàn thành khóa định hướng online (30 phút)<br>📱 Tải app CRABOR để nhận ca<br>💸 Bắt đầu làm và nhận tiền ngay sau ca đầu',
-    step3Extra: `
-      <div class="field">
-        <label>Ngày sinh <span class="req">*</span></label>
-        <div class="input-wrap"><span class="icon">📅</span>
-          <input type="text" id="dob" placeholder="DD/MM/YYYY" maxlength="10">
-        </div>
-        <div class="err-msg" id="dobErr">Bạn phải từ 18 tuổi trở lên</div>
-      </div>
-      <div class="field">
-        <label>Kinh nghiệm dọn nhà <span class="req">*</span></label>
-        <div class="radio-group rc-gv">
-          <div class="radio-card"><input type="radio" name="exp" id="e1" value="no-exp"><label for="e1"><span class="r-icon">🌱</span>Chưa có<br>kinh nghiệm</label></div>
-          <div class="radio-card"><input type="radio" name="exp" id="e2" value="1y"><label for="e2"><span class="r-icon">⭐</span>1–2 năm</label></div>
-          <div class="radio-card"><input type="radio" name="exp" id="e3" value="3y"><label for="e3"><span class="r-icon">🌟</span>3–5 năm</label></div>
-          <div class="radio-card"><input type="radio" name="exp" id="e4" value="5y+"><label for="e4"><span class="r-icon">🏆</span>Trên 5 năm</label></div>
-        </div>
-        <div class="err-msg" id="expErr">Vui lòng chọn kinh nghiệm</div>
-      </div>`,
-    step4Title: 'Kỹ năng & lịch làm việc',
-    step4Sub: 'Cho chúng mình biết bạn có thể làm gì và khi nào',
-    step4Content: `
-      <div class="field">
-        <label>Kỹ năng dọn nhà <span class="req">*</span> <small style="color:#999;font-weight:600;text-transform:none;letter-spacing:0">(chọn nhiều)</small></label>
-        <div class="chip-group" id="serviceChips">
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🧹 Quét dọn cơ bản</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🚿 Dọn nhà tắm</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🍳 Dọn bếp</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🪟 Lau kính/cửa sổ</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🛋️ Hút bụi sofa</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">👕 Giặt ủi quần áo</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🍽️ Rửa bát</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🐾 Dọn chuồng thú cưng</div>
-        </div>
-        <div class="err-msg" id="servicesErr">Vui lòng chọn ít nhất 1 kỹ năng</div>
-      </div>
-      <div class="field">
-        <label>Ca có thể làm <span class="req">*</span> <small style="color:#999;font-weight:600;text-transform:none;letter-spacing:0">(chọn nhiều)</small></label>
-        <div class="chip-group" id="shiftChips">
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🌅 Sáng (7–11h)</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">☀️ Trưa (11–14h)</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🌤️ Chiều (14–18h)</div>
-          <div class="chip" onclick="toggleChip(this,'on-gv')">🌙 Tối (18–21h)</div>
-        </div>
-        <div class="err-msg" id="shiftsErr">Vui lòng chọn ít nhất 1 ca</div>
-      </div>
-      <div class="field">
-        <label>Số ca tối đa mỗi tuần</label>
-        <input type="range" id="maxShifts" min="1" max="14" value="7" oninput="document.getElementById('shiftVal').textContent=this.value+' ca/tuần'">
-        <div class="range-row"><span>1 ca</span><span id="shiftVal" style="color:#3aaa5c;font-weight:900;">7 ca/tuần</span><span>14 ca</span></div>
-      </div>
-      <div class="field">
-        <label>Phương tiện di chuyển</label>
-        <div class="radio-group rc-gv">
-          <div class="radio-card"><input type="radio" name="transport" id="tr1" value="motorbike"><label for="tr1"><span class="r-icon">🛵</span>Xe máy</label></div>
-          <div class="radio-card"><input type="radio" name="transport" id="tr2" value="bicycle"><label for="tr2"><span class="r-icon">🚲</span>Xe đạp/đi bộ</label></div>
-        </div>
-      </div>`,
-    step5Content: `
-      <div class="field">
-        <label>Ảnh CCCD mặt trước <span class="req">*</span></label>
-        <div class="upload-zone upload-zone-gv" id="z1"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt trước</strong></p><img class="preview-img" id="p1"></div>
-        <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
-      </div>
-      <div class="field">
-        <label>Ảnh CCCD mặt sau <span class="req">*</span></label>
-        <div class="upload-zone upload-zone-gv" id="z2"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt sau</strong></p><img class="preview-img" id="p2"></div>
-        <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
-      </div>
-      <div class="field">
-        <label>Ảnh chân dung (selfie rõ mặt) <span class="req">*</span></label>
-        <div class="upload-zone upload-zone-gv" id="z3"><input type="file" accept="image/*" onchange="prevFile(this,'p3','selfie')"><div class="upload-icon">🤳</div><p><strong>Selfie</strong> rõ nét, không đeo kính/mũ</p><img class="preview-img" id="p3"></div>
-        <div class="err-msg" id="selfieErr">Vui lòng tải ảnh selfie</div>
-      </div>
-      <div class="info-box info-gv" style="margin-top:4px;">
-        🛡️ <div>Ảnh của bạn chỉ dùng để xác minh danh tính và hiển thị cho khách hàng khi nhận ca. CRABOR cam kết bảo mật thông tin cá nhân.</div>
-      </div>`
+    nextSteps: '📞 Chờ cuộc gọi xác nhận<br>📋 Hoàn thành khóa định hướng online<br>📱 Tải app CRABOR để nhận ca',
+    step3Extra: '<div class="field"><label>Ngày sinh *</label><div class="input-wrap"><span class="icon">📅</span><input type="text" id="dob" placeholder="DD/MM/YYYY" maxlength="10"></div><div class="err-msg" id="dobErr">Bạn phải từ 18 tuổi</div></div><div class="field"><label>Kinh nghiệm *</label><div class="radio-group rc-gv"><div class="radio-card"><input type="radio" name="exp" id="e1" value="no-exp"><label for="e1">🌱 Chưa có KN</label></div><div class="radio-card"><input type="radio" name="exp" id="e2" value="1y"><label for="e2">⭐ 1–2 năm</label></div><div class="radio-card"><input type="radio" name="exp" id="e3" value="3y"><label for="e3">🌟 3–5 năm</label></div><div class="radio-card"><input type="radio" name="exp" id="e4" value="5y+"><label for="e4">🏆 Trên 5 năm</label></div></div><div class="err-msg" id="expErr">Chọn kinh nghiệm</div></div>',
+    step4Content: `<div class="field"><label>Kỹ năng dọn nhà *</label><div class="chip-group" id="serviceChips"><div class="chip" onclick="toggleChip(this,'on-gv')">🧹 Quét dọn</div><div class="chip" onclick="toggleChip(this,'on-gv')">🚿 Dọn nhà tắm</div><div class="chip" onclick="toggleChip(this,'on-gv')">🍳 Dọn bếp</div><div class="chip" onclick="toggleChip(this,'on-gv')">🪟 Lau kính</div></div><div class="err-msg" id="servicesErr">Chọn ít nhất 1 kỹ năng</div></div><div class="field"><label>Ca làm việc *</label><div class="chip-group" id="shiftChips"><div class="chip" onclick="toggleChip(this,'on-gv')">🌅 Sáng</div><div class="chip" onclick="toggleChip(this,'on-gv')">☀️ Trưa</div><div class="chip" onclick="toggleChip(this,'on-gv')">🌤️ Chiều</div><div class="chip" onclick="toggleChip(this,'on-gv')">🌙 Tối</div></div><div class="err-msg" id="shiftsErr">Chọn ít nhất 1 ca</div></div>`,
+    step5Content: `<div class="field"><label>CCCD mặt trước *</label><div class="upload-zone upload-zone-gv"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>Mặt trước</p><img class="preview-img" id="p1"></div><div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh</div></div><div class="field"><label>CCCD mặt sau *</label><div class="upload-zone upload-zone-gv"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>Mặt sau</p><img class="preview-img" id="p2"></div><div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh</div></div><div class="field"><label>Ảnh selfie *</label><div class="upload-zone upload-zone-gv"><input type="file" accept="image/*" onchange="prevFile(this,'p3','selfie')"><div class="upload-icon">🤳</div><p>Selfie rõ mặt</p><img class="preview-img" id="p3"></div><div class="err-msg" id="selfieErr">Vui lòng tải ảnh</div></div>`
   },
-
   cs: {
-    type: 'partner',
     name: 'China Shop',
     emoji: '🛍️',
     badge: '🇨🇳 Đối tác China Shop · Hà Nội',
     title: 'Đăng ký đối tác<br><em>China Shop</em> 🛍️',
-    sub: 'Nhập hàng nội địa Trung chính hãng — bán qua app CRABOR — giao tận nơi',
-    info: 'Bạn đang đăng ký làm <strong>đối tác China Shop</strong>. Hoa hồng <strong>12%/đơn</strong>. Phí đăng ký gian hàng <strong>500k/năm</strong>.',
-    infoClass: 'info-cs',
-    headClass: 'head-cs',
-    logoClass: 'logo-cs',
-    progClass: 'prog-cs',
-    btnClass: 'btn-cs',
-    chkClass: 'check-row',
+    sub: 'Nhập hàng nội địa Trung chính hãng — bán qua app CRABOR',
+    info: 'Bạn đang đăng ký làm <strong>đối tác China Shop</strong>. Hoa hồng <strong>12%/đơn</strong>. Phí gian hàng <strong>500k/năm</strong>.',
     feeAmt: '12%',
-    feeNote: 'Hoa hồng mỗi đơn thành công · Phí gian hàng 500k/năm',
-    feeBadge: '🇨🇳 Phí<br>500k/năm<br>Gian hàng',
-    feeClass: 'fee-cs',
+    feeNote: 'Hoa hồng mỗi đơn · Phí gian hàng 500k/năm',
+    feeBadge: '🇨🇳 500k/năm',
     steps: ['SĐT', 'Xác minh', 'Cơ sở', 'Sản phẩm', 'Giấy tờ', 'Xác nhận'],
     successIcon: '🛍️',
-    successClass: 'success-title-cs',
-    nextSteps: '📞 Chờ cuộc gọi xác nhận từ CRABOR<br>📦 Gửi mẫu sản phẩm để kiểm định chất lượng<br>🤝 Ký hợp đồng đối tác nhập hàng<br>📱 Nhận tài khoản quản lý gian hàng trên app',
-    step3Extra: `
-      <div class="field">
-        <label>Nguồn hàng chính <span class="req">*</span></label>
-        <div class="radio-group rc-cs">
-          <div class="radio-card"><input type="radio" name="source" id="s1" value="1688"><label for="s1"><span class="r-icon">🏭</span>1688.com<br>(xưởng)</label></div>
-          <div class="radio-card"><input type="radio" name="source" id="s2" value="taobao"><label for="s2"><span class="r-icon">🛒</span>Taobao<br>(bán lẻ)</label></div>
-          <div class="radio-card"><input type="radio" name="source" id="s3" value="direct"><label for="s3"><span class="r-icon">🤝</span>Trực tiếp<br>với xưởng</label></div>
-          <div class="radio-card"><input type="radio" name="source" id="s4" value="other"><label for="s4"><span class="r-icon">📦</span>Nguồn<br>khác</label></div>
-        </div>
-        <div class="err-msg" id="sourceErr">Vui lòng chọn nguồn hàng</div>
-      </div>`,
-    step4Title: 'Thông tin sản phẩm',
-    step4Sub: 'Mô tả danh mục hàng bạn muốn bán trên CRABOR China Shop',
-    step4Content: `
-      <div class="field">
-        <label>Danh mục sản phẩm <span class="req">*</span> <small style="color:#999;font-weight:600;text-transform:none;letter-spacing:0">(chọn nhiều)</small></label>
-        <div class="chip-group" id="serviceChips">
-          <div class="chip" onclick="toggleChip(this,'on-cs')">🏠 Đồ gia dụng</div>
-          <div class="chip" onclick="toggleChip(this,'on-cs')">💄 Mỹ phẩm / Skincare</div>
-          <div class="chip" onclick="toggleChip(this,'on-cs')">👗 Thời trang</div>
-          <div class="chip" onclick="toggleChip(this,'on-cs')">📱 Phụ kiện công nghệ</div>
-          <div class="chip" onclick="toggleChip(this,'on-cs')">🍱 Thực phẩm / đồ ăn vặt</div>
-          <div class="chip" onclick="toggleChip(this,'on-cs')">🧸 Đồ chơi / quà tặng</div>
-          <div class="chip" onclick="toggleChip(this,'on-cs')">🏋️ Dụng cụ thể thao</div>
-          <div class="chip" onclick="toggleChip(this,'on-cs')">🌿 Chăm sóc sức khỏe</div>
-        </div>
-        <div class="err-msg" id="servicesErr">Vui lòng chọn ít nhất 1 danh mục</div>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label>Số SKU hiện có</label>
-          <div class="input-wrap"><span class="icon">📦</span>
-            <input type="number" id="skuCount" placeholder="50" min="1">
-          </div>
-        </div>
-        <div class="field">
-          <label>Giá trị đơn trung bình (VNĐ)</label>
-          <div class="input-wrap"><span class="icon">💰</span>
-            <input type="number" id="avgOrder" placeholder="300000" min="0">
-          </div>
-        </div>
-      </div>
-      <div class="field">
-        <label>Thời gian giao hàng về VN (ngày)</label>
-        <input type="range" id="shippingDays" min="5" max="30" value="10" oninput="document.getElementById('shipVal').textContent=this.value+' ngày'">
-        <div class="range-row"><span>5 ngày</span><span id="shipVal" style="color:#E8504A;font-weight:900;">10 ngày</span><span>30 ngày</span></div>
-      </div>
-      <div class="field">
-        <label>Mô tả sản phẩm / lợi thế cạnh tranh</label>
-        <textarea id="bizDesc" placeholder="Ví dụ: Chuyên mỹ phẩm nội địa Trung chính hãng thương hiệu XYZ, có kho tại Quảng Châu, ship 7–10 ngày..."></textarea>
-      </div>`,
-    step5Content: `
-      <div class="field">
-        <label>Ảnh CCCD mặt trước <span class="req">*</span></label>
-        <div class="upload-zone" id="z1"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt trước</strong></p><img class="preview-img" id="p1"></div>
-        <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
-      </div>
-      <div class="field">
-        <label>Ảnh CCCD mặt sau <span class="req">*</span></label>
-        <div class="upload-zone" id="z2"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt sau</strong></p><img class="preview-img" id="p2"></div>
-        <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
-      </div>
-      <div class="field">
-        <label>Ảnh sản phẩm mẫu (3–5 sản phẩm tiêu biểu) <span class="req">*</span></label>
-        <div class="upload-zone" id="z3"><input type="file" accept="image/*" onchange="prevFile(this,'p3','productSample')"><div class="upload-icon">📦</div><p>Ảnh <strong>sản phẩm mẫu</strong> có nhãn hiệu rõ ràng</p><img class="preview-img" id="p3"></div>
-        <div class="err-msg" id="productSampleErr">Vui lòng tải ảnh sản phẩm mẫu</div>
-      </div>
-      <div class="field">
-        <label>Giấy tờ nhập khẩu / hóa đơn nguồn hàng <span class="req">*</span></label>
-        <div class="upload-zone" id="z4"><input type="file" accept="image/*,application/pdf" onchange="prevFile(this,'p4','importDoc')"><div class="upload-icon">📄</div><p>Hóa đơn nhập hàng hoặc <strong>giấy tờ nguồn gốc</strong></p><img class="preview-img" id="p4"></div>
-        <div class="err-msg" id="importDocErr">Vui lòng tải giấy tờ nhập hàng</div>
-      </div>
-      <div class="info-box info-cs" style="margin-top:4px;">
-        🔍 <div>CRABOR sẽ xem xét hồ sơ và yêu cầu gửi sản phẩm mẫu để kiểm định trước khi duyệt gian hàng. Chỉ hàng chính hãng, nguồn gốc rõ ràng mới được duyệt.</div>
-      </div>`
+    nextSteps: '📞 Chờ cuộc gọi xác nhận<br>📦 Gửi mẫu sản phẩm kiểm định<br>🤝 Ký hợp đồng đối tác',
+    step3Extra: '<div class="field"><label>Nguồn hàng chính *</label><div class="radio-group"><div class="radio-card"><input type="radio" name="source" id="s1" value="1688"><label for="s1">🏭 1688.com</label></div><div class="radio-card"><input type="radio" name="source" id="s2" value="taobao"><label for="s2">🛒 Taobao</label></div></div><div class="err-msg" id="sourceErr">Chọn nguồn hàng</div></div>',
+    step4Content: `<div class="field"><label>Danh mục sản phẩm *</label><div class="chip-group" id="serviceChips"><div class="chip" onclick="toggleChip(this,'on-cs')">🏠 Đồ gia dụng</div><div class="chip" onclick="toggleChip(this,'on-cs')">💄 Mỹ phẩm</div><div class="chip" onclick="toggleChip(this,'on-cs')">👗 Thời trang</div><div class="chip" onclick="toggleChip(this,'on-cs')">📱 Phụ kiện</div></div><div class="err-msg" id="servicesErr">Chọn ít nhất 1 danh mục</div></div>`,
+    step5Content: `<div class="field"><label>CCCD mặt trước *</label><div class="upload-zone"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>Mặt trước</p><img class="preview-img" id="p1"></div><div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh</div></div><div class="field"><label>CCCD mặt sau *</label><div class="upload-zone"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>Mặt sau</p><img class="preview-img" id="p2"></div><div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh</div></div><div class="field"><label>Ảnh sản phẩm mẫu *</label><div class="upload-zone"><input type="file" accept="image/*" onchange="prevFile(this,'p3','productSample')"><div class="upload-icon">📦</div><p>Sản phẩm mẫu</p><img class="preview-img" id="p3"></div><div class="err-msg" id="productSampleErr">Vui lòng tải ảnh</div></div>`
   },
-
   sp: {
-    type: 'shipper',
     name: 'Shipper',
     emoji: '🛵',
     badge: '🆕 App giao đồ ăn mới · Hà Nội',
     title: 'Đăng ký <em>Shipper</em><br>Early Bird 🦀',
     sub: 'Chỉ còn 50 suất · Phí ưu đãi 500k · Hoàn tiền sau 1.000 đơn',
     info: 'Bạn đang đăng ký làm <strong>Shipper CRABOR</strong>. Thu nhập <strong>20k–50k/đơn</strong>. Phí kích hoạt <strong>500k</strong> (hoàn sau 1000 đơn).',
-    infoClass: 'info-sp',
-    headClass: 'head-sp',
-    logoClass: 'logo-sp',
-    progClass: 'prog-sp',
-    btnClass: 'btn-sp',
-    chkClass: 'check-row',
     feeAmt: '500.000đ',
     feeNote: 'Phí kích hoạt · Hoàn lại sau 1.000 đơn',
-    feeBadge: '⚡ Early Bird<br>Còn 50 suất',
-    feeClass: 'fee-sp',
+    feeBadge: '⚡ Early Bird',
     steps: ['SĐT', 'Xác minh', 'Thông tin', 'Giấy tờ', 'Xác nhận'],
     successIcon: '🛵',
-    successClass: 'success-title-sp',
-    nextSteps: '📞 Chờ cuộc gọi xác nhận từ CRABOR<br>📦 Nhận kit đồng phục sau khi duyệt<br>📱 Tải app CRABOR Shipper để bắt đầu<br>💸 Thanh toán phí 500k khi nhận kit',
-    step3Extra: `
-      <div class="field">
-        <label>Ngày sinh <span class="req">*</span></label>
-        <div class="input-wrap"><span class="icon">📅</span>
-          <input type="text" id="dob" placeholder="DD/MM/YYYY" maxlength="10">
-        </div>
-        <div class="err-msg" id="dobErr">Bạn phải từ 18 tuổi trở lên</div>
-      </div>
-      <div class="field">
-        <label>Phương tiện <span class="req">*</span></label>
-        <div class="radio-group">
-          <div class="radio-card"><input type="radio" name="vehicle" id="v1" value="Xe máy"><label for="v1"><span class="r-icon">🛵</span>Xe máy</label></div>
-          <div class="radio-card"><input type="radio" name="vehicle" id="v2" value="Xe đạp điện"><label for="v2"><span class="r-icon">🚲</span>Xe đạp điện</label></div>
-        </div>
-        <div class="err-msg" id="vehicleErr">Vui lòng chọn phương tiện</div>
-      </div>`,
-    step4Title: 'Tải lên giấy tờ',
-    step4Sub: 'Ảnh chụp rõ nét, không bị mờ. Chấp nhận JPG, PNG (tối đa 5MB)',
-    step4Content: `
-      <div class="field">
-        <label>Ảnh CCCD mặt trước <span class="req">*</span></label>
-        <div class="upload-zone" id="z1"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt trước</strong></p><img class="preview-img" id="p1"></div>
-        <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
-      </div>
-      <div class="field">
-        <label>Ảnh CCCD mặt sau <span class="req">*</span></label>
-        <div class="upload-zone" id="z2"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt sau</strong></p><img class="preview-img" id="p2"></div>
-        <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
-      </div>
-      <div class="field">
-        <label>Ảnh chân dung (selfie) <span class="req">*</span></label>
-        <div class="upload-zone" id="z3"><input type="file" accept="image/*" onchange="prevFile(this,'p3','selfie')"><div class="upload-icon">🤳</div><p><strong>Selfie</strong> rõ nét, không đeo kính/mũ</p><img class="preview-img" id="p3"></div>
-        <div class="err-msg" id="selfieErr">Vui lòng tải ảnh selfie</div>
-      </div>
-      <div class="field">
-        <label>Ảnh phương tiện (biển số rõ) <span class="req">*</span></label>
-        <div class="upload-zone" id="z4"><input type="file" accept="image/*" onchange="prevFile(this,'p4','vehicleImg')"><div class="upload-icon">🛵</div><p>Ảnh <strong>phương tiện</strong> rõ biển số</p><img class="preview-img" id="p4"></div>
-        <div class="err-msg" id="vehicleImgErr">Vui lòng tải ảnh phương tiện</div>
-      </div>`,
-    step5Content: '' // Shipper dùng step4 làm step giấy tờ
+    nextSteps: '📞 Chờ cuộc gọi xác nhận<br>📦 Nhận kit đồng phục<br>📱 Tải app CRABOR Shipper',
+    step3Extra: '<div class="field"><label>Ngày sinh *</label><div class="input-wrap"><span class="icon">📅</span><input type="text" id="dob" placeholder="DD/MM/YYYY" maxlength="10"></div><div class="err-msg" id="dobErr">Bạn phải từ 18 tuổi</div></div><div class="field"><label>Phương tiện *</label><div class="radio-group"><div class="radio-card"><input type="radio" name="vehicle" id="v1" value="Xe máy"><label for="v1">🛵 Xe máy</label></div><div class="radio-card"><input type="radio" name="vehicle" id="v2" value="Xe đạp điện"><label for="v2">🚲 Xe đạp điện</label></div></div><div class="err-msg" id="vehicleErr">Chọn phương tiện</div></div>',
+    step4Content: `<div class="field"><label>CCCD mặt trước *</label><div class="upload-zone"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>Mặt trước</p><img class="preview-img" id="p1"></div><div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh</div></div><div class="field"><label>CCCD mặt sau *</label><div class="upload-zone"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>Mặt sau</p><img class="preview-img" id="p2"></div><div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh</div></div><div class="field"><label>Ảnh selfie *</label><div class="upload-zone"><input type="file" accept="image/*" onchange="prevFile(this,'p3','selfie')"><div class="upload-icon">🤳</div><p>Selfie rõ mặt</p><img class="preview-img" id="p3"></div><div class="err-msg" id="selfieErr">Vui lòng tải ảnh</div></div><div class="field"><label>Ảnh phương tiện *</label><div class="upload-zone"><input type="file" accept="image/*" onchange="prevFile(this,'p4','vehicleImg')"><div class="upload-icon">🛵</div><p>Rõ biển số</p><img class="preview-img" id="p4"></div><div class="err-msg" id="vehicleImgErr">Vui lòng tải ảnh</div></div>`,
+    step5Content: ''
   }
 };
 
-// ── STATE ──
 let mod = 'gl';
 let currentStep = 1;
 let phoneVerified = false;
 let phone = '';
 let uploads = {};
 let otpTimer = null;
-let state = {
-  phone: '',
-  otp: '',
-  verified: false,
-  firstName: '',
-  lastName: '',
-  email: '',
-  dob: '',
-  district: '',
-  vehicle: '',
-  files: {}
-};
+let selectedModule = null;
 
-// ── SWITCH MODULE ──
-function switchModule(m, btn) {
-  mod = m;
-  document.querySelectorAll('.mod-btn').forEach(b => b.className = 'mod-btn');
-  btn.classList.add('on-' + m);
+// PAGE NAVIGATION
+function goToWelcome() {
+  document.getElementById('pageWelcome').classList.add('active');
+  document.getElementById('pageRegister').classList.remove('active');
+  selectedModule = null;
+  document.getElementById('startRegisterBtn').disabled = true;
+  document.querySelectorAll('.module-item').forEach(item => {
+    item.classList.remove('active');
+  });
+}
 
+function goToRegister() {
+  if (!selectedModule) return;
+  mod = selectedModule;
+  document.getElementById('pageWelcome').classList.remove('active');
+  document.getElementById('pageRegister').classList.add('active');
+  switchModule(mod);
+  resetFormFields();
+  goStep(1);
+}
+
+function selectModule(module) {
+  selectedModule = module;
+  document.querySelectorAll('.module-item').forEach(item => {
+    if (item.dataset.module === module) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
+  document.getElementById('startRegisterBtn').disabled = false;
+}
+
+function startRegistration() {
+  goToRegister();
+}
+
+// SWITCH MODULE
+function switchModule(m) {
   const cfg = MODULES[m];
 
   // Head
-  const head = document.getElementById('cardHead');
-  head.className = 'card-head ' + cfg.headClass;
+  document.getElementById('cardHead').className = 'card-head head-' + m;
   document.getElementById('headBadge').innerHTML = cfg.badge;
   document.getElementById('headTitle').innerHTML = cfg.title;
   document.getElementById('headSub').textContent = cfg.sub;
-  document.getElementById('logoSm').className = 'logo-sm ' + cfg.logoClass;
+  document.getElementById('logoSm').className = 'logo-sm logo-' + m;
 
-  // Logo SVG per module
+  // Logo SVG
   const logoSvg = document.getElementById('logoSvg');
-  if (m === 'gl') logoSvg.innerHTML = `<rect x="22" y="22" width="96" height="96" rx="14" fill="#F5F0DC"/><rect x="22" y="22" width="96" height="28" rx="14" fill="#6495ed" opacity=".8"/><rect x="22" y="42" width="96" height="8" fill="#6495ed" opacity=".8"/><circle cx="70" cy="88" r="30" fill="#6495ed" opacity=".35"/><circle cx="70" cy="88" r="22" fill="#F5F0DC"/><circle cx="70" cy="88" r="14" fill="#6495ed" opacity=".3"/><circle cx="38" cy="34" r="6" fill="#E8504A"/><circle cx="56" cy="34" r="6" fill="#FFD84D"/>`;
-  if (m === 'gv') logoSvg.innerHTML = `<rect x="56" y="15" width="14" height="70" rx="7" fill="#F5F0DC"/><path d="M30 85 Q70 72 110 85 L104 112 Q70 122 36 112Z" fill="#F5F0DC"/><circle cx="28" cy="48" r="6" fill="#FFD84D" opacity=".9"/><circle cx="112" cy="42" r="5" fill="#FFD84D" opacity=".7"/><circle cx="105" cy="65" r="7" fill="#3aaa5c" opacity=".8"/><circle cx="22" cy="70" r="5" fill="#3aaa5c" opacity=".7"/>`;
-  if (m === 'cs') logoSvg.innerHTML = `<rect x="22" y="48" width="96" height="76" rx="10" fill="#F5F0DC"/><rect x="22" y="48" width="96" height="24" rx="10" fill="#FFD84D"/><rect x="22" y="62" width="96" height="10" fill="#FFD84D"/><rect x="60" y="20" width="14" height="80" rx="5" fill="#E8504A" opacity=".55"/><path d="M46 48 Q46 28 70 28 Q94 28 94 48" stroke="#F5F0DC" stroke-width="6" fill="none" stroke-linecap="round"/><text x="70" y="102" font-family="Arial Black" font-size="12" font-weight="900" fill="#E8504A" text-anchor="middle">★</text>`;
-  if (m === 'sp') logoSvg.innerHTML = `<path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/><ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/><circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/><circle cx="54" cy="49" r="2.5" fill="#F5F0DC"/><circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/><circle cx="82" cy="49" r="2.5" fill="#F5F0DC"/><path d="M28 73 Q8 60 7 47 Q17 33 27 43 Q21 52 28 61Z" fill="#F5F0DC"/><path d="M112 73 Q132 60 133 47 Q123 33 113 43 Q119 52 112 61Z" fill="#F5F0DC"/><path d="M57 96 Q70 107 83 96" stroke="#E8504A" stroke-width="3.5" stroke-linecap="round" fill="none"/>`;
+  if (m === 'gl') logoSvg.innerHTML = `<rect x="22" y="22" width="96" height="96" rx="14" fill="#F5F0DC"/><rect x="22" y="22" width="96" height="28" rx="14" fill="#6495ed" opacity=".8"/><circle cx="70" cy="88" r="30" fill="#6495ed" opacity=".35"/><circle cx="70" cy="88" r="22" fill="#F5F0DC"/><circle cx="38" cy="34" r="6" fill="#E8504A"/><circle cx="56" cy="34" r="6" fill="#FFD84D"/>`;
+  if (m === 'gv') logoSvg.innerHTML = `<rect x="56" y="15" width="14" height="70" rx="7" fill="#F5F0DC"/><path d="M30 85 Q70 72 110 85 L104 112 Q70 122 36 112Z" fill="#F5F0DC"/><circle cx="28" cy="48" r="6" fill="#FFD84D"/>`;
+  if (m === 'cs') logoSvg.innerHTML = `<rect x="22" y="48" width="96" height="76" rx="10" fill="#F5F0DC"/><rect x="22" y="48" width="96" height="24" rx="10" fill="#FFD84D"/><text x="70" y="102" font-family="Arial Black" font-size="12" fill="#E8504A" text-anchor="middle">★</text>`;
+  if (m === 'sp') logoSvg.innerHTML = `<path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/><circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/><circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/>`;
 
-  // Progress bar
-  const progWrap = document.getElementById('progWrap');
-  progWrap.className = 'progress-wrap ' + cfg.progClass;
+  // Progress
+  document.getElementById('progWrap').className = 'progress-wrap prog-' + m;
 
   // Buttons
   document.querySelectorAll('.btn-next').forEach(b => {
-    b.className = 'btn-next ' + cfg.btnClass;
+    b.className = 'btn-next btn-' + m;
   });
   document.querySelectorAll('.btn-otp').forEach(b => {
     b.className = 'btn-otp btn-otp-' + m;
@@ -1748,131 +1518,73 @@ function switchModule(m, btn) {
 
   // Info box
   const infoBox = document.getElementById('moduleInfoBox');
-  infoBox.className = 'info-box ' + cfg.infoClass;
+  infoBox.className = 'info-box info-' + m;
   infoBox.innerHTML = '💡 <div>' + cfg.info + '</div>';
 
-  // Checkboxes color
+  // Checkboxes
   ['chkRow1', 'chkRow2', 'chkRow3'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.className = 'check-row ' + cfg.chkClass;
+    if (el) el.className = 'check-row check-row-' + m;
   });
 
   // Fee box
   const feeBox = document.getElementById('feeBox');
-  feeBox.className = 'fee-box ' + cfg.feeClass;
+  feeBox.className = 'fee-box fee-' + m;
   document.getElementById('feeAmt').textContent = cfg.feeAmt;
   document.getElementById('feeNote').textContent = cfg.feeNote;
   document.getElementById('feeBadge').innerHTML = cfg.feeBadge;
 
-  // Render steps bar
+  // Steps
   renderSteps(cfg.steps, currentStep);
 
-  // Điều chỉnh form fields theo module
-  adjustFormForModule(cfg);
-
-  // Inject step3 extra
+  // Step3 extra
   document.getElementById('step3Extra').innerHTML = cfg.step3Extra || '';
 
   // Step3 title
-  if (m === 'sp') {
+  if (m === 'sp' || m === 'gv') {
     document.getElementById('step3Title').textContent = 'Thông tin cá nhân';
     document.getElementById('step3Sub').textContent = 'Điền đầy đủ thông tin cá nhân của bạn';
-  } else if (m === 'gv') {
-    document.getElementById('step3Title').textContent = 'Thông tin cá nhân';
-    document.getElementById('step3Sub').textContent = 'Điền đầy đủ thông tin cá nhân của bạn';
+    document.getElementById('lastNameLabel').innerHTML = 'Họ <span class="req">*</span>';
+    document.getElementById('firstNameLabel').innerHTML = 'Tên <span class="req">*</span>';
   } else {
     document.getElementById('step3Title').textContent = 'Thông tin cơ sở';
     document.getElementById('step3Sub').textContent = 'Điền thông tin chính xác về cơ sở kinh doanh của bạn';
+    document.getElementById('lastNameLabel').innerHTML = 'Họ chủ cơ sở <span class="req">*</span>';
+    document.getElementById('firstNameLabel').innerHTML = 'Tên chủ cơ sở <span class="req">*</span>';
   }
 
-  // Step4 & Step5
+  // BizName field
   if (m === 'sp') {
-    // Shipper: step4 là giấy tờ, step5 là xác nhận
-    document.getElementById('step4Title').textContent = 'Tải lên giấy tờ';
-    document.getElementById('step4Sub').textContent = 'Ảnh chụp rõ nét, không bị mờ. Chấp nhận JPG, PNG (tối đa 5MB)';
-    document.getElementById('step4Content').innerHTML = cfg.step4Content;
-    document.getElementById('step5Content').innerHTML = ''; // Không dùng step5 content
+    document.getElementById('bizNameField').style.display = 'none';
+    document.getElementById('addressField').style.display = 'none';
   } else {
-    document.getElementById('step4Title').textContent = cfg.step4Title;
-    document.getElementById('step4Sub').textContent = cfg.step4Sub;
+    document.getElementById('bizNameField').style.display = 'block';
+    document.getElementById('addressField').style.display = 'block';
+    document.getElementById('bizNameLabel').innerHTML = m === 'gv' ? 'Tên hiển thị <span class="req">*</span>' : 'Tên cơ sở <span class="req">*</span>';
+    document.getElementById('bizName').placeholder = m === 'gv' ? 'Nguyễn Văn A' : 'Tiệm giặt Minh Tú';
+  }
+
+  // Step4 content
+  if (m === 'sp') {
+    document.getElementById('step4Title').textContent = 'Tải lên giấy tờ';
+    document.getElementById('step4Sub').textContent = 'Ảnh chụp rõ nét, không bị mờ';
+    document.getElementById('step4Content').innerHTML = cfg.step4Content;
+    document.getElementById('step5Content').innerHTML = '';
+  } else {
+    document.getElementById('step4Title').textContent = cfg.step4Title || 'Chi tiết dịch vụ';
+    document.getElementById('step4Sub').textContent = cfg.step4Sub || 'Thông tin về dịch vụ bạn cung cấp';
     document.getElementById('step4Content').innerHTML = cfg.step4Content;
     document.getElementById('step5Content').innerHTML = cfg.step5Content;
   }
 
   // Success
   document.getElementById('successIcon').textContent = cfg.successIcon;
-  document.getElementById('successTitle').className = 'success-title ' + cfg.successClass;
+  document.getElementById('successTitle').className = 'success-title success-title-' + m;
   document.getElementById('nextStepsContent').innerHTML = cfg.nextSteps;
-  document.getElementById('btnRestart').className = 'btn-next ' + cfg.btnClass;
+  document.getElementById('btnRestart').className = 'btn-next btn-' + m;
 
-  // Reset state
   uploads = {};
   phoneVerified = false;
-  
-  // Reset form fields
-  resetFormFields();
-
-  // Reset về step 1
-  goStep(1);
-}
-
-function adjustFormForModule(cfg) {
-  // Điều chỉnh labels và fields theo module
-  if (mod === 'sp' || mod === 'gv') {
-    // Shipper và Giúp việc: dùng "Tên hiển thị" thay vì "Tên cơ sở"
-    document.getElementById('bizNameLabel').innerHTML = 'Tên hiển thị <span class="req">*</span>';
-    document.getElementById('bizName').placeholder = 'Nguyễn Văn A';
-    document.getElementById('addressLabel').textContent = 'Địa chỉ thường trú';
-    document.getElementById('districtLabel').textContent = 'Khu vực hoạt động';
-    
-    // Ẩn địa chỉ cho shipper? Giữ lại nhưng có thể không bắt buộc
-    if (mod === 'sp') {
-      document.getElementById('addressField').style.display = 'block';
-    }
-  } else {
-    document.getElementById('bizNameLabel').innerHTML = 'Tên cơ sở / thương hiệu <span class="req">*</span>';
-    document.getElementById('bizName').placeholder = 'Tiệm giặt Minh Tú';
-    document.getElementById('addressLabel').textContent = 'Địa chỉ cơ sở';
-    document.getElementById('districtLabel').textContent = 'Quận / Huyện';
-    document.getElementById('addressField').style.display = 'block';
-  }
-
-  // Điều chỉnh labels họ tên
-  if (mod === 'cs') {
-    document.getElementById('lastNameLabel').innerHTML = 'Họ chủ cơ sở <span class="req">*</span>';
-    document.getElementById('firstNameLabel').innerHTML = 'Tên chủ cơ sở <span class="req">*</span>';
-  } else {
-    document.getElementById('lastNameLabel').innerHTML = 'Họ <span class="req">*</span>';
-    document.getElementById('firstNameLabel').innerHTML = 'Tên <span class="req">*</span>';
-  }
-}
-
-function resetFormFields() {
-  // Reset các input fields
-  const inputs = ['phone', 'lastName', 'firstName', 'bizName', 'email', 'address', 'district', 'dob'];
-  inputs.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-
-  // Reset radios
-  document.querySelectorAll('input[type=radio]').forEach(r => r.checked = false);
-  
-  // Reset chips
-  document.querySelectorAll('.chip').forEach(c => {
-    c.className = 'chip';
-  });
-
-  // Reset upload previews
-  document.querySelectorAll('.preview-img').forEach(img => {
-    img.style.display = 'none';
-    img.src = '';
-  });
-
-  // Reset error messages
-  document.querySelectorAll('.err-msg').forEach(err => {
-    err.classList.remove('show');
-  });
 }
 
 function renderSteps(labels, active) {
@@ -1881,13 +1593,26 @@ function renderSteps(labels, active) {
   labels.forEach((lbl, i) => {
     const n = i + 1;
     const cls = n < active ? 'done' : n === active ? 'active' : '';
-    html += `<div class="step-col"> <div class="step-circle ${cls}" id="sc${n}">${n < active ? '✓' : n}</div> <div class="step-label ${cls}" id="sl${n}">${lbl}</div> </div>`;
-    if (i < labels.length - 1) html += `<div class="step-line ${n < active ? 'done' : ''}" id="line${n}"></div>`;
+    html += `<div class="step-col"> <div class="step-circle ${cls}">${n < active ? '✓' : n}</div> <div class="step-label ${cls}">${lbl}</div> </div>`;
+    if (i < labels.length - 1) html += `<div class="step-line ${n < active ? 'done' : ''}"></div>`;
   });
   bar.innerHTML = html;
 }
 
-// ── NAVIGATION ──
+function resetFormFields() {
+  ['phone', 'lastName', 'firstName', 'bizName', 'email', 'address', 'district', 'dob'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.querySelectorAll('input[type=radio]').forEach(r => r.checked = false);
+  document.querySelectorAll('.chip').forEach(c => c.className = 'chip');
+  document.querySelectorAll('.preview-img').forEach(img => {
+    img.style.display = 'none';
+    img.src = '';
+  });
+  document.querySelectorAll('.err-msg').forEach(err => err.classList.remove('show'));
+}
+
 function goStep(n) {
   if (n === 2 && !validateStep1()) return;
   if (n >= 3 && !phoneVerified) {
@@ -1903,7 +1628,6 @@ function goStep(n) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── STEP 1 ──
 function validateStep1() {
   const val = document.getElementById('phone').value.trim();
   const err = document.getElementById('phoneErr');
@@ -1915,7 +1639,6 @@ function validateStep1() {
   err.classList.remove('show');
   document.getElementById('phone').classList.remove('err');
   phone = val;
-  state.phone = val;
   return true;
 }
 
@@ -1925,20 +1648,12 @@ function step1Next() {
   }
 }
 
-async function sendOTP(resend = false) {
+function sendOTP(resend = false) {
   const val = document.getElementById('phone').value.trim();
   if (!/^0[0-9]{9}$/.test(val)) return;
   phone = val;
   const btn = document.getElementById('btnOtp');
   btn.disabled = true;
-  
-  try {
-    await fetch(`${API}/api/auth/send-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, type: mod + '_register' })
-    });
-  } catch (e) { }
   
   showToast('📱 (Demo) OTP: 123456');
   if (!resend) {
@@ -1983,50 +1698,27 @@ document.addEventListener('keydown', e => {
   }
 });
 
-async function verifyOTP() {
+function verifyOTP() {
   const code = [0, 1, 2, 3, 4, 5].map(i => document.getElementById('o' + i).value).join('');
   const errEl = document.getElementById('otpErr');
   if (code.length !== 6) {
     errEl.style.display = 'block';
     return;
   }
-  const sp = document.getElementById('verifySpin'),
-    tx = document.getElementById('verifyTxt');
-  sp.classList.add('show');
-  tx.style.display = 'none';
   
-  try {
-    const r = await fetch(`${API}/api/auth/verify-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, otp: code, type: mod + '_register' })
-    });
-    const d = await r.json();
-    if (d.success || code === '123456') {
-      phoneVerified = true;
-      state.verified = true;
-      errEl.style.display = 'none';
-      showToast('✅ Xác minh thành công!');
-      goStep(3);
-    } else errEl.style.display = 'block';
-  } catch (e) {
-    if (code === '123456') {
-      phoneVerified = true;
-      state.verified = true;
-      errEl.style.display = 'none';
-      showToast('✅ Xác minh thành công!');
-      goStep(3);
-    } else errEl.style.display = 'block';
+  if (code === '123456') {
+    phoneVerified = true;
+    errEl.style.display = 'none';
+    showToast('✅ Xác minh thành công!');
+    goStep(3);
+  } else {
+    errEl.style.display = 'block';
   }
-  sp.classList.remove('show');
-  tx.style.display = 'inline';
 }
 
-// ── STEP 3 ──
 function validateStep3() {
   let ok = true;
 
-  // Common fields
   const checks = [
     ['lastName', 'lastNameErr', v => v.length > 0],
     ['firstName', 'firstNameErr', v => v.length > 0],
@@ -2034,13 +1726,8 @@ function validateStep3() {
     ['district', 'districtErr', v => v !== '']
   ];
 
-  // Thêm bizName cho partner (trừ shipper)
   if (mod !== 'sp') {
     checks.push(['bizName', 'bizNameErr', v => v.length > 0]);
-  }
-
-  // Thêm address cho partner (trừ shipper)
-  if (mod !== 'sp') {
     checks.push(['address', 'addressErr', v => v.length > 3]);
   }
 
@@ -2059,98 +1746,58 @@ function validateStep3() {
     }
   });
 
-  // Module-specific validation
-  if (mod === 'gv' || mod === 'sp') {
-    const dob = document.getElementById('dob');
-    if (dob) {
-      const v = dob.value.trim();
-      const dobErr = document.getElementById('dobErr');
-      const valid = /\d{2}\/\d{2}\/\d{4}/.test(v);
-      let age18 = false;
-      if (valid) {
-        const [d, m2, y] = v.split('/');
-        const birth = new Date(y, m2 - 1, d);
-        age18 = (new Date() - birth) / (365.25 * 24 * 3600e3) >= 18;
-      }
-      if (!valid || !age18) {
-        dobErr.classList.add('show');
-        dob.classList.add('err');
-        ok = false;
-      } else {
-        dobErr.classList.remove('show');
-        dob.classList.remove('err');
-        state.dob = v;
-      }
+  if ((mod === 'gv' || mod === 'sp') && document.getElementById('dob')) {
+    const dob = document.getElementById('dob').value.trim();
+    const dobErr = document.getElementById('dobErr');
+    if (!/\d{2}\/\d{2}\/\d{4}/.test(dob)) {
+      dobErr.classList.add('show');
+      ok = false;
+    } else {
+      dobErr.classList.remove('show');
     }
   }
 
   if (mod === 'gv') {
     const exp = document.querySelector('input[name=exp]:checked');
     const expErr = document.getElementById('expErr');
-    if (expErr) {
-      if (!exp) {
-        expErr.classList.add('show');
-        ok = false;
-      } else expErr.classList.remove('show');
-    }
+    if (!exp) {
+      expErr.classList.add('show');
+      ok = false;
+    } else expErr.classList.remove('show');
   }
 
   if (mod === 'cs') {
     const src = document.querySelector('input[name=source]:checked');
     const srcErr = document.getElementById('sourceErr');
-    if (srcErr) {
-      if (!src) {
-        srcErr.classList.add('show');
-        ok = false;
-      } else srcErr.classList.remove('show');
-    }
+    if (!src) {
+      srcErr.classList.add('show');
+      ok = false;
+    } else srcErr.classList.remove('show');
   }
 
   if (mod === 'sp') {
     const vehicle = document.querySelector('input[name=vehicle]:checked');
     const vehicleErr = document.getElementById('vehicleErr');
-    if (vehicleErr) {
-      if (!vehicle) {
-        vehicleErr.classList.add('show');
-        ok = false;
-      } else {
-        vehicleErr.classList.remove('show');
-        state.vehicle = vehicle.value;
-      }
-    }
+    if (!vehicle) {
+      vehicleErr.classList.add('show');
+      ok = false;
+    } else vehicleErr.classList.remove('show');
   }
 
-  if (ok) {
-    // Lưu state
-    state.lastName = document.getElementById('lastName').value.trim();
-    state.firstName = document.getElementById('firstName').value.trim();
-    state.email = document.getElementById('email').value.trim();
-    state.district = document.getElementById('district').value;
-    
-    if (mod !== 'sp') {
-      state.bizName = document.getElementById('bizName').value.trim();
-      state.address = document.getElementById('address').value.trim();
-    }
-
-    goStep(4);
-  }
+  if (ok) goStep(4);
 }
 
-// ── STEP 4 ──
 function toggleChip(el, cls) {
   el.classList.toggle(cls);
 }
 
 function validateStep4() {
   if (mod === 'sp') {
-    // Shipper: step4 là giấy tờ
-    validateStep5(); // Dùng chung validation step5
+    validateStep5();
     return;
   }
 
   let ok = true;
-
-  // Check at least 1 service chip selected
   const chips = document.querySelectorAll('#serviceChips .chip.on-gl, #serviceChips .chip.on-gv, #serviceChips .chip.on-cs');
   const servErr = document.getElementById('servicesErr');
   if (servErr) {
@@ -2160,43 +1807,18 @@ function validateStep4() {
     } else servErr.classList.remove('show');
   }
 
-  if (mod === 'gl') {
-    const price = document.getElementById('pricePerKg');
-    const pErr = document.getElementById('priceErr');
-    if (price && (!price.value || price.value < 1000)) {
-      pErr.classList.add('show');
-      price.classList.add('err');
-      ok = false;
-    } else if (price) {
-      pErr.classList.remove('show');
-      price.classList.remove('err');
-    }
-
-    const ta = document.querySelector('input[name=turnaround]:checked');
-    const taErr = document.getElementById('turnaroundErr');
-    if (taErr) {
-      if (!ta) {
-        taErr.classList.add('show');
-        ok = false;
-      } else taErr.classList.remove('show');
-    }
-  }
-
   if (mod === 'gv') {
     const shiftChips = document.querySelectorAll('#shiftChips .chip.on-gv');
     const shErr = document.getElementById('shiftsErr');
-    if (shErr) {
-      if (shiftChips.length === 0) {
-        shErr.classList.add('show');
-        ok = false;
-      } else shErr.classList.remove('show');
-    }
+    if (shErr && shiftChips.length === 0) {
+      shErr.classList.add('show');
+      ok = false;
+    } else if (shErr) shErr.classList.remove('show');
   }
 
   if (ok) goStep(5);
 }
 
-// ── STEP 5 ──
 function prevFile(input, prevId, key) {
   const file = input.files[0];
   if (!file) return;
@@ -2210,15 +1832,14 @@ function prevFile(input, prevId, key) {
   };
   reader.readAsDataURL(file);
   uploads[key] = true;
-  state.files[key] = file;
 }
 
 function validateStep5() {
   let ok = true;
   const required = {
-    gl: ['cccdFront', 'cccdBack', 'shopFront', 'shopInside'],
+    gl: ['cccdFront', 'cccdBack', 'shopFront'],
     gv: ['cccdFront', 'cccdBack', 'selfie'],
-    cs: ['cccdFront', 'cccdBack', 'productSample', 'importDoc'],
+    cs: ['cccdFront', 'cccdBack', 'productSample'],
     sp: ['cccdFront', 'cccdBack', 'selfie', 'vehicleImg']
   };
 
@@ -2226,10 +1847,8 @@ function validateStep5() {
     cccdFront: 'cccdFrontErr',
     cccdBack: 'cccdBackErr',
     shopFront: 'shopFrontErr',
-    shopInside: 'shopInsideErr',
     selfie: 'selfieErr',
     productSample: 'productSampleErr',
-    importDoc: 'importDocErr',
     vehicleImg: 'vehicleImgErr'
   };
 
@@ -2249,39 +1868,28 @@ function validateStep5() {
   }
 }
 
-// ── STEP 6 ──
 function buildSummary() {
   const cfg = MODULES[mod];
   const rows = [
-    ['Module', cfg.name + ' ' + cfg.emoji],
+    ['Dịch vụ', cfg.name + ' ' + cfg.emoji],
     ['Họ tên', (document.getElementById('lastName')?.value || '') + ' ' + (document.getElementById('firstName')?.value || '')],
-    ['Số điện thoại', phone],
+    ['SĐT', phone],
     ['Email', document.getElementById('email')?.value || '']
   ];
 
   if (mod !== 'sp') {
-    rows.push(['Tên cơ sở', document.getElementById('bizName')?.value || '']);
+    rows.push(['Cơ sở', document.getElementById('bizName')?.value || '']);
     rows.push(['Địa chỉ', document.getElementById('address')?.value || '']);
   }
 
-  rows.push(['Quận/Huyện', document.getElementById('district')?.value || '']);
-
-  if (mod === 'sp') {
-    rows.push(['Phương tiện', state.vehicle || '']);
-  }
-
-  if (mod !== 'sp') {
-    rows.push(['Hoa hồng CRABOR', cfg.feeAmt]);
-  } else {
-    rows.push(['Phí kích hoạt', '500.000đ']);
-  }
+  rows.push(['Quận', document.getElementById('district')?.value || '']);
 
   document.getElementById('summaryBox').innerHTML = rows.map(([k, v]) =>
     `<div class="summary-row"><span class="key">${k}</span><span class="val">${v}</span></div>`
   ).join('');
 }
 
-async function submitForm() {
+function submitForm() {
   const allOk = ['chkTerms', 'chkInfo', 'chkService'].every(id => {
     const el = document.getElementById(id);
     return el ? el.checked : true;
@@ -2293,68 +1901,15 @@ async function submitForm() {
   }
   document.getElementById('checkErr').classList.remove('show');
 
-  const btn = document.getElementById('btnSubmit');
-  const sp = document.getElementById('submitSpin'),
-    tx = document.getElementById('submitTxt');
-  btn.disabled = true;
-  sp.classList.add('show');
-  tx.style.display = 'none';
-
-  const payload = {
-    module: mod,
-    type: MODULES[mod].type,
-    phone: phone,
-    firstName: document.getElementById('firstName')?.value,
-    lastName: document.getElementById('lastName')?.value,
-    email: document.getElementById('email')?.value,
-    district: document.getElementById('district')?.value,
-  };
-
-  if (mod !== 'sp') {
-    payload.bizName = document.getElementById('bizName')?.value;
-    payload.address = document.getElementById('address')?.value;
-  }
-
-  if (mod === 'sp' || mod === 'gv') {
-    payload.dob = document.getElementById('dob')?.value;
-  }
-
-  if (mod === 'sp') {
-    payload.vehicle = state.vehicle;
-  }
-
-  let regId = 'CRB-';
-  if (MODULES[mod].type === 'partner') {
-    regId = 'CRB-P-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-  } else {
-    regId = 'CRB-S-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-  }
-
-  try {
-    const endpoint = MODULES[mod].type === 'partner' ? '/api/partner/register' : '/api/shipper/register';
-    const r = await fetch(`${API}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const d = await r.json();
-    if (d.registerId) regId = d.registerId;
-  } catch (e) { }
-
+  const regId = 'CRB-' + (mod === 'sp' ? 'S-' : 'P-') + Math.random().toString(36).substr(2, 6).toUpperCase();
   document.getElementById('registerId').textContent = regId;
 
-  btn.disabled = false;
-  sp.classList.remove('show');
-  tx.style.display = 'inline';
-
-  // Go to success
   document.getElementById('step6').classList.remove('show');
   document.getElementById('step7').classList.add('show');
   showToast('🎉 Đăng ký thành công!');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── TOAST ──
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -2362,11 +1917,8 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ── DOB formatter ──
+// DOB formatter
 document.addEventListener('DOMContentLoaded', () => {
-  renderSteps(MODULES[mod].steps, 1);
-
-  // DOB formatter
   const dob = document.getElementById('dob');
   if (dob) {
     dob.addEventListener('input', e => {
@@ -2378,6 +1930,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
-
 </body>
 </html>
