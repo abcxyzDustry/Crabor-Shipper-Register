@@ -2491,6 +2491,1068 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
+// Thay thế toàn bộ phần script trong file index.html bằng code này
 
+<script>
+const API_BASE = ''; // Để trống nếu cùng domain
+
+// ── MODULE CONFIG ──
+const MODULES = {
+  gl: {
+    type: 'partner',
+    name: 'Giặt Là',
+    emoji: '🫧',
+    badge: '👕 Đối tác Giặt Là · Hà Nội',
+    title: 'Đăng ký đối tác<br><em>Giặt Là</em> 🫧',
+    sub: 'Kết nối tiệm giặt của bạn với hàng nghìn khách qua app CRABOR',
+    info: 'Bạn đang đăng ký làm <strong>đối tác Giặt Là</strong>. Hoa hồng <strong>18%/đơn</strong>. Shipper CRABOR sẽ lấy và trả đồ tận nơi cho bạn.',
+    infoClass: 'info-gl',
+    headClass: 'head-gl',
+    logoClass: 'logo-gl',
+    progClass: 'prog-gl',
+    btnClass: 'btn-gl',
+    chkClass: 'check-row-gl',
+    feeAmt: '18%',
+    feeNote: 'Mỗi đơn thành công · Miễn phí đăng ký',
+    feeBadge: '✅ Đăng ký<br>Miễn phí<br>100%',
+    feeClass: 'fee-gl',
+    steps: ['SĐT', 'Xác minh', 'Cơ sở', 'Dịch vụ', 'Giấy tờ', 'Xác nhận'],
+    successIcon: '👕',
+    successClass: 'success-title-gl',
+    nextSteps: '📞 Chờ cuộc gọi xác nhận từ CRABOR<br>🤝 Ký hợp đồng đối tác<br>📱 Nhận tài khoản đăng nhập app quản lý<br>🛵 Bắt đầu nhận đơn từ khách hàng',
+    step3Extra: `
+      <div class="field">
+        <label>Năm thành lập tiệm</label>
+        <div class="input-wrap"><span class="icon">📅</span>
+          <input type="number" id="bizYear" placeholder="2020" min="1990" max="2025">
+        </div>
+      </div>`,
+    step4Title: 'Chi tiết dịch vụ giặt là',
+    step4Sub: 'Cho chúng mình biết tiệm bạn cung cấp những dịch vụ gì',
+    step4Content: `
+      <div class="field">
+        <label>Dịch vụ cung cấp <span class="req">*</span> <small style="color:#999;font-weight:600;text-transform:none;letter-spacing:0">(chọn nhiều)</small></label>
+        <div class="chip-group" id="serviceChips">
+          <div class="chip" onclick="toggleChip(this,'on-gl')">👕 Giặt thường</div>
+          <div class="chip" onclick="toggleChip(this,'on-gl')">🔥 Giặt ủi</div>
+          <div class="chip" onclick="toggleChip(this,'on-gl')">✨ Giặt khô</div>
+          <div class="chip" onclick="toggleChip(this,'on-gl')">🛏️ Chăn màn</div>
+          <div class="chip" onclick="toggleChip(this,'on-gl')">🪟 Rèm cửa</div>
+          <div class="chip" onclick="toggleChip(this,'on-gl')">👔 Veston/Áo vest</div>
+          <div class="chip" onclick="toggleChip(this,'on-gl')">👘 Áo dài</div>
+          <div class="chip" onclick="toggleChip(this,'on-gl')">👟 Giày dép</div>
+        </div>
+        <div class="err-msg" id="servicesErr">Vui lòng chọn ít nhất 1 dịch vụ</div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Giá giặt cơ bản (kg) <span class="req">*</span></label>
+          <div class="input-wrap"><span class="icon">💰</span>
+            <input type="number" id="pricePerKg" placeholder="20000" min="5000">
+          </div>
+          <div class="err-msg" id="priceErr">Vui lòng nhập giá</div>
+        </div>
+        <div class="field">
+          <label>Sức chứa (kg/ngày)</label>
+          <div class="input-wrap"><span class="icon">⚖️</span>
+            <input type="number" id="capacity" placeholder="50" min="5">
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Thời gian hoàn thành đơn <span class="req">*</span></label>
+        <div class="radio-group rc-gl">
+          <div class="radio-card"><input type="radio" name="turnaround" id="t1" value="same-day"><label for="t1"><span class="r-icon">⚡</span>Trong ngày</label></div>
+          <div class="radio-card"><input type="radio" name="turnaround" id="t2" value="24h"><label for="t2"><span class="r-icon">🕐</span>24 giờ</label></div>
+          <div class="radio-card"><input type="radio" name="turnaround" id="t3" value="48h"><label for="t3"><span class="r-icon">🕑</span>2 ngày</label></div>
+          <div class="radio-card"><input type="radio" name="turnaround" id="t4" value="express"><label for="t4"><span class="r-icon">🚀</span>Express</label></div>
+        </div>
+        <div class="err-msg" id="turnaroundErr">Vui lòng chọn thời gian hoàn thành</div>
+      </div>
+      <div class="field">
+        <label>Giờ hoạt động</label>
+        <div class="grid-2">
+          <div class="input-wrap"><span class="icon">🌅</span><input type="text" id="openTime" placeholder="07:00"></div>
+          <div class="input-wrap"><span class="icon">🌆</span><input type="text" id="closeTime" placeholder="21:00"></div>
+        </div>
+      </div>`,
+    step5Content: `
+      <div class="field">
+        <label>Ảnh mặt trước CCCD chủ cơ sở <span class="req">*</span></label>
+        <div class="upload-zone upload-zone-gl" id="z1"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt trước</strong></p><img class="preview-img" id="p1"></div>
+        <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
+      </div>
+      <div class="field">
+        <label>Ảnh mặt sau CCCD <span class="req">*</span></label>
+        <div class="upload-zone upload-zone-gl" id="z2"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt sau</strong></p><img class="preview-img" id="p2"></div>
+        <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
+      </div>
+      <div class="field">
+        <label>Ảnh mặt tiền tiệm giặt <span class="req">*</span></label>
+        <div class="upload-zone upload-zone-gl" id="z3"><input type="file" accept="image/*" onchange="prevFile(this,'p3','shopFront')"><div class="upload-icon">🏪</div><p>Ảnh <strong>mặt tiền tiệm</strong> rõ bảng hiệu</p><img class="preview-img" id="p3"></div>
+        <div class="err-msg" id="shopFrontErr">Vui lòng tải ảnh mặt tiền tiệm</div>
+      </div>
+      <div class="field">
+        <label>Ảnh khu vực giặt / máy giặt <span class="req">*</span></label>
+        <div class="upload-zone upload-zone-gl" id="z4"><input type="file" accept="image/*" onchange="prevFile(this,'p4','shopInside')"><div class="upload-icon">🫧</div><p>Ảnh <strong>bên trong tiệm</strong> / máy giặt</p><img class="preview-img" id="p4"></div>
+        <div class="err-msg" id="shopInsideErr">Vui lòng tải ảnh bên trong tiệm</div>
+      </div>`
+  },
+
+  gv: {
+    type: 'partner',
+    name: 'Giúp Việc',
+    emoji: '✨',
+    badge: '🧹 Đối tác Giúp Việc · Hà Nội',
+    title: 'Đăng ký làm<br><em>Người Giúp Việc</em> 🧹',
+    sub: 'Tự chọn lịch — nhận tiền ngay — khách hàng đã xác minh 100%',
+    info: 'Bạn đang đăng ký làm <strong>người giúp việc CRABOR</strong>. Thu nhập <strong>200k–350k/ca</strong>. Phí nền tảng <strong>15%</strong>. Miễn phí đăng ký.',
+    infoClass: 'info-gv',
+    headClass: 'head-gv',
+    logoClass: 'logo-gv',
+    progClass: 'prog-gv',
+    btnClass: 'btn-gv',
+    chkClass: 'check-row-gv',
+    feeAmt: '15%',
+    feeNote: 'Phí nền tảng · Giữ lại 85% · Nhận tiền ngay',
+    feeBadge: '🆓 Đăng ký<br>Miễn Phí<br>Hoàn Toàn',
+    feeClass: 'fee-gv',
+    steps: ['SĐT', 'Xác minh', 'Bản thân', 'Kỹ năng', 'Giấy tờ', 'Xác nhận'],
+    successIcon: '🧹',
+    successClass: 'success-title-gv',
+    nextSteps: '📞 Chờ cuộc gọi xác nhận từ CRABOR<br>📋 Hoàn thành khóa định hướng online (30 phút)<br>📱 Tải app CRABOR để nhận ca<br>💸 Bắt đầu làm và nhận tiền ngay sau ca đầu',
+    step3Extra: `
+      <div class="field">
+        <label>Ngày sinh <span class="req">*</span></label>
+        <div class="input-wrap"><span class="icon">📅</span>
+          <input type="text" id="dob" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="err-msg" id="dobErr">Bạn phải từ 18 tuổi trở lên</div>
+      </div>
+      <div class="field">
+        <label>Kinh nghiệm dọn nhà <span class="req">*</span></label>
+        <div class="radio-group rc-gv">
+          <div class="radio-card"><input type="radio" name="exp" id="e1" value="no-exp"><label for="e1"><span class="r-icon">🌱</span>Chưa có<br>kinh nghiệm</label></div>
+          <div class="radio-card"><input type="radio" name="exp" id="e2" value="1y"><label for="e2"><span class="r-icon">⭐</span>1–2 năm</label></div>
+          <div class="radio-card"><input type="radio" name="exp" id="e3" value="3y"><label for="e3"><span class="r-icon">🌟</span>3–5 năm</label></div>
+          <div class="radio-card"><input type="radio" name="exp" id="e4" value="5y+"><label for="e4"><span class="r-icon">🏆</span>Trên 5 năm</label></div>
+        </div>
+        <div class="err-msg" id="expErr">Vui lòng chọn kinh nghiệm</div>
+      </div>`,
+    step4Title: 'Kỹ năng & lịch làm việc',
+    step4Sub: 'Cho chúng mình biết bạn có thể làm gì và khi nào',
+    step4Content: `
+      <div class="field">
+        <label>Kỹ năng dọn nhà <span class="req">*</span> <small style="color:#999;font-weight:600;text-transform:none;letter-spacing:0">(chọn nhiều)</small></label>
+        <div class="chip-group" id="serviceChips">
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🧹 Quét dọn cơ bản</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🚿 Dọn nhà tắm</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🍳 Dọn bếp</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🪟 Lau kính/cửa sổ</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🛋️ Hút bụi sofa</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">👕 Giặt ủi quần áo</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🍽️ Rửa bát</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🐾 Dọn chuồng thú cưng</div>
+        </div>
+        <div class="err-msg" id="servicesErr">Vui lòng chọn ít nhất 1 kỹ năng</div>
+      </div>
+      <div class="field">
+        <label>Ca có thể làm <span class="req">*</span> <small style="color:#999;font-weight:600;text-transform:none;letter-spacing:0">(chọn nhiều)</small></label>
+        <div class="chip-group" id="shiftChips">
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🌅 Sáng (7–11h)</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">☀️ Trưa (11–14h)</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🌤️ Chiều (14–18h)</div>
+          <div class="chip" onclick="toggleChip(this,'on-gv')">🌙 Tối (18–21h)</div>
+        </div>
+        <div class="err-msg" id="shiftsErr">Vui lòng chọn ít nhất 1 ca</div>
+      </div>
+      <div class="field">
+        <label>Số ca tối đa mỗi tuần</label>
+        <input type="range" id="maxShifts" min="1" max="14" value="7" oninput="document.getElementById('shiftVal').textContent=this.value+' ca/tuần'">
+        <div class="range-row"><span>1 ca</span><span id="shiftVal" style="color:#3aaa5c;font-weight:900;">7 ca/tuần</span><span>14 ca</span></div>
+      </div>
+      <div class="field">
+        <label>Phương tiện di chuyển</label>
+        <div class="radio-group rc-gv">
+          <div class="radio-card"><input type="radio" name="transport" id="tr1" value="motorbike"><label for="tr1"><span class="r-icon">🛵</span>Xe máy</label></div>
+          <div class="radio-card"><input type="radio" name="transport" id="tr2" value="bicycle"><label for="tr2"><span class="r-icon">🚲</span>Xe đạp/đi bộ</label></div>
+        </div>
+      </div>`,
+    step5Content: `
+      <div class="field">
+        <label>Ảnh CCCD mặt trước <span class="req">*</span></label>
+        <div class="upload-zone upload-zone-gv" id="z1"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt trước</strong></p><img class="preview-img" id="p1"></div>
+        <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
+      </div>
+      <div class="field">
+        <label>Ảnh CCCD mặt sau <span class="req">*</span></label>
+        <div class="upload-zone upload-zone-gv" id="z2"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt sau</strong></p><img class="preview-img" id="p2"></div>
+        <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
+      </div>
+      <div class="field">
+        <label>Ảnh chân dung (selfie rõ mặt) <span class="req">*</span></label>
+        <div class="upload-zone upload-zone-gv" id="z3"><input type="file" accept="image/*" onchange="prevFile(this,'p3','selfie')"><div class="upload-icon">🤳</div><p><strong>Selfie</strong> rõ nét, không đeo kính/mũ</p><img class="preview-img" id="p3"></div>
+        <div class="err-msg" id="selfieErr">Vui lòng tải ảnh selfie</div>
+      </div>
+      <div class="info-box info-gv" style="margin-top:4px;">
+        🛡️ <div>Ảnh của bạn chỉ dùng để xác minh danh tính và hiển thị cho khách hàng khi nhận ca. CRABOR cam kết bảo mật thông tin cá nhân.</div>
+      </div>`
+  },
+
+  cs: {
+    type: 'partner',
+    name: 'China Shop',
+    emoji: '🛍️',
+    badge: '🇨🇳 Đối tác China Shop · Hà Nội',
+    title: 'Đăng ký đối tác<br><em>China Shop</em> 🛍️',
+    sub: 'Nhập hàng nội địa Trung chính hãng — bán qua app CRABOR — giao tận nơi',
+    info: 'Bạn đang đăng ký làm <strong>đối tác China Shop</strong>. Hoa hồng <strong>12%/đơn</strong>. Phí đăng ký gian hàng <strong>500k/năm</strong>.',
+    infoClass: 'info-cs',
+    headClass: 'head-cs',
+    logoClass: 'logo-cs',
+    progClass: 'prog-cs',
+    btnClass: 'btn-cs',
+    chkClass: 'check-row',
+    feeAmt: '12%',
+    feeNote: 'Hoa hồng mỗi đơn thành công · Phí gian hàng 500k/năm',
+    feeBadge: '🇨🇳 Phí<br>500k/năm<br>Gian hàng',
+    feeClass: 'fee-cs',
+    steps: ['SĐT', 'Xác minh', 'Cơ sở', 'Sản phẩm', 'Giấy tờ', 'Xác nhận'],
+    successIcon: '🛍️',
+    successClass: 'success-title-cs',
+    nextSteps: '📞 Chờ cuộc gọi xác nhận từ CRABOR<br>📦 Gửi mẫu sản phẩm để kiểm định chất lượng<br>🤝 Ký hợp đồng đối tác nhập hàng<br>📱 Nhận tài khoản quản lý gian hàng trên app',
+    step3Extra: `
+      <div class="field">
+        <label>Nguồn hàng chính <span class="req">*</span></label>
+        <div class="radio-group rc-cs">
+          <div class="radio-card"><input type="radio" name="source" id="s1" value="1688"><label for="s1"><span class="r-icon">🏭</span>1688.com<br>(xưởng)</label></div>
+          <div class="radio-card"><input type="radio" name="source" id="s2" value="taobao"><label for="s2"><span class="r-icon">🛒</span>Taobao<br>(bán lẻ)</label></div>
+          <div class="radio-card"><input type="radio" name="source" id="s3" value="direct"><label for="s3"><span class="r-icon">🤝</span>Trực tiếp<br>với xưởng</label></div>
+          <div class="radio-card"><input type="radio" name="source" id="s4" value="other"><label for="s4"><span class="r-icon">📦</span>Nguồn<br>khác</label></div>
+        </div>
+        <div class="err-msg" id="sourceErr">Vui lòng chọn nguồn hàng</div>
+      </div>`,
+    step4Title: 'Thông tin sản phẩm',
+    step4Sub: 'Mô tả danh mục hàng bạn muốn bán trên CRABOR China Shop',
+    step4Content: `
+      <div class="field">
+        <label>Danh mục sản phẩm <span class="req">*</span> <small style="color:#999;font-weight:600;text-transform:none;letter-spacing:0">(chọn nhiều)</small></label>
+        <div class="chip-group" id="serviceChips">
+          <div class="chip" onclick="toggleChip(this,'on-cs')">🏠 Đồ gia dụng</div>
+          <div class="chip" onclick="toggleChip(this,'on-cs')">💄 Mỹ phẩm / Skincare</div>
+          <div class="chip" onclick="toggleChip(this,'on-cs')">👗 Thời trang</div>
+          <div class="chip" onclick="toggleChip(this,'on-cs')">📱 Phụ kiện công nghệ</div>
+          <div class="chip" onclick="toggleChip(this,'on-cs')">🍱 Thực phẩm / đồ ăn vặt</div>
+          <div class="chip" onclick="toggleChip(this,'on-cs')">🧸 Đồ chơi / quà tặng</div>
+          <div class="chip" onclick="toggleChip(this,'on-cs')">🏋️ Dụng cụ thể thao</div>
+          <div class="chip" onclick="toggleChip(this,'on-cs')">🌿 Chăm sóc sức khỏe</div>
+        </div>
+        <div class="err-msg" id="servicesErr">Vui lòng chọn ít nhất 1 danh mục</div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Số SKU hiện có</label>
+          <div class="input-wrap"><span class="icon">📦</span>
+            <input type="number" id="skuCount" placeholder="50" min="1">
+          </div>
+        </div>
+        <div class="field">
+          <label>Giá trị đơn trung bình (VNĐ)</label>
+          <div class="input-wrap"><span class="icon">💰</span>
+            <input type="number" id="avgOrder" placeholder="300000" min="0">
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Thời gian giao hàng về VN (ngày)</label>
+        <input type="range" id="shippingDays" min="5" max="30" value="10" oninput="document.getElementById('shipVal').textContent=this.value+' ngày'">
+        <div class="range-row"><span>5 ngày</span><span id="shipVal" style="color:#E8504A;font-weight:900;">10 ngày</span><span>30 ngày</span></div>
+      </div>
+      <div class="field">
+        <label>Mô tả sản phẩm / lợi thế cạnh tranh</label>
+        <textarea id="bizDesc" placeholder="Ví dụ: Chuyên mỹ phẩm nội địa Trung chính hãng thương hiệu XYZ, có kho tại Quảng Châu, ship 7–10 ngày..."></textarea>
+      </div>`,
+    step5Content: `
+      <div class="field">
+        <label>Ảnh CCCD mặt trước <span class="req">*</span></label>
+        <div class="upload-zone" id="z1"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt trước</strong></p><img class="preview-img" id="p1"></div>
+        <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
+      </div>
+      <div class="field">
+        <label>Ảnh CCCD mặt sau <span class="req">*</span></label>
+        <div class="upload-zone" id="z2"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt sau</strong></p><img class="preview-img" id="p2"></div>
+        <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
+      </div>
+      <div class="field">
+        <label>Ảnh sản phẩm mẫu (3–5 sản phẩm tiêu biểu) <span class="req">*</span></label>
+        <div class="upload-zone" id="z3"><input type="file" accept="image/*" onchange="prevFile(this,'p3','productSample')"><div class="upload-icon">📦</div><p>Ảnh <strong>sản phẩm mẫu</strong> có nhãn hiệu rõ ràng</p><img class="preview-img" id="p3"></div>
+        <div class="err-msg" id="productSampleErr">Vui lòng tải ảnh sản phẩm mẫu</div>
+      </div>
+      <div class="field">
+        <label>Giấy tờ nhập khẩu / hóa đơn nguồn hàng <span class="req">*</span></label>
+        <div class="upload-zone" id="z4"><input type="file" accept="image/*,application/pdf" onchange="prevFile(this,'p4','importDoc')"><div class="upload-icon">📄</div><p>Hóa đơn nhập hàng hoặc <strong>giấy tờ nguồn gốc</strong></p><img class="preview-img" id="p4"></div>
+        <div class="err-msg" id="importDocErr">Vui lòng tải giấy tờ nhập hàng</div>
+      </div>
+      <div class="info-box info-cs" style="margin-top:4px;">
+        🔍 <div>CRABOR sẽ xem xét hồ sơ và yêu cầu gửi sản phẩm mẫu để kiểm định trước khi duyệt gian hàng. Chỉ hàng chính hãng, nguồn gốc rõ ràng mới được duyệt.</div>
+      </div>`
+  },
+
+  sp: {
+    type: 'shipper',
+    name: 'Shipper',
+    emoji: '🛵',
+    badge: '🆕 App giao đồ ăn mới · Hà Nội',
+    title: 'Đăng ký <em>Shipper</em><br>Early Bird 🦀',
+    sub: 'Chỉ còn 50 suất · Phí ưu đãi 500k · Hoàn tiền sau 1.000 đơn',
+    info: 'Bạn đang đăng ký làm <strong>Shipper CRABOR</strong>. Thu nhập <strong>20k–50k/đơn</strong>. Phí kích hoạt <strong>500k</strong> (hoàn sau 1000 đơn).',
+    infoClass: 'info-sp',
+    headClass: 'head-sp',
+    logoClass: 'logo-sp',
+    progClass: 'prog-sp',
+    btnClass: 'btn-sp',
+    chkClass: 'check-row',
+    feeAmt: '500.000đ',
+    feeNote: 'Phí kích hoạt · Hoàn lại sau 1.000 đơn',
+    feeBadge: '⚡ Early Bird<br>Còn 50 suất',
+    feeClass: 'fee-sp',
+    steps: ['SĐT', 'Xác minh', 'Thông tin', 'Giấy tờ', 'Xác nhận'],
+    successIcon: '🛵',
+    successClass: 'success-title-sp',
+    nextSteps: '📞 Chờ cuộc gọi xác nhận từ CRABOR<br>📦 Nhận kit đồng phục sau khi duyệt<br>📱 Tải app CRABOR Shipper để bắt đầu<br>💸 Thanh toán phí 500k khi nhận kit',
+    step3Extra: `
+      <div class="field">
+        <label>Ngày sinh <span class="req">*</span></label>
+        <div class="input-wrap"><span class="icon">📅</span>
+          <input type="text" id="dob" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="err-msg" id="dobErr">Bạn phải từ 18 tuổi trở lên</div>
+      </div>
+      <div class="field">
+        <label>Phương tiện <span class="req">*</span></label>
+        <div class="radio-group">
+          <div class="radio-card"><input type="radio" name="vehicle" id="v1" value="Xe máy"><label for="v1"><span class="r-icon">🛵</span>Xe máy</label></div>
+          <div class="radio-card"><input type="radio" name="vehicle" id="v2" value="Xe đạp điện"><label for="v2"><span class="r-icon">🚲</span>Xe đạp điện</label></div>
+        </div>
+        <div class="err-msg" id="vehicleErr">Vui lòng chọn phương tiện</div>
+      </div>`,
+    step4Title: 'Tải lên giấy tờ',
+    step4Sub: 'Ảnh chụp rõ nét, không bị mờ. Chấp nhận JPG, PNG (tối đa 5MB)',
+    step4Content: `
+      <div class="field">
+        <label>Ảnh CCCD mặt trước <span class="req">*</span></label>
+        <div class="upload-zone" id="z1"><input type="file" accept="image/*" onchange="prevFile(this,'p1','cccdFront')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt trước</strong></p><img class="preview-img" id="p1"></div>
+        <div class="err-msg" id="cccdFrontErr">Vui lòng tải ảnh CCCD mặt trước</div>
+      </div>
+      <div class="field">
+        <label>Ảnh CCCD mặt sau <span class="req">*</span></label>
+        <div class="upload-zone" id="z2"><input type="file" accept="image/*" onchange="prevFile(this,'p2','cccdBack')"><div class="upload-icon">🪪</div><p>CCCD <strong>mặt sau</strong></p><img class="preview-img" id="p2"></div>
+        <div class="err-msg" id="cccdBackErr">Vui lòng tải ảnh CCCD mặt sau</div>
+      </div>
+      <div class="field">
+        <label>Ảnh chân dung (selfie) <span class="req">*</span></label>
+        <div class="upload-zone" id="z3"><input type="file" accept="image/*" onchange="prevFile(this,'p3','selfie')"><div class="upload-icon">🤳</div><p><strong>Selfie</strong> rõ nét, không đeo kính/mũ</p><img class="preview-img" id="p3"></div>
+        <div class="err-msg" id="selfieErr">Vui lòng tải ảnh selfie</div>
+      </div>
+      <div class="field">
+        <label>Ảnh phương tiện (biển số rõ) <span class="req">*</span></label>
+        <div class="upload-zone" id="z4"><input type="file" accept="image/*" onchange="prevFile(this,'p4','vehicleImg')"><div class="upload-icon">🛵</div><p>Ảnh <strong>phương tiện</strong> rõ biển số</p><img class="preview-img" id="p4"></div>
+        <div class="err-msg" id="vehicleImgErr">Vui lòng tải ảnh phương tiện</div>
+      </div>`,
+    step5Content: '' // Shipper dùng step4 làm step giấy tờ
+  }
+};
+
+// ── STATE ──
+let mod = 'gl';
+let currentStep = 1;
+let phoneVerified = false;
+let phone = '';
+let uploads = {};
+let otpTimer = null;
+let state = {
+  phone: '',
+  otp: '',
+  verified: false,
+  firstName: '',
+  lastName: '',
+  email: '',
+  dob: '',
+  district: '',
+  vehicle: '',
+  files: {}
+};
+
+// ── START REGISTRATION FROM WELCOME SCREEN ──
+function startRegistration(module) {
+  document.getElementById('welcomeScreen').classList.add('hide');
+  document.getElementById('card').classList.remove('hide');
+  switchModule(module);
+}
+
+function getModuleName(module) {
+  const names = {
+    gl: 'Giặt là',
+    gv: 'Giúp việc',
+    cs: 'China Shop',
+    sp: 'Shipper'
+  };
+  return names[module];
+}
+
+// ── SWITCH MODULE ──
+function switchModule(m) {
+  mod = m;
+  const cfg = MODULES[m];
+
+  const head = document.getElementById('cardHead');
+  head.className = 'card-head ' + cfg.headClass;
+  document.getElementById('headBadge').innerHTML = cfg.badge;
+  document.getElementById('headTitle').innerHTML = cfg.title;
+  document.getElementById('headSub').textContent = cfg.sub;
+  document.getElementById('logoSm').className = 'logo-sm ' + cfg.logoClass;
+
+  const logoSvg = document.getElementById('logoSvg');
+  if (m === 'gl') logoSvg.innerHTML = `<rect x="22" y="22" width="96" height="96" rx="14" fill="#F5F0DC"/><rect x="22" y="22" width="96" height="28" rx="14" fill="#6495ed" opacity=".8"/><rect x="22" y="42" width="96" height="8" fill="#6495ed" opacity=".8"/><circle cx="70" cy="88" r="30" fill="#6495ed" opacity=".35"/><circle cx="70" cy="88" r="22" fill="#F5F0DC"/><circle cx="70" cy="88" r="14" fill="#6495ed" opacity=".3"/><circle cx="38" cy="34" r="6" fill="#E8504A"/><circle cx="56" cy="34" r="6" fill="#FFD84D"/>`;
+  if (m === 'gv') logoSvg.innerHTML = `<rect x="56" y="15" width="14" height="70" rx="7" fill="#F5F0DC"/><path d="M30 85 Q70 72 110 85 L104 112 Q70 122 36 112Z" fill="#F5F0DC"/><circle cx="28" cy="48" r="6" fill="#FFD84D" opacity=".9"/><circle cx="112" cy="42" r="5" fill="#FFD84D" opacity=".7"/><circle cx="105" cy="65" r="7" fill="#3aaa5c" opacity=".8"/><circle cx="22" cy="70" r="5" fill="#3aaa5c" opacity=".7"/>`;
+  if (m === 'cs') logoSvg.innerHTML = `<rect x="22" y="48" width="96" height="76" rx="10" fill="#F5F0DC"/><rect x="22" y="48" width="96" height="24" rx="10" fill="#FFD84D"/><rect x="22" y="62" width="96" height="10" fill="#FFD84D"/><rect x="60" y="20" width="14" height="80" rx="5" fill="#E8504A" opacity=".55"/><path d="M46 48 Q46 28 70 28 Q94 28 94 48" stroke="#F5F0DC" stroke-width="6" fill="none" stroke-linecap="round"/><text x="70" y="102" font-family="Arial Black" font-size="12" font-weight="900" fill="#E8504A" text-anchor="middle">★</text>`;
+  if (m === 'sp') logoSvg.innerHTML = `<path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/><ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/><circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/><circle cx="54" cy="49" r="2.5" fill="#F5F0DC"/><circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/><circle cx="82" cy="49" r="2.5" fill="#F5F0DC"/><path d="M28 73 Q8 60 7 47 Q17 33 27 43 Q21 52 28 61Z" fill="#F5F0DC"/><path d="M112 73 Q132 60 133 47 Q123 33 113 43 Q119 52 112 61Z" fill="#F5F0DC"/><path d="M57 96 Q70 107 83 96" stroke="#E8504A" stroke-width="3.5" stroke-linecap="round" fill="none"/>`;
+
+  const progWrap = document.getElementById('progWrap');
+  progWrap.className = 'progress-wrap ' + cfg.progClass;
+
+  document.querySelectorAll('.btn-next').forEach(b => {
+    b.className = 'btn-next ' + cfg.btnClass;
+  });
+  document.querySelectorAll('.btn-otp').forEach(b => {
+    b.className = 'btn-otp btn-otp-' + m;
+  });
+
+  const infoBox = document.getElementById('moduleInfoBox');
+  infoBox.className = 'info-box ' + cfg.infoClass;
+  infoBox.innerHTML = '💡 <div>' + cfg.info + '</div>';
+
+  ['chkRow1', 'chkRow2', 'chkRow3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'check-row ' + cfg.chkClass;
+  });
+
+  const feeBox = document.getElementById('feeBox');
+  feeBox.className = 'fee-box ' + cfg.feeClass;
+  document.getElementById('feeAmt').textContent = cfg.feeAmt;
+  document.getElementById('feeNote').textContent = cfg.feeNote;
+  document.getElementById('feeBadge').innerHTML = cfg.feeBadge;
+
+  renderSteps(cfg.steps, currentStep);
+  adjustFormForModule(cfg);
+  document.getElementById('step3Extra').innerHTML = cfg.step3Extra || '';
+
+  if (m === 'sp') {
+    document.getElementById('step3Title').textContent = 'Thông tin cá nhân';
+    document.getElementById('step3Sub').textContent = 'Điền đầy đủ thông tin cá nhân của bạn';
+  } else if (m === 'gv') {
+    document.getElementById('step3Title').textContent = 'Thông tin cá nhân';
+    document.getElementById('step3Sub').textContent = 'Điền đầy đủ thông tin cá nhân của bạn';
+  } else {
+    document.getElementById('step3Title').textContent = 'Thông tin cơ sở';
+    document.getElementById('step3Sub').textContent = 'Điền thông tin chính xác về cơ sở kinh doanh của bạn';
+  }
+
+  if (m === 'sp') {
+    document.getElementById('step4Title').textContent = 'Tải lên giấy tờ';
+    document.getElementById('step4Sub').textContent = 'Ảnh chụp rõ nét, không bị mờ. Chấp nhận JPG, PNG (tối đa 5MB)';
+    document.getElementById('step4Content').innerHTML = cfg.step4Content;
+    document.getElementById('step5Content').innerHTML = '';
+  } else {
+    document.getElementById('step4Title').textContent = cfg.step4Title;
+    document.getElementById('step4Sub').textContent = cfg.step4Sub;
+    document.getElementById('step4Content').innerHTML = cfg.step4Content;
+    document.getElementById('step5Content').innerHTML = cfg.step5Content;
+  }
+
+  document.getElementById('successIcon').textContent = cfg.successIcon;
+  document.getElementById('successTitle').className = 'success-title ' + cfg.successClass;
+  document.getElementById('nextStepsContent').innerHTML = cfg.nextSteps;
+  document.getElementById('btnRestart').className = 'btn-next ' + cfg.btnClass;
+
+  uploads = {};
+  phoneVerified = false;
+  resetFormFields();
+  goStep(1);
+}
+
+function adjustFormForModule(cfg) {
+  if (mod === 'sp' || mod === 'gv') {
+    document.getElementById('bizNameLabel').innerHTML = 'Tên hiển thị <span class="req">*</span>';
+    document.getElementById('bizName').placeholder = 'Nguyễn Văn A';
+    document.getElementById('addressLabel').textContent = 'Địa chỉ thường trú';
+    document.getElementById('districtLabel').textContent = 'Khu vực hoạt động';
+    
+    if (mod === 'sp') {
+      document.getElementById('addressField').style.display = 'block';
+    }
+  } else {
+    document.getElementById('bizNameLabel').innerHTML = 'Tên cơ sở / thương hiệu <span class="req">*</span>';
+    document.getElementById('bizName').placeholder = 'Tiệm giặt Minh Tú';
+    document.getElementById('addressLabel').textContent = 'Địa chỉ cơ sở';
+    document.getElementById('districtLabel').textContent = 'Quận / Huyện';
+    document.getElementById('addressField').style.display = 'block';
+  }
+
+  if (mod === 'cs') {
+    document.getElementById('lastNameLabel').innerHTML = 'Họ chủ cơ sở <span class="req">*</span>';
+    document.getElementById('firstNameLabel').innerHTML = 'Tên chủ cơ sở <span class="req">*</span>';
+  } else {
+    document.getElementById('lastNameLabel').innerHTML = 'Họ <span class="req">*</span>';
+    document.getElementById('firstNameLabel').innerHTML = 'Tên <span class="req">*</span>';
+  }
+}
+
+function resetFormFields() {
+  const inputs = ['phone', 'lastName', 'firstName', 'bizName', 'email', 'address', 'district', 'dob'];
+  inputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  document.querySelectorAll('input[type=radio]').forEach(r => r.checked = false);
+  
+  document.querySelectorAll('.chip').forEach(c => {
+    c.className = 'chip';
+  });
+
+  document.querySelectorAll('.preview-img').forEach(img => {
+    img.style.display = 'none';
+    img.src = '';
+  });
+
+  document.querySelectorAll('.err-msg').forEach(err => {
+    err.classList.remove('show');
+  });
+}
+
+function renderSteps(labels, active) {
+  const bar = document.getElementById('stepsBar');
+  let html = '';
+  labels.forEach((lbl, i) => {
+    const n = i + 1;
+    const cls = n < active ? 'done' : n === active ? 'active' : '';
+    html += `<div class="step-col"> <div class="step-circle ${cls}" id="sc${n}">${n < active ? '✓' : n}</div> <div class="step-label ${cls}" id="sl${n}">${lbl}</div> </div>`;
+    if (i < labels.length - 1) html += `<div class="step-line ${n < active ? 'done' : ''}" id="line${n}"></div>`;
+  });
+  bar.innerHTML = html;
+}
+
+// ── NAVIGATION ──
+function goStep(n) {
+  if (n === 2 && !validateStep1()) return;
+  if (n >= 3 && !phoneVerified) {
+    showToast('❌ Vui lòng xác minh OTP trước');
+    return;
+  }
+  if (n === 6) buildSummary();
+
+  document.getElementById('step' + currentStep).classList.remove('show');
+  document.getElementById('step' + n).classList.add('show');
+  currentStep = n;
+  renderSteps(MODULES[mod].steps, n);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── STEP 1 ──
+function validateStep1() {
+  const val = document.getElementById('phone').value.trim();
+  const err = document.getElementById('phoneErr');
+  if (!/^0[0-9]{9}$/.test(val)) {
+    err.classList.add('show');
+    document.getElementById('phone').classList.add('err');
+    return false;
+  }
+  err.classList.remove('show');
+  document.getElementById('phone').classList.remove('err');
+  phone = val;
+  state.phone = val;
+  return true;
+}
+
+function step1Next() {
+  if (validateStep1()) {
+    sendOTP();
+  }
+}
+
+// Cập nhật hàm sendOTP để gọi API thật
+async function sendOTP(resend = false) {
+  const val = document.getElementById('phone').value.trim();
+  if (!/^0[0-9]{9}$/.test(val)) return;
+  phone = val;
+  const btn = document.getElementById('btnOtp');
+  btn.disabled = true;
+  
+  try {
+    const response = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        phone, 
+        type: mod === 'sp' ? 'shipper_register' : 'partner_register' 
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showToast('📱 Đã gửi mã OTP');
+      if (!resend) {
+        document.getElementById('phoneMask').textContent = phone.slice(0, 3) + '****' + phone.slice(-3);
+        goStep(2);
+      }
+    } else {
+      showToast('❌ ' + data.message);
+      btn.disabled = false;
+    }
+  } catch (error) {
+    showToast('❌ Lỗi kết nối server');
+    btn.disabled = false;
+  }
+  
+  startCountdown(btn);
+}
+
+function startCountdown(btn) {
+  let s = 60;
+  const cd = document.getElementById('countdown');
+  cd.style.display = 'block';
+  if (otpTimer) clearInterval(otpTimer);
+  otpTimer = setInterval(() => {
+    cd.textContent = `Gửi lại sau ${s}s`;
+    s--;
+    if (s < 0) {
+      clearInterval(otpTimer);
+      btn.disabled = false;
+      cd.style.display = 'none';
+    }
+  }, 1000);
+}
+
+function otpIn(el, idx) {
+  el.value = el.value.replace(/\D/, '');
+  if (el.value) {
+    el.classList.add('filled');
+    const nx = document.getElementById('o' + (idx + 1));
+    if (nx) nx.focus();
+  } else el.classList.remove('filled');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Backspace') {
+    const ids = ['o0', 'o1', 'o2', 'o3', 'o4', 'o5'];
+    const idx = ids.indexOf(document.activeElement?.id);
+    if (idx > 0 && !document.activeElement.value) {
+      document.getElementById(ids[idx - 1]).focus();
+    }
+  }
+});
+
+// Cập nhật hàm verifyOTP
+async function verifyOTP() {
+  const code = [0, 1, 2, 3, 4, 5].map(i => document.getElementById('o' + i).value).join('');
+  const errEl = document.getElementById('otpErr');
+  
+  if (code.length !== 6) {
+    errEl.style.display = 'block';
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        phone, 
+        otp: code, 
+        type: mod === 'sp' ? 'shipper_register' : 'partner_register' 
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      phoneVerified = true;
+      state.verified = true;
+      errEl.style.display = 'none';
+      showToast('✅ Xác minh thành công!');
+      goStep(3);
+    } else {
+      errEl.style.display = 'block';
+    }
+  } catch (error) {
+    showToast('❌ Lỗi xác minh');
+    errEl.style.display = 'block';
+  }
+}
+
+// ── STEP 3 ──
+function validateStep3() {
+  let ok = true;
+
+  const checks = [
+    ['lastName', 'lastNameErr', v => v.length > 0],
+    ['firstName', 'firstNameErr', v => v.length > 0],
+    ['email', 'emailErr', v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)],
+    ['district', 'districtErr', v => v !== '']
+  ];
+
+  if (mod !== 'sp') {
+    checks.push(['bizName', 'bizNameErr', v => v.length > 0]);
+  }
+
+  if (mod !== 'sp') {
+    checks.push(['address', 'addressErr', v => v.length > 3]);
+  }
+
+  checks.forEach(([id, errId, fn]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const v = el.value.trim();
+    const err = document.getElementById(errId);
+    if (!fn(v)) {
+      err.classList.add('show');
+      el.classList.add('err');
+      ok = false;
+    } else {
+      err.classList.remove('show');
+      el.classList.remove('err');
+    }
+  });
+
+  if (mod === 'gv' || mod === 'sp') {
+    const dob = document.getElementById('dob');
+    if (dob) {
+      const v = dob.value.trim();
+      const dobErr = document.getElementById('dobErr');
+      const valid = /\d{2}\/\d{2}\/\d{4}/.test(v);
+      let age18 = false;
+      if (valid) {
+        const [d, m2, y] = v.split('/');
+        const birth = new Date(y, m2 - 1, d);
+        age18 = (new Date() - birth) / (365.25 * 24 * 3600e3) >= 18;
+      }
+      if (!valid || !age18) {
+        dobErr.classList.add('show');
+        dob.classList.add('err');
+        ok = false;
+      } else {
+        dobErr.classList.remove('show');
+        dob.classList.remove('err');
+        state.dob = v;
+      }
+    }
+  }
+
+  if (mod === 'gv') {
+    const exp = document.querySelector('input[name=exp]:checked');
+    const expErr = document.getElementById('expErr');
+    if (expErr) {
+      if (!exp) {
+        expErr.classList.add('show');
+        ok = false;
+      } else expErr.classList.remove('show');
+    }
+  }
+
+  if (mod === 'cs') {
+    const src = document.querySelector('input[name=source]:checked');
+    const srcErr = document.getElementById('sourceErr');
+    if (srcErr) {
+      if (!src) {
+        srcErr.classList.add('show');
+        ok = false;
+      } else srcErr.classList.remove('show');
+    }
+  }
+
+  if (mod === 'sp') {
+    const vehicle = document.querySelector('input[name=vehicle]:checked');
+    const vehicleErr = document.getElementById('vehicleErr');
+    if (vehicleErr) {
+      if (!vehicle) {
+        vehicleErr.classList.add('show');
+        ok = false;
+      } else {
+        vehicleErr.classList.remove('show');
+        state.vehicle = vehicle.value;
+      }
+    }
+  }
+
+  if (ok) {
+    state.lastName = document.getElementById('lastName').value.trim();
+    state.firstName = document.getElementById('firstName').value.trim();
+    state.email = document.getElementById('email').value.trim();
+    state.district = document.getElementById('district').value;
+    
+    if (mod !== 'sp') {
+      state.bizName = document.getElementById('bizName').value.trim();
+      state.address = document.getElementById('address').value.trim();
+    }
+
+    goStep(4);
+  }
+}
+
+// ── STEP 4 ──
+function toggleChip(el, cls) {
+  el.classList.toggle(cls);
+}
+
+function validateStep4() {
+  if (mod === 'sp') {
+    validateStep5();
+    return;
+  }
+
+  let ok = true;
+
+  const chips = document.querySelectorAll('#serviceChips .chip.on-gl, #serviceChips .chip.on-gv, #serviceChips .chip.on-cs');
+  const servErr = document.getElementById('servicesErr');
+  if (servErr) {
+    if (chips.length === 0) {
+      servErr.classList.add('show');
+      ok = false;
+    } else servErr.classList.remove('show');
+  }
+
+  if (mod === 'gl') {
+    const price = document.getElementById('pricePerKg');
+    const pErr = document.getElementById('priceErr');
+    if (price && (!price.value || price.value < 1000)) {
+      pErr.classList.add('show');
+      price.classList.add('err');
+      ok = false;
+    } else if (price) {
+      pErr.classList.remove('show');
+      price.classList.remove('err');
+    }
+
+    const ta = document.querySelector('input[name=turnaround]:checked');
+    const taErr = document.getElementById('turnaroundErr');
+    if (taErr) {
+      if (!ta) {
+        taErr.classList.add('show');
+        ok = false;
+      } else taErr.classList.remove('show');
+    }
+  }
+
+  if (mod === 'gv') {
+    const shiftChips = document.querySelectorAll('#shiftChips .chip.on-gv');
+    const shErr = document.getElementById('shiftsErr');
+    if (shErr) {
+      if (shiftChips.length === 0) {
+        shErr.classList.add('show');
+        ok = false;
+      } else shErr.classList.remove('show');
+    }
+  }
+
+  if (ok) goStep(5);
+}
+
+// ── STEP 5 ──
+function prevFile(input, prevId, key) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById(prevId);
+    if (img) {
+      img.src = e.target.result;
+      img.style.display = 'block';
+    }
+  };
+  reader.readAsDataURL(file);
+  uploads[key] = true;
+  state.files[key] = file;
+}
+
+function validateStep5() {
+  let ok = true;
+  const required = {
+    gl: ['cccdFront', 'cccdBack', 'shopFront', 'shopInside'],
+    gv: ['cccdFront', 'cccdBack', 'selfie'],
+    cs: ['cccdFront', 'cccdBack', 'productSample', 'importDoc'],
+    sp: ['cccdFront', 'cccdBack', 'selfie', 'vehicleImg']
+  };
+
+  const errIds = {
+    cccdFront: 'cccdFrontErr',
+    cccdBack: 'cccdBackErr',
+    shopFront: 'shopFrontErr',
+    shopInside: 'shopInsideErr',
+    selfie: 'selfieErr',
+    productSample: 'productSampleErr',
+    importDoc: 'importDocErr',
+    vehicleImg: 'vehicleImgErr'
+  };
+
+  (required[mod] || []).forEach(key => {
+    const errEl = document.getElementById(errIds[key]);
+    if (errEl) {
+      if (!uploads[key]) {
+        errEl.classList.add('show');
+        ok = false;
+      } else errEl.classList.remove('show');
+    }
+  });
+
+  if (ok) {
+    buildSummary();
+    goStep(6);
+  }
+}
+
+// ── STEP 6 ──
+function buildSummary() {
+  const cfg = MODULES[mod];
+  const rows = [
+    ['Module', cfg.name + ' ' + cfg.emoji],
+    ['Họ tên', (document.getElementById('lastName')?.value || '') + ' ' + (document.getElementById('firstName')?.value || '')],
+    ['Số điện thoại', phone],
+    ['Email', document.getElementById('email')?.value || '']
+  ];
+
+  if (mod !== 'sp') {
+    rows.push(['Tên cơ sở', document.getElementById('bizName')?.value || '']);
+    rows.push(['Địa chỉ', document.getElementById('address')?.value || '']);
+  }
+
+  rows.push(['Quận/Huyện', document.getElementById('district')?.value || '']);
+
+  if (mod === 'sp') {
+    rows.push(['Phương tiện', state.vehicle || '']);
+  }
+
+  if (mod !== 'sp') {
+    rows.push(['Hoa hồng CRABOR', cfg.feeAmt]);
+  } else {
+    rows.push(['Phí kích hoạt', '500.000đ']);
+  }
+
+  document.getElementById('summaryBox').innerHTML = rows.map(([k, v]) =>
+    `<div class="summary-row"><span class="key">${k}</span><span class="val">${v}</span></div>`
+  ).join('');
+}
+
+// Helper function để lấy các chip đã chọn
+function getSelectedChips(selector) {
+  const chips = document.querySelectorAll(selector + ' .chip.on-gl, ' + selector + ' .chip.on-gv, ' + selector + ' .chip.on-cs');
+  return Array.from(chips).map(chip => chip.textContent.trim());
+}
+
+// Cập nhật hàm submitForm
+async function submitForm() {
+  const allOk = ['chkTerms', 'chkInfo', 'chkService'].every(id => {
+    const el = document.getElementById(id);
+    return el ? el.checked : true;
+  });
+
+  if (!allOk) {
+    document.getElementById('checkErr').classList.add('show');
+    return;
+  }
+  document.getElementById('checkErr').classList.remove('show');
+
+  const btn = document.getElementById('btnSubmit');
+  btn.disabled = true;
+
+  const payload = {
+    phone: phone,
+    firstName: document.getElementById('firstName')?.value,
+    lastName: document.getElementById('lastName')?.value,
+    email: document.getElementById('email')?.value,
+    district: document.getElementById('district')?.value,
+  };
+
+  if (mod !== 'sp') {
+    payload.bizName = document.getElementById('bizName')?.value;
+    payload.address = document.getElementById('address')?.value;
+    payload.type = mod;
+    
+    if (mod === 'gl') {
+      payload.services = getSelectedChips('#serviceChips');
+      payload.pricePerKg = document.getElementById('pricePerKg')?.value;
+      payload.turnaround = document.querySelector('input[name=turnaround]:checked')?.value;
+    }
+    
+    if (mod === 'gv') {
+      payload.services = getSelectedChips('#serviceChips');
+      payload.shifts = getSelectedChips('#shiftChips');
+      payload.exp = document.querySelector('input[name=exp]:checked')?.value;
+      payload.dob = document.getElementById('dob')?.value;
+    }
+    
+    if (mod === 'cs') {
+      payload.categories = getSelectedChips('#serviceChips');
+      payload.source = document.querySelector('input[name=source]:checked')?.value;
+    }
+  }
+
+  if (mod === 'sp') {
+    payload.dob = document.getElementById('dob')?.value;
+    payload.vehicle = document.querySelector('input[name=vehicle]:checked')?.value;
+  }
+
+  try {
+    const endpoint = mod === 'sp' ? '/api/shipper/register' : '/api/partner/register';
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      document.getElementById('registerId').textContent = data.registerId;
+      
+      document.getElementById('step6').classList.remove('show');
+      document.getElementById('step7').classList.add('show');
+      showToast('🎉 Đăng ký thành công!');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      showToast('❌ ' + data.message);
+      btn.disabled = false;
+    }
+  } catch (error) {
+    showToast('❌ Lỗi kết nối server');
+    btn.disabled = false;
+  }
+}
+
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── DOB formatter ──
+document.addEventListener('DOMContentLoaded', () => {
+  renderSteps(MODULES[mod].steps, 1);
+
+  const dob = document.getElementById('dob');
+  if (dob) {
+    dob.addEventListener('input', e => {
+      let v = e.target.value.replace(/\D/g, '');
+      if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+      if (v.length >= 6) v = v.slice(0, 5) + '/' + v.slice(5, 9);
+      e.target.value = v;
+    });
+  }
+});
+</script>
 </body>
 </html>
