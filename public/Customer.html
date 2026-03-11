@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CRABOR – Đặt hàng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red: #E8504A;
+  --cream: #F5F0DC;
+  --yellow: #FFD84D;
+  --dark: #1a1a1a;
+  --gray: #777;
+  --light: #f5f5f5;
+  --white: #fff;
+  --radius: 20px;
+  --shadow: 0 8px 30px rgba(0,0,0,.12);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  font-family: 'Nunito', sans-serif;
+  background: #f0ede6;
+  min-height: 100vh;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  overflow-x: hidden;
+}
+/* ── SCREENS ── */
+.screen { display:none; flex-direction:column; min-height:100vh; }
+.screen.active { display:flex; }
+
+/* ══ LOGIN SCREEN ══ */
+#loginScreen {
+  background: linear-gradient(160deg, #E8504A 0%, #c93d37 55%, #1a1a1a 100%);
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 40px;
+}
+.login-hero {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60px 30px 30px;
+  flex: 1;
+}
+.login-crab {
+  width: 110px; height: 110px;
+  background: rgba(245,240,220,.15);
+  border-radius: 35px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+  border: 2px solid rgba(245,240,220,.25);
+  animation: floatAnim 3s ease-in-out infinite;
+}
+@keyframes floatAnim { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.login-brand {
+  font-family: 'Fredoka One', cursive;
+  font-size: 3.5rem;
+  color: #F5F0DC;
+  text-shadow: 4px 4px 0 rgba(0,0,0,.2);
+  margin-bottom: 8px;
+}
+.login-sub { font-size: 1rem; color: rgba(245,240,220,.8); font-weight: 700; text-align:center; }
+.login-card {
+  background: #fff;
+  border-radius: 32px 32px 0 0;
+  padding: 35px 28px 30px;
+  width: 100%;
+}
+.login-title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.6rem;
+  color: #1a1a1a;
+  margin-bottom: 6px;
+}
+.login-hint { font-size: 0.9rem; color: #777; font-weight: 700; margin-bottom: 25px; }
+.inp-wrap { position: relative; margin-bottom: 14px; }
+.inp-wrap .ico { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; }
+.inp {
+  width: 100%; padding: 15px 16px 15px 46px;
+  border: 2px solid #e8e8e8; border-radius: 14px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem; font-weight: 700;
+  outline: none; background: #fafafa;
+  transition: border-color .2s;
+}
+.inp:focus { border-color: #E8504A; background: #fff; }
+.phone-row { display:flex; gap:10px; }
+.phone-row .inp { flex:1; }
+.btn-otp {
+  padding: 0 16px; border-radius: 14px;
+  border: 2px solid #E8504A; background: transparent;
+  color: #E8504A; font-family: 'Fredoka One', cursive;
+  font-size: 0.95rem; cursor: pointer; white-space: nowrap;
+  transition: all .2s; flex-shrink: 0;
+}
+.btn-otp:hover { background: #E8504A; color: #fff; }
+.btn-otp:disabled { opacity:.4; cursor:not-allowed; }
+.otp-row { display:flex; gap:10px; justify-content:center; margin: 18px 0; }
+.otp-d {
+  width: 52px; height: 60px; border-radius: 14px;
+  border: 2px solid #e8e8e8; background: #fafafa;
+  font-family: 'Fredoka One', cursive; font-size: 1.8rem;
+  text-align: center; outline: none; transition: border-color .2s;
+}
+.otp-d:focus { border-color: #E8504A; background: #fff; }
+.otp-d.filled { border-color: #3aaa5c; }
+.btn-main {
+  width: 100%; padding: 17px;
+  border-radius: 60px; border: none;
+  background: #E8504A;
+  box-shadow: 0 8px 25px rgba(232,80,74,.4);
+  color: #fff;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.2rem; cursor: pointer;
+  transition: all .2s; margin-top: 8px;
+}
+.btn-main:hover { transform: translateY(-2px); background: #c93d37; }
+.btn-main:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+.err { color:#ff4d4d; font-size:.85rem; font-weight:800; margin-top:5px; display:none; }
+.err.show { display:block; }
+.countdown { font-size:.8rem; color:#777; font-weight:700; margin-top:5px; display:none; }
+
+/* ══ MAIN APP ══ */
+#appScreen { background: #f0ede6; }
+.topbar {
+  background: linear-gradient(135deg, #E8504A, #c93d37);
+  padding: 50px 20px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.topbar::after {
+  content:'';
+  position: absolute;
+  width: 250px; height: 250px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,216,77,.15), transparent 70%);
+  right: -60px; bottom: -80px;
+}
+.topbar-row { display:flex; justify-content:space-between; align-items:center; position:relative; }
+.topbar-left .greeting { font-size:.85rem; color:rgba(245,240,220,.8); font-weight:700; }
+.topbar-left .uname {
+  font-family:'Fredoka One',cursive;
+  font-size:1.3rem; color:#F5F0DC;
+}
+.topbar-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(245,240,220,.2);
+  border: 2px solid rgba(245,240,220,.4);
+  display: flex; align-items:center; justify-content:center;
+  font-size: 1.3rem; cursor:pointer;
+}
+.topbar-location {
+  display: flex; align-items:center; gap:6px;
+  color: rgba(245,240,220,.85); font-size:.85rem; font-weight:700;
+  margin-top: 12px; position:relative;
+}
+.topbar-search {
+  background: rgba(255,255,255,.15);
+  border: 1.5px solid rgba(245,240,220,.25);
+  border-radius: 14px;
+  padding: 11px 16px 11px 40px;
+  color: rgba(245,240,220,.9);
+  font-family:'Nunito',sans-serif;
+  font-size:.95rem; font-weight:700;
+  width:100%; outline:none; margin-top:14px; position:relative;
+}
+.search-icon {
+  position:absolute; left:16px; bottom:16px;
+  font-size:1rem; pointer-events:none;
+}
+
+/* TABS CONTENT */
+.tab-content { flex:1; overflow-y:auto; padding-bottom: 85px; }
+.tab-page { display:none; }
+.tab-page.active { display:block; }
+
+/* HOME TAB */
+.promo-banner {
+  margin: 16px; border-radius: var(--radius);
+  background: linear-gradient(135deg, #1a1a1a, #333);
+  padding: 22px 20px;
+  display: flex; align-items:center; gap:16px;
+  overflow:hidden; position:relative;
+}
+.promo-banner::before {
+  content:'';
+  position:absolute;
+  width:150px; height:150px; border-radius:50%;
+  background: radial-gradient(circle, rgba(232,80,74,.3), transparent 70%);
+  right:-30px; top:-30px;
+}
+.promo-text h3 {
+  font-family:'Fredoka One',cursive;
+  font-size:1.3rem; color:#FFD84D;
+  margin-bottom:5px;
+}
+.promo-text p { font-size:.85rem; color:rgba(255,255,255,.8); font-weight:700; }
+.promo-badge {
+  background:#E8504A; color:#fff;
+  padding:6px 12px; border-radius:20px;
+  font-size:.75rem; font-weight:900;
+  margin-top:8px; display:inline-block;
+}
+
+.section-title {
+  font-family:'Fredoka One',cursive;
+  font-size:1.2rem; color:#1a1a1a;
+  padding: 16px 16px 10px;
+}
+
+/* SERVICE MODULES */
+.modules-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 16px 4px;
+}
+.module-card {
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  display:flex; flex-direction:column; gap:10px;
+  position:relative; overflow:hidden;
+}
+.module-card:hover { transform:translateY(-4px); box-shadow:var(--shadow); }
+.module-card.food { background: linear-gradient(135deg, #E8504A, #c93d37); }
+.module-card.laundry { background: linear-gradient(135deg, #2d3d7a, #1a2040); }
+.module-card.cleaning { background: linear-gradient(135deg, #2d5a2d, #1a2f1a); }
+.module-card.china { background: linear-gradient(135deg, #7a2d2d, #4a1a1a); }
+.module-card .mc-icon { font-size: 2.2rem; }
+.module-card .mc-name {
+  font-family:'Fredoka One',cursive;
+  font-size:1.1rem; color:#F5F0DC;
+}
+.module-card .mc-sub { font-size:.75rem; color:rgba(245,240,220,.75); font-weight:700; }
+.mc-badge {
+  position:absolute; top:12px; right:12px;
+  background:#FFD84D; color:#7a3a00;
+  padding:3px 8px; border-radius:10px;
+  font-size:.65rem; font-weight:900;
+}
+
+/* FOOD PAGE */
+.cat-scroll {
+  display:flex; gap:10px; padding:14px 16px;
+  overflow-x:auto; scrollbar-width:none;
+}
+.cat-scroll::-webkit-scrollbar { display:none; }
+.cat-chip {
+  flex-shrink:0;
+  background:#fff; border: 2px solid #e8e8e8;
+  padding:8px 16px; border-radius:30px;
+  font-size:.85rem; font-weight:800; color:#555;
+  cursor:pointer; transition:all .2s; white-space:nowrap;
+}
+.cat-chip.active { background:#E8504A; border-color:#E8504A; color:#fff; }
+.products-list { padding: 0 16px 16px; }
+.product-card {
+  background:#fff; border-radius:16px;
+  display:flex; align-items:center; gap:14px;
+  padding:14px; margin-bottom:10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+  cursor:pointer; transition:transform .15s;
+}
+.product-card:hover { transform:translateY(-2px); }
+.prod-img {
+  width:72px; height:72px; border-radius:12px;
+  background:#f0ede6;
+  display:flex; align-items:center; justify-content:center;
+  font-size:2rem; flex-shrink:0;
+}
+.prod-info { flex:1; }
+.prod-name { font-weight:900; font-size:.95rem; color:#1a1a1a; margin-bottom:3px; }
+.prod-desc { font-size:.8rem; color:#777; font-weight:600; margin-bottom:6px; line-height:1.4; }
+.prod-price {
+  font-family:'Fredoka One',cursive;
+  font-size:1.1rem; color:#E8504A;
+}
+.prod-sold { font-size:.75rem; color:#bbb; font-weight:700; }
+.prod-add {
+  width:34px; height:34px; border-radius:50%;
+  background:#E8504A; border:none; color:#fff;
+  font-size:1.2rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; transition:transform .15s;
+}
+.prod-add:hover { transform:scale(1.1); }
+
+/* CART */
+.cart-fab {
+  position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+  max-width:398px; width:calc(100% - 32px);
+  background:#1a1a1a;
+  border-radius:16px; padding:14px 18px;
+  display:flex; align-items:center; gap:12px;
+  cursor:pointer; z-index:50;
+  box-shadow:0 8px 30px rgba(0,0,0,.3);
+  transition:transform .2s;
+  display:none;
+}
+.cart-fab.show { display:flex; }
+.cart-fab:hover { transform:translateX(-50%) translateY(-2px); }
+.cart-count {
+  background:#E8504A; color:#fff;
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Fredoka One',cursive; font-size:.9rem;
+  flex-shrink:0;
+}
+.cart-label { flex:1; color:#F5F0DC; font-weight:800; font-size:.9rem; }
+.cart-total { font-family:'Fredoka One',cursive; color:#FFD84D; font-size:1rem; }
+
+/* CART SHEET */
+.sheet-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.5);
+  z-index:100; display:none; align-items:flex-end;
+}
+.sheet-overlay.show { display:flex; }
+.sheet {
+  background:#fff; border-radius:28px 28px 0 0;
+  padding:24px; width:100%; max-height:85vh;
+  overflow-y:auto;
+  animation:slideUp .3s ease;
+  max-width:430px; margin:0 auto;
+}
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.sheet-handle {
+  width:40px; height:4px; background:#e8e8e8;
+  border-radius:2px; margin:0 auto 20px;
+}
+.sheet-title {
+  font-family:'Fredoka One',cursive;
+  font-size:1.4rem; color:#1a1a1a; margin-bottom:16px;
+}
+.cart-item {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 0; border-bottom:1px solid #f5f5f5;
+}
+.ci-icon { font-size:1.5rem; }
+.ci-name { flex:1; font-weight:800; font-size:.9rem; }
+.ci-qty-row { display:flex; align-items:center; gap:8px; }
+.qty-btn {
+  width:28px; height:28px; border-radius:50%;
+  border:2px solid #e8e8e8; background:#fff;
+  font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-weight:900; color:#555; transition:all .15s;
+}
+.qty-btn:hover { border-color:#E8504A; color:#E8504A; }
+.ci-price { font-family:'Fredoka One',cursive; color:#E8504A; font-size:.95rem; min-width:60px; text-align:right; }
+.cart-total-row {
+  display:flex; justify-content:space-between;
+  padding:14px 0; font-weight:900;
+}
+.cart-grand { font-family:'Fredoka One',cursive; font-size:1.1rem; color:#E8504A; }
+.addr-field {
+  width:100%; padding:13px 16px;
+  border:2px solid #e8e8e8; border-radius:14px;
+  font-family:'Nunito',sans-serif; font-size:.9rem; font-weight:700;
+  outline:none; resize:none; background:#fafafa;
+  transition:border-color .2s; margin-bottom:10px;
+}
+.addr-field:focus { border-color:#E8504A; background:#fff; }
+.pay-opts { display:flex; gap:8px; margin-bottom:16px; }
+.pay-opt {
+  flex:1; padding:10px;
+  border:2px solid #e8e8e8; border-radius:12px;
+  text-align:center; font-size:.8rem; font-weight:800;
+  color:#555; cursor:pointer; transition:all .2s;
+}
+.pay-opt.sel { border-color:#E8504A; background:#fff5f5; color:#E8504A; }
+
+/* ORDERS TAB */
+.order-card {
+  background:#fff; border-radius:16px;
+  margin:0 16px 10px;
+  padding:16px;
+  box-shadow:0 2px 10px rgba(0,0,0,.06);
+}
+.oc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.oc-id { font-size:.75rem; font-weight:800; color:#bbb; }
+.oc-status-badge {
+  padding:4px 10px; border-radius:20px;
+  font-size:.72rem; font-weight:900;
+}
+.s-pending    { background:#fff3e0; color:#e67e22; }
+.s-confirmed  { background:#e8f5e9; color:#27ae60; }
+.s-preparing  { background:#e3f2fd; color:#2196f3; }
+.s-picked_up  { background:#f3e5f5; color:#9c27b0; }
+.s-delivering { background:#fff8e1; color:#f57f17; }
+.s-delivered  { background:#e8f5e9; color:#1b5e20; }
+.s-cancelled  { background:#fce4ec; color:#c62828; }
+.oc-module { font-weight:900; font-size:.95rem; color:#1a1a1a; }
+.oc-items { font-size:.83rem; color:#777; font-weight:700; margin-bottom:8px; }
+.oc-bottom { display:flex; justify-content:space-between; }
+.oc-total { font-family:'Fredoka One',cursive; color:#E8504A; font-size:1.05rem; }
+.oc-time { font-size:.75rem; color:#bbb; font-weight:700; }
+
+/* PROFILE TAB */
+.profile-header {
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  padding:40px 20px 30px;
+  display:flex; flex-direction:column; align-items:center; gap:12px;
+}
+.prof-avatar {
+  width:80px; height:80px; border-radius:50%;
+  background:rgba(245,240,220,.2);
+  border:3px solid rgba(245,240,220,.4);
+  display:flex; align-items:center; justify-content:center; font-size:2.5rem;
+}
+.prof-name { font-family:'Fredoka One',cursive; font-size:1.5rem; color:#F5F0DC; }
+.prof-phone { font-size:.9rem; color:rgba(245,240,220,.8); font-weight:700; }
+.prof-stats {
+  display:flex; gap:20px; margin-top:8px;
+}
+.ps-item { text-align:center; }
+.ps-num { font-family:'Fredoka One',cursive; font-size:1.4rem; color:#FFD84D; }
+.ps-label { font-size:.72rem; color:rgba(245,240,220,.75); font-weight:700; }
+.menu-list { background:#fff; margin:0; }
+.menu-item {
+  display:flex; align-items:center; gap:14px;
+  padding:16px 20px; border-bottom:1px solid #f5f5f5;
+  cursor:pointer; transition:background .15s;
+}
+.menu-item:hover { background:#fafafa; }
+.mi-icon {
+  width:40px; height:40px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem; flex-shrink:0;
+}
+.mi-icon.red { background:#fff5f5; }
+.mi-icon.blue { background:#f0f4ff; }
+.mi-icon.green { background:#f0fff5; }
+.mi-icon.yellow { background:#fffbf0; }
+.mi-label { flex:1; font-weight:800; font-size:.95rem; color:#1a1a1a; }
+.mi-arrow { color:#ddd; font-size:1rem; }
+
+/* BOTTOM NAV */
+.bottom-nav {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  max-width:430px; width:100%;
+  background:#fff;
+  border-top:1px solid #f0f0f0;
+  display:flex;
+  padding:8px 0 20px;
+  z-index:60;
+  box-shadow:0 -4px 20px rgba(0,0,0,.08);
+}
+.nav-item {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; gap:4px;
+  cursor:pointer; padding:4px;
+  transition:color .15s; position:relative;
+}
+.nav-icon { font-size:1.4rem; }
+.nav-label { font-size:.68rem; font-weight:800; color:#bbb; }
+.nav-item.active .nav-label { color:#E8504A; }
+.nav-dot {
+  position:absolute; top:2px; right:calc(50% - 18px);
+  width:8px; height:8px; border-radius:50%;
+  background:#E8504A; display:none;
+}
+.nav-dot.show { display:block; }
+
+/* LOADING */
+.loading-page {
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  min-height:60vh; gap:12px;
+  color:#bbb; font-weight:800; font-size:.9rem;
+}
+.spinner {
+  width:36px; height:36px; border-radius:50%;
+  border:3px solid #f0f0f0;
+  border-top-color:#E8504A;
+  animation:spin .6s linear infinite;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:100px; left:50%; transform:translateX(-50%) translateY(100px);
+  background:#1a1a1a; color:#fff;
+  border-radius:50px; padding:12px 24px;
+  font-weight:800; font-size:.9rem;
+  z-index:999; white-space:nowrap;
+  transition:transform .3s;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+/* BACK BTN */
+.page-header {
+  display:flex; align-items:center; gap:12px;
+  padding:16px;
+  position:sticky; top:0; background:#f0ede6; z-index:10;
+}
+.back-btn {
+  width:38px; height:38px; border-radius:50%;
+  background:#fff; border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem; box-shadow:0 2px 8px rgba(0,0,0,.1);
+  flex-shrink:0;
+}
+.page-title { font-family:'Fredoka One',cursive; font-size:1.2rem; color:#1a1a1a; }
+
+/* Empty state */
+.empty-state {
+  text-align:center; padding:60px 30px;
+  color:#bbb;
+}
+.empty-state .ei { font-size:3.5rem; margin-bottom:14px; }
+.empty-state p { font-weight:700; font-size:.95rem; }
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div class="screen active" id="loginScreen">
+  <div class="login-hero">
+    <div class="login-crab">
+      <svg width="70" height="70" viewBox="0 0 140 140" fill="none">
+        <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+        <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+        <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/><circle cx="54" cy="49" r="2.5" fill="#F5F0DC"/>
+        <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/><circle cx="82" cy="49" r="2.5" fill="#F5F0DC"/>
+        <path d="M28 73 Q8 60 7 47 Q17 33 27 43 Q21 52 28 61Z" fill="#F5F0DC"/>
+        <path d="M112 73 Q132 60 133 47 Q123 33 113 43 Q119 52 112 61Z" fill="#F5F0DC"/>
+        <path d="M57 96 Q70 107 83 96" stroke="#E8504A" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="login-brand">CRABOR</div>
+    <div class="login-sub">Đặt đồ ăn · Giặt là · Dọn nhà · Hàng Trung</div>
+  </div>
+  <div class="login-card">
+    <!-- Phase 1: Phone -->
+    <div id="lp1">
+      <div class="login-title">Đăng nhập / Đăng ký</div>
+      <div class="login-hint">Nhập SĐT để nhận mã OTP xác minh</div>
+      <div class="phone-row">
+        <div class="inp-wrap" style="flex:1;margin-bottom:0">
+          <span class="ico">📱</span>
+          <input class="inp" type="tel" id="lPhone" placeholder="0901 234 567" maxlength="10">
+        </div>
+        <button class="btn-otp" id="lBtnOtp" onclick="loginSendOtp()">Gửi OTP</button>
+      </div>
+      <div class="err show" id="lPhoneErr" style="display:none">Vui lòng nhập SĐT hợp lệ</div>
+      <div class="countdown" id="lCountdown"></div>
+      <button class="btn-main" onclick="loginSendOtp()" style="margin-top:16px">Tiếp tục →</button>
+    </div>
+    <!-- Phase 2: OTP -->
+    <div id="lp2" style="display:none">
+      <div class="login-title">Nhập mã OTP</div>
+      <div class="login-hint">Mã 6 số đã gửi về <strong id="lMask"></strong></div>
+      <div class="otp-row">
+        <input class="otp-d" type="text" maxlength="1" id="ld0" oninput="otpNav(this,0,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld1" oninput="otpNav(this,1,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld2" oninput="otpNav(this,2,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld3" oninput="otpNav(this,3,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld4" oninput="otpNav(this,4,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld5" oninput="otpNav(this,5,'ld')">
+      </div>
+      <div class="err" id="lOtpErr">Mã OTP không đúng</div>
+      <button class="btn-main" onclick="loginVerify()">Đăng nhập 🦀</button>
+      <p style="text-align:center;margin-top:14px;font-size:.85rem;color:#777;font-weight:700;">
+        <button onclick="showLoginPhase(1)" style="background:none;border:none;color:#E8504A;font-weight:900;cursor:pointer">← Đổi số</button>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div class="screen" id="appScreen">
+  <!-- TOP BAR -->
+  <div class="topbar" id="topbar">
+    <div class="topbar-row">
+      <div class="topbar-left">
+        <div class="greeting">Xin chào 👋</div>
+        <div class="uname" id="tbName">Bạn ơi!</div>
+      </div>
+      <div class="topbar-avatar" onclick="switchTab('profile')">👤</div>
+    </div>
+    <div class="topbar-location">📍 <span id="tbDistrict">Hà Nội</span></div>
+    <div style="position:relative;margin-top:14px;">
+      <span class="search-icon">🔍</span>
+      <input class="topbar-search" type="text" placeholder="Tìm món ăn, dịch vụ...">
+    </div>
+  </div>
+
+  <!-- TAB CONTENTS -->
+  <div class="tab-content">
+
+    <!-- HOME -->
+    <div class="tab-page active" id="tab-home">
+      <div class="promo-banner">
+        <div style="font-size:3rem">🦀</div>
+        <div class="promo-text">
+          <h3>CRABOR Super App</h3>
+          <p>Giao đồ ăn · Giặt là · Dọn nhà · Hàng Trung</p>
+          <div class="promo-badge">⚡ Giao trong 30 phút</div>
+        </div>
+      </div>
+      <div class="section-title">Dịch vụ của CRABOR</div>
+      <div class="modules-grid">
+        <div class="module-card food" onclick="openModule('food')">
+          <div class="mc-icon">🍜</div>
+          <div class="mc-name">Giao đồ ăn</div>
+          <div class="mc-sub">Giao trong 30 phút</div>
+          <div class="mc-badge">HOT</div>
+        </div>
+        <div class="module-card laundry" onclick="openModule('laundry')">
+          <div class="mc-icon">👕</div>
+          <div class="mc-name">Giặt là</div>
+          <div class="mc-sub">Lấy & trả tận nơi</div>
+        </div>
+        <div class="module-card cleaning" onclick="openModule('cleaning')">
+          <div class="mc-icon">🧹</div>
+          <div class="mc-name">Dọn nhà</div>
+          <div class="mc-sub">200k–350k/ca</div>
+        </div>
+        <div class="module-card china" onclick="openModule('china')">
+          <div class="mc-icon">🛍️</div>
+          <div class="mc-name">China Shop</div>
+          <div class="mc-sub">Hàng nội địa Trung</div>
+        </div>
+      </div>
+      <div class="section-title">Đơn gần đây</div>
+      <div id="recentOrders">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- FOOD MODULE -->
+    <div class="tab-page" id="tab-food">
+      <div class="page-header">
+        <button class="back-btn" onclick="switchTab('home')">←</button>
+        <div class="page-title">🍜 Giao đồ ăn</div>
+      </div>
+      <div class="cat-scroll" id="catScroll"></div>
+      <div class="products-list" id="productList">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ORDERS TAB -->
+    <div class="tab-page" id="tab-orders">
+      <div style="padding:20px 16px 10px">
+        <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#1a1a1a">Đơn hàng của tôi</div>
+        <div style="font-size:.85rem;color:#777;font-weight:700;margin-top:2px">Theo dõi tất cả đơn</div>
+      </div>
+      <div id="ordersList">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- PROFILE TAB -->
+    <div class="tab-page" id="tab-profile">
+      <div class="profile-header">
+        <div class="prof-avatar">👤</div>
+        <div class="prof-name" id="profName">–</div>
+        <div class="prof-phone" id="profPhone">–</div>
+        <div class="prof-stats">
+          <div class="ps-item"><div class="ps-num" id="profOrders">0</div><div class="ps-label">Đơn hàng</div></div>
+          <div class="ps-item"><div class="ps-num" id="profPts">0</div><div class="ps-label">Điểm thưởng</div></div>
+          <div class="ps-item"><div class="ps-num" id="profSpent">0</div><div class="ps-label">Đã chi (k)</div></div>
+        </div>
+      </div>
+      <div class="menu-list">
+        <div class="menu-item"><div class="mi-icon red">📦</div><div class="mi-label">Lịch sử đơn hàng</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item"><div class="mi-icon blue">📍</div><div class="mi-label">Địa chỉ đã lưu</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item"><div class="mi-icon green">💰</div><div class="mi-label">Phương thức thanh toán</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item"><div class="mi-icon yellow">🎁</div><div class="mi-label">Ưu đãi của tôi</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item"><div class="mi-icon red">⭐</div><div class="mi-label">Điểm thưởng CRABOR</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="logout()"><div class="mi-icon" style="background:#fce4ec">🚪</div><div class="mi-label" style="color:#c62828">Đăng xuất</div><span class="mi-arrow">›</span></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
+
+  <!-- CART FAB -->
+  <div class="cart-fab" id="cartFab" onclick="openCart()">
+    <div class="cart-count" id="cartCount">0</div>
+    <div class="cart-label">Xem giỏ hàng</div>
+    <div class="cart-total" id="cartTotalFab">0đ</div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="nav-item active" id="nav-home" onclick="switchTab('home')">
+      <div class="nav-icon">🏠</div><div class="nav-label">Trang chủ</div>
+    </div>
+    <div class="nav-item" id="nav-food" onclick="switchTab('food')">
+      <div class="nav-icon">🍜</div><div class="nav-label">Đặt đồ ăn</div>
+    </div>
+    <div class="nav-item" id="nav-orders" onclick="switchTab('orders')">
+      <div class="nav-icon">📦</div><div class="nav-label">Đơn hàng</div>
+      <div class="nav-dot" id="orderDot"></div>
+    </div>
+    <div class="nav-item" id="nav-profile" onclick="switchTab('profile')">
+      <div class="nav-icon">👤</div><div class="nav-label">Cá nhân</div>
+    </div>
+  </div>
+</div>
+
+<!-- CART SHEET -->
+<div class="sheet-overlay" id="cartOverlay" onclick="closeCart(event)">
+  <div class="sheet" id="cartSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🛒 Giỏ hàng</div>
+    <div id="cartItemsHtml"></div>
+    <div class="cart-total-row">
+      <span style="font-weight:800">Tổng đơn</span>
+      <span class="cart-grand" id="cartGrand">0đ</span>
+    </div>
+    <div style="font-weight:900;font-size:.85rem;color:#444;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Địa chỉ giao hàng</div>
+    <textarea class="addr-field" id="orderAddr" rows="2" placeholder="Nhập địa chỉ giao hàng của bạn..."></textarea>
+    <div style="font-weight:900;font-size:.85rem;color:#444;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Thanh toán</div>
+    <div class="pay-opts">
+      <div class="pay-opt sel" onclick="selPay(this,'cash')">💵 Tiền mặt</div>
+      <div class="pay-opt" onclick="selPay(this,'momo')">💜 MoMo</div>
+      <div class="pay-opt" onclick="selPay(this,'zalopay')">🔵 ZaloPay</div>
+    </div>
+    <button class="btn-main" onclick="placeOrder()">🦀 Đặt hàng ngay</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════
+//  STATE
+// ════════════════════════════
+let user = null;
+let loginPhone = '';
+let cart = [];
+let products = [];
+let payMethod = 'cash';
+let currentTab = 'home';
+let loginTimer = null;
+
+// ════════════════════════════
+//  LOGIN
+// ════════════════════════════
+function showLoginPhase(n) {
+  document.getElementById('lp1').style.display = n===1?'':'none';
+  document.getElementById('lp2').style.display = n===2?'':'none';
+}
+
+async function loginSendOtp() {
+  const phone = document.getElementById('lPhone').value.trim();
+  if (!/^0[0-9]{9}$/.test(phone)) {
+    document.getElementById('lPhoneErr').style.display = 'block'; return;
+  }
+  document.getElementById('lPhoneErr').style.display = 'none';
+  loginPhone = phone;
+  const btn = document.getElementById('lBtnOtp'); btn.disabled = true;
+  try {
+    const r = await fetch('/api/auth/send-otp', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ phone, type:'user_login' })
+    });
+    const d = await r.json();
+    if (d.devOtp) toast('🛠️ Dev OTP: '+d.devOtp);
+  } catch(e) { toast('❌ Lỗi kết nối server'); btn.disabled=false; return; }
+  document.getElementById('lMask').textContent = phone.slice(0,3)+'****'+phone.slice(-3);
+  showLoginPhase(2);
+  let s=60;
+  const cd = document.getElementById('lCountdown'); cd.style.display='block';
+  if(loginTimer) clearInterval(loginTimer);
+  loginTimer=setInterval(()=>{cd.textContent=`Gửi lại sau ${s}s`;s--;if(s<0){clearInterval(loginTimer);btn.disabled=false;cd.style.display='none';}},1000);
+}
+
+function otpNav(el, idx, prefix) {
+  el.value = el.value.replace(/\D/,'');
+  if(el.value){el.classList.add('filled');const nx=document.getElementById(prefix+(idx+1));if(nx)nx.focus();}
+  else el.classList.remove('filled');
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Backspace'){
+    const ids=['ld0','ld1','ld2','ld3','ld4','ld5'];
+    const idx=ids.indexOf(document.activeElement?.id);
+    if(idx>0&&!document.activeElement.value)document.getElementById(ids[idx-1]).focus();
+  }
+});
+
+async function loginVerify() {
+  const code=[0,1,2,3,4,5].map(i=>document.getElementById('ld'+i).value).join('');
+  if(code.length!==6){document.getElementById('lOtpErr').classList.add('show');return;}
+  try {
+    const r = await fetch('/api/auth/verify-otp',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:loginPhone,otp:code,type:'user_login'})
+    });
+    const d = await r.json();
+    if(d.success){
+      user = d.user || {phone:loginPhone,fullName:'Khách hàng'};
+      document.getElementById('loginScreen').classList.remove('active');
+      document.getElementById('appScreen').classList.add('active');
+      initApp();
+    } else {document.getElementById('lOtpErr').classList.add('show');}
+  } catch(e){toast('❌ Lỗi xác minh');}
+}
+
+// ════════════════════════════
+//  APP INIT
+// ════════════════════════════
+async function initApp() {
+  // Check existing session
+  try {
+    const r = await fetch('/api/auth/me');
+    const d = await r.json();
+    if(d.user) user = d.user;
+  } catch(e){}
+  
+  if(!user) {
+    document.getElementById('loginScreen').classList.add('active');
+    document.getElementById('appScreen').classList.remove('active');
+    return;
+  }
+  
+  updateTopBar();
+  loadProducts();
+  loadOrders();
+  loadRecentOrders();
+}
+
+function updateTopBar() {
+  if(!user) return;
+  document.getElementById('tbName').textContent = user.fullName || 'Bạn ơi!';
+  document.getElementById('tbDistrict').textContent = user.district || 'Hà Nội';
+  document.getElementById('profName').textContent = user.fullName || 'Người dùng CRABOR';
+  document.getElementById('profPhone').textContent = user.phone || '';
+  document.getElementById('profOrders').textContent = user.totalOrders || 0;
+  document.getElementById('profPts').textContent = user.loyaltyPts || 0;
+  document.getElementById('profSpent').textContent = Math.round((user.totalSpent||0)/1000);
+}
+
+// ════════════════════════════
+//  NAVIGATION
+// ════════════════════════════
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const page = document.getElementById('tab-'+tab);
+  if(page) page.classList.add('active');
+  const nav = document.getElementById('nav-'+tab);
+  if(nav) nav.classList.add('active');
+  // Hide topbar for food page
+  document.getElementById('topbar').style.display = tab==='food'?'none':'';
+}
+
+function openModule(mod) {
+  if(mod==='food') switchTab('food');
+  else toast('🔜 Module '+mod+' sắp ra mắt!');
+}
+
+// ════════════════════════════
+//  PRODUCTS / FOOD
+// ════════════════════════════
+const CATEGORIES = ['Tất cả','Cơm','Bún/Phở','Đồ uống','Ăn vặt','Healthy'];
+const DEMO_PRODUCTS = [
+  {_id:'1',name:'Cơm tấm sườn bì',description:'Sườn nướng + bì + ốp la',price:45000,category:'Cơm',emoji:'🍚',sold:342},
+  {_id:'2',name:'Phở bò tái chín',description:'Phở bò truyền thống Hà Nội',price:55000,category:'Bún/Phở',emoji:'🍜',sold:218},
+  {_id:'3',name:'Bún chả Hà Nội',description:'Chả nướng + bún + rau sống',price:50000,category:'Bún/Phở',emoji:'🥗',sold:189},
+  {_id:'4',name:'Trà sữa Oolong',description:'Trà oolong + sữa tươi + trân châu',price:38000,category:'Đồ uống',emoji:'🧋',sold:567},
+  {_id:'5',name:'Bánh mì thịt nguội',description:'Bánh mì giòn + pate + thịt nguội',price:25000,category:'Ăn vặt',emoji:'🥖',sold:445},
+  {_id:'6',name:'Salad gà healthy',description:'Ức gà + rau củ + sốt mè rang',price:65000,category:'Healthy',emoji:'🥙',sold:123},
+];
+
+let activeCat = 'Tất cả';
+
+async function loadProducts() {
+  try {
+    const r = await fetch('/api/products');
+    const d = await r.json();
+    if(d.products && d.products.length>0) products = d.products;
+    else products = DEMO_PRODUCTS;
+  } catch(e) { products = DEMO_PRODUCTS; }
+  renderCategories();
+  renderProducts();
+}
+
+function renderCategories() {
+  const cats = ['Tất cả',...new Set(products.map(p=>p.category).filter(Boolean))];
+  document.getElementById('catScroll').innerHTML = cats.map(c=>
+    `<div class="cat-chip ${c===activeCat?'active':''}" onclick="filterCat('${c}')">${c}</div>`
+  ).join('');
+}
+
+function filterCat(cat) {
+  activeCat = cat;
+  renderCategories();
+  renderProducts();
+}
+
+function renderProducts() {
+  const list = activeCat==='Tất cả' ? products : products.filter(p=>p.category===activeCat);
+  document.getElementById('productList').innerHTML = list.map(p=>`
+    <div class="product-card">
+      <div class="prod-img">${p.emoji||'🍽️'}</div>
+      <div class="prod-info">
+        <div class="prod-name">${p.name}</div>
+        <div class="prod-desc">${p.description||''}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="prod-price">${fmtPrice(p.price)}</div>
+          <div class="prod-sold">🔥 ${p.sold||0} đã bán</div>
+        </div>
+      </div>
+      <button class="prod-add" onclick="addToCart('${p._id}','${p.name}',${p.price},'${p.emoji||'🍽️'}')">+</button>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════
+//  CART
+// ════════════════════════════
+function addToCart(id, name, price, emoji) {
+  const existing = cart.find(i=>i.id===id);
+  if(existing) existing.qty++;
+  else cart.push({id,name,price,emoji,qty:1});
+  updateCartUI();
+  toast('✅ Đã thêm '+name);
+}
+
+function updateCartUI() {
+  const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const count = cart.reduce((s,i)=>s+i.qty,0);
+  const fab = document.getElementById('cartFab');
+  if(count>0){ fab.classList.add('show'); document.getElementById('nav-food').querySelector('.nav-dot').classList.add('show');}
+  else{ fab.classList.remove('show'); document.getElementById('nav-food').querySelector('.nav-dot').classList.remove('show');}
+  document.getElementById('cartCount').textContent = count;
+  document.getElementById('cartTotalFab').textContent = fmtPrice(total);
+  document.getElementById('cartGrand').textContent = fmtPrice(total);
+}
+
+function openCart() {
+  renderCartItems();
+  document.getElementById('cartOverlay').classList.add('show');
+}
+
+function closeCart(e) {
+  if(e.target===document.getElementById('cartOverlay'))
+    document.getElementById('cartOverlay').classList.remove('show');
+}
+
+function renderCartItems() {
+  if(cart.length===0){document.getElementById('cartItemsHtml').innerHTML='<div style="text-align:center;padding:20px;color:#bbb;font-weight:700">Giỏ hàng trống</div>';return;}
+  document.getElementById('cartItemsHtml').innerHTML = cart.map(i=>`
+    <div class="cart-item">
+      <div class="ci-icon">${i.emoji}</div>
+      <div class="ci-name">${i.name}</div>
+      <div class="ci-qty-row">
+        <button class="qty-btn" onclick="changeQty('${i.id}',-1)">−</button>
+        <span style="font-family:'Fredoka One',cursive;font-size:1.1rem">${i.qty}</span>
+        <button class="qty-btn" onclick="changeQty('${i.id}',1)">+</button>
+      </div>
+      <div class="ci-price">${fmtPrice(i.price*i.qty)}</div>
+    </div>
+  `).join('');
+}
+
+function changeQty(id, delta) {
+  const item = cart.find(i=>i.id===id);
+  if(!item) return;
+  item.qty += delta;
+  if(item.qty<=0) cart = cart.filter(i=>i.id!==id);
+  renderCartItems(); updateCartUI();
+}
+
+function selPay(el, method) {
+  document.querySelectorAll('.pay-opt').forEach(o=>o.classList.remove('sel'));
+  el.classList.add('sel'); payMethod = method;
+}
+
+async function placeOrder() {
+  const addr = document.getElementById('orderAddr').value.trim();
+  if(!addr){toast('❌ Vui lòng nhập địa chỉ giao hàng');return;}
+  if(cart.length===0){toast('❌ Giỏ hàng trống');return;}
+  const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
+  try {
+    const r = await fetch('/api/orders',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        module:'food', address:addr,
+        items:cart.map(i=>({productId:i.id,name:i.name,qty:i.qty,price:i.price})),
+        total, paymentMethod:payMethod
+      })
+    });
+    const d = await r.json();
+    if(d.success||d.order){
+      cart=[];updateCartUI();
+      document.getElementById('cartOverlay').classList.remove('show');
+      toast('🎉 Đặt hàng thành công! '+d.order?.orderId||'');
+      switchTab('orders'); loadOrders();
+    } else toast('❌ '+(d.message||'Lỗi đặt hàng'));
+  } catch(e){toast('❌ Lỗi kết nối');}
+}
+
+// ════════════════════════════
+//  ORDERS
+// ════════════════════════════
+const STATUS_VN = {pending:'Đang chờ',confirmed:'Đã xác nhận',preparing:'Đang chuẩn bị',picked_up:'Đã lấy hàng',delivering:'Đang giao',delivered:'Đã giao',cancelled:'Đã huỷ',refunded:'Đã hoàn'};
+const MODULE_VN = {food:'🍜 Đồ ăn',laundry:'👕 Giặt là',cleaning:'🧹 Dọn nhà',china_shop:'🛍️ China Shop'};
+
+async function loadOrders() {
+  document.getElementById('ordersList').innerHTML='<div class="loading-page"><div class="spinner"></div></div>';
+  try {
+    const r = await fetch('/api/orders');
+    const d = await r.json();
+    renderOrders(d.orders||[]);
+  } catch(e){renderOrders([]);}
+}
+
+async function loadRecentOrders() {
+  try {
+    const r = await fetch('/api/orders');
+    const d = await r.json();
+    const orders = (d.orders||[]).slice(0,3);
+    if(orders.length===0){
+      document.getElementById('recentOrders').innerHTML='<div class="empty-state"><div class="ei">🦀</div><p>Chưa có đơn hàng nào<br>Hãy đặt món đầu tiên!</p></div>';
+    } else renderOrdersIn('recentOrders',orders);
+  } catch(e){document.getElementById('recentOrders').innerHTML='';}
+}
+
+function renderOrders(orders) {
+  if(orders.length===0){
+    document.getElementById('ordersList').innerHTML='<div class="empty-state"><div class="ei">📦</div><p>Chưa có đơn hàng nào</p></div>';
+    return;
+  }
+  renderOrdersIn('ordersList',orders);
+}
+
+function renderOrdersIn(containerId, orders) {
+  document.getElementById(containerId).innerHTML = orders.map(o=>`
+    <div class="order-card">
+      <div class="oc-top">
+        <div>
+          <div class="oc-id">${o.orderId}</div>
+          <div class="oc-module">${MODULE_VN[o.module]||o.module}</div>
+        </div>
+        <div class="oc-status-badge s-${o.status}">${STATUS_VN[o.status]||o.status}</div>
+      </div>
+      <div class="oc-items">${(o.items||[]).map(i=>i.name).join(', ')||'–'}</div>
+      <div class="oc-bottom">
+        <div class="oc-total">${fmtPrice(o.finalTotal||o.total)}</div>
+        <div class="oc-time">${timeAgo(o.createdAt)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════
+//  UTILS
+// ════════════════════════════
+function fmtPrice(n) {
+  if(!n) return '0đ';
+  return n.toLocaleString('vi-VN')+'đ';
+}
+function timeAgo(date) {
+  if(!date) return '';
+  const d = new Date(date), now = new Date();
+  const diff = Math.floor((now-d)/60000);
+  if(diff<1) return 'Vừa xong';
+  if(diff<60) return diff+'p trước';
+  if(diff<1440) return Math.floor(diff/60)+'h trước';
+  return Math.floor(diff/1440)+'ngày trước';
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+async function logout() {
+  try{await fetch('/api/auth/logout',{method:'POST'});}catch(e){}
+  user=null; cart=[];
+  document.getElementById('appScreen').classList.remove('active');
+  document.getElementById('loginScreen').classList.add('active');
+  showLoginPhase(1);
+}
+
+// ════════════════════════════
+//  BOOT
+// ════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const r = await fetch('/api/auth/me');
+    const d = await r.json();
+    if(d.user && d.user.phone){
+      user = d.user;
+      document.getElementById('loginScreen').classList.remove('active');
+      document.getElementById('appScreen').classList.add('active');
+      initApp();
+    }
+  } catch(e){}
+});
+</script>
+</body>
+</html>
