@@ -1155,7 +1155,7 @@ app.patch('/api/admin/registrations/:type/:id/status', adminAuth, async (req, re
 async function setupDefaultAdmin() {
   const count = await Admin.countDocuments().catch(() => 0);
   if (count === 0) {
-    const pass = process.env.ADMIN_DEFAULT_PASS || 'Crabor@2025';
+    const pass = process.env.ADMIN_DEFAULT_PASS || 'admin123';
     await Admin.create({ username: 'admin', password: pass, role: 'superadmin', name: 'CRABOR Admin' }).catch(()=>{});
     console.log('👑 Admin mặc định: admin / ' + pass);
     console.log('   ⚠️  Đổi mật khẩu sau lần đăng nhập đầu!');
