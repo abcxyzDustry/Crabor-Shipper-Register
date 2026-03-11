@@ -1334,7 +1334,7 @@ async function submitForm() {
   if(mod!=='sp'){
     payload.bizName=document.getElementById('bizName')?.value;
     payload.address=document.getElementById('address')?.value;
-    payload.type=mod;
+    payload.module=mod;
     if(mod==='gl'){payload.services=getSelectedChips('#serviceChips');payload.pricePerKg=document.getElementById('pricePerKg')?.value;payload.turnaround=document.querySelector('input[name=turnaround]:checked')?.value;}
     if(mod==='gv'){payload.services=getSelectedChips('#serviceChips');payload.shifts=getSelectedChips('#shiftChips');payload.exp=document.querySelector('input[name=exp]:checked')?.value;payload.dob=document.getElementById('dob')?.value;}
     if(mod==='cs'){payload.categories=getSelectedChips('#serviceChips');payload.source=document.querySelector('input[name=source]:checked')?.value;}
