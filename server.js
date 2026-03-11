@@ -46,7 +46,8 @@ if (!MONGODB_URI) {
   process.exit(1);
 }
 
-mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+// Kết nối MongoDB không cần options deprecated
+mongoose.connect(MONGODB_URI)
   .then(() => console.log('✅ MongoDB Atlas connected — DB: crabor'))
   .catch(err => { console.error('❌ MongoDB error:', err.message); process.exit(1); });
 
