@@ -479,6 +479,26 @@ app.post('/api/auth/logout', (req, res) => {
   req.session.destroy(() => res.json({ success: true }));
 });
 
+// POST /api/auth/admin-login
+app.post('/api/auth/admin-login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const admin = await Admin.findOne({ username });
+    if (!admin) return res.status(401).json({ success: false, message: 'Sai tên đăng nhập' });
+    const bcrypt = require('bcryptjs');
+    // Support both plain text (dev) and bcrypt hash (prod)
+    const ok = admin.password === password ||
+      await bcrypt.compare(password, admin.password).catch(() => false);
+    if (!ok) return res.status(401).json({ success: false, message: 'Sai mật khẩu' });
+    req.session.adminId   = admin._id;
+    req.session.adminUser = admin.username;
+    req.session.role      = 'admin';
+    res.json({ success: true, admin: { username: admin.username, role: admin.role } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/auth/me
 app.get('/api/auth/me', async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ success: false });
