@@ -1455,6 +1455,31 @@ setTimeout(()=>t.classList.remove(‘show’),3500);
 // ══════════════════════════════════════
 document.addEventListener(‘DOMContentLoaded’, ()=>{
 renderSteps(MODULES[mod].steps, 1);
+
+// ── Đọc hash từ URL để auto-chọn module ──
+// Ví dụ: /register#shipper → sp, /register#partner → gl, /register#food → fd, v.v.
+const hashMap = {
+‘shipper’: ‘sp’,
+‘sp’:      ‘sp’,
+‘partner’: ‘gl’,
+‘giatla’:  ‘gl’,
+‘gl’:      ‘gl’,
+‘giupviec’:‘gv’,
+‘gv’:      ‘gv’,
+‘china’:   ‘cs’,
+‘cs’:      ‘cs’,
+‘food’:    ‘fd’,
+‘fd’:      ‘fd’,
+‘ride’:    ‘rx’,
+‘rx’:      ‘rx’,
+‘taixe’:   ‘rx’,
+};
+
+const rawHash = window.location.hash.replace(’#’,’’).toLowerCase().trim();
+if (rawHash && hashMap[rawHash]) {
+// Tự động bắt đầu form với module tương ứng
+startRegistration(hashMap[rawHash]);
+}
 });
 </script>
 
