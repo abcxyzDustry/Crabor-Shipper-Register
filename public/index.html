@@ -1,10 +1,1807 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-    <title>Crabor Super App</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRABOR Super App – 7 Module Tuyển Dụng & Marketing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --coral: #E8504A;
+  --coral-d: #c93d37;
+  --coral-dd: #9e2d27;
+  --cream: #F5F0DC;
+  --cream2: rgba(245,240,220,0.15);
+  --cream3: rgba(245,240,220,0.07);
+  --yellow: #FFD84D;
+  --yellow-d: #e6b800;
+  --green: #3aaa5c;
+  --green-dark: #1a4a2a;
+  --blue: #2d7dd2;
+  --blue-dark: #1a2a4a;
+  --dark: #1a1a1a;
+  --purple: #6495ed;
+  --purple-dark: #1a2040;
+  --red-dark: #2a0a0a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #111;
+  font-family: 'Nunito', 'Segoe UI', Arial, sans-serif;
+  padding: 48px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+/* ── NAV TABS CHÍNH ── */
+.nav-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  position: sticky;
+  top: 16px;
+  z-index: 1000;
+  background: rgba(17, 17, 17, 0.92);
+  padding: 12px 16px;
+  border-radius: 60px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  max-width: 1200px;
+  width: 100%;
+}
+.nav-btn {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  padding: 10px 20px;
+  border-radius: 40px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.5);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.25s;
+  white-space: nowrap;
+}
+.nav-btn:hover { border-color: var(--coral); color: var(--cream); }
+.nav-btn.active { background: var(--coral); border-color: var(--coral); color: var(--cream); }
+
+/* ── SECTION WRAPPER ── */
+.section {
+  width: 100%;
+  max-width: 1200px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  animation: fadeUp 0.4s ease;
+}
+.section.show { display: flex; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sec-label {
+  color: #555;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  align-self: flex-start;
+}
+
+/* ══════════════════════════════════════
+     SHARED BANNER SHELL
+══════════════════════════════════════ */
+.banner {
+  width: 100%;
+  border-radius: 28px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.55);
+}
+.dots {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(245, 240, 220, 0.07) 1px, transparent 1px);
+  background-size: 26px 26px;
+  pointer-events: none;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.blob1 { width: 340px; height: 340px; background: radial-gradient(circle, var(--cream2), transparent 70%); top: -100px; right: -80px; }
+.blob2 { width: 180px; height: 180px; background: radial-gradient(circle, rgba(255, 216, 77, 0.12), transparent 70%); bottom: -60px; left: 100px; }
+
+/* Banner inner grid */
+.banner-inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  align-items: center;
+  padding: 52px 55px 52px 60px;
+  gap: 28px;
+}
+.new-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--cream2);
+  border: 1.5px solid rgba(245, 240, 220, 0.3);
+  color: var(--cream);
+  font-weight: 900;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 20px;
+  margin-bottom: 14px;
+}
+.new-badge span {
+  background: var(--yellow);
+  color: #7a3a00;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+}
+.banner-title {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 3.6rem;
+  line-height: 0.98;
+  color: var(--cream);
+  margin-bottom: 14px;
+  text-shadow: 3px 4px 0 rgba(0, 0, 0, 0.15);
+}
+.banner-title em {
+  font-style: normal;
+  color: var(--yellow);
+}
+.banner-sub {
+  font-size: 0.97rem;
+  color: rgba(245, 240, 220, 0.8);
+  font-weight: 700;
+  line-height: 1.6;
+  margin-bottom: 22px;
+  max-width: 400px;
+}
+
+/* Compare table */
+.compare-table {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.compare-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.compare-table th {
+  color: rgba(245, 240, 220, 0.6);
+  font-weight: 800;
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 0.68rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.compare-table td {
+  color: var(--cream);
+  font-weight: 700;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(245, 240, 220, 0.08);
+}
+.compare-table td:not(:first-child) { text-align: center; }
+.compare-table .col-crabor { color: var(--yellow); }
+.compare-table .yes { color: #7dde9a; font-size: 0.95rem; }
+.compare-table .no { color: rgba(245, 240, 220, 0.3); font-size: 0.95rem; }
+.compare-table .hl { background: rgba(255, 216, 77, 0.12); border-radius: 4px; }
+
+.perks-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 26px;
+}
+.perk {
+  background: var(--cream2);
+  border: 1.5px solid rgba(245, 240, 220, 0.2);
+  color: var(--cream);
+  font-weight: 800;
+  font-size: 0.78rem;
+  padding: 6px 13px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.btn {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 1.1rem;
+  padding: 13px 30px;
+  border-radius: 50px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn:hover { transform: translateY(-3px); }
+.btn-cream { background: var(--cream); color: var(--coral-d); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2); }
+.btn-cream:hover { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25); }
+.btn-green { background: var(--green); color: #fff; box-shadow: 0 6px 20px rgba(58, 170, 92, 0.3); }
+.btn-green:hover { box-shadow: 0 10px 28px rgba(58, 170, 92, 0.4); }
+.btn-yellow { background: var(--yellow); color: #7a3a00; box-shadow: 0 6px 20px rgba(255, 216, 77, 0.3); }
+.btn-yellow:hover { box-shadow: 0 10px 28px rgba(255, 216, 77, 0.4); }
+.cta-note {
+  color: rgba(245, 240, 220, 0.65);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.cta-note strong { color: var(--yellow); }
+
+/* Right column */
+.banner-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.logo-circle {
+  width: 180px;
+  height: 180px;
+  background: var(--coral-d);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid rgba(245, 240, 220, 0.18);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+.price-pill {
+  background: var(--yellow);
+  color: #7a3a00;
+  border-radius: 18px;
+  padding: 12px 22px;
+  text-align: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+.price-pill .old {
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+.price-pill .new {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 1.85rem;
+  line-height: 1.1;
+}
+.price-pill .lbl {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.68;
+}
+
+/* Stats grid */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.stat-box {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 14px 12px;
+  text-align: center;
+}
+.stat-box .num {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 1.6rem;
+  color: #7dde9a;
+  line-height: 1;
+}
+.stat-box .lbl {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 800;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+/* Feature grid */
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.feat {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.feat .icon {
+  font-size: 1.3rem;
+  margin-bottom: 6px;
+}
+.feat strong {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 2px;
+}
+.feat span {
+  font-size: 0.73rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+}
+
+/* Voucher box */
+.voucher-box {
+  background: var(--yellow);
+  border-radius: 18px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 22px;
+  box-shadow: 0 8px 24px rgba(255, 216, 77, 0.25);
+}
+.voucher-icon {
+  font-size: 2.4rem;
+  flex-shrink: 0;
+}
+.voucher-text .big {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 1.9rem;
+  color: #7a3a00;
+  line-height: 1;
+}
+.voucher-text .small {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #a05000;
+  margin-top: 2px;
+}
+
+/* App badges */
+.app-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.app-badge {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+}
+.app-badge .ab-icon {
+  font-size: 1.3rem;
+}
+.app-badge strong {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+.app-badge span {
+  font-size: 0.68rem;
+  opacity: 0.65;
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════
+     SOCIAL POST CARD
+══════════════════════════════════════ */
+.post {
+  width: 100%;
+  max-width: 560px;
+  background: #fff;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+.post-head {
+  padding: 28px 30px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.post-head::after {
+  content: '';
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: rgba(245, 240, 220, 0.08);
+  bottom: -90px;
+  right: -60px;
+}
+.post-head-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.post-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(245, 240, 220, 0.28);
+  flex-shrink: 0;
+}
+.post-brand strong {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 1.05rem;
+  display: block;
+}
+.post-brand span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.72;
+}
+.post-h {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 1.75rem;
+  line-height: 1.15;
+}
+.post-h em { font-style: normal; }
+.post-body {
+  padding: 26px 30px;
+}
+.post-intro {
+  font-size: 0.94rem;
+  color: #444;
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+.benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.brow {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.bicon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.btext strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #222;
+  margin-bottom: 1px;
+}
+.btext span {
+  font-size: 0.79rem;
+  color: #777;
+  font-weight: 600;
+}
+.divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #eee, transparent);
+  margin: 18px 0;
+}
+.req-box {
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+.req-box h4 {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+}
+.req-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.req-list li {
+  font-size: 0.82rem;
+  color: #555;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.req-list li::before {
+  content: '✓';
+  font-weight: 900;
+}
+.price-row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 14px;
+  padding: 15px 18px;
+  margin-bottom: 18px;
+}
+.price-row-card .pl .lbl2 {
+  font-size: 0.7rem;
+  font-weight: 800;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.price-row-card .pl .amt {
+  font-family: 'Fredoka One', 'Arial Black', Arial, cursive;
+  font-size: 1.9rem;
+  line-height: 1.1;
+}
+.price-row-card .pl .note {
+  font-size: 0.68rem;
+  opacity: 0.65;
+  font-weight: 700;
+}
+.price-row-card .pr {
+  border-radius: 9px;
+  padding: 8px 13px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.hashtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+.hashtag {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 4px 11px;
+  border-radius: 20px;
+}
+.post-footer {
+  text-align: center;
+  font-size: 0.77rem;
+  color: #bbb;
+  font-weight: 700;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* ══════════════════════════════════════
+     MODULE COLOR SCHEMES
+══════════════════════════════════════ */
+/* Shipper (Coral) */
+.shipper-banner { background: var(--coral); }
+.shipper-head { background: var(--coral); }
+.shipper-post-icon { background: var(--coral-d); }
+.shipper-bicon { background: #fff5f5; border: 1.5px solid #fde0de; }
+.shipper-req { background: #fff8f7; border: 2px solid #fde0de; }
+.shipper-req h4 { color: var(--coral); }
+.shipper-req .req-list li::before { color: var(--coral); }
+.shipper-price-row { background: var(--coral); }
+.shipper-price-row .pr { background: var(--yellow); color: #7a3a00; }
+.shipper-hashtag { color: var(--coral); background: #fff0ef; border: 1.5px solid #fcc; }
+
+/* Partner (Green) */
+.partner-banner { background: linear-gradient(135deg, #1a3a2a 0%, #2d6644 50%, #1a3a2a 100%); }
+.partner-head { background: linear-gradient(135deg, #1a3a2a, #2d6644); }
+.partner-post-icon { background: rgba(58, 170, 92, 0.3); }
+.partner-bicon { background: #f0fff5; border: 1.5px solid #b8f0cc; }
+.partner-req { background: #f5fff8; border: 2px solid #b8f0cc; }
+.partner-req h4 { color: #2d6644; }
+.partner-req .req-list li::before { color: var(--green); }
+.partner-price-row { background: linear-gradient(135deg, #1a3a2a, #2d6644); }
+.partner-price-row .pr { background: var(--green); color: #fff; }
+.partner-hashtag { color: #2d6644; background: #f0fff5; border: 1.5px solid #b8f0cc; }
+.partner-logo-circle { background: rgba(58, 170, 92, 0.2); border-color: rgba(58, 170, 92, 0.3); }
+.partner-pill { background: var(--green); color: #fff; }
+
+/* User (Blue) */
+.user-banner { background: linear-gradient(135deg, #1a2a4a 0%, #2d4d8a 50%, #1a2a4a 100%); }
+.user-head { background: linear-gradient(135deg, #1a2a4a, #2d4d8a); }
+.user-post-icon { background: rgba(45, 125, 210, 0.3); }
+.user-bicon { background: #f0f7ff; border: 1.5px solid #b8d8ff; }
+.user-req { background: #f5f8ff; border: 2px solid #b8d8ff; }
+.user-req h4 { color: #2d4d8a; }
+.user-req .req-list li::before { color: var(--blue); }
+.user-price-row { background: linear-gradient(135deg, #1a2a4a, #2d4d8a); }
+.user-price-row .pr { background: var(--yellow); color: #7a3a00; }
+.user-hashtag { color: #2d4d8a; background: #f0f7ff; border: 1.5px solid #b8d8ff; }
+.user-logo-circle { background: rgba(45, 125, 210, 0.2); border-color: rgba(45, 125, 210, 0.3); }
+
+/* Xe công nghệ (Coral/Blue mix) */
+.xe-banner { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); }
+.xe-head { background: linear-gradient(135deg, #1a1a2e, #0f3460); }
+.xe-post-icon { background: rgba(232, 80, 74, 0.3); }
+.xe-bicon { background: #fff0ef; border: 1.5px solid #fcc; }
+.xe-req { background: #f8f0ff; border: 2px solid #e0c8ff; }
+.xe-req h4 { color: #6a0dad; }
+.xe-req .req-list li::before { color: #6a0dad; }
+.xe-price-row { background: linear-gradient(135deg, #1a1a2e, #0f3460); }
+.xe-price-row .pr { background: var(--yellow); color: #7a3a00; }
+.xe-hashtag { color: #0f3460; background: #f0f4ff; border: 1.5px solid #c8d8ff; }
+.xe-logo-circle { background: rgba(232, 80, 74, 0.2); border-color: rgba(232, 80, 74, 0.3); }
+
+/* Giúp việc (Green) */
+.gv-banner { background: linear-gradient(135deg, #1a2f1a 0%, #2d5a2d 50%, #1a4a2a 100%); }
+.gv-head { background: linear-gradient(135deg, #1a2f1a, #2d5a2d); }
+.gv-post-icon { background: rgba(58, 170, 92, 0.3); }
+.gv-bicon { background: #f0fff5; border: 1.5px solid #b8f0cc; }
+.gv-req { background: #f5fff8; border: 2px solid #b8f0cc; }
+.gv-req h4 { color: #2d5a2d; }
+.gv-req .req-list li::before { color: var(--green); }
+.gv-price-row { background: linear-gradient(135deg, #1a2f1a, #2d5a2d); }
+.gv-price-row .pr { background: var(--green); color: #fff; }
+.gv-hashtag { color: #2d5a2d; background: #f0fff5; border: 1.5px solid #b8f0cc; }
+.gv-logo-circle { background: rgba(58, 170, 92, 0.2); border-color: rgba(58, 170, 92, 0.3); }
+
+/* Giặt là (Purple) */
+.gl-banner { background: linear-gradient(135deg, #1a2040 0%, #2d3d7a 50%, #1a3060 100%); }
+.gl-head { background: linear-gradient(135deg, #1a2040, #2d3d7a); }
+.gl-post-icon { background: rgba(100, 149, 237, 0.3); }
+.gl-bicon { background: #f0f4ff; border: 1.5px solid #c8d8ff; }
+.gl-req { background: #f0f4ff; border: 2px solid #c8d8ff; }
+.gl-req h4 { color: #2d3d7a; }
+.gl-req .req-list li::before { color: var(--purple); }
+.gl-price-row { background: linear-gradient(135deg, #1a2040, #2d3d7a); }
+.gl-price-row .pr { background: var(--yellow); color: #7a3a00; }
+.gl-hashtag { color: #2d3d7a; background: #f0f4ff; border: 1.5px solid #c8d8ff; }
+.gl-logo-circle { background: rgba(100, 149, 237, 0.2); border-color: rgba(100, 149, 237, 0.3); }
+
+/* China Shop (Red) */
+.cs-banner { background: linear-gradient(135deg, #2a0a0a 0%, #5a1a1a 40%, var(--coral) 100%); }
+.cs-head { background: linear-gradient(135deg, #2a0a0a, #5a1a1a, var(--coral)); }
+.cs-post-icon { background: rgba(255, 216, 77, 0.25); }
+.cs-bicon { background: #fff8f0; border: 1.5px solid #ffd8a8; }
+.cs-req { background: #fff8f0; border: 2px solid #ffd8a8; }
+.cs-req h4 { color: var(--coral); }
+.cs-req .req-list li::before { color: var(--coral); }
+.cs-price-row { background: linear-gradient(135deg, #2a0a0a, var(--coral)); }
+.cs-price-row .pr { background: var(--yellow); color: #7a3a00; }
+.cs-hashtag { color: var(--coral); background: #fff0ef; border: 1.5px solid #fcc; }
+.cs-logo-circle { background: rgba(255, 216, 77, 0.15); border-color: rgba(255, 216, 77, 0.25); }
+
+/* Responsive */
+@media (max-width: 700px) {
+  .banner-inner {
+    grid-template-columns: 1fr;
+    padding: 36px 28px;
+  }
+  .banner-right { display: none; }
+  .banner-title { font-size: 2.8rem; }
+  .stats-row { grid-template-columns: repeat(3, 1fr); }
+  .feature-grid { grid-template-columns: 1fr 1fr; }
+  .nav-tabs { padding: 8px 12px; }
+  .nav-btn { font-size: 0.8rem; padding: 8px 12px; }
+}
+</style>
 </head>
 <body>
-    <h1>Chào mừng đến với Crabor Super App</h1>
-    <p>Máy chủ đang chạy!</p>
+
+<!-- NAV TABS CHÍNH - 7 MODULE -->
+<div class="nav-tabs">
+  <button class="nav-btn active" onclick="showModule('xe', this)">🚗 Xe công nghệ</button>
+  <button class="nav-btn" onclick="showModule('shipper', this)">🚴 Shipper</button>
+  <button class="nav-btn" onclick="showModule('gv', this)">🧹 Giúp việc</button>
+  <button class="nav-btn" onclick="showModule('gl', this)">👕 Giặt là</button>
+  <button class="nav-btn" onclick="showModule('partner', this)">🏪 Đối tác</button>
+  <button class="nav-btn" onclick="showModule('user', this)">🛵 Người dùng</button>
+  <button class="nav-btn" onclick="showModule('cs', this)">🛍️ China Shop</button>
+</div>
+
+<!-- ========================================
+     MODULE 1: XE CÔNG NGHỆ (Từ file 1)
+======================================== -->
+<div id="sec-xe" class="section show">
+  <span class="sec-label">🚗 Banner tuyển tài xế — Xe công nghệ CRABOR</span>
+  
+  <!-- Banner tuyển tài xế -->
+  <div class="banner xe-banner">
+    <div class="dots"></div>
+    <div class="blob" style="width:360px;height:360px;background:radial-gradient(circle,rgba(232,80,74,.2),transparent 70%);top:-120px;right:-80px;"></div>
+    <div class="blob" style="width:180px;height:180px;background:radial-gradient(circle,rgba(255,216,77,.1),transparent 70%);bottom:-50px;left:100px;"></div>
+    <div class="banner-inner">
+      <div>
+        <div class="new-badge">🚗 Tài xế công nghệ <span>Mới tại Hà Nội</span></div>
+        <h1 class="banner-title">Chạy xe cùng<br><em>CRABOR</em><br>Thu nhập tốt!</h1>
+        <p class="banner-sub">App xe công nghệ mới — phí nền tảng thấp nhất thị trường, tài xế giữ lại nhiều hơn mỗi chuyến</p>
+        
+        <div class="compare-table">
+          <table>
+            <tr>
+              <th>Tiêu chí</th>
+              <th class="col-crabor">🦀 CRABOR</th>
+              <th>Grab</th>
+              <th>Be</th>
+            </tr>
+            <tr>
+              <td>Phí nền tảng</td>
+              <td class="col-crabor hl">15%</td>
+              <td>28–32%</td>
+              <td>20–25%</td>
+            </tr>
+            <tr>
+              <td>Cạnh tranh chuyến</td>
+              <td class="col-crabor hl yes">✓ Ít</td>
+              <td class="no">Rất cao</td>
+              <td class="no">Cao</td>
+            </tr>
+            <tr>
+              <td>Phí đăng ký</td>
+              <td class="col-crabor hl">800k EB</td>
+              <td>Có phí</td>
+              <td>Có phí</td>
+            </tr>
+            <tr>
+              <td>Hoàn phí đăng ký</td>
+              <td class="col-crabor hl yes">✓ 1.500 chuyến</td>
+              <td class="no">✗</td>
+              <td class="no">✗</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="perks-row">
+          <div class="perk">🚗 App mới — ít tài xế</div>
+          <div class="perk">💸 Giữ 85% mỗi chuyến</div>
+          <div class="perk">🔄 Hoàn 800k sau 1.500 chuyến</div>
+          <div class="perk">⏰ Tự chủ lịch chạy xe</div>
+        </div>
+        
+        <div class="cta-row">
+          <button class="btn btn-cream">Đăng ký tài xế →</button>
+          <div class="cta-note">Chỉ <strong>50 suất Early Bird</strong><br>Hết suất là hết ưu đãi</div>
+        </div>
+      </div>
+      
+      <div class="banner-right">
+        <div class="logo-circle xe-logo-circle">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+            <rect x="15" y="45" width="90" height="42" rx="10" fill="#F5F0DC"/>
+            <rect x="28" y="28" width="64" height="30" rx="8" fill="#F5F0DC" opacity=".8"/>
+            <circle cx="33" cy="87" r="11" fill="#E8504A"/><circle cx="33" cy="87" r="6" fill="#F5F0DC"/>
+            <circle cx="87" cy="87" r="11" fill="#E8504A"/><circle cx="87" cy="87" r="6" fill="#F5F0DC"/>
+            <rect x="28" y="30" width="64" height="20" rx="6" fill="#E8504A" opacity=".3"/>
+            <rect x="32" y="32" width="24" height="16" rx="4" fill="#E8504A" opacity=".5"/>
+            <rect x="64" y="32" width="24" height="16" rx="4" fill="#E8504A" opacity=".5"/>
+            <ellipse cx="20" cy="65" rx="5" ry="3" fill="#FFD84D"/>
+            <ellipse cx="100" cy="65" rx="5" ry="3" fill="#FFD84D"/>
+            <text x="60" y="113" font-family="Arial Black" font-size="11" font-weight="900" fill="#F5F0DC" text-anchor="middle">CRABOR</text>
+          </svg>
+        </div>
+        <div class="price-pill">
+          <div class="old">1.000.000đ</div>
+          <div class="new">800.000đ</div>
+          <div class="lbl">Early Bird</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <span class="sec-label">📱 Bài viết MXH — Tuyển tài xế</span>
+  
+  <!-- Post tài xế -->
+  <div class="post">
+    <div class="post-head xe-head">
+      <div class="post-head-row">
+        <div class="post-icon xe-post-icon">
+          <svg width="26" height="26" viewBox="0 0 120 120" fill="none">
+            <rect x="15" y="45" width="90" height="42" rx="10" fill="#F5F0DC"/>
+            <rect x="28" y="28" width="64" height="30" rx="8" fill="#F5F0DC" opacity=".7"/>
+            <circle cx="33" cy="87" r="11" fill="#E8504A"/><circle cx="33" cy="87" r="6" fill="#F5F0DC"/>
+            <circle cx="87" cy="87" r="11" fill="#E8504A"/><circle cx="87" cy="87" r="6" fill="#F5F0DC"/>
+          </svg>
+        </div>
+        <div class="post-brand"><strong style="color:#F5F0DC;">CRABOR Xe Công Nghệ</strong><span style="color:rgba(245,240,220,.65);">🆕 App mới · Hà Nội</span></div>
+      </div>
+      <div class="post-h" style="color:#F5F0DC;">🚗 Chạy xe công nghệ<br><em style="color:#FFD84D;">CRABOR</em> — Giữ lại<br>nhiều hơn mỗi chuyến!</div>
+    </div>
+    <div class="post-body">
+      <p class="post-intro">CRABOR vừa ra mắt dịch vụ <strong>xe công nghệ tại Hà Nội</strong> — phí nền tảng chỉ <strong>15%</strong> (Grab lấy 28–32%). App mới = <strong>ít tài xế cạnh tranh</strong> = nhiều chuyến hơn cho bạn! 🔥</p>
+      
+      <div class="benefits">
+        <div class="brow">
+          <div class="bicon xe-bicon">🚗</div>
+          <div class="btext"><strong>App mới = cơ hội vàng cho tài xế đầu tiên</strong><span>Grab/Be hàng nghìn tài xế chen nhau — CRABOR bạn là người đi đầu</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon xe-bicon">💸</div>
+          <div class="btext"><strong>Giữ 85% mỗi chuyến — thấp nhất thị trường</strong><span>Mỗi 100k tiền chuyến, bạn giữ 85k. Grab chỉ cho giữ 68–72k</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon xe-bicon">🔄</div>
+          <div class="btext"><strong>Hoàn 800k sau 1.500 chuyến hoàn thành</strong><span>Đạt đủ trong 6 tháng → nhận lại toàn bộ phí đăng ký Early Bird</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon xe-bicon">⏰</div>
+          <div class="btext"><strong>Tự do 100% thời gian — không KPI</strong><span>Bật app lúc nào, nhận chuyến lúc đó. Kể cả chạy thêm buổi tối</span></div>
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="req-box xe-req">
+        <h4>📋 Điều kiện tài xế CRABOR</h4>
+        <ul class="req-list">
+          <li>Có xe máy hoặc ô tô + bằng lái hợp lệ</li>
+          <li>CCCD và hồ sơ lái xe đầy đủ</li>
+          <li>Điện thoại Android/iOS chạy app được</li>
+          <li>Đang sinh sống tại Hà Nội</li>
+        </ul>
+      </div>
+      
+      <div class="price-row-card xe-price-row">
+        <div class="pl">
+          <div class="lbl2">Phí Early Bird</div>
+          <div class="amt">800.000đ</div>
+          <div class="note">Hoàn lại sau 1.500 chuyến · Bao gồm đồng phục</div>
+        </div>
+        <div class="pr">⚡ Còn<br>50 suất<br>duy nhất</div>
+      </div>
+      
+      <div class="hashtags">
+        <span class="hashtag xe-hashtag">#CraborXe</span>
+        <span class="hashtag xe-hashtag">#TaixeHaNoi</span>
+        <span class="hashtag xe-hashtag">#XeCongNghe</span>
+        <span class="hashtag xe-hashtag">#AppMoi2025</span>
+      </div>
+      <div class="post-footer">📩 Đăng ký qua link trong bio · CRABOR – Nhanh như cua chạy 🦀</div>
+    </div>
+  </div>
+
+  <span class="sec-label">📌 Banner người dùng — Gọi xe CRABOR</span>
+  
+  <!-- Banner người dùng xe -->
+  <div class="banner" style="background:linear-gradient(135deg,#0f3460 0%,#1a1a2e 100%);">
+    <div class="dots"></div>
+    <div class="blob" style="width:300px;height:300px;background:radial-gradient(circle,rgba(255,216,77,.15),transparent 70%);top:-80px;right:-60px;"></div>
+    <div class="banner-inner">
+      <div>
+        <div class="new-badge" style="background:rgba(255,216,77,.15);border-color:rgba(255,216,77,.3);color:#FFD84D;">🚗 Xe công nghệ · Ra mắt tại Hà Nội</div>
+        <h1 class="banner-title" style="color:#fff;">Gọi xe nhanh<br>giá <em style="color:#FFD84D;">cực tốt</em><br>cùng CRABOR!</h1>
+        <p class="banner-sub" style="color:rgba(255,255,255,.72);">App mới — giá cước cạnh tranh, tài xế chuyên nghiệp, đặt xe trong 30 giây</p>
+        
+        <div class="voucher-box" style="background:#FFD84D;">
+          <div class="voucher-icon">🎟️</div>
+          <div class="voucher-text">
+            <div class="big" style="color:#7a3a00;">Giảm 30.000đ</div>
+            <div class="small" style="color:#a05000;">Chuyến đầu tiên · Áp dụng ngay khi tải app</div>
+          </div>
+        </div>
+        
+        <div class="feature-grid">
+          <div class="feat"><div class="icon">⚡</div><strong>Đặt xe 30 giây</strong><span>Tài xế đến trong 5 phút</span></div>
+          <div class="feat"><div class="icon">💰</div><strong>Giá cước thấp hơn</strong><span>Rẻ hơn Grab 10–15%</span></div>
+          <div class="feat"><div class="icon">📍</div><strong>Theo dõi xe live</strong><span>Biết tài xế đang ở đâu</span></div>
+          <div class="feat"><div class="icon">🔒</div><strong>Tài xế xác minh</strong><span>100% đã qua kiểm duyệt</span></div>
+        </div>
+        
+        <div class="cta-row">
+          <button class="btn btn-yellow">Tải app đặt xe →</button>
+          <div class="cta-note">Mời bạn nhận thêm <strong>20k/người</strong></div>
+        </div>
+      </div>
+      
+      <div class="banner-right">
+        <div class="logo-circle" style="background:rgba(255,216,77,.15);border-color:rgba(255,216,77,.25);">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+            <rect x="15" y="45" width="90" height="42" rx="10" fill="#F5F0DC"/>
+            <rect x="28" y="28" width="64" height="30" rx="8" fill="#F5F0DC" opacity=".8"/>
+            <circle cx="33" cy="87" r="11" fill="#FFD84D"/><circle cx="33" cy="87" r="6" fill="#1a1a2e"/>
+            <circle cx="87" cy="87" r="11" fill="#FFD84D"/><circle cx="87" cy="87" r="6" fill="#1a1a2e"/>
+            <rect x="32" y="32" width="24" height="16" rx="4" fill="#FFD84D" opacity=".4"/>
+            <rect x="64" y="32" width="24" height="16" rx="4" fill="#FFD84D" opacity=".4"/>
+            <ellipse cx="20" cy="65" rx="5" ry="3" fill="#FFD84D"/>
+            <ellipse cx="100" cy="65" rx="5" ry="3" fill="#FFD84D"/>
+            <text x="60" y="113" font-family="Arial Black" font-size="11" fill="#F5F0DC" text-anchor="middle">CRABOR</text>
+          </svg>
+        </div>
+        <div class="app-badges">
+          <div class="app-badge"><div class="ab-icon">🍎</div><div><strong>App Store</strong><span>iOS 13.0+</span></div></div>
+          <div class="app-badge"><div class="ab-icon">🤖</div><div><strong>Google Play</strong><span>Android 8.0+</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================
+     MODULE 2: SHIPPER (Từ file 2)
+======================================== -->
+<div id="sec-shipper" class="section">
+  <span class="sec-label">📌 Banner – Shipper CRABOR</span>
+
+  <div class="banner shipper-banner">
+    <div class="dots"></div>
+    <div class="blob blob1"></div><div class="blob blob2"></div>
+    <div class="banner-inner">
+      <div>
+        <div class="new-badge">🆕 App mới ra mắt <span>Early Bird</span></div>
+        <h1 class="banner-title">Chạy đơn cùng<br><em>CRABOR</em><br>— Tự do thật sự!</h1>
+        <p class="banner-sub">App giao đồ ăn mới tại Hà Nội — 50 shipper đầu tiên nhận ưu đãi <strong style="color:#FFD84D">không nơi nào có</strong></p>
+
+        <div class="compare-table">
+          <table>
+            <tr>
+              <th>Tiêu chí</th>
+              <th class="col-crabor">🦀 CRABOR</th>
+              <th>Grab</th>
+              <th>ShopeeFood</th>
+              <th>Be</th>
+            </tr>
+            <tr>
+              <td>Phí đăng ký</td>
+              <td class="col-crabor hl">500k EB</td><td>0đ*</td><td>0đ*</td><td>0đ*</td>
+            </tr>
+            <tr>
+              <td>Hoàn phí</td>
+              <td class="col-crabor hl yes">✓ 1.000 đơn</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td>
+            </tr>
+            <tr>
+              <td>Phí nền tảng</td>
+              <td class="col-crabor hl">9% (EB)</td><td>25–30%</td><td>20–25%</td><td>20%</td>
+            </tr>
+            <tr>
+              <td>Cạnh tranh đơn</td>
+              <td class="col-crabor hl yes">✓ Ít</td><td class="no">Rất cao</td><td class="no">Cao</td><td class="no">Cao</td>
+            </tr>
+            <tr>
+              <td>Shipper mới dễ đơn</td>
+              <td class="col-crabor hl yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="perks-row">
+          <div class="perk">🎉 Phí chỉ 500k</div>
+          <div class="perk">💸 Phí nền tảng 9%</div>
+          <div class="perk">🔄 Hoàn 500k sau 1.000 đơn</div>
+          <div class="perk">⏰ Tự chọn giờ làm</div>
+          <div class="perk">📦 Ít cạnh tranh</div>
+        </div>
+        <div class="cta-row">
+          <button class="btn btn-cream">Đăng ký ngay →</button>
+          <div class="cta-note">Chỉ còn <strong>50 suất Early Bird</strong><br>Hết suất là hết ưu đãi</div>
+        </div>
+      </div>
+      <div class="banner-right">
+        <div class="logo-circle">
+          <svg width="140" height="140" viewBox="0 0 140 140" fill="none">
+            <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+            <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+            <path d="M28 73 Q8 60 7 47 Q6 36 17 35 Q27 33 27 43 Q21 52 28 61Z" fill="#F5F0DC"/>
+            <path d="M17 35 Q7 28 10 20 Q14 13 21 18 Q25 23 20 30Z" fill="#F5F0DC"/>
+            <path d="M112 73 Q132 60 133 47 Q134 36 123 35 Q113 33 113 43 Q119 52 112 61Z" fill="#F5F0DC"/>
+            <path d="M123 35 Q133 28 130 20 Q126 13 119 18 Q115 23 120 30Z" fill="#F5F0DC"/>
+            <path d="M36 89 Q19 82 13 91" stroke="#F5F0DC" stroke-width="6" stroke-linecap="round"/>
+            <path d="M39 97 Q21 96 16 107" stroke="#F5F0DC" stroke-width="6" stroke-linecap="round"/>
+            <path d="M104 89 Q121 82 127 91" stroke="#F5F0DC" stroke-width="6" stroke-linecap="round"/>
+            <path d="M101 97 Q119 96 124 107" stroke="#F5F0DC" stroke-width="6" stroke-linecap="round"/>
+            <rect x="52" y="51" width="8" height="15" rx="4" fill="#F5F0DC"/>
+            <rect x="80" y="51" width="8" height="15" rx="4" fill="#F5F0DC"/>
+            <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/>
+            <circle cx="54" cy="49" r="2.5" fill="#F5F0DC"/>
+            <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/>
+            <circle cx="82" cy="49" r="2.5" fill="#F5F0DC"/>
+            <path d="M57 96 Q70 107 83 96" stroke="#E8504A" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+            <text x="70" y="127" font-family="Arial Black" font-size="15" fill="#F5F0DC" text-anchor="middle">CRABOR</text>
+          </svg>
+        </div>
+        <div class="price-pill">
+          <div class="old">700.000đ</div>
+          <div class="new">500.000đ</div>
+          <div class="lbl">Early Bird</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <span class="sec-label">📱 Bài viết MXH – Shipper</span>
+
+  <div class="post">
+    <div class="post-head shipper-head">
+      <div class="post-head-row">
+        <div class="post-icon shipper-post-icon">
+          <svg width="28" height="28" viewBox="0 0 140 140" fill="none">
+            <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+            <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+            <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/>
+            <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/>
+            <path d="M28 73 Q8 60 7 47 Q17 33 27 43Z" fill="#F5F0DC"/>
+            <path d="M112 73 Q132 60 133 47 Q123 33 113 43Z" fill="#F5F0DC"/>
+          </svg>
+        </div>
+        <div class="post-brand"><strong>CRABOR</strong><span>App giao đồ ăn mới · Hà Nội 🆕</span></div>
+      </div>
+      <div class="post-h">🚴 Gia nhập đội ngũ<br><em>Shipper CRABOR</em><br>— Thế hệ mới!</div>
+    </div>
+    <div class="post-body">
+      <p class="post-intro">CRABOR là <strong>app giao đồ ăn vừa ra mắt</strong> tại Hà Nội — nghĩa là <strong>ít shipper cạnh tranh, nhiều đơn hơn cho bạn</strong>. Chúng mình đang tuyển <strong>50 shipper Early Bird đầu tiên</strong> với ưu đãi CỰC KHỦNG để cùng xây dựng nền tảng! 🔥</p>
+
+      <div class="benefits">
+        <div class="brow">
+          <div class="bicon shipper-bicon">🆕</div>
+          <div class="btext"><strong>App mới = Ít cạnh tranh, nhiều đơn hơn</strong><span>Grab/Shopee có hàng nghìn shipper chen nhau — CRABOR thì bạn là người đầu tiên</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon shipper-bicon">💸</div>
+          <div class="btext"><strong>Phí nền tảng chỉ 9% — thấp nhất thị trường</strong><span>Grab/ShopeeFood lấy 20–30%, CRABOR Early Bird chỉ 9%</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon shipper-bicon">🔄</div>
+          <div class="btext"><strong>Hoàn lại 500k sau 1.000 đơn</strong><span>Đạt đủ đơn trong 6 tháng → nhận lại toàn bộ phí đăng ký</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon shipper-bicon">⏰</div>
+          <div class="btext"><strong>Tự do 100% — không KPI, không sếp</strong><span>Online lúc nào thì nhận đơn lúc đó, kể cả 1–2 tiếng/ngày</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      
+      <div class="req-box shipper-req">
+        <h4>📋 Điều kiện tham gia</h4>
+        <ul class="req-list">
+          <li>Có xe máy + CCCD hợp lệ</li>
+          <li>Có điện thoại Android hoặc iOS</li>
+          <li>Đang sinh sống tại Hà Nội</li>
+          <li>Cam kết tối thiểu 10 đơn/tuần giai đoạn đầu</li>
+        </ul>
+      </div>
+
+      <div class="price-row-card shipper-price-row">
+        <div class="pl">
+          <div class="lbl2">Phí Early Bird</div>
+          <div class="amt">500.000đ</div>
+          <div class="note">Đồng phục + kích hoạt + xác minh giấy tờ</div>
+        </div>
+        <div class="pr">⚡ Còn<br>50 suất<br>duy nhất</div>
+      </div>
+
+      <div class="hashtags">
+        <span class="hashtag shipper-hashtag">#CraborShipper</span>
+        <span class="hashtag shipper-hashtag">#ShipperHaNoi</span>
+        <span class="hashtag shipper-hashtag">#SinhVienKiemTien</span>
+        <span class="hashtag shipper-hashtag">#AppMoi</span>
+      </div>
+      <div class="post-footer">📩 Đăng ký qua link trong bio · CRABOR – Nhanh như cua chạy 🦀</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================
+     MODULE 3: GIÚP VIỆC (Từ file 1)
+======================================== -->
+<div id="sec-gv" class="section">
+  <span class="sec-label">🧹 Banner tuyển người giúp việc — CRABOR Giúp Việc</span>
+
+  <div class="banner gv-banner">
+    <div class="dots"></div>
+    <div class="blob" style="width:340px;height:340px;background:radial-gradient(circle,rgba(58,170,92,.18),transparent 70%);top:-100px;right:-70px;"></div>
+    <div class="blob" style="width:160px;height:160px;background:radial-gradient(circle,rgba(255,216,77,.1),transparent 70%);bottom:-40px;left:80px;"></div>
+    <div class="banner-inner">
+      <div>
+        <div class="new-badge" style="background:rgba(58,170,92,.2);border-color:rgba(58,170,92,.4);color:#7dde9a;">🧹 Giúp việc theo giờ · Mới tại Hà Nội</div>
+        <h1 class="banner-title">Làm giúp việc<br><em style="color:#7dde9a;">CRABOR</em><br>Thu nhập ổn định!</h1>
+        <p class="banner-sub">Nền tảng kết nối giúp việc theo giờ — tự chọn ca, nhận tiền nhanh, khách hàng đã xác minh</p>
+        
+        <div class="compare-table" style="background:rgba(0,0,0,.25);">
+          <table>
+            <tr>
+              <th>Tiêu chí</th>
+              <th class="col-crabor">🦀 CRABOR</th>
+              <th>BTaskee</th>
+              <th>Homedy</th>
+            </tr>
+            <tr>
+              <td>Phí nền tảng</td>
+              <td class="col-crabor hl">15%</td>
+              <td>25–30%</td>
+              <td>20–25%</td>
+            </tr>
+            <tr>
+              <td>Khách hàng xác minh</td>
+              <td class="col-crabor hl yes">✓ 100%</td>
+              <td class="yes">✓</td>
+              <td class="no">Một phần</td>
+            </tr>
+            <tr>
+              <td>Tự chọn ca làm</td>
+              <td class="col-crabor hl yes">✓ Hoàn toàn</td>
+              <td class="yes">✓</td>
+              <td class="no">Hạn chế</td>
+            </tr>
+            <tr>
+              <td>Nhận tiền ngay</td>
+              <td class="col-crabor hl yes">✓ Sau mỗi ca</td>
+              <td class="no">Theo tuần</td>
+              <td class="no">Theo tuần</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="perks-row">
+          <div class="perk" style="background:rgba(58,170,92,.15);border-color:rgba(58,170,92,.3);color:#a8f0be;">🏠 200k–350k/ca 3–4 tiếng</div>
+          <div class="perk" style="background:rgba(58,170,92,.15);border-color:rgba(58,170,92,.3);color:#a8f0be;">💸 Giữ 85% mỗi ca</div>
+          <div class="perk" style="background:rgba(58,170,92,.15);border-color:rgba(58,170,92,.3);color:#a8f0be;">📅 Tự chọn lịch làm</div>
+          <div class="perk" style="background:rgba(58,170,92,.15);border-color:rgba(58,170,92,.3);color:#a8f0be;">⚡ Nhận tiền ngay</div>
+        </div>
+        
+        <div class="cta-row">
+          <button class="btn btn-green">Đăng ký làm việc →</button>
+          <div class="cta-note">Miễn phí đăng ký<br><strong style="color:#7dde9a;">Không mất gì để thử</strong></div>
+        </div>
+      </div>
+      
+      <div class="banner-right">
+        <div class="logo-circle gv-logo-circle">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+            <rect x="54" y="15" width="12" height="60" rx="6" fill="#F5F0DC"/>
+            <path d="M30 75 Q60 65 90 75 L85 100 Q60 108 35 100Z" fill="#F5F0DC"/>
+            <circle cx="25" cy="40" r="4" fill="#FFD84D"/>
+            <circle cx="95" cy="35" r="3" fill="#FFD84D"/>
+            <circle cx="88" cy="55" r="5" fill="#7dde9a"/>
+            <text x="60" y="118" font-family="Arial Black" font-size="10" fill="#F5F0DC" text-anchor="middle">CRABOR</text>
+          </svg>
+        </div>
+        <div class="partner-pill" style="background:#3aaa5c;">
+          <div class="new" style="font-size:1.4rem;">Miễn phí</div>
+          <div class="lbl">Đăng ký ngay</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <span class="sec-label">📱 Bài viết MXH — Tuyển người giúp việc</span>
+
+  <div class="post">
+    <div class="post-head gv-head">
+      <div class="post-head-row">
+        <div class="post-icon gv-post-icon">
+          <svg width="26" height="26" viewBox="0 0 120 120" fill="none">
+            <rect x="54" y="15" width="12" height="55" rx="6" fill="#F5F0DC"/>
+            <path d="M30 70 Q60 60 90 70 L85 95 Q60 103 35 95Z" fill="#F5F0DC"/>
+            <circle cx="25" cy="40" r="4" fill="#FFD84D"/>
+          </svg>
+        </div>
+        <div class="post-brand"><strong style="color:#F5F0DC;">CRABOR Giúp Việc</strong><span style="color:rgba(245,240,220,.65);">Dọn nhà theo giờ · Hà Nội 🆕</span></div>
+      </div>
+      <div class="post-h" style="color:#F5F0DC;">🧹 Làm giúp việc<br>linh hoạt cùng<br><em style="color:#7dde9a;">CRABOR!</em></div>
+    </div>
+    <div class="post-body">
+      <p class="post-intro">Bạn muốn làm việc <strong>linh hoạt thời gian</strong>, thu nhập <strong>200k–350k mỗi ca</strong>? CRABOR đang tuyển người dọn nhà theo giờ tại Hà Nội — <strong>miễn phí đăng ký</strong>, nhận tiền ngay sau mỗi ca! 🏠</p>
+      
+      <div class="benefits">
+        <div class="brow">
+          <div class="bicon gv-bicon">💰</div>
+          <div class="btext"><strong>Thu nhập 200k–350k mỗi ca 3–4 tiếng</strong><span>Làm 2 ca/ngày = 400–700k — tốt hơn nhiều công việc văn phòng</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon gv-bicon">📅</div>
+          <div class="btext"><strong>Hoàn toàn tự chọn lịch làm việc</strong><span>Sáng, chiều, tối — bạn bật app và nhận ca phù hợp</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon gv-bicon">⚡</div>
+          <div class="btext"><strong>Nhận tiền ngay sau khi hoàn thành ca</strong><span>Không chờ đến cuối tuần hay cuối tháng</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon gv-bicon">🛡️</div>
+          <div class="btext"><strong>Khách hàng đã xác minh 100% an toàn</strong><span>Mọi khách hàng qua CCCD và xác minh địa chỉ trước</span></div>
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="req-box gv-req">
+        <h4>📋 Điều kiện tham gia</h4>
+        <ul class="req-list">
+          <li>Có CCCD hợp lệ, từ 18 tuổi trở lên</li>
+          <li>Có kinh nghiệm dọn nhà cơ bản</li>
+          <li>Có điện thoại để dùng app CRABOR</li>
+          <li>Đang sinh sống tại Hà Nội</li>
+        </ul>
+      </div>
+      
+      <div class="price-row-card gv-price-row">
+        <div class="pl">
+          <div class="lbl2">Thu nhập trung bình</div>
+          <div class="amt">200–350k/ca</div>
+          <div class="note">Nhận tiền ngay · Tự chọn lịch · Phí nền tảng 15%</div>
+        </div>
+        <div class="pr">🏠 Đăng ký<br>Miễn Phí<br>Ngay!</div>
+      </div>
+      
+      <div class="hashtags">
+        <span class="hashtag gv-hashtag">#CraborGiupViec</span>
+        <span class="hashtag gv-hashtag">#GiupViecHaNoi</span>
+        <span class="hashtag gv-hashtag">#LamViecLinhHoat</span>
+        <span class="hashtag gv-hashtag">#DocNhaTheoGio</span>
+      </div>
+      <div class="post-footer">📩 Đăng ký qua link trong bio · CRABOR – Nhanh như cua chạy 🦀</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================
+     MODULE 4: GIẶT LÀ (Từ file 1)
+======================================== -->
+<div id="sec-gl" class="section">
+  <span class="sec-label">👕 Banner tuyển tiệm đối tác — CRABOR Giặt Là</span>
+
+  <div class="banner gl-banner">
+    <div class="dots"></div>
+    <div class="blob" style="width:340px;height:340px;background:radial-gradient(circle,rgba(100,149,237,.2),transparent 70%);top:-100px;right:-70px;"></div>
+    <div class="blob" style="width:160px;height:160px;background:radial-gradient(circle,rgba(255,216,77,.1),transparent 70%);bottom:-40px;left:80px;"></div>
+    <div class="banner-inner">
+      <div>
+        <div class="new-badge" style="background:rgba(100,149,237,.2);border-color:rgba(100,149,237,.4);color:#90b8ff;">👕 Tiệm giặt đối tác · Mới tại Hà Nội</div>
+        <h1 class="banner-title">Tăng đơn hàng<br>tiệm giặt với<br><em style="color:#90b8ff;">CRABOR!</em></h1>
+        <p class="banner-sub">Kết nối tiệm giặt của bạn với hàng nghìn khách hàng — có sẵn shipper đến lấy và trả đồ</p>
+        
+        <div class="stats-row">
+          <div class="stat-box"><div class="num" style="color:#90b8ff;">18%</div><div class="lbl">Hoa hồng thấp nhất</div></div>
+          <div class="stat-box"><div class="num" style="color:#90b8ff;">0đ</div><div class="lbl">Phí đăng ký ban đầu</div></div>
+          <div class="stat-box"><div class="num" style="color:#90b8ff;">24h</div><div class="lbl">Hỗ trợ vận hành</div></div>
+        </div>
+        
+        <div class="perks-row">
+          <div class="perk" style="background:rgba(100,149,237,.15);border-color:rgba(100,149,237,.3);color:#c0d8ff;">✅ Đăng ký miễn phí</div>
+          <div class="perk" style="background:rgba(100,149,237,.15);border-color:rgba(100,149,237,.3);color:#c0d8ff;">🛵 Shipper đến lấy đồ</div>
+          <div class="perk" style="background:rgba(100,149,237,.15);border-color:rgba(100,149,237,.3);color:#c0d8ff;">📱 Quản lý đơn qua app</div>
+        </div>
+        
+        <div class="cta-row">
+          <button class="btn" style="background:#6495ed;color:#fff;">Đăng ký tiệm →</button>
+          <div class="cta-note">Miễn phí hoàn toàn<br><strong style="color:#90b8ff;">Không mất gì để thử</strong></div>
+        </div>
+      </div>
+      
+      <div class="banner-right">
+        <div class="logo-circle gl-logo-circle">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+            <rect x="20" y="20" width="80" height="85" rx="10" fill="#F5F0DC"/>
+            <circle cx="60" cy="68" r="28" fill="#6495ed" opacity=".4"/>
+            <circle cx="60" cy="68" r="22" fill="#F5F0DC"/>
+            <circle cx="60" cy="68" r="16" fill="#6495ed" opacity=".3"/>
+            <text x="60" y="118" font-family="Arial Black" font-size="10" fill="#1a2040" text-anchor="middle">CRABOR</text>
+          </svg>
+        </div>
+        <div class="price-pill" style="background:#6495ed;color:#fff;">
+          <div class="new" style="font-size:1.4rem;">Miễn phí</div>
+          <div class="lbl">Hoa hồng 18%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <span class="sec-label">📱 Bài viết MXH — Người dùng đặt giặt là</span>
+
+  <div class="post">
+    <div class="post-head gl-head">
+      <div class="post-head-row">
+        <div class="post-icon gl-post-icon">
+          <svg width="26" height="26" viewBox="0 0 120 120" fill="none">
+            <rect x="20" y="20" width="80" height="85" rx="10" fill="#F5F0DC"/>
+            <circle cx="60" cy="68" r="28" fill="#6495ed" opacity=".5"/>
+            <circle cx="60" cy="68" r="18" fill="#F5F0DC"/>
+          </svg>
+        </div>
+        <div class="post-brand"><strong style="color:#F5F0DC;">CRABOR Giặt Là</strong><span style="color:rgba(245,240,220,.65);">Lấy và giao tận nhà · Hà Nội</span></div>
+      </div>
+      <div class="post-h" style="color:#F5F0DC;">👕 Giặt sạch giao<br>tận nhà — <em style="color:#90b8ff;">Đặt trong</em><br><em style="color:#FFD84D;">60 giây!</em></div>
+    </div>
+    <div class="post-body">
+      <p class="post-intro">Không còn phải tự giặt hay ra tiệm! CRABOR <strong>đến lấy đồ tại nhà</strong>, giặt sạch sẽ tại tiệm đối tác uy tín, rồi <strong>giao lại tận tay</strong> trong ngày. Đặt lịch cực dễ ngay trên app! 👕✨</p>
+      
+      <div class="benefits">
+        <div class="brow">
+          <div class="bicon gl-bicon">🛵</div>
+          <div class="btext"><strong>Lấy và giao tận nhà — không cần ra ngoài</strong><span>Shipper CRABOR đến lấy đồ, giặt xong giao lại cho bạn</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon gl-bicon">⏰</div>
+          <div class="btext"><strong>Nhanh chóng — giao lại trong ngày</strong><span>Đặt buổi sáng, nhận đồ sạch buổi chiều tối</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon gl-bicon">🏪</div>
+          <div class="btext"><strong>Tiệm giặt đối tác đã kiểm duyệt uy tín</strong><span>Chỉ hợp tác với tiệm đạt chuẩn chất lượng CRABOR</span></div>
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="req-box gl-req">
+        <h4>👕 Dịch vụ giặt là CRABOR</h4>
+        <ul class="req-list">
+          <li>Giặt thường · Giặt ủi · Giặt khô</li>
+          <li>Chăn, màn, rèm cửa khổ lớn</li>
+          <li>Đồ thể thao, veston, áo dài</li>
+        </ul>
+      </div>
+      
+      <div class="price-row-card gl-price-row">
+        <div class="pl">
+          <div class="lbl2">Đơn giặt đầu tiên</div>
+          <div class="amt">Giảm 30k</div>
+          <div class="note">Áp dụng đơn từ 100k · Lấy và giao miễn phí</div>
+        </div>
+        <div class="pr">👕 Đặt<br>Ngay</div>
+      </div>
+      
+      <div class="hashtags">
+        <span class="hashtag gl-hashtag">#CraborGiatLa</span>
+        <span class="hashtag gl-hashtag">#GiatLaHaNoi</span>
+        <span class="hashtag gl-hashtag">#LayVaGiaoTanNha</span>
+      </div>
+      <div class="post-footer">📩 Đặt lịch qua link trong bio · CRABOR – Nhanh như cua chạy 🦀</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================
+     MODULE 5: ĐỐI TÁC (Từ file 2)
+======================================== -->
+<div id="sec-partner" class="section">
+  <span class="sec-label">📌 Banner – Đối tác CRABOR</span>
+
+  <div class="banner partner-banner">
+    <div class="dots"></div>
+    <div class="blob blob1"></div><div class="blob blob2"></div>
+    <div class="banner-inner">
+      <div>
+        <div class="new-badge" style="background:rgba(58,170,92,.2);border-color:rgba(58,170,92,.4);color:#7dde9a;">🏪 Dành cho nhà hàng & quán ăn</div>
+        <h1 class="banner-title">Tăng doanh thu<br><em>online</em> ngay<br>hôm nay!</h1>
+        <p class="banner-sub">CRABOR kết nối quán của bạn với hàng nghìn khách hàng mới — phí hoa hồng thấp, hỗ trợ tận tình</p>
+
+        <div class="stats-row">
+          <div class="stat-box"><div class="num">20%</div><div class="lbl">Hoa hồng thấp nhất</div></div>
+          <div class="stat-box"><div class="num">0đ</div><div class="lbl">Phí đăng ký ban đầu</div></div>
+          <div class="stat-box"><div class="num">24h</div><div class="lbl">Hỗ trợ xử lý đơn</div></div>
+        </div>
+
+        <div class="compare-table" style="background:rgba(0,0,0,.25);">
+          <table>
+            <tr>
+              <th>Tiêu chí</th>
+              <th class="col-crabor">🦀 CRABOR</th>
+              <th>Grab</th>
+              <th>ShopeeFood</th>
+            </tr>
+            <tr>
+              <td>Hoa hồng</td>
+              <td class="col-crabor hl">20%</td><td>25–30%</td><td>20–25%</td>
+            </tr>
+            <tr>
+              <td>Phí đăng ký</td>
+              <td class="col-crabor hl yes">✓ Miễn phí</td><td class="no">Có phí</td><td class="no">Có phí</td>
+            </tr>
+            <tr>
+              <td>Thủ tục đơn giản</td>
+              <td class="col-crabor hl yes">✓ Nhanh</td><td class="no">Phức tạp</td><td class="no">Phức tạp</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="perks-row">
+          <div class="perk" style="background:rgba(58,170,92,.15);border-color:rgba(58,170,92,.3);color:#a8f0be;">✅ Đăng ký miễn phí</div>
+          <div class="perk" style="background:rgba(58,170,92,.15);border-color:rgba(58,170,92,.3);color:#a8f0be;">📈 Tăng doanh thu online</div>
+          <div class="perk" style="background:rgba(58,170,92,.15);border-color:rgba(58,170,92,.3);color:#a8f0be;">🚴 Có sẵn đội shipper</div>
+        </div>
+        
+        <div class="cta-row">
+          <button class="btn btn-green">Đăng ký đối tác →</button>
+          <div class="cta-note">Miễn phí hoàn toàn<br><strong style="color:#7dde9a">Không mất gì để thử</strong></div>
+        </div>
+      </div>
+      
+      <div class="banner-right">
+        <div class="partner-logo-circle">
+          <svg width="140" height="140" viewBox="0 0 140 140" fill="none">
+            <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+            <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+            <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#3aaa5c"/>
+            <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#3aaa5c"/>
+            <text x="70" y="127" font-family="Arial Black" font-size="15" fill="#F5F0DC" text-anchor="middle">CRABOR</text>
+          </svg>
+        </div>
+        <div class="partner-pill">
+          <div class="new">Miễn phí</div>
+          <div class="lbl">Đăng ký đối tác</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <span class="sec-label">📱 Bài viết MXH – Đối tác</span>
+
+  <div class="post">
+    <div class="post-head partner-head">
+      <div class="post-head-row">
+        <div class="post-icon partner-post-icon">
+          <svg width="28" height="28" viewBox="0 0 140 140" fill="none">
+            <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+            <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+            <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#3aaa5c"/>
+            <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#3aaa5c"/>
+          </svg>
+        </div>
+        <div class="post-brand"><strong>CRABOR</strong><span>Nền tảng giao đồ ăn · Hà Nội</span></div>
+      </div>
+      <div class="post-h">🏪 Mở rộng doanh thu<br><em>online cùng CRABOR</em><br>— Miễn phí!</div>
+    </div>
+    <div class="post-body">
+      <p class="post-intro">Quán bạn đang chỉ bán <strong>tại chỗ</strong>? Đã đến lúc tăng thêm <strong>kênh online</strong> mà không cần tốn thêm nhân viên. CRABOR kết nối quán với khách hàng xung quanh — có sẵn shipper, quản lý đơn dễ dàng ngay trên điện thoại. 📱</p>
+
+      <div class="benefits">
+        <div class="brow">
+          <div class="bicon partner-bicon">💰</div>
+          <div class="btext"><strong>Hoa hồng chỉ 20% — thấp hơn đối thủ</strong><span>Grab lấy 25–30%, CRABOR chỉ 20% mỗi đơn thành công</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon partner-bicon">🆓</div>
+          <div class="btext"><strong>Đăng ký hoàn toàn miễn phí</strong><span>Không phí gia nhập, không phí duy trì — chỉ trả hoa hồng khi có đơn</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon partner-bicon">🚴</div>
+          <div class="btext"><strong>Có sẵn đội shipper khu vực</strong><span>Không cần lo shipper — CRABOR lo hết, bạn chỉ cần chuẩn bị món</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      
+      <div class="req-box partner-req">
+        <h4>📋 Điều kiện đăng ký đối tác</h4>
+        <ul class="req-list">
+          <li>Có giấy phép kinh doanh hợp lệ</li>
+          <li>Có địa điểm cố định tại Hà Nội</li>
+          <li>Có menu rõ ràng và giá niêm yết</li>
+        </ul>
+      </div>
+
+      <div class="price-row-card partner-price-row">
+        <div class="pl">
+          <div class="lbl2">Phí đăng ký đối tác</div>
+          <div class="amt">Miễn phí</div>
+          <div class="note">Chỉ trả 20% hoa hồng khi có đơn thành công</div>
+        </div>
+        <div class="pr">🏪 Đăng ký<br>ngay</div>
+      </div>
+
+      <div class="hashtags">
+        <span class="hashtag partner-hashtag">#CraborPartner</span>
+        <span class="hashtag partner-hashtag">#NhaHangHaNoi</span>
+        <span class="hashtag partner-hashtag">#TangDoanhThu</span>
+      </div>
+      <div class="post-footer">📩 Liên hệ qua link trong bio · CRABOR – Đồng hành cùng đối tác 🦀</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================
+     MODULE 6: NGƯỜI DÙNG (Từ file 2)
+======================================== -->
+<div id="sec-user" class="section">
+  <span class="sec-label">📌 Banner – Người dùng CRABOR</span>
+
+  <div class="banner user-banner">
+    <div class="dots"></div>
+    <div class="blob blob1"></div><div class="blob blob2"></div>
+    <div class="banner-inner">
+      <div>
+        <div class="new-badge" style="background:rgba(45,125,210,.2);border-color:rgba(45,125,210,.4);color:#90c8ff;">🍜 App giao đồ ăn mới tại Hà Nội</div>
+        <h1 class="banner-title">Đặt đồ ăn<br>nhanh hơn với<br><em>CRABOR!</em></h1>
+        <p class="banner-sub">Giao hàng nhanh · Giá tốt · Voucher ngập tràn — Tải ngay và nhận ưu đãi đặc biệt cho người dùng đầu tiên</p>
+
+        <div class="voucher-box">
+          <div class="voucher-icon">🎟️</div>
+          <div class="voucher-text">
+            <div class="big">Giảm 50.000đ</div>
+            <div class="small">Cho đơn đầu tiên · Tối thiểu 100k · Khi mời bạn mới cũng được thêm voucher!</div>
+          </div>
+        </div>
+
+        <div class="feature-grid">
+          <div class="feat"><div class="icon">⚡</div><strong>Giao hàng siêu nhanh</strong><span>Cam kết dưới 30 phút</span></div>
+          <div class="feat"><div class="icon">💳</div><strong>Thanh toán đa dạng</strong><span>Thẻ, ví, tiền mặt</span></div>
+          <div class="feat"><div class="icon">📍</div><strong>Theo dõi shipper live</strong><span>Biết đơn đang ở đâu</span></div>
+          <div class="feat"><div class="icon">🎁</div><strong>Voucher mỗi ngày</strong><span>Ưu đãi liên tục</span></div>
+        </div>
+
+        <div class="cta-row">
+          <button class="btn btn-yellow">Tải app ngay →</button>
+          <div class="cta-note">Có trên iOS & Android<br><strong style="color:#FFD84D">Mời bạn nhận thêm 50k</strong></div>
+        </div>
+      </div>
+      
+      <div class="banner-right">
+        <div class="user-logo-circle">
+          <svg width="140" height="140" viewBox="0 0 140 140" fill="none">
+            <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+            <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+            <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#2d7dd2"/>
+            <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#2d7dd2"/>
+            <text x="70" y="127" font-family="Arial Black" font-size="15" fill="#F5F0DC" text-anchor="middle">CRABOR</text>
+          </svg>
+        </div>
+        <div class="app-badges">
+          <div class="app-badge"><div class="ab-icon">🍎</div><div><strong>App Store</strong><span>iOS 13.0 trở lên</span></div></div>
+          <div class="app-badge"><div class="ab-icon">🤖</div><div><strong>Google Play</strong><span>Android 8.0 trở lên</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <span class="sec-label">📱 Bài viết MXH – Người dùng</span>
+
+  <div class="post">
+    <div class="post-head user-head">
+      <div class="post-head-row">
+        <div class="post-icon user-post-icon">
+          <svg width="28" height="28" viewBox="0 0 140 140" fill="none">
+            <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+            <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+            <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#2d7dd2"/>
+            <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#2d7dd2"/>
+          </svg>
+        </div>
+        <div class="post-brand"><strong>CRABOR</strong><span>App giao đồ ăn · Hà Nội 🆕</span></div>
+      </div>
+      <div class="post-h">🍜 Đặt đồ ăn cùng<br><em>CRABOR</em> — Nhận ngay<br><em>voucher 50k!</em></div>
+    </div>
+    <div class="post-body">
+      <p class="post-intro">CRABOR vừa ra mắt tại Hà Nội — app giao đồ ăn <strong>nhanh, giá tốt, voucher nhiều</strong>. Tải ngay hôm nay và nhận <strong>50k cho đơn đầu tiên</strong>, mời thêm bạn lại có thêm voucher! 🎉</p>
+
+      <div class="benefits">
+        <div class="brow">
+          <div class="bicon user-bicon">🎟️</div>
+          <div class="btext"><strong>Giảm 50k đơn đầu tiên</strong><span>Áp dụng đơn từ 100k, chỉ dành cho người dùng mới</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon user-bicon">👥</div>
+          <div class="btext"><strong>Mời bạn — cả hai cùng được voucher</strong><span>Mỗi người bạn tải app qua link của bạn → bạn nhận thêm 30k</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon user-bicon">⚡</div>
+          <div class="btext"><strong>Giao hàng trong 30 phút</strong><span>Shipper khu vực sẵn sàng — giao nhanh hơn bạn nghĩ</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      
+      <div class="req-box user-req">
+        <h4>📱 Tải app CRABOR ngay</h4>
+        <ul class="req-list">
+          <li>Có trên App Store (iOS) và Google Play (Android)</li>
+          <li>Đăng ký bằng số điện thoại — chỉ 30 giây</li>
+          <li>Nhập mã mời để nhận voucher 50k ngay</li>
+        </ul>
+      </div>
+
+      <div class="price-row-card user-price-row">
+        <div class="pl">
+          <div class="lbl2">Ưu đãi người dùng mới</div>
+          <div class="amt">Giảm 50k</div>
+          <div class="note">Đơn đầu tiên từ 100k · Có hạn sử dụng</div>
+        </div>
+        <div class="pr">🎁 Thêm<br>30k khi<br>mời bạn</div>
+      </div>
+
+      <div class="hashtags">
+        <span class="hashtag user-hashtag">#CraborApp</span>
+        <span class="hashtag user-hashtag">#GiaoDoAnHaNoi</span>
+        <span class="hashtag user-hashtag">#Voucher50k</span>
+      </div>
+      <div class="post-footer">📩 Link tải app trong bio · CRABOR – Nhanh như cua chạy 🦀</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================
+     MODULE 7: CHINA SHOP (Từ file 1)
+======================================== -->
+<div id="sec-cs" class="section">
+  <span class="sec-label">🛍️ Banner đối tác — CRABOR China Shop</span>
+
+  <div class="banner cs-banner">
+    <div class="dots"></div>
+    <div class="blob" style="width:360px;height:360px;background:radial-gradient(circle,rgba(255,216,77,.18),transparent 70%);top:-120px;right:-80px;"></div>
+    <div class="blob" style="width:200px;height:200px;background:radial-gradient(circle,rgba(245,240,220,.08),transparent 70%);bottom:-60px;left:60px;"></div>
+    <div class="banner-inner">
+      <div>
+        <div class="new-badge" style="background:rgba(255,216,77,.2);border-color:rgba(255,216,77,.4);color:#FFD84D;">🇨🇳 Hàng nội địa Trung · Chính hãng</div>
+        <h1 class="banner-title" style="color:#F5F0DC;">Hàng Trung xịn<br><em style="color:#FFD84D;">giao tận nơi</em><br>nhanh chóng!</h1>
+        <p class="banner-sub" style="color:rgba(245,240,220,.8);">Hàng nội địa Trung Quốc chính hãng — nguồn gốc rõ ràng, giá tốt, ship về Hà Nội trong 7–12 ngày</p>
+        
+        <div class="compare-table" style="background:rgba(0,0,0,.3);">
+          <table>
+            <tr>
+              <th>Tiêu chí</th>
+              <th class="col-crabor">🦀 CRABOR</th>
+              <th>Order FB</th>
+              <th>Taobao VN</th>
+            </tr>
+            <tr>
+              <td>Nguồn hàng</td>
+              <td class="col-crabor hl">Chính hãng</td>
+              <td>Không rõ</td>
+              <td>Tự order</td>
+            </tr>
+            <tr>
+              <td>Thời gian ship</td>
+              <td class="col-crabor hl">7–12 ngày</td>
+              <td>15–25 ngày</td>
+              <td>20–30 ngày</td>
+            </tr>
+            <tr>
+              <td>Đặt trên app</td>
+              <td class="col-crabor hl yes">✓ Dễ dàng</td>
+              <td class="no">Nhắn tin FB</td>
+              <td class="no">Website phức tạp</td>
+            </tr>
+            <tr>
+              <td>Hoàn tiền/đổi trả</td>
+              <td class="col-crabor hl yes">✓ Rõ ràng</td>
+              <td class="no">Khó đòi</td>
+              <td class="no">Phức tạp</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="perks-row">
+          <div class="perk" style="background:rgba(255,216,77,.15);border-color:rgba(255,216,77,.3);color:#FFD84D;">🇨🇳 Hàng chính hãng</div>
+          <div class="perk" style="background:rgba(255,216,77,.15);border-color:rgba(255,216,77,.3);color:#FFD84D;">⚡ Ship 7–12 ngày</div>
+          <div class="perk" style="background:rgba(255,216,77,.15);border-color:rgba(255,216,77,.3);color:#FFD84D;">📱 Đặt dễ dàng</div>
+          <div class="perk" style="background:rgba(255,216,77,.15);border-color:rgba(255,216,77,.3);color:#FFD84D;">🔄 Đổi trả rõ ràng</div>
+        </div>
+        
+        <div class="cta-row">
+          <button class="btn btn-yellow">Mua hàng ngay →</button>
+          <div class="cta-note" style="color:rgba(245,240,220,.6);">Miễn phí ship đơn đầu<br><strong style="color:#FFD84D;">Voucher 100k cho user mới</strong></div>
+        </div>
+      </div>
+      
+      <div class="banner-right">
+        <div class="logo-circle cs-logo-circle">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+            <rect x="20" y="45" width="80" height="65" rx="8" fill="#F5F0DC"/>
+            <rect x="20" y="45" width="80" height="20" rx="8" fill="#FFD84D"/>
+            <rect x="20" y="57" width="80" height="8" fill="#FFD84D"/>
+            <rect x="54" y="20" width="12" height="73" rx="4" fill="#E8504A" opacity=".6"/>
+            <text x="38" y="42" font-size="14" fill="#E8504A">★</text>
+            <text x="72" y="42" font-size="10" fill="#E8504A">★</text>
+            <path d="M42 45 Q42 28 60 28 Q78 28 78 45" stroke="#F5F0DC" stroke-width="5" fill="none"/>
+            <circle cx="60" cy="78" r="12" fill="#E8504A" opacity=".3"/>
+            <text x="60" y="83" text-anchor="middle" font-size="14" fill="#FFD84D">★</text>
+            <text x="60" y="113" font-family="Arial Black" font-size="10" fill="#1a1a1a" text-anchor="middle">CRABOR</text>
+          </svg>
+        </div>
+        <div class="price-pill" style="background:#FFD84D;">
+          <div class="new" style="font-size:1.5rem;">Voucher 100k</div>
+          <div class="lbl">Đơn đầu tiên</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <span class="sec-label">📱 Bài viết MXH — China Shop người dùng</span>
+
+  <div class="post">
+    <div class="post-head cs-head">
+      <div class="post-head-row">
+        <div class="post-icon cs-post-icon">
+          <svg width="26" height="26" viewBox="0 0 120 120" fill="none">
+            <rect x="20" y="45" width="80" height="65" rx="8" fill="#F5F0DC"/>
+            <rect x="20" y="45" width="80" height="18" rx="8" fill="#FFD84D"/>
+            <rect x="54" y="20" width="12" height="45" rx="4" fill="#E8504A" opacity=".6"/>
+            <path d="M42 45 Q42 28 60 28 Q78 28 78 45" stroke="#F5F0DC" stroke-width="4" fill="none"/>
+          </svg>
+        </div>
+        <div class="post-brand"><strong style="color:#F5F0DC;">CRABOR China Shop</strong><span style="color:rgba(245,240,220,.65);">Hàng nội địa Trung · Chính hãng 🇨🇳</span></div>
+      </div>
+      <div class="post-h" style="color:#F5F0DC;">🛍️ Hàng Trung xịn<br><em style="color:#FFD84D;">chính hãng</em><br>giao tận nhà!</div>
+    </div>
+    <div class="post-body">
+      <p class="post-intro">Hàng nội địa Trung Quốc <strong>chính hãng, giá tốt</strong> — giờ đây chỉ cần đặt trên app CRABOR, nhận hàng tận nhà trong <strong>7–12 ngày</strong>. Không còn cảnh nhắn tin page mà không biết hàng thật hay giả! 🇨🇳✨</p>
+      
+      <div class="benefits">
+        <div class="brow">
+          <div class="bicon cs-bicon">🇨🇳</div>
+          <div class="btext"><strong>Hàng nội địa Trung chính hãng 100%</strong><span>Nguồn gốc rõ ràng, có tem chính hãng — không hàng giả, không hàng nhái</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon cs-bicon">⚡</div>
+          <div class="btext"><strong>Ship về Hà Nội chỉ 7–12 ngày</strong><span>Nhanh hơn nhiều so với tự order Taobao (20–30 ngày)</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon cs-bicon">📱</div>
+          <div class="btext"><strong>Đặt dễ dàng ngay trên app CRABOR</strong><span>Không cần nhắn tin, không cần biết tiếng Trung — đặt như mua hàng Shopee</span></div>
+        </div>
+        <div class="brow">
+          <div class="bicon cs-bicon">🔄</div>
+          <div class="btext"><strong>Đổi trả rõ ràng — có bảo lãnh từ CRABOR</strong><span>Hàng không đúng mô tả → hoàn tiền hoặc đổi hàng, không cần tranh cãi</span></div>
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="req-box cs-req">
+        <h4>🛍️ Danh mục hàng phổ biến</h4>
+        <ul class="req-list">
+          <li>Đồ gia dụng · Thiết bị nhà bếp</li>
+          <li>Mỹ phẩm · Skincare nội địa Trung</li>
+          <li>Quần áo · Phụ kiện thời trang</li>
+        </ul>
+      </div>
+      
+      <div class="price-row-card cs-price-row">
+        <div class="pl">
+          <div class="lbl2">Voucher đơn đầu tiên</div>
+          <div class="amt">Giảm 100k</div>
+          <div class="note">Miễn phí ship · Áp dụng đơn từ 300k</div>
+        </div>
+        <div class="pr">🇨🇳 Mua<br>Ngay</div>
+      </div>
+      
+      <div class="hashtags">
+        <span class="hashtag cs-hashtag">#CraborChinaShop</span>
+        <span class="hashtag cs-hashtag">#HangNoiDiaTrung</span>
+        <span class="hashtag cs-hashtag">#ChinhHang</span>
+        <span class="hashtag cs-hashtag">#HangTrungXin</span>
+      </div>
+      <div class="post-footer">📩 Xem sản phẩm qua link trong bio · CRABOR – Nhanh như cua chạy 🦀</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showModule(id, btn) {
+  // Ẩn tất cả sections
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('show'));
+  // Bỏ active tất cả nav buttons
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  // Hiện section được chọn
+  document.getElementById('sec-' + id).classList.add('show');
+  // Active button được click
+  btn.classList.add('active');
+  // Scroll lên đầu
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+
 </body>
 </html>
