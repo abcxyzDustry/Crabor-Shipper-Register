@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -36,90 +35,90 @@ body {
 
 /* ══ LOGIN SCREEN ══ */
 #loginScreen {
-background: linear-gradient(160deg, #E8504A 0%, #c93d37 55%, #1a1a1a 100%);
-align-items: center;
-justify-content: flex-end;
-padding: 0 0 40px;
+  background: linear-gradient(160deg, #E8504A 0%, #c93d37 55%, #1a1a1a 100%);
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 40px;
 }
 .login-hero {
-width: 100%;
-display: flex;
-flex-direction: column;
-align-items: center;
-padding: 60px 30px 30px;
-flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60px 30px 30px;
+  flex: 1;
 }
 .login-crab {
-width: 110px; height: 110px;
-background: rgba(245,240,220,.15);
-border-radius: 35px;
-display: flex; align-items: center; justify-content: center;
-margin-bottom: 20px;
-border: 2px solid rgba(245,240,220,.25);
-animation: floatAnim 3s ease-in-out infinite;
+  width: 110px; height: 110px;
+  background: rgba(245,240,220,.15);
+  border-radius: 35px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+  border: 2px solid rgba(245,240,220,.25);
+  animation: floatAnim 3s ease-in-out infinite;
 }
 @keyframes floatAnim { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
 .login-brand {
-font-family: ‘Fredoka One’, cursive;
-font-size: 3.5rem;
-color: #F5F0DC;
-text-shadow: 4px 4px 0 rgba(0,0,0,.2);
-margin-bottom: 8px;
+  font-family: 'Fredoka One', cursive;
+  font-size: 3.5rem;
+  color: #F5F0DC;
+  text-shadow: 4px 4px 0 rgba(0,0,0,.2);
+  margin-bottom: 8px;
 }
 .login-sub { font-size: 1rem; color: rgba(245,240,220,.8); font-weight: 700; text-align:center; }
 .login-card {
-background: #fff;
-border-radius: 32px 32px 0 0;
-padding: 35px 28px 30px;
-width: 100%;
+  background: #fff;
+  border-radius: 32px 32px 0 0;
+  padding: 35px 28px 30px;
+  width: 100%;
 }
 .login-title {
-font-family: ‘Fredoka One’, cursive;
-font-size: 1.6rem;
-color: #1a1a1a;
-margin-bottom: 6px;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.6rem;
+  color: #1a1a1a;
+  margin-bottom: 6px;
 }
 .login-hint { font-size: 0.9rem; color: #777; font-weight: 700; margin-bottom: 25px; }
 .inp-wrap { position: relative; margin-bottom: 14px; }
 .inp-wrap .ico { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; }
 .inp {
-width: 100%; padding: 15px 16px 15px 46px;
-border: 2px solid #e8e8e8; border-radius: 14px;
-font-family: ‘Nunito’, sans-serif;
-font-size: 1rem; font-weight: 700;
-outline: none; background: #fafafa;
-transition: border-color .2s;
+  width: 100%; padding: 15px 16px 15px 46px;
+  border: 2px solid #e8e8e8; border-radius: 14px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem; font-weight: 700;
+  outline: none; background: #fafafa;
+  transition: border-color .2s;
 }
 .inp:focus { border-color: #E8504A; background: #fff; }
 .phone-row { display:flex; gap:10px; }
 .phone-row .inp { flex:1; }
 .btn-otp {
-padding: 0 16px; border-radius: 14px;
-border: 2px solid #E8504A; background: transparent;
-color: #E8504A; font-family: ‘Fredoka One’, cursive;
-font-size: 0.95rem; cursor: pointer; white-space: nowrap;
-transition: all .2s; flex-shrink: 0;
+  padding: 0 16px; border-radius: 14px;
+  border: 2px solid #E8504A; background: transparent;
+  color: #E8504A; font-family: 'Fredoka One', cursive;
+  font-size: 0.95rem; cursor: pointer; white-space: nowrap;
+  transition: all .2s; flex-shrink: 0;
 }
 .btn-otp:hover { background: #E8504A; color: #fff; }
 .btn-otp:disabled { opacity:.4; cursor:not-allowed; }
 .otp-row { display:flex; gap:10px; justify-content:center; margin: 18px 0; }
 .otp-d {
-width: 52px; height: 60px; border-radius: 14px;
-border: 2px solid #e8e8e8; background: #fafafa;
-font-family: ‘Fredoka One’, cursive; font-size: 1.8rem;
-text-align: center; outline: none; transition: border-color .2s;
+  width: 52px; height: 60px; border-radius: 14px;
+  border: 2px solid #e8e8e8; background: #fafafa;
+  font-family: 'Fredoka One', cursive; font-size: 1.8rem;
+  text-align: center; outline: none; transition: border-color .2s;
 }
 .otp-d:focus { border-color: #E8504A; background: #fff; }
 .otp-d.filled { border-color: #3aaa5c; }
 .btn-main {
-width: 100%; padding: 17px;
-border-radius: 60px; border: none;
-background: #E8504A;
-box-shadow: 0 8px 25px rgba(232,80,74,.4);
-color: #fff;
-font-family: ‘Fredoka One’, cursive;
-font-size: 1.2rem; cursor: pointer;
-transition: all .2s; margin-top: 8px;
+  width: 100%; padding: 17px;
+  border-radius: 60px; border: none;
+  background: #E8504A;
+  box-shadow: 0 8px 25px rgba(232,80,74,.4);
+  color: #fff;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.2rem; cursor: pointer;
+  transition: all .2s; margin-top: 8px;
 }
 .btn-main:hover { transform: translateY(-2px); background: #c93d37; }
 .btn-main:disabled { opacity:.5; cursor:not-allowed; transform:none; }
@@ -130,50 +129,50 @@ transition: all .2s; margin-top: 8px;
 /* ══ MAIN APP ══ */
 #appScreen { background: #f0ede6; }
 .topbar {
-background: linear-gradient(135deg, #E8504A, #c93d37);
-padding: 50px 20px 20px;
-position: relative;
-overflow: hidden;
+  background: linear-gradient(135deg, #E8504A, #c93d37);
+  padding: 50px 20px 20px;
+  position: relative;
+  overflow: hidden;
 }
 .topbar::after {
-content:’’;
-position: absolute;
-width: 250px; height: 250px;
-border-radius: 50%;
-background: radial-gradient(circle, rgba(255,216,77,.15), transparent 70%);
-right: -60px; bottom: -80px;
+  content:'';
+  position: absolute;
+  width: 250px; height: 250px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,216,77,.15), transparent 70%);
+  right: -60px; bottom: -80px;
 }
 .topbar-row { display:flex; justify-content:space-between; align-items:center; position:relative; }
 .topbar-left .greeting { font-size:.85rem; color:rgba(245,240,220,.8); font-weight:700; }
 .topbar-left .uname {
-font-family:‘Fredoka One’,cursive;
-font-size:1.3rem; color:#F5F0DC;
+  font-family:'Fredoka One',cursive;
+  font-size:1.3rem; color:#F5F0DC;
 }
 .topbar-avatar {
-width: 44px; height: 44px; border-radius: 50%;
-background: rgba(245,240,220,.2);
-border: 2px solid rgba(245,240,220,.4);
-display: flex; align-items:center; justify-content:center;
-font-size: 1.3rem; cursor:pointer;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(245,240,220,.2);
+  border: 2px solid rgba(245,240,220,.4);
+  display: flex; align-items:center; justify-content:center;
+  font-size: 1.3rem; cursor:pointer;
 }
 .topbar-location {
-display: flex; align-items:center; gap:6px;
-color: rgba(245,240,220,.85); font-size:.85rem; font-weight:700;
-margin-top: 12px; position:relative;
+  display: flex; align-items:center; gap:6px;
+  color: rgba(245,240,220,.85); font-size:.85rem; font-weight:700;
+  margin-top: 12px; position:relative;
 }
 .topbar-search {
-background: rgba(255,255,255,.15);
-border: 1.5px solid rgba(245,240,220,.25);
-border-radius: 14px;
-padding: 11px 16px 11px 40px;
-color: rgba(245,240,220,.9);
-font-family:‘Nunito’,sans-serif;
-font-size:.95rem; font-weight:700;
-width:100%; outline:none; margin-top:14px; position:relative;
+  background: rgba(255,255,255,.15);
+  border: 1.5px solid rgba(245,240,220,.25);
+  border-radius: 14px;
+  padding: 11px 16px 11px 40px;
+  color: rgba(245,240,220,.9);
+  font-family:'Nunito',sans-serif;
+  font-size:.95rem; font-weight:700;
+  width:100%; outline:none; margin-top:14px; position:relative;
 }
 .search-icon {
-position:absolute; left:16px; bottom:16px;
-font-size:1rem; pointer-events:none;
+  position:absolute; left:16px; bottom:16px;
+  font-size:1rem; pointer-events:none;
 }
 
 /* TABS CONTENT */
@@ -183,212 +182,212 @@ font-size:1rem; pointer-events:none;
 
 /* HOME TAB */
 .promo-banner {
-margin: 16px; border-radius: var(–radius);
-background: linear-gradient(135deg, #1a1a1a, #333);
-padding: 22px 20px;
-display: flex; align-items:center; gap:16px;
-overflow:hidden; position:relative;
+  margin: 16px; border-radius: var(--radius);
+  background: linear-gradient(135deg, #1a1a1a, #333);
+  padding: 22px 20px;
+  display: flex; align-items:center; gap:16px;
+  overflow:hidden; position:relative;
 }
 .promo-banner::before {
-content:’’;
-position:absolute;
-width:150px; height:150px; border-radius:50%;
-background: radial-gradient(circle, rgba(232,80,74,.3), transparent 70%);
-right:-30px; top:-30px;
+  content:'';
+  position:absolute;
+  width:150px; height:150px; border-radius:50%;
+  background: radial-gradient(circle, rgba(232,80,74,.3), transparent 70%);
+  right:-30px; top:-30px;
 }
 .promo-text h3 {
-font-family:‘Fredoka One’,cursive;
-font-size:1.3rem; color:#FFD84D;
-margin-bottom:5px;
+  font-family:'Fredoka One',cursive;
+  font-size:1.3rem; color:#FFD84D;
+  margin-bottom:5px;
 }
 .promo-text p { font-size:.85rem; color:rgba(255,255,255,.8); font-weight:700; }
 .promo-badge {
-background:#E8504A; color:#fff;
-padding:6px 12px; border-radius:20px;
-font-size:.75rem; font-weight:900;
-margin-top:8px; display:inline-block;
+  background:#E8504A; color:#fff;
+  padding:6px 12px; border-radius:20px;
+  font-size:.75rem; font-weight:900;
+  margin-top:8px; display:inline-block;
 }
 
 .section-title {
-font-family:‘Fredoka One’,cursive;
-font-size:1.2rem; color:#1a1a1a;
-padding: 16px 16px 10px;
+  font-family:'Fredoka One',cursive;
+  font-size:1.2rem; color:#1a1a1a;
+  padding: 16px 16px 10px;
 }
 
 /* SERVICE MODULES */
 .modules-grid {
-display: grid;
-grid-template-columns: 1fr 1fr;
-gap: 12px;
-padding: 0 16px 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 16px 4px;
 }
 .module-card {
-border-radius: var(–radius);
-padding: 20px 16px;
-cursor: pointer;
-transition: transform .2s, box-shadow .2s;
-display:flex; flex-direction:column; gap:10px;
-position:relative; overflow:hidden;
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  display:flex; flex-direction:column; gap:10px;
+  position:relative; overflow:hidden;
 }
-.module-card:hover { transform:translateY(-4px); box-shadow:var(–shadow); }
+.module-card:hover { transform:translateY(-4px); box-shadow:var(--shadow); }
 .module-card.food { background: linear-gradient(135deg, #E8504A, #c93d37); }
 .module-card.laundry { background: linear-gradient(135deg, #2d3d7a, #1a2040); }
 .module-card.cleaning { background: linear-gradient(135deg, #2d5a2d, #1a2f1a); }
 .module-card.china { background: linear-gradient(135deg, #7a2d2d, #4a1a1a); }
 .module-card .mc-icon { font-size: 2.2rem; }
 .module-card .mc-name {
-font-family:‘Fredoka One’,cursive;
-font-size:1.1rem; color:#F5F0DC;
+  font-family:'Fredoka One',cursive;
+  font-size:1.1rem; color:#F5F0DC;
 }
 .module-card .mc-sub { font-size:.75rem; color:rgba(245,240,220,.75); font-weight:700; }
 .mc-badge {
-position:absolute; top:12px; right:12px;
-background:#FFD84D; color:#7a3a00;
-padding:3px 8px; border-radius:10px;
-font-size:.65rem; font-weight:900;
+  position:absolute; top:12px; right:12px;
+  background:#FFD84D; color:#7a3a00;
+  padding:3px 8px; border-radius:10px;
+  font-size:.65rem; font-weight:900;
 }
 
 /* FOOD PAGE */
 .cat-scroll {
-display:flex; gap:10px; padding:14px 16px;
-overflow-x:auto; scrollbar-width:none;
+  display:flex; gap:10px; padding:14px 16px;
+  overflow-x:auto; scrollbar-width:none;
 }
 .cat-scroll::-webkit-scrollbar { display:none; }
 .cat-chip {
-flex-shrink:0;
-background:#fff; border: 2px solid #e8e8e8;
-padding:8px 16px; border-radius:30px;
-font-size:.85rem; font-weight:800; color:#555;
-cursor:pointer; transition:all .2s; white-space:nowrap;
+  flex-shrink:0;
+  background:#fff; border: 2px solid #e8e8e8;
+  padding:8px 16px; border-radius:30px;
+  font-size:.85rem; font-weight:800; color:#555;
+  cursor:pointer; transition:all .2s; white-space:nowrap;
 }
 .cat-chip.active { background:#E8504A; border-color:#E8504A; color:#fff; }
 .products-list { padding: 0 16px 16px; }
 .product-card {
-background:#fff; border-radius:16px;
-display:flex; align-items:center; gap:14px;
-padding:14px; margin-bottom:10px;
-box-shadow: 0 2px 10px rgba(0,0,0,.06);
-cursor:pointer; transition:transform .15s;
+  background:#fff; border-radius:16px;
+  display:flex; align-items:center; gap:14px;
+  padding:14px; margin-bottom:10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+  cursor:pointer; transition:transform .15s;
 }
 .product-card:hover { transform:translateY(-2px); }
 .prod-img {
-width:72px; height:72px; border-radius:12px;
-background:#f0ede6;
-display:flex; align-items:center; justify-content:center;
-font-size:2rem; flex-shrink:0;
+  width:72px; height:72px; border-radius:12px;
+  background:#f0ede6;
+  display:flex; align-items:center; justify-content:center;
+  font-size:2rem; flex-shrink:0;
 }
 .prod-info { flex:1; }
 .prod-name { font-weight:900; font-size:.95rem; color:#1a1a1a; margin-bottom:3px; }
 .prod-desc { font-size:.8rem; color:#777; font-weight:600; margin-bottom:6px; line-height:1.4; }
 .prod-price {
-font-family:‘Fredoka One’,cursive;
-font-size:1.1rem; color:#E8504A;
+  font-family:'Fredoka One',cursive;
+  font-size:1.1rem; color:#E8504A;
 }
 .prod-sold { font-size:.75rem; color:#bbb; font-weight:700; }
 .prod-add {
-width:34px; height:34px; border-radius:50%;
-background:#E8504A; border:none; color:#fff;
-font-size:1.2rem; cursor:pointer;
-display:flex; align-items:center; justify-content:center;
-flex-shrink:0; transition:transform .15s;
+  width:34px; height:34px; border-radius:50%;
+  background:#E8504A; border:none; color:#fff;
+  font-size:1.2rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; transition:transform .15s;
 }
 .prod-add:hover { transform:scale(1.1); }
 
 /* CART */
 .cart-fab {
-position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
-max-width:398px; width:calc(100% - 32px);
-background:#1a1a1a;
-border-radius:16px; padding:14px 18px;
-display:flex; align-items:center; gap:12px;
-cursor:pointer; z-index:50;
-box-shadow:0 8px 30px rgba(0,0,0,.3);
-transition:transform .2s;
-display:none;
+  position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+  max-width:398px; width:calc(100% - 32px);
+  background:#1a1a1a;
+  border-radius:16px; padding:14px 18px;
+  display:flex; align-items:center; gap:12px;
+  cursor:pointer; z-index:50;
+  box-shadow:0 8px 30px rgba(0,0,0,.3);
+  transition:transform .2s;
+  display:none;
 }
 .cart-fab.show { display:flex; }
 .cart-fab:hover { transform:translateX(-50%) translateY(-2px); }
 .cart-count {
-background:#E8504A; color:#fff;
-width:28px; height:28px; border-radius:50%;
-display:flex; align-items:center; justify-content:center;
-font-family:‘Fredoka One’,cursive; font-size:.9rem;
-flex-shrink:0;
+  background:#E8504A; color:#fff;
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Fredoka One',cursive; font-size:.9rem;
+  flex-shrink:0;
 }
 .cart-label { flex:1; color:#F5F0DC; font-weight:800; font-size:.9rem; }
-.cart-total { font-family:‘Fredoka One’,cursive; color:#FFD84D; font-size:1rem; }
+.cart-total { font-family:'Fredoka One',cursive; color:#FFD84D; font-size:1rem; }
 
 /* CART SHEET */
 .sheet-overlay {
-position:fixed; inset:0; background:rgba(0,0,0,.5);
-z-index:100; display:none; align-items:flex-end;
+  position:fixed; inset:0; background:rgba(0,0,0,.5);
+  z-index:100; display:none; align-items:flex-end;
 }
 .sheet-overlay.show { display:flex; }
 .sheet {
-background:#fff; border-radius:28px 28px 0 0;
-padding:24px; width:100%; max-height:85vh;
-overflow-y:auto;
-animation:slideUp .3s ease;
-max-width:430px; margin:0 auto;
+  background:#fff; border-radius:28px 28px 0 0;
+  padding:24px; width:100%; max-height:85vh;
+  overflow-y:auto;
+  animation:slideUp .3s ease;
+  max-width:430px; margin:0 auto;
 }
 @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
 .sheet-handle {
-width:40px; height:4px; background:#e8e8e8;
-border-radius:2px; margin:0 auto 20px;
+  width:40px; height:4px; background:#e8e8e8;
+  border-radius:2px; margin:0 auto 20px;
 }
 .sheet-title {
-font-family:‘Fredoka One’,cursive;
-font-size:1.4rem; color:#1a1a1a; margin-bottom:16px;
+  font-family:'Fredoka One',cursive;
+  font-size:1.4rem; color:#1a1a1a; margin-bottom:16px;
 }
 .cart-item {
-display:flex; align-items:center; gap:12px;
-padding:10px 0; border-bottom:1px solid #f5f5f5;
+  display:flex; align-items:center; gap:12px;
+  padding:10px 0; border-bottom:1px solid #f5f5f5;
 }
 .ci-icon { font-size:1.5rem; }
 .ci-name { flex:1; font-weight:800; font-size:.9rem; }
 .ci-qty-row { display:flex; align-items:center; gap:8px; }
 .qty-btn {
-width:28px; height:28px; border-radius:50%;
-border:2px solid #e8e8e8; background:#fff;
-font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
-font-weight:900; color:#555; transition:all .15s;
+  width:28px; height:28px; border-radius:50%;
+  border:2px solid #e8e8e8; background:#fff;
+  font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-weight:900; color:#555; transition:all .15s;
 }
 .qty-btn:hover { border-color:#E8504A; color:#E8504A; }
-.ci-price { font-family:‘Fredoka One’,cursive; color:#E8504A; font-size:.95rem; min-width:60px; text-align:right; }
+.ci-price { font-family:'Fredoka One',cursive; color:#E8504A; font-size:.95rem; min-width:60px; text-align:right; }
 .cart-total-row {
-display:flex; justify-content:space-between;
-padding:14px 0; font-weight:900;
+  display:flex; justify-content:space-between;
+  padding:14px 0; font-weight:900;
 }
-.cart-grand { font-family:‘Fredoka One’,cursive; font-size:1.1rem; color:#E8504A; }
+.cart-grand { font-family:'Fredoka One',cursive; font-size:1.1rem; color:#E8504A; }
 .addr-field {
-width:100%; padding:13px 16px;
-border:2px solid #e8e8e8; border-radius:14px;
-font-family:‘Nunito’,sans-serif; font-size:.9rem; font-weight:700;
-outline:none; resize:none; background:#fafafa;
-transition:border-color .2s; margin-bottom:10px;
+  width:100%; padding:13px 16px;
+  border:2px solid #e8e8e8; border-radius:14px;
+  font-family:'Nunito',sans-serif; font-size:.9rem; font-weight:700;
+  outline:none; resize:none; background:#fafafa;
+  transition:border-color .2s; margin-bottom:10px;
 }
 .addr-field:focus { border-color:#E8504A; background:#fff; }
 .pay-opts { display:flex; gap:8px; margin-bottom:16px; }
 .pay-opt {
-flex:1; padding:10px;
-border:2px solid #e8e8e8; border-radius:12px;
-text-align:center; font-size:.8rem; font-weight:800;
-color:#555; cursor:pointer; transition:all .2s;
+  flex:1; padding:10px;
+  border:2px solid #e8e8e8; border-radius:12px;
+  text-align:center; font-size:.8rem; font-weight:800;
+  color:#555; cursor:pointer; transition:all .2s;
 }
 .pay-opt.sel { border-color:#E8504A; background:#fff5f5; color:#E8504A; }
 
 /* ORDERS TAB */
 .order-card {
-background:#fff; border-radius:16px;
-margin:0 16px 10px;
-padding:16px;
-box-shadow:0 2px 10px rgba(0,0,0,.06);
+  background:#fff; border-radius:16px;
+  margin:0 16px 10px;
+  padding:16px;
+  box-shadow:0 2px 10px rgba(0,0,0,.06);
 }
 .oc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
 .oc-id { font-size:.75rem; font-weight:800; color:#bbb; }
 .oc-status-badge {
-padding:4px 10px; border-radius:20px;
-font-size:.72rem; font-weight:900;
+  padding:4px 10px; border-radius:20px;
+  font-size:.72rem; font-weight:900;
 }
 .s-pending    { background:#fff3e0; color:#e67e22; }
 .s-confirmed  { background:#e8f5e9; color:#27ae60; }
@@ -400,40 +399,40 @@ font-size:.72rem; font-weight:900;
 .oc-module { font-weight:900; font-size:.95rem; color:#1a1a1a; }
 .oc-items { font-size:.83rem; color:#777; font-weight:700; margin-bottom:8px; }
 .oc-bottom { display:flex; justify-content:space-between; }
-.oc-total { font-family:‘Fredoka One’,cursive; color:#E8504A; font-size:1.05rem; }
+.oc-total { font-family:'Fredoka One',cursive; color:#E8504A; font-size:1.05rem; }
 .oc-time { font-size:.75rem; color:#bbb; font-weight:700; }
 
 /* PROFILE TAB */
 .profile-header {
-background:linear-gradient(135deg,#E8504A,#c93d37);
-padding:40px 20px 30px;
-display:flex; flex-direction:column; align-items:center; gap:12px;
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  padding:40px 20px 30px;
+  display:flex; flex-direction:column; align-items:center; gap:12px;
 }
 .prof-avatar {
-width:80px; height:80px; border-radius:50%;
-background:rgba(245,240,220,.2);
-border:3px solid rgba(245,240,220,.4);
-display:flex; align-items:center; justify-content:center; font-size:2.5rem;
+  width:80px; height:80px; border-radius:50%;
+  background:rgba(245,240,220,.2);
+  border:3px solid rgba(245,240,220,.4);
+  display:flex; align-items:center; justify-content:center; font-size:2.5rem;
 }
-.prof-name { font-family:‘Fredoka One’,cursive; font-size:1.5rem; color:#F5F0DC; }
+.prof-name { font-family:'Fredoka One',cursive; font-size:1.5rem; color:#F5F0DC; }
 .prof-phone { font-size:.9rem; color:rgba(245,240,220,.8); font-weight:700; }
 .prof-stats {
-display:flex; gap:20px; margin-top:8px;
+  display:flex; gap:20px; margin-top:8px;
 }
 .ps-item { text-align:center; }
-.ps-num { font-family:‘Fredoka One’,cursive; font-size:1.4rem; color:#FFD84D; }
+.ps-num { font-family:'Fredoka One',cursive; font-size:1.4rem; color:#FFD84D; }
 .ps-label { font-size:.72rem; color:rgba(245,240,220,.75); font-weight:700; }
 .menu-list { background:#fff; margin:0; }
 .menu-item {
-display:flex; align-items:center; gap:14px;
-padding:16px 20px; border-bottom:1px solid #f5f5f5;
-cursor:pointer; transition:background .15s;
+  display:flex; align-items:center; gap:14px;
+  padding:16px 20px; border-bottom:1px solid #f5f5f5;
+  cursor:pointer; transition:background .15s;
 }
 .menu-item:hover { background:#fafafa; }
 .mi-icon {
-width:40px; height:40px; border-radius:12px;
-display:flex; align-items:center; justify-content:center;
-font-size:1.2rem; flex-shrink:0;
+  width:40px; height:40px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem; flex-shrink:0;
 }
 .mi-icon.red { background:#fff5f5; }
 .mi-icon.blue { background:#f0f4ff; }
@@ -444,28 +443,28 @@ font-size:1.2rem; flex-shrink:0;
 
 /* BOTTOM NAV */
 .bottom-nav {
-position:fixed; bottom:0; left:50%; transform:translateX(-50%);
-max-width:430px; width:100%;
-background:#fff;
-border-top:1px solid #f0f0f0;
-display:flex;
-padding:8px 0 20px;
-z-index:60;
-box-shadow:0 -4px 20px rgba(0,0,0,.08);
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  max-width:430px; width:100%;
+  background:#fff;
+  border-top:1px solid #f0f0f0;
+  display:flex;
+  padding:8px 0 20px;
+  z-index:60;
+  box-shadow:0 -4px 20px rgba(0,0,0,.08);
 }
 .nav-item {
-flex:1; display:flex; flex-direction:column;
-align-items:center; gap:4px;
-cursor:pointer; padding:4px;
-transition:color .15s; position:relative;
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; gap:4px;
+  cursor:pointer; padding:4px;
+  transition:color .15s; position:relative;
 }
 .nav-icon { font-size:1.4rem; }
 .nav-label { font-size:.68rem; font-weight:800; color:#bbb; }
 .nav-item.active .nav-label { color:#E8504A; }
 .nav-dot {
-position:absolute; top:2px; right:calc(50% - 18px);
-width:8px; height:8px; border-radius:50%;
-background:#E8504A; display:none;
+  position:absolute; top:2px; right:calc(50% - 18px);
+  width:8px; height:8px; border-radius:50%;
+  background:#E8504A; display:none;
 }
 .nav-dot.show { display:block; }
 
@@ -474,7 +473,7 @@ background:#E8504A; display:none;
 .ad-scroll::-webkit-scrollbar{display:none;}
 .ad-card{min-width:180px;border-radius:16px;padding:16px;position:relative;cursor:pointer;flex-shrink:0;}
 .ad-text{color:#fff;}
-.ad-title{font-family:‘Fredoka One’,cursive;font-size:1.1rem;color:#fff;margin-bottom:4px;}
+.ad-title{font-family:'Fredoka One',cursive;font-size:1.1rem;color:#fff;margin-bottom:4px;}
 .ad-sub{font-size:.78rem;color:rgba(255,255,255,.85);font-weight:700;}
 .ad-badge{position:absolute;top:10px;right:10px;background:#FFD84D;color:#7a3a00;font-size:.65rem;font-weight:900;padding:3px 8px;border-radius:20px;}
 /* ── FOOD CATS ── */
@@ -497,10 +496,10 @@ background:#E8504A; display:none;
 .vc-btn{background:#E8504A;color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:.75rem;font-weight:900;cursor:pointer;}
 /* ── LOYALTY POINTS ── */
 .loyalty-card{background:linear-gradient(135deg,#E8504A,#c93d37);border-radius:20px;padding:20px;margin:0 16px 16px;color:#fff;}
-.lc-pts{font-family:‘Fredoka One’,cursive;font-size:2.5rem;color:#FFD84D;margin-bottom:4px;}
+.lc-pts{font-family:'Fredoka One',cursive;font-size:2.5rem;color:#FFD84D;margin-bottom:4px;}
 .lc-label{font-size:.85rem;color:rgba(255,255,255,.85);font-weight:700;margin-bottom:14px;}
 .lc-row{display:flex;gap:8px;}
-.lc-action{flex:1;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:12px;padding:10px;font-size:.78rem;font-weight:800;cursor:pointer;font-family:‘Nunito’,sans-serif;}
+.lc-action{flex:1;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:12px;padding:10px;font-size:.78rem;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;}
 /* ── SAVED ADDRESS ── */
 .addr-list{padding:0 16px;display:flex;flex-direction:column;gap:10px;}
 .addr-card{background:#fff;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);}
@@ -512,72 +511,72 @@ background:#E8504A; display:none;
 .addr-add{background:#fff;border:2px dashed #E8504A;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;color:#E8504A;font-weight:900;font-size:.88rem;}
 /* LOADING */
 .loading-page {
-display:flex; flex-direction:column;
-align-items:center; justify-content:center;
-min-height:60vh; gap:12px;
-color:#bbb; font-weight:800; font-size:.9rem;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  min-height:60vh; gap:12px;
+  color:#bbb; font-weight:800; font-size:.9rem;
 }
 .spinner {
-width:36px; height:36px; border-radius:50%;
-border:3px solid #f0f0f0;
-border-top-color:#E8504A;
-animation:spin .6s linear infinite;
+  width:36px; height:36px; border-radius:50%;
+  border:3px solid #f0f0f0;
+  border-top-color:#E8504A;
+  animation:spin .6s linear infinite;
 }
 @keyframes spin { to{transform:rotate(360deg)} }
 
 /* TOAST */
 .toast {
-position:fixed; bottom:100px; left:50%; transform:translateX(-50%) translateY(100px);
-background:#1a1a1a; color:#fff;
-border-radius:50px; padding:12px 24px;
-font-weight:800; font-size:.9rem;
-z-index:999; white-space:nowrap;
-transition:transform .3s;
+  position:fixed; bottom:100px; left:50%; transform:translateX(-50%) translateY(100px);
+  background:#1a1a1a; color:#fff;
+  border-radius:50px; padding:12px 24px;
+  font-weight:800; font-size:.9rem;
+  z-index:999; white-space:nowrap;
+  transition:transform .3s;
 }
 .toast.show { transform:translateX(-50%) translateY(0); }
 
 /* BACK BTN */
 .page-header {
-display:flex; align-items:center; gap:12px;
-padding:16px;
-position:sticky; top:0; background:#f0ede6; z-index:10;
+  display:flex; align-items:center; gap:12px;
+  padding:16px;
+  position:sticky; top:0; background:#f0ede6; z-index:10;
 }
 .back-btn {
-width:38px; height:38px; border-radius:50%;
-background:#fff; border:none; cursor:pointer;
-display:flex; align-items:center; justify-content:center;
-font-size:1rem; box-shadow:0 2px 8px rgba(0,0,0,.1);
-flex-shrink:0;
+  width:38px; height:38px; border-radius:50%;
+  background:#fff; border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem; box-shadow:0 2px 8px rgba(0,0,0,.1);
+  flex-shrink:0;
 }
-.page-title { font-family:‘Fredoka One’,cursive; font-size:1.2rem; color:#1a1a1a; }
+.page-title { font-family:'Fredoka One',cursive; font-size:1.2rem; color:#1a1a1a; }
 
 /* RESTAURANT LIST */
 .rest-card {
-background:#fff; border-radius:18px;
-margin:0 16px 12px; overflow:hidden;
-box-shadow:0 3px 14px rgba(0,0,0,.08);
-cursor:pointer; transition:transform .2s;
+  background:#fff; border-radius:18px;
+  margin:0 16px 12px; overflow:hidden;
+  box-shadow:0 3px 14px rgba(0,0,0,.08);
+  cursor:pointer; transition:transform .2s;
 }
 .rest-card:hover { transform:translateY(-3px); }
 .rest-cover {
-width:100%; height:130px;
-background:linear-gradient(135deg,#E8504A,#c93d37);
-display:flex; align-items:center; justify-content:center;
-font-size:3.5rem; position:relative; overflow:hidden;
+  width:100%; height:130px;
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  display:flex; align-items:center; justify-content:center;
+  font-size:3.5rem; position:relative; overflow:hidden;
 }
 .rest-cover::after {
-content:’’;position:absolute;inset:0;
-background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.35));
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.35));
 }
 .rest-cover-img { width:100%;height:100%;object-fit:cover;position:absolute;inset:0; }
 .rest-status-badge {
-position:absolute;bottom:10px;left:12px;z-index:2;
-background:#3aaa5c;color:#fff;
-padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:900;
+  position:absolute;bottom:10px;left:12px;z-index:2;
+  background:#3aaa5c;color:#fff;
+  padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:900;
 }
 .rest-status-badge.closed { background:#999; }
 .rest-body { padding:14px; }
-.rest-name { font-family:‘Fredoka One’,cursive;font-size:1.1rem;color:#1a1a1a;margin-bottom:4px; }
+.rest-name { font-family:'Fredoka One',cursive;font-size:1.1rem;color:#1a1a1a;margin-bottom:4px; }
 .rest-cats { font-size:.78rem;color:#777;font-weight:700;margin-bottom:8px; }
 .rest-meta { display:flex;gap:14px;align-items:center; }
 .rest-rating { font-size:.82rem;font-weight:900;color:#ff9500; }
@@ -586,32 +585,32 @@ padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:900;
 
 /* RESTAURANT INFO CARD (inside menu view) */
 .rest-info-card {
-background:linear-gradient(135deg,#E8504A,#c93d37);
-margin:0 16px 14px; border-radius:18px;
-padding:16px; color:#F5F0DC; position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  margin:0 16px 14px; border-radius:18px;
+  padding:16px; color:#F5F0DC; position:relative;overflow:hidden;
 }
 .rest-info-card::before {
-content:’’;position:absolute;width:150px;height:150px;border-radius:50%;
-background:radial-gradient(circle,rgba(255,216,77,.2),transparent 70%);
-right:-30px;bottom:-40px;
+  content:'';position:absolute;width:150px;height:150px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,216,77,.2),transparent 70%);
+  right:-30px;bottom:-40px;
 }
-.ric-name { font-family:‘Fredoka One’,cursive;font-size:1.2rem;margin-bottom:4px; }
+.ric-name { font-family:'Fredoka One',cursive;font-size:1.2rem;margin-bottom:4px; }
 .ric-cats { font-size:.78rem;opacity:.8;font-weight:700;margin-bottom:8px; }
 .ric-row { display:flex;gap:16px; }
 .ric-stat { font-size:.8rem;font-weight:800; }
-.ric-stat span { font-family:‘Fredoka One’,cursive;font-size:1rem;color:#FFD84D; }
+.ric-stat span { font-family:'Fredoka One',cursive;font-size:1rem;color:#FFD84D; }
 
 .district-chip {
-flex-shrink:0;background:#fff;border:2px solid #e8e8e8;
-padding:8px 14px;border-radius:30px;font-size:.82rem;
-font-weight:800;color:#555;cursor:pointer;transition:all .2s;white-space:nowrap;
+  flex-shrink:0;background:#fff;border:2px solid #e8e8e8;
+  padding:8px 14px;border-radius:30px;font-size:.82rem;
+  font-weight:800;color:#555;cursor:pointer;transition:all .2s;white-space:nowrap;
 }
 .district-chip.active { background:#E8504A;border-color:#E8504A;color:#fff; }
 
 /* Empty state */
 .empty-state {
-text-align:center; padding:60px 30px;
-color:#bbb;
+  text-align:center; padding:60px 30px;
+  color:#bbb;
 }
 .empty-state .ei { font-size:3.5rem; margin-bottom:14px; }
 .empty-state p { font-weight:700; font-size:.95rem; }
@@ -622,10 +621,10 @@ color:#bbb;
 
 /* FEATURED PRODUCTS */
 .feat-prod-card {
-display:flex;align-items:center;gap:12px;
-background:#fff;border-radius:16px;padding:12px;
-margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,.06);
-cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;gap:12px;
+  background:#fff;border-radius:16px;padding:12px;
+  margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,.06);
+  cursor:pointer;transition:all .2s;
 }
 .feat-prod-card:active { transform:scale(.98); }
 .feat-prod-img { width:64px;height:64px;border-radius:12px;object-fit:cover;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0; }
@@ -633,7 +632,7 @@ cursor:pointer;transition:all .2s;
 .feat-prod-name { font-weight:800;font-size:.95rem;color:#1a1a1a;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .feat-prod-rest { font-size:.75rem;color:#aaa;font-weight:700;margin-bottom:5px; }
 .feat-prod-row { display:flex;align-items:center;justify-content:space-between; }
-.feat-prod-price { font-family:‘Fredoka One’,cursive;font-size:1rem;color:#E8504A; }
+.feat-prod-price { font-family:'Fredoka One',cursive;font-size:1rem;color:#E8504A; }
 .feat-prod-old { font-size:.78rem;color:#bbb;text-decoration:line-through;margin-right:4px; }
 .feat-prod-badge { background:#E8504A;color:#fff;font-size:.65rem;font-weight:900;padding:2px 7px;border-radius:20px; }
 .feat-prod-add { width:34px;height:34px;border-radius:50%;background:#E8504A;color:#fff;border:none;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s; }
@@ -649,36 +648,13 @@ cursor:pointer;transition:all .2s;
 .sd-sub { font-size:.72rem;color:#aaa;font-weight:700; }
 .sd-type { margin-left:auto;font-size:.68rem;font-weight:900;padding:3px 8px;border-radius:20px;background:#fff3e0;color:#e67e22;flex-shrink:0; }
 
-/* DEV MODE BANNER */
-.dev-banner {
-position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
-background: linear-gradient(135deg, #1a1a2e, #16213e);
-color: #FFD84D; font-size: .72rem; font-weight: 900;
-text-align: center; padding: 6px 12px;
-font-family: ‘Courier New’, monospace; letter-spacing: .5px;
-border-bottom: 2px solid #FFD84D;
-display: flex; align-items: center; justify-content: center; gap: 10px;
-}
-.dev-banner .dev-otp {
-background: #FFD84D; color: #1a1a2e;
-padding: 2px 10px; border-radius: 20px; font-size: .7rem;
-}
-.dev-banner .dev-close {
-position: absolute; right: 12px; cursor: pointer;
-color: #aaa; font-size: .9rem; line-height: 1;
-}
+
 body { padding-top: 36px; }
 </style>
-
 </head>
 <body>
 
-<div class="dev-banner" id="devBanner">
-  🛠️ CHẾ ĐỘ THỬ NGHIỆM &nbsp;·&nbsp; OTP bất kỳ đều được chấp nhận
-  <span class="dev-otp">OTP: 1-2-3-4-5-6</span>
-  <span class="dev-otp" style="background:#3aaa5c;color:#fff">SĐT bất kỳ</span>
-  <span class="dev-close" onclick="document.getElementById('devBanner').style.display='none'">✕</span>
-</div>
+
 <!-- ═══ LOGIN ═══ -->
 <div class="screen active" id="loginScreen">
   <div class="login-hero">
@@ -734,7 +710,6 @@ body { padding-top: 36px; }
 </div>
 
 <!-- ═══ APP ═══ -->
-
 <div class="screen" id="appScreen">
   <!-- TOP BAR -->
   <div class="topbar" id="topbar">
@@ -754,257 +729,253 @@ body { padding-top: 36px; }
   </div>
 
   <!-- TAB CONTENTS -->
-
   <div class="tab-content">
 
-```
-<!-- HOME -->
-<div class="tab-page active" id="tab-home">
-  <!-- PROMO BANNER SLIDER -->
-  <div class="promo-banner" id="promoBanner" onclick="openModule('food')">
-    <div style="font-size:3rem">🦀</div>
-    <div class="promo-text">
-      <h3>CRABOR Super App</h3>
-      <p>Giao đồ ăn · Giặt là · Dọn nhà · Hàng Trung</p>
-      <div class="promo-badge">⚡ Giao trong 30 phút</div>
+    <!-- HOME -->
+    <div class="tab-page active" id="tab-home">
+      <!-- PROMO BANNER SLIDER -->
+      <div class="promo-banner" id="promoBanner" onclick="openModule('food')">
+        <div style="font-size:3rem">🦀</div>
+        <div class="promo-text">
+          <h3>CRABOR Super App</h3>
+          <p>Giao đồ ăn · Giặt là · Dọn nhà · Hàng Trung</p>
+          <div class="promo-badge">⚡ Giao trong 30 phút</div>
+        </div>
+      </div>
+      <!-- AD BANNERS -->
+      <div class="ad-scroll" id="adBanners">
+        <div class="ad-card" style="background:linear-gradient(135deg,#E8504A,#c93d37)">
+          <div class="ad-text"><div class="ad-title">🍜 Đặt đồ ăn</div><div class="ad-sub">Giao trong 30 phút</div></div>
+          <div class="ad-badge">MỚI</div>
+        </div>
+        <div class="ad-card" style="background:linear-gradient(135deg,#6495ed,#2d3d7a)">
+          <div class="ad-text"><div class="ad-title">👕 Giặt là</div><div class="ad-sub">Lấy & trả tận nơi</div></div>
+          <div class="ad-badge">PHỔ BIẾN</div>
+        </div>
+        <div class="ad-card" style="background:linear-gradient(135deg,#3aaa5c,#2d5a2d)">
+          <div class="ad-text"><div class="ad-title">🧹 Dọn nhà</div><div class="ad-sub">200k–350k/ca</div></div>
+          <div class="ad-badge">HOT</div>
+        </div>
+      </div>
+      <!-- FOOD CATEGORIES -->
+      <div class="section-title">🍽️ Danh mục món ăn</div>
+      <div class="food-cats-grid" id="foodCatsGrid">
+        <div class="fcat" onclick="openFoodCat('Cơm')"><div class="fcat-icon">🍚</div><div class="fcat-name">Cơm</div></div>
+        <div class="fcat" onclick="openFoodCat('Bún/Phở')"><div class="fcat-icon">🍜</div><div class="fcat-name">Bún/Phở</div></div>
+        <div class="fcat" onclick="openFoodCat('Bánh mì')"><div class="fcat-icon">🥖</div><div class="fcat-name">Bánh mì</div></div>
+        <div class="fcat" onclick="openFoodCat('Đồ uống')"><div class="fcat-icon">🧋</div><div class="fcat-name">Đồ uống</div></div>
+        <div class="fcat" onclick="openFoodCat('Ăn vặt')"><div class="fcat-icon">🍟</div><div class="fcat-name">Ăn vặt</div></div>
+        <div class="fcat" onclick="openFoodCat('Tráng miệng')"><div class="fcat-icon">🍰</div><div class="fcat-name">Tráng miệng</div></div>
+        <div class="fcat" onclick="openFoodCat('Combo')"><div class="fcat-icon">🎁</div><div class="fcat-name">Combo</div></div>
+        <div class="fcat" onclick="openFoodCat('Đồ chay')"><div class="fcat-icon">🌱</div><div class="fcat-name">Đồ chay</div></div>
+        <div class="fcat" onclick="openFoodCat('Nướng/BBQ')"><div class="fcat-icon">🍖</div><div class="fcat-name">BBQ</div></div>
+        <div class="fcat" onclick="openFoodCat('Sushi')"><div class="fcat-icon">🍣</div><div class="fcat-name">Sushi</div></div>
+      </div>
+      <!-- FEATURED PRODUCTS -->
+      <div class="section-title">🔥 Món nổi bật hôm nay</div>
+      <div id="featuredProducts" style="padding:0 16px 4px">
+        <div class="loading-page" style="padding:20px"><div class="spinner"></div></div>
+      </div>
+      <div class="section-title">Dịch vụ của CRABOR</div>
+      <div class="modules-grid">
+        <div class="module-card food" onclick="openModule('food')">
+          <div class="mc-icon">🍜</div>
+          <div class="mc-name">Giao đồ ăn</div>
+          <div class="mc-sub">Giao trong 30 phút</div>
+          <div class="mc-badge">HOT</div>
+        </div>
+        <div class="module-card laundry" onclick="openModule('laundry')">
+          <div class="mc-icon">👕</div>
+          <div class="mc-name">Giặt là</div>
+          <div class="mc-sub">Lấy & trả tận nơi</div>
+        </div>
+        <div class="module-card cleaning" onclick="openModule('cleaning')">
+          <div class="mc-icon">🧹</div>
+          <div class="mc-name">Dọn nhà</div>
+          <div class="mc-sub">200k–350k/ca</div>
+        </div>
+        <div class="module-card china" onclick="openModule('china')">
+          <div class="mc-icon">🛍️</div>
+          <div class="mc-name">China Shop</div>
+          <div class="mc-sub">Hàng nội địa Trung</div>
+        </div>
+      </div>
+      <div class="section-title">Đơn gần đây</div>
+      <div id="recentOrders">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
     </div>
-  </div>
-  <!-- AD BANNERS -->
-  <div class="ad-scroll" id="adBanners">
-    <div class="ad-card" style="background:linear-gradient(135deg,#E8504A,#c93d37)">
-      <div class="ad-text"><div class="ad-title">🍜 Đặt đồ ăn</div><div class="ad-sub">Giao trong 30 phút</div></div>
-      <div class="ad-badge">MỚI</div>
-    </div>
-    <div class="ad-card" style="background:linear-gradient(135deg,#6495ed,#2d3d7a)">
-      <div class="ad-text"><div class="ad-title">👕 Giặt là</div><div class="ad-sub">Lấy & trả tận nơi</div></div>
-      <div class="ad-badge">PHỔ BIẾN</div>
-    </div>
-    <div class="ad-card" style="background:linear-gradient(135deg,#3aaa5c,#2d5a2d)">
-      <div class="ad-text"><div class="ad-title">🧹 Dọn nhà</div><div class="ad-sub">200k–350k/ca</div></div>
-      <div class="ad-badge">HOT</div>
-    </div>
-  </div>
-  <!-- FOOD CATEGORIES -->
-  <div class="section-title">🍽️ Danh mục món ăn</div>
-  <div class="food-cats-grid" id="foodCatsGrid">
-    <div class="fcat" onclick="openFoodCat('Cơm')"><div class="fcat-icon">🍚</div><div class="fcat-name">Cơm</div></div>
-    <div class="fcat" onclick="openFoodCat('Bún/Phở')"><div class="fcat-icon">🍜</div><div class="fcat-name">Bún/Phở</div></div>
-    <div class="fcat" onclick="openFoodCat('Bánh mì')"><div class="fcat-icon">🥖</div><div class="fcat-name">Bánh mì</div></div>
-    <div class="fcat" onclick="openFoodCat('Đồ uống')"><div class="fcat-icon">🧋</div><div class="fcat-name">Đồ uống</div></div>
-    <div class="fcat" onclick="openFoodCat('Ăn vặt')"><div class="fcat-icon">🍟</div><div class="fcat-name">Ăn vặt</div></div>
-    <div class="fcat" onclick="openFoodCat('Tráng miệng')"><div class="fcat-icon">🍰</div><div class="fcat-name">Tráng miệng</div></div>
-    <div class="fcat" onclick="openFoodCat('Combo')"><div class="fcat-icon">🎁</div><div class="fcat-name">Combo</div></div>
-    <div class="fcat" onclick="openFoodCat('Đồ chay')"><div class="fcat-icon">🌱</div><div class="fcat-name">Đồ chay</div></div>
-    <div class="fcat" onclick="openFoodCat('Nướng/BBQ')"><div class="fcat-icon">🍖</div><div class="fcat-name">BBQ</div></div>
-    <div class="fcat" onclick="openFoodCat('Sushi')"><div class="fcat-icon">🍣</div><div class="fcat-name">Sushi</div></div>
-  </div>
-  <!-- FEATURED PRODUCTS -->
-  <div class="section-title">🔥 Món nổi bật hôm nay</div>
-  <div id="featuredProducts" style="padding:0 16px 4px">
-    <div class="loading-page" style="padding:20px"><div class="spinner"></div></div>
-  </div>
-  <div class="section-title">Dịch vụ của CRABOR</div>
-  <div class="modules-grid">
-    <div class="module-card food" onclick="openModule('food')">
-      <div class="mc-icon">🍜</div>
-      <div class="mc-name">Giao đồ ăn</div>
-      <div class="mc-sub">Giao trong 30 phút</div>
-      <div class="mc-badge">HOT</div>
-    </div>
-    <div class="module-card laundry" onclick="openModule('laundry')">
-      <div class="mc-icon">👕</div>
-      <div class="mc-name">Giặt là</div>
-      <div class="mc-sub">Lấy & trả tận nơi</div>
-    </div>
-    <div class="module-card cleaning" onclick="openModule('cleaning')">
-      <div class="mc-icon">🧹</div>
-      <div class="mc-name">Dọn nhà</div>
-      <div class="mc-sub">200k–350k/ca</div>
-    </div>
-    <div class="module-card china" onclick="openModule('china')">
-      <div class="mc-icon">🛍️</div>
-      <div class="mc-name">China Shop</div>
-      <div class="mc-sub">Hàng nội địa Trung</div>
-    </div>
-  </div>
-  <div class="section-title">Đơn gần đây</div>
-  <div id="recentOrders">
-    <div class="loading-page"><div class="spinner"></div></div>
-  </div>
-</div>
 
-<!-- FOOD MODULE: Danh sách tiệm -->
-<div class="tab-page" id="tab-food">
-  <div class="page-header">
-    <button class="back-btn" onclick="switchTab('home')">←</button>
-    <div class="page-title">🍜 Giao đồ ăn</div>
-  </div>
-  <!-- Search bar -->
-  <div style="padding:10px 16px">
-    <div style="background:#f5f5f5;border-radius:14px;padding:11px 16px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:1.1rem">🔍</span>
-      <input type="text" id="foodSearch" placeholder="Tìm nhà hàng, món ăn..." oninput="searchRestaurants(this.value)" style="border:none;background:none;font-family:'Nunito',sans-serif;font-size:.9rem;font-weight:700;flex:1;outline:none;color:#1a1a1a">
-      <button onclick="document.getElementById('foodSearch').value='';searchRestaurants('')" style="border:none;background:none;color:#aaa;font-size:1rem;cursor:pointer;padding:0">✕</button>
+    <!-- FOOD MODULE: Danh sách tiệm -->
+    <div class="tab-page" id="tab-food">
+      <div class="page-header">
+        <button class="back-btn" onclick="switchTab('home')">←</button>
+        <div class="page-title">🍜 Giao đồ ăn</div>
+      </div>
+      <!-- Search bar -->
+      <div style="padding:10px 16px">
+        <div style="background:#f5f5f5;border-radius:14px;padding:11px 16px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1rem">🔍</span>
+          <input type="text" id="foodSearch" placeholder="Tìm nhà hàng, món ăn..." oninput="searchRestaurants(this.value)" style="border:none;background:none;font-family:'Nunito',sans-serif;font-size:.9rem;font-weight:700;flex:1;outline:none;color:#1a1a1a">
+          <button onclick="document.getElementById('foodSearch').value='';searchRestaurants('')" style="border:none;background:none;color:#aaa;font-size:1rem;cursor:pointer;padding:0">✕</button>
+        </div>
+      </div>
+      <!-- Food category chips -->
+      <div class="cat-scroll" id="foodCatChips" style="padding:4px 16px 0">
+        <button class="dist-chip active" onclick="filterFoodCat('all',this)">🍽 Tất cả</button>
+        <button class="dist-chip" onclick="filterFoodCat('Cơm',this)">🍚 Cơm</button>
+        <button class="dist-chip" onclick="filterFoodCat('Bún/Phở',this)">🍜 Bún/Phở</button>
+        <button class="dist-chip" onclick="filterFoodCat('Bánh mì',this)">🥖 Bánh mì</button>
+        <button class="dist-chip" onclick="filterFoodCat('Đồ uống',this)">🧋 Đồ uống</button>
+        <button class="dist-chip" onclick="filterFoodCat('Ăn vặt',this)">🍟 Ăn vặt</button>
+        <button class="dist-chip" onclick="filterFoodCat('Fast food',this)">🍔 Fast food</button>
+        <button class="dist-chip" onclick="filterFoodCat('Lẩu',this)">🥘 Lẩu</button>
+        <button class="dist-chip" onclick="filterFoodCat('Tráng miệng',this)">🍰 Tráng miệng</button>
+      </div>
+      <!-- District filter -->
+      <div class="cat-scroll" id="districtScroll" style="padding-top:4px"></div>
+      <!-- Sort/filter bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px">
+        <div style="font-size:.78rem;font-weight:700;color:#aaa" id="restCount">Đang tải...</div>
+        <div style="display:flex;gap:6px">
+          <button id="sortRating" onclick="sortRestaurants('rating',this)" style="background:#fff3e0;color:#e67e22;border:none;padding:5px 12px;border-radius:20px;font-size:.72rem;font-weight:800;cursor:pointer">⭐ Đánh giá</button>
+          <button id="sortNearest" onclick="sortRestaurants('nearest',this)" style="background:#f0f7ff;color:#2196f3;border:none;padding:5px 12px;border-radius:20px;font-size:.72rem;font-weight:800;cursor:pointer">📍 Gần nhất</button>
+        </div>
+      </div>
+      <!-- Restaurant list -->
+      <div id="restaurantList">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
     </div>
-  </div>
-  <!-- Food category chips -->
-  <div class="cat-scroll" id="foodCatChips" style="padding:4px 16px 0">
-    <button class="dist-chip active" onclick="filterFoodCat('all',this)">🍽 Tất cả</button>
-    <button class="dist-chip" onclick="filterFoodCat('Cơm',this)">🍚 Cơm</button>
-    <button class="dist-chip" onclick="filterFoodCat('Bún/Phở',this)">🍜 Bún/Phở</button>
-    <button class="dist-chip" onclick="filterFoodCat('Bánh mì',this)">🥖 Bánh mì</button>
-    <button class="dist-chip" onclick="filterFoodCat('Đồ uống',this)">🧋 Đồ uống</button>
-    <button class="dist-chip" onclick="filterFoodCat('Ăn vặt',this)">🍟 Ăn vặt</button>
-    <button class="dist-chip" onclick="filterFoodCat('Fast food',this)">🍔 Fast food</button>
-    <button class="dist-chip" onclick="filterFoodCat('Lẩu',this)">🥘 Lẩu</button>
-    <button class="dist-chip" onclick="filterFoodCat('Tráng miệng',this)">🍰 Tráng miệng</button>
-  </div>
-  <!-- District filter -->
-  <div class="cat-scroll" id="districtScroll" style="padding-top:4px"></div>
-  <!-- Sort/filter bar -->
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px">
-    <div style="font-size:.78rem;font-weight:700;color:#aaa" id="restCount">Đang tải...</div>
-    <div style="display:flex;gap:6px">
-      <button id="sortRating" onclick="sortRestaurants('rating',this)" style="background:#fff3e0;color:#e67e22;border:none;padding:5px 12px;border-radius:20px;font-size:.72rem;font-weight:800;cursor:pointer">⭐ Đánh giá</button>
-      <button id="sortNearest" onclick="sortRestaurants('nearest',this)" style="background:#f0f7ff;color:#2196f3;border:none;padding:5px 12px;border-radius:20px;font-size:.72rem;font-weight:800;cursor:pointer">📍 Gần nhất</button>
-    </div>
-  </div>
-  <!-- Restaurant list -->
-  <div id="restaurantList">
-    <div class="loading-page"><div class="spinner"></div></div>
-  </div>
-</div>
 
-<!-- FOOD MODULE: Menu của tiệm -->
-<div class="tab-page" id="tab-menu">
-  <div class="page-header">
-    <button class="back-btn" onclick="backToRestaurants()">←</button>
-    <div class="page-title" id="menuTitle">🍜 Thực đơn</div>
-  </div>
-  <!-- Restaurant info card -->
-  <div class="rest-info-card" id="restInfoCard"></div>
-  <!-- Category filter -->
-  <div class="cat-scroll" id="catScroll"></div>
-  <!-- Products -->
-  <div class="products-list" id="productList">
-    <div class="loading-page"><div class="spinner"></div></div>
-  </div>
-</div>
+    <!-- FOOD MODULE: Menu của tiệm -->
+    <div class="tab-page" id="tab-menu">
+      <div class="page-header">
+        <button class="back-btn" onclick="backToRestaurants()">←</button>
+        <div class="page-title" id="menuTitle">🍜 Thực đơn</div>
+      </div>
+      <!-- Restaurant info card -->
+      <div class="rest-info-card" id="restInfoCard"></div>
+      <!-- Category filter -->
+      <div class="cat-scroll" id="catScroll"></div>
+      <!-- Products -->
+      <div class="products-list" id="productList">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
+    </div>
 
-<!-- ORDERS TAB -->
-<div class="tab-page" id="tab-orders">
-  <div style="padding:20px 16px 10px;display:flex;align-items:center;justify-content:space-between">
-    <div>
-      <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#1a1a1a">Đơn hàng của tôi</div>
-      <div style="font-size:.85rem;color:#777;font-weight:700;margin-top:2px">Theo dõi tất cả đơn</div>
+    <!-- ORDERS TAB -->
+    <div class="tab-page" id="tab-orders">
+      <div style="padding:20px 16px 10px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#1a1a1a">Đơn hàng của tôi</div>
+          <div style="font-size:.85rem;color:#777;font-weight:700;margin-top:2px">Theo dõi tất cả đơn</div>
+        </div>
+      </div>
+      <!-- Order status filter -->
+      <div style="display:flex;gap:8px;padding:4px 16px 12px;overflow-x:auto;scrollbar-width:none;">
+        <button class="filter-chip active" onclick="filterOrders('all',this)">Tất cả</button>
+        <button class="filter-chip" onclick="filterOrders('pending',this)">Đang chờ</button>
+        <button class="filter-chip" onclick="filterOrders('delivering',this)">Đang giao</button>
+        <button class="filter-chip" onclick="filterOrders('delivered',this)">Hoàn thành</button>
+        <button class="filter-chip" onclick="filterOrders('cancelled',this)">Đã huỷ</button>
+      </div>
+      <div id="ordersList">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
     </div>
-  </div>
-  <!-- Order status filter -->
-  <div style="display:flex;gap:8px;padding:4px 16px 12px;overflow-x:auto;scrollbar-width:none;">
-    <button class="filter-chip active" onclick="filterOrders('all',this)">Tất cả</button>
-    <button class="filter-chip" onclick="filterOrders('pending',this)">Đang chờ</button>
-    <button class="filter-chip" onclick="filterOrders('delivering',this)">Đang giao</button>
-    <button class="filter-chip" onclick="filterOrders('delivered',this)">Hoàn thành</button>
-    <button class="filter-chip" onclick="filterOrders('cancelled',this)">Đã huỷ</button>
-  </div>
-  <div id="ordersList">
-    <div class="loading-page"><div class="spinner"></div></div>
-  </div>
-</div>
 
-<!-- VOUCHERS TAB -->
-<div class="tab-page" id="tab-vouchers">
-  <div style="padding:20px 16px 10px">
-    <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#1a1a1a">🎁 Ưu đãi của tôi</div>
-    <div style="font-size:.85rem;color:#777;font-weight:700;margin-top:2px">Voucher & khuyến mãi</div>
-  </div>
-  <div class="loyalty-card">
-    <div class="lc-pts" id="vcPts">0</div>
-    <div class="lc-label">🦀 Điểm thưởng CRABOR của bạn</div>
-    <div class="lc-row">
-      <button class="lc-action" onclick="toast('🔜 Tính năng đang phát triển')">🎁 Đổi điểm</button>
-      <button class="lc-action" onclick="toast('🔜 Tính năng đang phát triển')">📋 Lịch sử điểm</button>
-    </div>
-  </div>
-  <div style="padding:0 16px;margin-bottom:12px;font-weight:900;font-size:.88rem;color:#444;text-transform:uppercase;letter-spacing:.5px">Voucher của bạn</div>
-  <div class="voucher-list" id="voucherList">
-    <div class="voucher-card">
-      <div class="vc-icon">🍜</div>
-      <div class="vc-body">
-        <div class="vc-title">Giảm 30k đơn đầu tiên</div>
-        <div class="vc-sub">Áp dụng cho đơn từ 100k · Giao đồ ăn</div>
-        <div class="vc-exp">HSD: 31/12/2025</div>
+    <!-- VOUCHERS TAB -->
+    <div class="tab-page" id="tab-vouchers">
+      <div style="padding:20px 16px 10px">
+        <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#1a1a1a">🎁 Ưu đãi của tôi</div>
+        <div style="font-size:.85rem;color:#777;font-weight:700;margin-top:2px">Voucher & khuyến mãi</div>
       </div>
-      <button class="vc-btn" onclick="applyVoucher('FIRST30')">Dùng</button>
-    </div>
-    <div class="voucher-card" style="border-left-color:#6495ed">
-      <div class="vc-icon">👕</div>
-      <div class="vc-body">
-        <div class="vc-title">Miễn phí lần giặt đầu tiên</div>
-        <div class="vc-sub">Giặt là · Đơn từ 2 kg</div>
-        <div class="vc-exp">HSD: 30/06/2025</div>
+      <div class="loyalty-card">
+        <div class="lc-pts" id="vcPts">0</div>
+        <div class="lc-label">🦀 Điểm thưởng CRABOR của bạn</div>
+        <div class="lc-row">
+          <button class="lc-action" onclick="toast('🔜 Tính năng đang phát triển')">🎁 Đổi điểm</button>
+          <button class="lc-action" onclick="toast('🔜 Tính năng đang phát triển')">📋 Lịch sử điểm</button>
+        </div>
       </div>
-      <button class="vc-btn" style="background:#6495ed" onclick="applyVoucher('WASH1FREE')">Dùng</button>
+      <div style="padding:0 16px;margin-bottom:12px;font-weight:900;font-size:.88rem;color:#444;text-transform:uppercase;letter-spacing:.5px">Voucher của bạn</div>
+      <div class="voucher-list" id="voucherList">
+        <div class="voucher-card">
+          <div class="vc-icon">🍜</div>
+          <div class="vc-body">
+            <div class="vc-title">Giảm 30k đơn đầu tiên</div>
+            <div class="vc-sub">Áp dụng cho đơn từ 100k · Giao đồ ăn</div>
+            <div class="vc-exp">HSD: 31/12/2025</div>
+          </div>
+          <button class="vc-btn" onclick="applyVoucher('FIRST30')">Dùng</button>
+        </div>
+        <div class="voucher-card" style="border-left-color:#6495ed">
+          <div class="vc-icon">👕</div>
+          <div class="vc-body">
+            <div class="vc-title">Miễn phí lần giặt đầu tiên</div>
+            <div class="vc-sub">Giặt là · Đơn từ 2 kg</div>
+            <div class="vc-exp">HSD: 30/06/2025</div>
+          </div>
+          <button class="vc-btn" style="background:#6495ed" onclick="applyVoucher('WASH1FREE')">Dùng</button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-<!-- PROFILE TAB -->
-<div class="tab-page" id="tab-profile">
-  <div class="profile-header">
-    <div class="prof-avatar">👤</div>
-    <div class="prof-name" id="profName">–</div>
-    <div class="prof-phone" id="profPhone">–</div>
-    <div class="prof-stats">
-      <div class="ps-item"><div class="ps-num" id="profOrders">0</div><div class="ps-label">Đơn hàng</div></div>
-      <div class="ps-item"><div class="ps-num" id="profPts">0</div><div class="ps-label">Điểm thưởng</div></div>
-      <div class="ps-item"><div class="ps-num" id="profSpent">0</div><div class="ps-label">Đã chi (k)</div></div>
+    <!-- PROFILE TAB -->
+    <div class="tab-page" id="tab-profile">
+      <div class="profile-header">
+        <div class="prof-avatar">👤</div>
+        <div class="prof-name" id="profName">–</div>
+        <div class="prof-phone" id="profPhone">–</div>
+        <div class="prof-stats">
+          <div class="ps-item"><div class="ps-num" id="profOrders">0</div><div class="ps-label">Đơn hàng</div></div>
+          <div class="ps-item"><div class="ps-num" id="profPts">0</div><div class="ps-label">Điểm thưởng</div></div>
+          <div class="ps-item"><div class="ps-num" id="profSpent">0</div><div class="ps-label">Đã chi (k)</div></div>
+        </div>
+      </div>
+      <div class="menu-list">
+        <div class="menu-item" onclick="switchTab('orders')"><div class="mi-icon red">📦</div><div class="mi-label">Lịch sử đơn hàng</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="showSavedAddresses()"><div class="mi-icon blue">📍</div><div class="mi-label">Địa chỉ đã lưu</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="showPaymentMethods()"><div class="mi-icon green">💰</div><div class="mi-label">Phương thức thanh toán</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="switchTab('vouchers')"><div class="mi-icon yellow">🎁</div><div class="mi-label">Ưu đãi & Voucher</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="switchTab('vouchers')"><div class="mi-icon red">⭐</div><div class="mi-label">Điểm thưởng CRABOR</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="showSettings()"><div class="mi-icon" style="background:#f3e5f5">⚙️</div><div class="mi-label">Cài đặt tài khoản</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="logout()"><div class="mi-icon" style="background:#fce4ec">🚪</div><div class="mi-label" style="color:#c62828">Đăng xuất</div><span class="mi-arrow">›</span></div>
+      </div>
+      <!-- SAVED ADDRESSES MODAL -->
+      <div id="addrModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center">
+        <div style="background:#fff;border-radius:24px 24px 0 0;padding:24px 0 40px;width:100%;max-width:430px;max-height:80vh;overflow-y:auto;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 16px">
+            <div style="font-family:'Fredoka One',cursive;font-size:1.2rem">📍 Địa chỉ đã lưu</div>
+            <button onclick="document.getElementById('addrModal').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer">✕</button>
+          </div>
+          <div class="addr-list">
+            <div class="addr-card"><div class="addr-icon">🏠</div><div class="addr-body"><div class="addr-label">Nhà</div><div class="addr-detail">123 Nguyễn Trãi, Thanh Xuân, Hà Nội</div></div><button class="addr-del">🗑️</button></div>
+            <div class="addr-card"><div class="addr-icon">💼</div><div class="addr-body"><div class="addr-label">Cơ quan</div><div class="addr-detail">45 Đống Đa, Ba Đình, Hà Nội</div></div><button class="addr-del">🗑️</button></div>
+            <div class="addr-add" onclick="toast('🔜 Thêm địa chỉ mới')">➕ Thêm địa chỉ mới</div>
+          </div>
+        </div>
+      </div>
+      <!-- PAYMENT METHODS MODAL -->
+      <div id="payModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center">
+        <div style="background:#fff;border-radius:24px 24px 0 0;padding:24px 0 40px;width:100%;max-width:430px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 16px">
+            <div style="font-family:'Fredoka One',cursive;font-size:1.2rem">💳 Phương thức thanh toán</div>
+            <button onclick="document.getElementById('payModal').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer">✕</button>
+          </div>
+          <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;">
+            <div class="addr-card"><div class="addr-icon">💵</div><div class="addr-body"><div class="addr-label">Tiền mặt khi nhận hàng</div><div class="addr-detail">Thanh toán trực tiếp cho shipper</div></div><span style="color:#3aaa5c;font-size:1.2rem">✓</span></div>
+            <div class="addr-card" onclick="toast('🔜 Sắp hỗ trợ MoMo')"><div class="addr-icon">💜</div><div class="addr-body"><div class="addr-label">MoMo</div><div class="addr-detail">Liên kết ví MoMo</div></div><span style="color:#ccc">›</span></div>
+            <div class="addr-card" onclick="toast('🔜 Sắp hỗ trợ ZaloPay')"><div class="addr-icon">🔵</div><div class="addr-body"><div class="addr-label">ZaloPay</div><div class="addr-detail">Liên kết ví ZaloPay</div></div><span style="color:#ccc">›</span></div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="menu-list">
-    <div class="menu-item" onclick="switchTab('orders')"><div class="mi-icon red">📦</div><div class="mi-label">Lịch sử đơn hàng</div><span class="mi-arrow">›</span></div>
-    <div class="menu-item" onclick="showSavedAddresses()"><div class="mi-icon blue">📍</div><div class="mi-label">Địa chỉ đã lưu</div><span class="mi-arrow">›</span></div>
-    <div class="menu-item" onclick="showPaymentMethods()"><div class="mi-icon green">💰</div><div class="mi-label">Phương thức thanh toán</div><span class="mi-arrow">›</span></div>
-    <div class="menu-item" onclick="switchTab('vouchers')"><div class="mi-icon yellow">🎁</div><div class="mi-label">Ưu đãi & Voucher</div><span class="mi-arrow">›</span></div>
-    <div class="menu-item" onclick="switchTab('vouchers')"><div class="mi-icon red">⭐</div><div class="mi-label">Điểm thưởng CRABOR</div><span class="mi-arrow">›</span></div>
-    <div class="menu-item" onclick="showSettings()"><div class="mi-icon" style="background:#f3e5f5">⚙️</div><div class="mi-label">Cài đặt tài khoản</div><span class="mi-arrow">›</span></div>
-    <div class="menu-item" onclick="logout()"><div class="mi-icon" style="background:#fce4ec">🚪</div><div class="mi-label" style="color:#c62828">Đăng xuất</div><span class="mi-arrow">›</span></div>
-  </div>
-  <!-- SAVED ADDRESSES MODAL -->
-  <div id="addrModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center">
-    <div style="background:#fff;border-radius:24px 24px 0 0;padding:24px 0 40px;width:100%;max-width:430px;max-height:80vh;overflow-y:auto;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 16px">
-        <div style="font-family:'Fredoka One',cursive;font-size:1.2rem">📍 Địa chỉ đã lưu</div>
-        <button onclick="document.getElementById('addrModal').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer">✕</button>
-      </div>
-      <div class="addr-list">
-        <div class="addr-card"><div class="addr-icon">🏠</div><div class="addr-body"><div class="addr-label">Nhà</div><div class="addr-detail">123 Nguyễn Trãi, Thanh Xuân, Hà Nội</div></div><button class="addr-del">🗑️</button></div>
-        <div class="addr-card"><div class="addr-icon">💼</div><div class="addr-body"><div class="addr-label">Cơ quan</div><div class="addr-detail">45 Đống Đa, Ba Đình, Hà Nội</div></div><button class="addr-del">🗑️</button></div>
-        <div class="addr-add" onclick="toast('🔜 Thêm địa chỉ mới')">➕ Thêm địa chỉ mới</div>
-      </div>
-    </div>
-  </div>
-  <!-- PAYMENT METHODS MODAL -->
-  <div id="payModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center">
-    <div style="background:#fff;border-radius:24px 24px 0 0;padding:24px 0 40px;width:100%;max-width:430px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 16px">
-        <div style="font-family:'Fredoka One',cursive;font-size:1.2rem">💳 Phương thức thanh toán</div>
-        <button onclick="document.getElementById('payModal').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer">✕</button>
-      </div>
-      <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;">
-        <div class="addr-card"><div class="addr-icon">💵</div><div class="addr-body"><div class="addr-label">Tiền mặt khi nhận hàng</div><div class="addr-detail">Thanh toán trực tiếp cho shipper</div></div><span style="color:#3aaa5c;font-size:1.2rem">✓</span></div>
-        <div class="addr-card" onclick="toast('🔜 Sắp hỗ trợ MoMo')"><div class="addr-icon">💜</div><div class="addr-body"><div class="addr-label">MoMo</div><div class="addr-detail">Liên kết ví MoMo</div></div><span style="color:#ccc">›</span></div>
-        <div class="addr-card" onclick="toast('🔜 Sắp hỗ trợ ZaloPay')"><div class="addr-icon">🔵</div><div class="addr-body"><div class="addr-label">ZaloPay</div><div class="addr-detail">Liên kết ví ZaloPay</div></div><span style="color:#ccc">›</span></div>
-      </div>
-    </div>
-  </div>
-</div>
-```
 
   </div><!-- /tab-content -->
 
   <!-- CART FAB -->
-
   <div class="cart-fab" id="cartFab" onclick="openCart()">
     <div class="cart-count" id="cartCount">0</div>
     <div class="cart-label">Xem giỏ hàng</div>
@@ -1012,7 +983,6 @@ body { padding-top: 36px; }
   </div>
 
   <!-- BOTTOM NAV -->
-
   <div class="bottom-nav">
     <div class="nav-item active" id="nav-home" onclick="switchTab('home')">
       <div class="nav-icon">🏠</div><div class="nav-label">Trang chủ</div>
@@ -1034,7 +1004,6 @@ body { padding-top: 36px; }
 </div>
 
 <!-- CART SHEET -->
-
 <div class="sheet-overlay" id="cartOverlay" onclick="closeCart(event)">
   <div class="sheet" id="cartSheet">
     <div class="sheet-handle"></div>
@@ -1065,7 +1034,7 @@ body { padding-top: 36px; }
 // ════════════════════════════
 let user = null;
 let loginPhone = '';
-let loginDevMode = false;
+
 let cart = [];
 let products = [];
 let payMethod = 'cash';
@@ -1087,7 +1056,6 @@ async function loginSendOtp() {
   }
   document.getElementById('lPhoneErr').style.display = 'none';
   loginPhone = phone;
-  loginDevMode = false;
   const btn = document.getElementById('lBtnOtp'); btn.disabled = true;
   try {
     const r = await fetch('/api/auth/send-otp', {
@@ -1095,15 +1063,15 @@ async function loginSendOtp() {
       body: JSON.stringify({ phone, type:'user_login' })
     });
     const d = await r.json();
-    if (d.success) {
-      if (d.devOtp) toast('🛠️ Dev OTP: '+d.devOtp);
-    } else {
-      loginDevMode = true;
-      toast('🛠️ [Dev Mode] OTP: 1-2-3-4-5-6');
+    if (!d.success) {
+      toast('❌ ' + (d.message || 'Không gửi được OTP'));
+      btn.disabled = false;
+      return;
     }
   } catch(e) {
-    loginDevMode = true;
-    toast('🛠️ [Dev Mode] Server offline — OTP: 1-2-3-4-5-6');
+    toast('❌ Không thể kết nối server. Vui lòng thử lại.');
+    btn.disabled = false;
+    return;
   }
   document.getElementById('lMask').textContent = phone.slice(0,3)+'****'+phone.slice(-3);
   showLoginPhase(2);
@@ -1131,35 +1099,31 @@ async function loginVerify() {
   const code=[0,1,2,3,4,5].map(i=>document.getElementById('ld'+i).value).join('');
   const errEl = document.getElementById('lOtpErr');
   if(code.length!==6){errEl.classList.add('show');errEl.textContent='Nhập đủ 6 chữ số';return;}
-  // Dev-mode bypass: accept any 6-digit code
-  if(loginDevMode) {
-    user = {phone:loginPhone, fullName:'Khách hàng Demo', _id:'demo'};
-    document.getElementById('loginScreen').classList.remove('active');
-    document.getElementById('appScreen').classList.add('active');
-    initApp(); return;
-  }
+  errEl.classList.remove('show');
   try {
-    const r = await fetch('/api/auth/verify-otp',{
+    const vr = await fetch('/api/auth/verify-otp',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({phone:loginPhone,otp:code,type:'user_login'})
     });
-    const d = await r.json();
-    if(d.success){
-      user = d.user || {phone:loginPhone,fullName:'Khách hàng'};
-      document.getElementById('loginScreen').classList.remove('active');
-      document.getElementById('appScreen').classList.add('active');
-      initApp();
-    } else {
+    const vd = await vr.json();
+    if(!vd.success){
       errEl.classList.add('show');
-      errEl.textContent='Mã OTP không đúng. Thử lại!';
+      errEl.textContent = vd.message || 'Mã OTP không đúng. Thử lại!';
+      return;
     }
-  } catch(e){
-    // Server offline fallback
-    // Dev mode: accept any 6-digit code when server offline
-    user = {phone:loginPhone, fullName:'Demo User', _id:'demo'};
+    // OTP đúng → tạo/lấy session
+    const lr = await fetch('/api/auth/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:loginPhone})
+    });
+    const ld = await lr.json();
+    user = ld.user || {phone:loginPhone};
     document.getElementById('loginScreen').classList.remove('active');
     document.getElementById('appScreen').classList.add('active');
     initApp();
+  } catch(e){
+    errEl.classList.add('show');
+    errEl.textContent = 'Không thể kết nối server. Vui lòng thử lại.';
   }
 }
 
@@ -1803,6 +1767,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 // -->
 </script>
-
 </body>
 </html>
