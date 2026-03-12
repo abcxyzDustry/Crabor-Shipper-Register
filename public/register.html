@@ -232,6 +232,36 @@ text-transform: uppercase; transition: color .3s;
 }
 .step-label.active, .step-label.done { color: rgba(245,240,220,.8); }
 
+/* ── BACK TO HOME BUTTON ── */
+.back-home-btn {
+position: absolute;
+top: 20px;
+left: 20px;
+z-index: 10;
+background: rgba(0,0,0,0.3);
+border: 2px solid rgba(255,255,255,0.3);
+color: #F5F0DC;
+width: 44px;
+height: 44px;
+border-radius: 50%;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 1.5rem;
+cursor: pointer;
+transition: all 0.3s;
+backdrop-filter: blur(4px);
+}
+.back-home-btn:hover {
+background: rgba(232,80,74,0.8);
+border-color: #FFD84D;
+transform: scale(1.1);
+}
+.back-home-btn span {
+line-height: 1;
+margin-right: 2px;
+}
+
 /* ── BODY ── */
 .card-body { padding: 40px 45px 45px; }
 .step-panel { display: none; animation: slideIn .3s ease; }
@@ -466,6 +496,7 @@ body { padding: 20px 12px 60px; }
 .welcome-features { grid-template-columns: 1fr; gap: 30px; }
 .welcome-title { font-size: 2.2rem; }
 .welcome-title em { font-size: 1.5rem; }
+.back-home-btn { width: 36px; height: 36px; font-size: 1.2rem; top: 10px; left: 10px; }
 }
 
 /* DEV MODE BANNER */
@@ -497,6 +528,7 @@ body { padding-top: 36px; }
   <span class="dev-otp">OTP: bất kỳ 6 số</span>
   <span class="dev-close" onclick="document.getElementById('devBanner').style.display='none'">✕</span>
 </div>
+
 <!-- MÀN HÌNH CHÀO MỪNG -->
 <div class="welcome-screen" id="welcomeScreen">
   <div class="welcome-head">
@@ -582,6 +614,11 @@ body { padding-top: 36px; }
 
 <!-- CARD -->
 <div class="card hide" id="card">
+  <!-- Nút back về màn hình chọn modules -->
+  <div class="back-home-btn" onclick="backToWelcome()" title="Quay lại chọn dịch vụ">
+    <span>←</span>
+  </div>
+  
   <div class="card-head head-gl" id="cardHead">
     <div class="head-top">
       <div class="logo-sm logo-gl" id="logoSm">
@@ -787,7 +824,7 @@ body { padding-top: 36px; }
 
 <script>
 // ══════════════════════════════════════
-//  CONFIG MODULE - ĐÃ FIX HOÀN TOÀN
+//  CONFIG MODULE
 // ══════════════════════════════════════
 const MODULES = {
   gl: {
@@ -1168,7 +1205,7 @@ let otpTimer = null;
 let state = { phone:'', verified:false, firstName:'', lastName:'', email:'', dob:'', district:'', vehicle:'', files:{} };
 
 // ══════════════════════════════════════
-//  WELCOME → START
+//  WELCOME → START & BACK
 // ══════════════════════════════════════
 function startRegistration(module) {
   try {
@@ -1193,6 +1230,17 @@ function startRegistration(module) {
     currentStep = 1;
     mod = module;
   }
+}
+
+function backToWelcome() {
+  // Hiển thị lại màn hình chào mừng, ẩn card đăng ký
+  document.getElementById('welcomeScreen').classList.remove('hide');
+  document.getElementById('card').classList.add('hide');
+  // Reset state
+  phone = ''; phoneVerified = false; devOtpBypass = false;
+  uploads = {};
+  if (otpTimer) clearInterval(otpTimer);
+  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 // ══════════════════════════════════════
@@ -1621,11 +1669,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
   renderSteps(MODULES[mod].steps, 1);
 
   // ── Đọc hash từ URL để auto-chọn module ──
-  // Ví dụ: /register#shipper → sp, /register#partner → gl, /register#food → fd, v.v.
   const hashMap = {
     'shipper': 'sp',
     'sp':      'sp',
-    'partner': 'fd',   // mặc định partner → nhà hàng (module phổ biến nhất)
+    'partner': 'fd',
     'doitac':  'gl',
     'giatla':  'gl',
     'gl':      'gl',
@@ -1646,10 +1693,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   const rawHash = window.location.hash.replace('#', '').toLowerCase().trim();
   if (rawHash && hashMap[rawHash]) {
-    // Tự động bắt đầu form với module tương ứng
     startRegistration(hashMap[rawHash]);
   }
 });
+// -->
 </script>
 
 </body>
