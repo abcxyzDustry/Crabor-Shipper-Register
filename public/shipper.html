@@ -621,8 +621,8 @@ function renderStatusSteps() {
   let html='';
   STATUS_STEPS.forEach((s,i)=>{
     const cls=i<cur?'done':i===cur?'active':'';
-    html+=`<div class="step-item"><div class="step-dot ${cls}">${STATUS_ICONS[s]}</div><div class="step-lbl ${cls}">${STATUS_LABELS[s]}</div></div>`;
-    if(i<STATUS_STEPS.length-1)html+=`<div class="step-line ${i<cur?'done':''}"></div>`;
+    html+=`<div class="step-item"><div class="step-dot ${cls}">${STATUS_ICONS[s]}<\/div><div class="step-lbl ${cls}">${STATUS_LABELS[s]}<\/div><\/div>`;
+    if(i<STATUS_STEPS.length-1)html+=`<div class="step-line ${i<cur?'done':''}"><\/div>`;
   });
   document.getElementById('statusSteps').innerHTML=html;
   const cur2=STATUS_STEPS.indexOf(currentOrder.status);
@@ -677,21 +677,21 @@ async function loadOrderHistory() {
 
 function renderHistory(orders) {
   if(orders.length===0){
-    document.getElementById('orderHistory').innerHTML='<div class="empty-state"><div class="ei">📋</div><p>Chưa có đơn hoàn thành</p></div>';
+    document.getElementById('orderHistory').innerHTML='<div class="empty-state"><div class="ei">📋<\/div><p>Chưa có đơn hoàn thành<\/p><\/div>';
     return;
   }
   document.getElementById('orderHistory').innerHTML=orders.map(o=>`
     <div class="hist-card">
       <div class="hc-row">
-        <div class="hc-id">${o.orderId}</div>
-        <div class="hc-earn">+${fmt(Math.round((o.shipFee||15000)*0.85))}</div>
-      </div>
-      <div class="hc-addr">📍 ${o.address||'–'}</div>
+        <div class="hc-id">${o.orderId}<\/div>
+        <div class="hc-earn">+${fmt(Math.round((o.shipFee||15000)*0.85))}<\/div>
+      <\/div>
+      <div class="hc-addr">📍 ${o.address||'–'}<\/div>
       <div class="hc-row">
-        <div class="hc-time">${timeAgo(o.deliveredAt||o.createdAt)}</div>
-        <div class="hc-badge">✅ Hoàn thành</div>
-      </div>
-    </div>
+        <div class="hc-time">${timeAgo(o.deliveredAt||o.createdAt)}<\/div>
+        <div class="hc-badge">✅ Hoàn thành<\/div>
+      <\/div>
+    <\/div>
   `).join('');
 }
 
