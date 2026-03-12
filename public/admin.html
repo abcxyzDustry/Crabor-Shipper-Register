@@ -1084,6 +1084,7 @@ animation:notifIn .3s ease;box-shadow:0 8px 30px rgba(0,0,0,.5);
 <div class="notif-stack" id="notifStack"></div>
 
 <script>
+// <!--
 // ══════════════════════════════════════
 //   CONFIG
 // ══════════════════════════════════════
@@ -1232,8 +1233,8 @@ function updateSocketBadge(connected) {
   ['socketBadge','socketBadge2'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    if (connected) { el.classList.remove('disconnected'); el.innerHTML = '<div class="live-dot"><\/div> LIVE'; }
-    else { el.classList.add('disconnected'); el.innerHTML = '<div class="live-dot"><\/div> OFFLINE'; }
+    if (connected) { el.classList.remove('disconnected'); el.innerHTML = '<div class="live-dot"></div> LIVE'; }
+    else { el.classList.add('disconnected'); el.innerHTML = '<div class="live-dot"></div> OFFLINE'; }
   });
 }
 
@@ -1259,16 +1260,16 @@ function addFeedItem({ type, title, meta, ico }) {
 function renderFeed(containerId, max) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  if (feedItems.length === 0) { el.innerHTML = '<div class="feed-empty">Chưa có hoạt động nào...<\/div>'; return; }
+  if (feedItems.length === 0) { el.innerHTML = '<div class="feed-empty">Chưa có hoạt động nào...</div>'; return; }
   el.innerHTML = feedItems.slice(0, max).map((it, i) => `
     <div class="feed-item ${i===0?'new':''}">
-      <div class="feed-ico ${it.ico}">${icoEmoji(it.ico)}<\/div>
+      <div class="feed-ico ${it.ico}">${icoEmoji(it.ico)}</div>
       <div class="feed-body">
-        <div class="feed-title">${it.title}<\/div>
-        <div class="feed-meta">${it.meta || ''}<\/div>
-      <\/div>
-      <div class="feed-time">${it.time}<\/div>
-    <\/div>
+        <div class="feed-title">${it.title}</div>
+        <div class="feed-meta">${it.meta || ''}</div>
+      </div>
+      <div class="feed-time">${it.time}</div>
+    </div>
   `).join('');
 }
 
@@ -1377,14 +1378,14 @@ async function loadUsers() {
     if (!r.success) return;
     document.getElementById('userTbody').innerHTML = r.data.map(u => `
       <tr>
-        <td><span style="font-family:var(--font-mono)">${u.phone}<\/span><\/td>
-        <td>${u.fullName||'—'}<\/td>
-        <td>${u.email||'—'}<\/td>
-        <td>${u.district||'—'}<\/td>
-        <td style="font-family:var(--font-mono)">${u.totalOrders||0}<\/td>
-        <td style="font-family:var(--font-mono)">${fmtMoney(u.totalSpent||0)}<\/td>
-        <td style="font-family:var(--font-mono)">${fmtDate(u.createdAt)}<\/td>
-      <\/tr>
+        <td><span style="font-family:var(--font-mono)">${u.phone}</span></td>
+        <td>${u.fullName||'—'}</td>
+        <td>${u.email||'—'}</td>
+        <td>${u.district||'—'}</td>
+        <td style="font-family:var(--font-mono)">${u.totalOrders||0}</td>
+        <td style="font-family:var(--font-mono)">${fmtMoney(u.totalSpent||0)}</td>
+        <td style="font-family:var(--font-mono)">${fmtDate(u.createdAt)}</td>
+      </tr>
     `).join('') || emptyRow(7);
   } catch(e) { console.error(e); }
 }
@@ -1392,58 +1393,58 @@ async function loadUsers() {
 // ── Row renderers ──────────────────────
 function renderShipperRow(s) {
   return `<tr id="row_${s._id}">
-    <td><span style="font-family:var(--font-mono);color:var(--coral)">${s.registerId}<\/span><\/td>
-    <td>${s.fullName||'—'}<\/td>
-    <td><span style="font-family:var(--font-mono)">${s.phone}<\/span><\/td>
-    <td>${s.district||'—'}<\/td>
-    <td>${s.vehicle||'—'}<\/td>
-    <td><span class="badge ${s.plan==='early_bird'?'delta-new':''}">${s.plan==='early_bird'?'⚡ Early Bird':'Standard'}<\/span><\/td>
-    <td><span class="badge b-${s.status}">${statusText(s.status)}<\/span><\/td>
-    <td style="font-family:var(--font-mono);color:var(--muted)">${fmtDate(s.registeredAt)}<\/td>
+    <td><span style="font-family:var(--font-mono);color:var(--coral)">${s.registerId}</span></td>
+    <td>${s.fullName||'—'}</td>
+    <td><span style="font-family:var(--font-mono)">${s.phone}</span></td>
+    <td>${s.district||'—'}</td>
+    <td>${s.vehicle||'—'}</td>
+    <td><span class="badge ${s.plan==='early_bird'?'delta-new':''}">${s.plan==='early_bird'?'⚡ Early Bird':'Standard'}</span></td>
+    <td><span class="badge b-${s.status}">${statusText(s.status)}</span></td>
+    <td style="font-family:var(--font-mono);color:var(--muted)">${fmtDate(s.registeredAt)}</td>
     <td><div style="display:flex;gap:6px;">
-      <button class="act-btn" onclick="viewRecord('${s._id}','shipper')">Xem<\/button>
+      <button class="act-btn" onclick="viewRecord('${s._id}','shipper')">Xem</button>
       ${s.status==='pending'?`
-        <button class="act-btn approve" onclick="quickStatus('${s._id}','shipper','approved')">✓ Duyệt<\/button>
-        <button class="act-btn reject"  onclick="quickStatus('${s._id}','shipper','rejected')">✗ Từ chối<\/button>
+        <button class="act-btn approve" onclick="quickStatus('${s._id}','shipper','approved')">✓ Duyệt</button>
+        <button class="act-btn reject"  onclick="quickStatus('${s._id}','shipper','rejected')">✗ Từ chối</button>
       `:''}
-    <\/div><\/td>
-  <\/tr>`;
+    </div></td>
+  </tr>`;
 }
 
 function renderPartnerRow(p) {
   const modIcon = {giat_la:'👕',giup_viec:'🧹',china_shop:'🛍️'}[p.module]||'🤝';
   return `<tr id="row_${p._id}">
-    <td><span style="font-family:var(--font-mono);color:var(--coral)">${p.registerId}<\/span><\/td>
-    <td>${p.fullName||'—'}<\/td>
-    <td>${p.bizName||p.nickname||'—'}<\/td>
-    <td><span style="font-family:var(--font-mono)">${p.phone}<\/span><\/td>
-    <td>${p.district||'—'}<\/td>
-    <td><span style="font-family:var(--font-mono)">${p.commission||'—'}%<\/span><\/td>
-    <td><span class="badge b-${p.status}">${statusText(p.status)}<\/span><\/td>
-    <td style="font-family:var(--font-mono);color:var(--muted)">${fmtDate(p.registeredAt)}<\/td>
+    <td><span style="font-family:var(--font-mono);color:var(--coral)">${p.registerId}</span></td>
+    <td>${p.fullName||'—'}</td>
+    <td>${p.bizName||p.nickname||'—'}</td>
+    <td><span style="font-family:var(--font-mono)">${p.phone}</span></td>
+    <td>${p.district||'—'}</td>
+    <td><span style="font-family:var(--font-mono)">${p.commission||'—'}%</span></td>
+    <td><span class="badge b-${p.status}">${statusText(p.status)}</span></td>
+    <td style="font-family:var(--font-mono);color:var(--muted)">${fmtDate(p.registeredAt)}</td>
     <td><div style="display:flex;gap:6px;">
-      <button class="act-btn" onclick="viewRecord('${p._id}','${p.module||'giat_la'}')">Xem<\/button>
+      <button class="act-btn" onclick="viewRecord('${p._id}','${p.module||'giat_la'}')">Xem</button>
       ${p.status==='pending'?`
-        <button class="act-btn approve" onclick="quickStatus('${p._id}','${p.module||'giat_la'}','approved')">✓ Duyệt<\/button>
-        <button class="act-btn reject"  onclick="quickStatus('${p._id}','${p.module||'giat_la'}','rejected')">✗ Từ chối<\/button>
+        <button class="act-btn approve" onclick="quickStatus('${p._id}','${p.module||'giat_la'}','approved')">✓ Duyệt</button>
+        <button class="act-btn reject"  onclick="quickStatus('${p._id}','${p.module||'giat_la'}','rejected')">✗ Từ chối</button>
       `:''}
-    <\/div><\/td>
-  <\/tr>`;
+    </div></td>
+  </tr>`;
 }
 
 function renderOrderRow(o) {
   const modIcon = {food:'🍜',laundry:'👕',cleaning:'🧹',china_shop:'🛍️',ride:'🚗'}[o.module]||'📦';
   return `<tr>
-    <td><span style="font-family:var(--font-mono);font-size:.8rem">${o.orderId}<\/span><\/td>
-    <td>${modIcon} ${o.module}<\/td>
-    <td>${o.customerId||'—'}<\/td>
-    <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.address||'—'}<\/td>
-    <td style="font-family:var(--font-mono)">${fmtMoney(o.finalTotal||0)}<\/td>
-    <td><span class="badge ${o.paymentStatus==='paid'?'b-active':'b-pending'}">${o.paymentStatus||'—'}<\/span><\/td>
-    <td><span class="badge b-${o.status}">${statusText(o.status)}<\/span><\/td>
-    <td style="font-family:var(--font-mono);color:var(--muted)">${fmtDate(o.createdAt)}<\/td>
-    <td><button class="act-btn" onclick="viewOrderDetail('${o.orderId}')">Chi tiết<\/button><\/td>
-  <\/tr>`;
+    <td><span style="font-family:var(--font-mono);font-size:.8rem">${o.orderId}</span></td>
+    <td>${modIcon} ${o.module}</td>
+    <td>${o.customerId||'—'}</td>
+    <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.address||'—'}</td>
+    <td style="font-family:var(--font-mono)">${fmtMoney(o.finalTotal||0)}</td>
+    <td><span class="badge ${o.paymentStatus==='paid'?'b-active':'b-pending'}">${o.paymentStatus||'—'}</span></td>
+    <td><span class="badge b-${o.status}">${statusText(o.status)}</span></td>
+    <td style="font-family:var(--font-mono);color:var(--muted)">${fmtDate(o.createdAt)}</td>
+    <td><button class="act-btn" onclick="viewOrderDetail('${o.orderId}')">Chi tiết</button></td>
+  </tr>`;
 }
 
 // ══════════════════════════════════════
@@ -1478,221 +1479,213 @@ async function viewRecord(id, type) {
   document.getElementById('modalTitle').textContent = `Hồ sơ ${data.registerId||''}`;
   document.getElementById('modalBody').innerHTML = `
     <div class="detail-grid">
-      <div class="detail-item"><label>Mã hồ sơ<\/label><div class="val" style="color:var(--coral)">${data.registerId||'—'}<\/div><\/div>
-      <div class="detail-item"><label>Loại<\/label><div class="val">${type}<\/div><\/div>
-      <div class="detail-item"><label>Họ tên<\/label><div class="val">${data.fullName||'—'}<\/div><\/div>
-      <div class="detail-item"><label>SĐT<\/label><div class="val">${data.phone||'—'}<\/div><\/div>
-      <div class="detail-item"><label>Email<\/label><div class="val">${data.email||'—'}<\/div><\/div>
-      <div class="detail-item"><label>Quận/Huyện<\/label><div class="val">${data.district||'—'}<\/div><\/div>
-      ${data.bizName?`<div class="detail-item"><label>Tên cơ sở<\/label><div class="val">${data.bizName}<\/div><\/div>`:''}
-      ${data.address?`<div class="detail-item"><label>Địa chỉ<\/label><div class="val">${data.address}<\/div><\/div>`:''}
-      ${data.vehicle?`<div class="detail-item"><label>Phương tiện<\/label><div class="val">${data.vehicle}<\/div><\/div>`:''}
-      ${data.dob?`<div class="detail-item"><label>Ngày sinh<\/label><div class="val">${data.dob}<\/div><\/div>`:''}
-      ${data.commission?`<div class="detail-item"><label>Hoa hồng<\/label><div class="val">${data.commission}%<\/div><\/div>`:''}
-      ${data.services?.length?`<div class="detail-item full"><label>Dịch vụ<\/label><div class="val">${data.services.join(', ')}<\/div><\/div>`:''}
-      <div class="detail-item"><label>Ngày đăng ký<\/label><div class="val">${fmtDate(data.registeredAt)}<\/div><\/div>
-      <div class="detail-item"><label>Trạng thái<\/label><div class="val"><span class="badge b-${data.status}">${statusText(data.status)}<\/span><\/div><\/div>
-    <\/div>
+      <div class="detail-item"><label>Mã hồ sơ</label><div class="val" style="color:var(--coral)">${data.registerId||'—'}</div></div>
+      <div class="detail-item"><label>Loại</label><div class="val">${type}</div></div>
+      <div class="detail-item"><label>Họ tên</label><div class="val">${data.fullName||'—'}</div></div>
+      <div class="detail-item"><label>SĐT</label><div class="val">${data.phone||'—'}</div></div>
+      <div class="detail-item"><label>Email</label><div class="val">${data.email||'—'}</div></div>
+      <div class="detail-item"><label>Quận/Huyện</label><div class="val">${data.district||'—'}</div></div>
+      ${data.bizName?`<div class="detail-item"><label>Tên cơ sở</label><div class="val">${data.bizName}</div></div>`:''}
+      ${data.address?`<div class="detail-item"><label>Địa chỉ</label><div class="val">${data.address}</div></div>`:''}
+      ${data.vehicle?`<div class="detail-item"><label>Phương tiện</label><div class="val">${data.vehicle}</div></div>`:''}
+      ${data.dob?`<div class="detail-item"><label>Ngày sinh</label><div class="val">${data.dob}</div></div>`:''}
+      ${data.commission?`<div class="detail-item"><label>Hoa hồng</label><div class="val">${data.commission}%</div></div>`:''}
+      ${data.services?.length?`<div class="detail-item full"><label>Dịch vụ</label><div class="val">${data.services.join(', ')}</div></div>`:''}
+      <div class="detail-item"><label>Ngày đăng ký</label><div class="val">${fmtDate(data.registeredAt)}</div></div>
+      <div class="detail-item"><label>Trạng thái</label><div class="val"><span class="badge b-${data.status}">${statusText(data.status)}</span></div></div>
+    </div>
     <hr class="modal-sep">
-    <label class="modal-label">Cập nhật trạng thái<\/label>
+    <label class="modal-label">Cập nhật trạng thái</label>
     <select class="modal-select" id="modalStatus" style="margin-bottom:14px;">
-      ${['pending','reviewing','approved','rejected','active','suspended'].map(s=>`<option value="${s}" ${s===data.status?'selected':''}>${statusText(s)}<\/option>`).join('')}
-    <\/select>
-    <label class="modal-label">Ghi chú admin<\/label>
-    <textarea class="modal-textarea" id="modalNotes">${data.adminNotes||''}<\/textarea>
-  `;
-  document.getElementById('overlay').classList.add('show');
+      ${['pending','reviewing','approved','rejected','active','suspended'].map(s=>`<option value="${s}" ${s===data.status?'selected':''}>${statusText(s)}</option>`).join('')}
+    </select>
+    <label class="modal-label">Ghi chú admin</label>
+    <textarea class="modal-textarea" id="modalNotes">${data.adminNotes||''}</textarea>
+
+`;
+document.getElementById(‘overlay’).classList.add(‘show’);
 }
 
 async function saveStatus() {
-  const status = document.getElementById('modalStatus').value;
-  const notes  = document.getElementById('modalNotes').value;
-  const { id, type } = selectedRecord;
-  if (!id) return;
-  try {
-    const r = await apiFetch(`/api/admin/registrations/${type}/${id}/status`, 'PATCH', { status, adminNotes: notes });
-    if (r.success) {
-      showNotif('✅ Đã cập nhật', `${r.data?.registerId} → ${statusText(status)}`, 'green');
-      closeModal();
-      loadStats();
-      loadTable(type === 'shipper' ? 'shipper' : 'partner');
-    }
-  } catch(e) { console.error(e); }
+const status = document.getElementById(‘modalStatus’).value;
+const notes  = document.getElementById(‘modalNotes’).value;
+const { id, type } = selectedRecord;
+if (!id) return;
+try {
+const r = await apiFetch(`/api/admin/registrations/${type}/${id}/status`, ‘PATCH’, { status, adminNotes: notes });
+if (r.success) {
+showNotif(‘✅ Đã cập nhật’, `${r.data?.registerId} → ${statusText(status)}`, ‘green’);
+closeModal();
+loadStats();
+loadTable(type === ‘shipper’ ? ‘shipper’ : ‘partner’);
+}
+} catch(e) { console.error(e); }
 }
 
 function closeModal() {
-  document.getElementById('overlay').classList.remove('show');
-  selectedRecord = { id: null, type: null };
+document.getElementById(‘overlay’).classList.remove(‘show’);
+selectedRecord = { id: null, type: null };
 }
 
 // ══════════════════════════════════════
 //   NOTIFICATIONS
 // ══════════════════════════════════════
-function showNotif(title, msg, color = 'coral') {
-  const stack = document.getElementById('notifStack');
-  const div = document.createElement('div');
-  div.className = 'notif';
-  div.style.borderColor = color === 'green' ? 'rgba(58,170,92,.4)' : color === 'blue' ? 'rgba(100,149,237,.4)' : 'rgba(232,80,74,.4)';
-  div.innerHTML = `
-    <div class="notif-ico">${color==='green'?'✅':color==='blue'?'🔵':'🔴'}<\/div>
-    <div>
-      <div class="notif-title">${title}<\/div>
-      <div class="notif-msg">${msg}<\/div>
-    <\/div>
-    <button class="notif-close" onclick="this.parentElement.remove()">×<\/button>
-  `;
-  stack.prepend(div);
-  setTimeout(() => { div.classList.add('fade-out'); setTimeout(() => div.remove(), 300); }, 5000);
+function showNotif(title, msg, color = ‘coral’) {
+const stack = document.getElementById(‘notifStack’);
+const div = document.createElement(‘div’);
+div.className = ‘notif’;
+div.style.borderColor = color === ‘green’ ? ‘rgba(58,170,92,.4)’ : color === ‘blue’ ? ‘rgba(100,149,237,.4)’ : ‘rgba(232,80,74,.4)’;
+div.innerHTML = `<div class="notif-ico">${color==='green'?'✅':color==='blue'?'🔵':'🔴'}</div> <div> <div class="notif-title">${title}</div> <div class="notif-msg">${msg}</div> </div> <button class="notif-close" onclick="this.parentElement.remove()">×</button>`;
+stack.prepend(div);
+setTimeout(() => { div.classList.add(‘fade-out’); setTimeout(() => div.remove(), 300); }, 5000);
 }
 
 // ══════════════════════════════════════
 //   PAGE NAVIGATION
 // ══════════════════════════════════════
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', banners:'pgBanners', settings:'pgSettings' };
+const pages = { dashboard:‘pgDashboard’, live:‘pgLive’, shippers:‘pgShippers’, partners:‘pgPartners’, orders:‘pgOrders’, users:‘pgUsers’, finance:‘pgFinance’, banners:‘pgBanners’, settings:‘pgSettings’ };
 
 function showPage(key) {
-  Object.values(pages).forEach(id => document.getElementById(id).classList.remove('show'));
-  document.getElementById(pages[key]).classList.add('show');
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  event.currentTarget.classList.add('active');
+Object.values(pages).forEach(id => document.getElementById(id).classList.remove(‘show’));
+document.getElementById(pages[key]).classList.add(‘show’);
+document.querySelectorAll(’.nav-item’).forEach(el => el.classList.remove(‘active’));
+event.currentTarget.classList.add(‘active’);
 
-  if (key === 'shippers')  loadTable('shipper');
-  if (key === 'partners')  loadTable('partner');
-  if (key === 'orders')    loadOrders();
-  if (key === 'users')     loadUsers();
-  if (key === 'dashboard') loadStats();
-  if (key === 'finance')   loadFinance();
-  if (key === 'banners')   loadBanners();
-  if (key === 'settings')  loadSettings();
+if (key === ‘shippers’)  loadTable(‘shipper’);
+if (key === ‘partners’)  loadTable(‘partner’);
+if (key === ‘orders’)    loadOrders();
+if (key === ‘users’)     loadUsers();
+if (key === ‘dashboard’) loadStats();
+if (key === ‘finance’)   loadFinance();
+if (key === ‘banners’)   loadBanners();
+if (key === ‘settings’)  loadSettings();
 }
 
 // ══════════════════════════════════════
 //   UTILITIES
 // ══════════════════════════════════════
-async function apiFetch(url, method = 'GET', body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY } };
-  if (body) opts.body = JSON.stringify(body);
-  const r = await fetch(`${API}${url}`, opts);
-  return r.json();
+async function apiFetch(url, method = ‘GET’, body) {
+const opts = { method, headers: { ‘Content-Type’: ‘application/json’, ‘x-admin-key’: ADMIN_KEY } };
+if (body) opts.body = JSON.stringify(body);
+const r = await fetch(`${API}${url}`, opts);
+return r.json();
 }
 
 function statusText(s) {
-  return { pending:'Chờ duyệt', reviewing:'Đang xem', approved:'Đã duyệt', rejected:'Từ chối', active:'Hoạt động', suspended:'Tạm ngưng', delivered:'Đã giao', delivering:'Đang giao', confirmed:'Đã xác nhận', cancelled:'Đã hủy', pending_order:'Chờ xác nhận' }[s] || s;
+return { pending:‘Chờ duyệt’, reviewing:‘Đang xem’, approved:‘Đã duyệt’, rejected:‘Từ chối’, active:‘Hoạt động’, suspended:‘Tạm ngưng’, delivered:‘Đã giao’, delivering:‘Đang giao’, confirmed:‘Đã xác nhận’, cancelled:‘Đã hủy’, pending_order:‘Chờ xác nhận’ }[s] || s;
 }
 
 function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
+if (!d) return ‘—’;
+return new Date(d).toLocaleDateString(‘vi-VN’, { day:‘2-digit’, month:‘2-digit’, year:‘numeric’ });
 }
 
 function fmtMoney(n) {
-  return new Intl.NumberFormat('vi-VN', { style:'currency', currency:'VND' }).format(n||0);
+return new Intl.NumberFormat(‘vi-VN’, { style:‘currency’, currency:‘VND’ }).format(n||0);
 }
 
-function setText(id, val) { const el=document.getElementById(id); if(el) el.textContent=val??'—'; }
-function setW(id, pct) { const el=document.getElementById(id); if(el) el.style.width=(Math.min(100,pct)||0)+'%'; }
-function emptyRow(cols) { return `<tr><td colspan="${cols}" style="text-align:center;padding:30px;color:var(--muted);font-family:var(--font-mono)">Không có dữ liệu<\/td><\/tr>`; }
+function setText(id, val) { const el=document.getElementById(id); if(el) el.textContent=val??’—’; }
+function setW(id, pct) { const el=document.getElementById(id); if(el) el.style.width=(Math.min(100,pct)||0)+’%’; }
+function emptyRow(cols) { return `<tr><td colspan="${cols}" style="text-align:center;padding:30px;color:var(--muted);font-family:var(--font-mono)">Không có dữ liệu</td></tr>`; }
 
-function flashCard(id) { const el=document.getElementById(id); if(!el) return; el.classList.add('flash'); el.addEventListener('animationend',()=>el.classList.remove('flash'),{once:true}); }
+function flashCard(id) { const el=document.getElementById(id); if(!el) return; el.classList.add(‘flash’); el.addEventListener(‘animationend’,()=>el.classList.remove(‘flash’),{once:true}); }
 function bumpBadge(id) { const el=document.getElementById(id); if(!el) return; const cur=parseInt(el.textContent)||0; el.textContent=cur+1; }
 
 function renderPager(containerId, total, page, limit, onClick) {
-  const pages = Math.ceil(total/limit);
-  if (pages <= 1) { document.getElementById(containerId).innerHTML=''; return; }
-  let html = '';
-  for (let i=1;i<=Math.min(pages,10);i++) {
-    html+=`<button class="pager-btn ${i===page?'active':''}" onclick="(${onClick.toString()})(${i})">${i}<\/button>`;
-  }
-  html+=`<span class="pager-info">Tổng ${total} bản ghi<\/span>`;
-  document.getElementById(containerId).innerHTML=html;
+const pages = Math.ceil(total/limit);
+if (pages <= 1) { document.getElementById(containerId).innerHTML=’’; return; }
+let html = ‘’;
+for (let i=1;i<=Math.min(pages,10);i++) {
+html+=`<button class="pager-btn ${i===page?'active':''}" onclick="(${onClick.toString()})(${i})">${i}</button>`;
+}
+html+=`<span class="pager-info">Tổng ${total} bản ghi</span>`;
+document.getElementById(containerId).innerHTML=html;
 }
 
 // Auto-refresh stats mỗi 30s
 setInterval(() => { if (currentUser) loadStats(); }, 30000);
 
-
-
-
 // ══════════════════════════════════════
 //   FINANCE
 // ══════════════════════════════════════
 async function loadFinance() {
-  try {
-    const d = await apiFetch('/analytics/overview');
-    const mul = ({today:1,week:7,month:30,quarter:90})[document.getElementById('finPeriod')?.value||'month'];
-    const gmv = (d.totalRevenue||0)*mul;
-    document.getElementById('finGmv').textContent = fmtMoney(gmv);
-    document.getElementById('finCommission').textContent = fmtMoney(Math.round(gmv*0.19));
-    document.getElementById('finDelivery').textContent = fmtMoney(Math.round(gmv*0.14));
-    document.getElementById('finShipperFee').textContent = fmtMoney((d.totalShippers||0)*700000);
-  } catch(e) {
-    ['finGmv','finCommission','finDelivery','finShipperFee'].forEach((id,i) => {
-      const vals=['5.2 tỷ','1.04 tỷ','750M','120M'];
-      const el=document.getElementById(id);if(el)el.textContent=vals[i];
-    });
-  }
-  renderModuleBars(); loadTransactions();
+try {
+const d = await apiFetch(’/analytics/overview’);
+const mul = ({today:1,week:7,month:30,quarter:90})[document.getElementById(‘finPeriod’)?.value||‘month’];
+const gmv = (d.totalRevenue||0)*mul;
+document.getElementById(‘finGmv’).textContent = fmtMoney(gmv);
+document.getElementById(‘finCommission’).textContent = fmtMoney(Math.round(gmv*0.19));
+document.getElementById(‘finDelivery’).textContent = fmtMoney(Math.round(gmv*0.14));
+document.getElementById(‘finShipperFee’).textContent = fmtMoney((d.totalShippers||0)*700000);
+} catch(e) {
+[‘finGmv’,‘finCommission’,‘finDelivery’,‘finShipperFee’].forEach((id,i) => {
+const vals=[‘5.2 tỷ’,‘1.04 tỷ’,‘750M’,‘120M’];
+const el=document.getElementById(id);if(el)el.textContent=vals[i];
+});
+}
+renderModuleBars(); loadTransactions();
 }
 
 function renderModuleBars() {
-  document.querySelectorAll('.module-bar-row').forEach(r => {
-    r.innerHTML=`<div class="bar-label">${r.dataset.module}<\/div><div class="bar-track"><div class="bar-fill" style="width:${r.dataset.pct}%;background:${r.dataset.color}"><\/div><\/div><div class="bar-pct">${r.dataset.pct}%<\/div>`;
-  });
+document.querySelectorAll(’.module-bar-row’).forEach(r => {
+r.innerHTML=`<div class="bar-label">${r.dataset.module}</div><div class="bar-track"><div class="bar-fill" style="width:${r.dataset.pct}%;background:${r.dataset.color}"></div></div><div class="bar-pct">${r.dataset.pct}%</div>`;
+});
 }
 
 async function loadTransactions() {
-  const t=document.getElementById('txTbody'); if(!t) return;
-  const TX=[
-    {id:'TRX-001',type:'Đặt hàng',user:'Nguyễn Văn A',amount:189000,method:'MoMo',module:'🍜 Đồ ăn',s:'success',time:'14:30'},
-    {id:'TRX-002',type:'Phí Shipper',user:'Trần Văn Sơn',amount:700000,method:'Tiền mặt',module:'🛵 Shipper',s:'success',time:'13:15'},
-    {id:'TRX-003',type:'Hoa hồng',user:'Tiệm Giặt Minh',amount:36000,method:'Hệ thống',module:'👕 Giặt là',s:'success',time:'12:00'},
-    {id:'TRX-004',type:'Hoàn tiền',user:'Lê Thị C',amount:-55000,method:'VNPay',module:'🍜 Đồ ăn',s:'refund',time:'11:30'},
-    {id:'TRX-005',type:'Đặt hàng',user:'Phạm Văn D',amount:399000,method:'VNPay',module:'🛍️ China Shop',s:'success',time:'10:00'},
-  ];
-  t.innerHTML=TX.map(x=>`<tr><td><code style="color:#E8504A;font-size:.75rem">${x.id}<\/code><\/td><td>${x.type}<\/td><td>${x.user}<\/td><td style="font-weight:800;color:${x.amount<0?'#dc3545':'#3aaa5c'}">${x.amount<0?'-':''}${fmtMoney(Math.abs(x.amount))}<\/td><td>${x.method}<\/td><td>${x.module}<\/td><td><span class="status-pill ${x.s==='success'?'status-ap':x.s==='refund'?'status-rj':'status-pend'}">${x.s==='success'?'Thành công':x.s==='refund'?'Hoàn tiền':'XL'}<\/span><\/td><td style="font-size:.78rem;color:var(--muted)">${x.time}<\/td><\/tr>`).join('');
+const t=document.getElementById(‘txTbody’); if(!t) return;
+const TX=[
+{id:‘TRX-001’,type:‘Đặt hàng’,user:‘Nguyễn Văn A’,amount:189000,method:‘MoMo’,module:‘🍜 Đồ ăn’,s:‘success’,time:‘14:30’},
+{id:‘TRX-002’,type:‘Phí Shipper’,user:‘Trần Văn Sơn’,amount:700000,method:‘Tiền mặt’,module:‘🛵 Shipper’,s:‘success’,time:‘13:15’},
+{id:‘TRX-003’,type:‘Hoa hồng’,user:‘Tiệm Giặt Minh’,amount:36000,method:‘Hệ thống’,module:‘👕 Giặt là’,s:‘success’,time:‘12:00’},
+{id:‘TRX-004’,type:‘Hoàn tiền’,user:‘Lê Thị C’,amount:-55000,method:‘VNPay’,module:‘🍜 Đồ ăn’,s:‘refund’,time:‘11:30’},
+{id:‘TRX-005’,type:‘Đặt hàng’,user:‘Phạm Văn D’,amount:399000,method:‘VNPay’,module:‘🛍️ China Shop’,s:‘success’,time:‘10:00’},
+];
+t.innerHTML=TX.map(x=>`<tr><td><code style="color:#E8504A;font-size:.75rem">${x.id}</code></td><td>${x.type}</td><td>${x.user}</td><td style="font-weight:800;color:${x.amount<0?'#dc3545':'#3aaa5c'}">${x.amount<0?'-':''}${fmtMoney(Math.abs(x.amount))}</td><td>${x.method}</td><td>${x.module}</td><td><span class="status-pill ${x.s==='success'?'status-ap':x.s==='refund'?'status-rj':'status-pend'}">${x.s==='success'?'Thành công':x.s==='refund'?'Hoàn tiền':'XL'}</span></td><td style="font-size:.78rem;color:var(--muted)">${x.time}</td></tr>`).join(’’);
 }
 
-function exportFinance() { alert('📊 Tính năng xuất Excel sẽ xuất đầy đủ dữ liệu giao dịch!'); }
+function exportFinance() { alert(‘📊 Tính năng xuất Excel sẽ xuất đầy đủ dữ liệu giao dịch!’); }
 
 // ══════════════════════════════════════
 //   BANNERS
 // ══════════════════════════════════════
 const DEMO_BANNERS = [
-  {id:1,title:'🍕 Pizza Thứ 5 Giảm 50%',desc:'Chỉ hôm nay! Đặt pizza bất kỳ được giảm ngay 50%',color:'linear-gradient(135deg,#FF6B35,#FF8E53)',target:'Tất cả',views:12400,clicks:298,ctr:'2.4%',status:'active'},
-  {id:2,title:'🛵 Đăng ký Shipper Early Bird',desc:'Còn 50 suất phí 500k. Sau đó 700k.',color:'linear-gradient(135deg,#E8504A,#c93d37)',target:'Tất cả',views:8900,clicks:345,ctr:'3.9%',status:'active'},
-  {id:3,title:'👕 Giảm 30% đơn giặt đầu tiên',desc:'Thử ngay dịch vụ giặt là CRABOR!',color:'linear-gradient(135deg,#6495ed,#3a6bc9)',target:'Khách mới',views:6200,clicks:186,ctr:'3.0%',status:'active'},
+{id:1,title:‘🍕 Pizza Thứ 5 Giảm 50%’,desc:‘Chỉ hôm nay! Đặt pizza bất kỳ được giảm ngay 50%’,color:‘linear-gradient(135deg,#FF6B35,#FF8E53)’,target:‘Tất cả’,views:12400,clicks:298,ctr:‘2.4%’,status:‘active’},
+{id:2,title:‘🛵 Đăng ký Shipper Early Bird’,desc:‘Còn 50 suất phí 500k. Sau đó 700k.’,color:‘linear-gradient(135deg,#E8504A,#c93d37)’,target:‘Tất cả’,views:8900,clicks:345,ctr:‘3.9%’,status:‘active’},
+{id:3,title:‘👕 Giảm 30% đơn giặt đầu tiên’,desc:‘Thử ngay dịch vụ giặt là CRABOR!’,color:‘linear-gradient(135deg,#6495ed,#3a6bc9)’,target:‘Khách mới’,views:6200,clicks:186,ctr:‘3.0%’,status:‘active’},
 ];
 
 async function loadBanners() { renderBannerGrid(); renderBannerHistory(); }
 
 function renderBannerGrid() {
-  const g=document.getElementById('bannerGrid'); if(!g) return;
-  g.innerHTML=DEMO_BANNERS.map(b=>`<div class="banner-card" style="background:${b.color};color:#fff"><span class="banner-status-pill">${b.status==='active'?'🟢 Đang chạy':'⏸ Dừng'}<\/span><div class="banner-card-title">${b.title}<\/div><div class="banner-card-meta">${b.desc}<\/div><div class="banner-card-stats"><span>👁 ${b.views.toLocaleString()}<\/span> <span>👆 ${b.clicks}<\/span> <span>CTR ${b.ctr}<\/span><\/div><div style="font-size:.72rem;opacity:.7;margin-top:6px">Đối tượng: ${b.target}<\/div><div class="banner-card-actions"><button class="banner-edit-btn" onclick="editBanner(${b.id})">✏️ Sửa<\/button><button class="banner-edit-btn" onclick="pauseBanner(${b.id})">⏸ Dừng<\/button><button class="banner-edit-btn" onclick="deleteBanner(${b.id})">🗑<\/button><\/div><\/div>`).join('');
+const g=document.getElementById(‘bannerGrid’); if(!g) return;
+g.innerHTML=DEMO_BANNERS.map(b=>`<div class="banner-card" style="background:${b.color};color:#fff"><span class="banner-status-pill">${b.status==='active'?'🟢 Đang chạy':'⏸ Dừng'}</span><div class="banner-card-title">${b.title}</div><div class="banner-card-meta">${b.desc}</div><div class="banner-card-stats"><span>👁 ${b.views.toLocaleString()}</span> <span>👆 ${b.clicks}</span> <span>CTR ${b.ctr}</span></div><div style="font-size:.72rem;opacity:.7;margin-top:6px">Đối tượng: ${b.target}</div><div class="banner-card-actions"><button class="banner-edit-btn" onclick="editBanner(${b.id})">✏️ Sửa</button><button class="banner-edit-btn" onclick="pauseBanner(${b.id})">⏸ Dừng</button><button class="banner-edit-btn" onclick="deleteBanner(${b.id})">🗑</button></div></div>`).join(’’);
 }
 
 function renderBannerHistory() {
-  const t=document.getElementById('bannerTbody'); if(!t) return;
-  const H=[{title:'🎁 Combo Tết 2025',target:'Tất cả',views:45000,clicks:1800,ctr:'4.0%',time:'01-31/01/2025',status:'ended'},{title:'🎄 Giảm 20% Giáng Sinh',target:'Khách hàng',views:38000,clicks:1140,ctr:'3.0%',time:'20-26/12/2024',status:'ended'}];
-  const all=[...DEMO_BANNERS.map(b=>({...b,time:'01/01-31/03/2025'})),...H];
-  t.innerHTML=all.map(b=>`<tr><td style="font-weight:700">${b.title}<\/td><td>${b.target}<\/td><td>${b.views?.toLocaleString()}<\/td><td>${b.clicks}<\/td><td>${b.ctr}<\/td><td style="color:var(--muted);font-size:.78rem">${b.time}<\/td><td><span class="status-pill ${b.status==='active'?'status-ap':'status-rj'}">${b.status==='active'?'Chạy':'Kết thúc'}<\/span><\/td><td>${b.status==='active'?`<button onclick="pauseBanner(${b.id})" style="background:rgba(255,200,0,.1);color:#FFD84D;border:none;padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:800;cursor:pointer">⏸<\/button>`:'–'}<\/td><\/tr>`).join('');
+const t=document.getElementById(‘bannerTbody’); if(!t) return;
+const H=[{title:‘🎁 Combo Tết 2025’,target:‘Tất cả’,views:45000,clicks:1800,ctr:‘4.0%’,time:‘01-31/01/2025’,status:‘ended’},{title:‘🎄 Giảm 20% Giáng Sinh’,target:‘Khách hàng’,views:38000,clicks:1140,ctr:‘3.0%’,time:‘20-26/12/2024’,status:‘ended’}];
+const all=[…DEMO_BANNERS.map(b=>({…b,time:‘01/01-31/03/2025’})),…H];
+t.innerHTML=all.map(b=>`<tr><td style="font-weight:700">${b.title}</td><td>${b.target}</td><td>${b.views?.toLocaleString()}</td><td>${b.clicks}</td><td>${b.ctr}</td><td style="color:var(--muted);font-size:.78rem">${b.time}</td><td><span class="status-pill ${b.status==='active'?'status-ap':'status-rj'}">${b.status==='active'?'Chạy':'Kết thúc'}</span></td><td>${b.status==='active'?`<button onclick="pauseBanner(${b.id})" style="background:rgba(255,200,0,.1);color:#FFD84D;border:none;padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:800;cursor:pointer">⏸</button>`:'–'}</td></tr>`).join(’’);
 }
 
 function openBannerModal(){
-  document.getElementById('bannerModalOverlay').classList.add('show');
-  const d=new Date(),t=d.toISOString().split('T')[0],t2=new Date(d.getTime()+30*864e5).toISOString().split('T')[0];
-  document.getElementById('bmStart').value=t; document.getElementById('bmEnd').value=t2;
+document.getElementById(‘bannerModalOverlay’).classList.add(‘show’);
+const d=new Date(),t=d.toISOString().split(‘T’)[0],t2=new Date(d.getTime()+30*864e5).toISOString().split(‘T’)[0];
+document.getElementById(‘bmStart’).value=t; document.getElementById(‘bmEnd’).value=t2;
 }
-function closeBannerModal(){document.getElementById('bannerModalOverlay').classList.remove('show');}
+function closeBannerModal(){document.getElementById(‘bannerModalOverlay’).classList.remove(‘show’);}
 function saveBanner(){
-  const title=document.getElementById('bmTitle').value.trim();
-  if(!title){alert('Vui lòng nhập tiêu đề!');return;}
-  DEMO_BANNERS.push({id:DEMO_BANNERS.length+1,title,desc:document.getElementById('bmDesc').value,color:document.getElementById('bmColor').value,target:document.getElementById('bmTarget').value,views:0,clicks:0,ctr:'0%',status:'active'});
-  renderBannerGrid();renderBannerHistory();closeBannerModal();
-  showNotif('✅ Banner mới',`"${title}" đã được tạo!`,'coral');
+const title=document.getElementById(‘bmTitle’).value.trim();
+if(!title){alert(‘Vui lòng nhập tiêu đề!’);return;}
+DEMO_BANNERS.push({id:DEMO_BANNERS.length+1,title,desc:document.getElementById(‘bmDesc’).value,color:document.getElementById(‘bmColor’).value,target:document.getElementById(‘bmTarget’).value,views:0,clicks:0,ctr:‘0%’,status:‘active’});
+renderBannerGrid();renderBannerHistory();closeBannerModal();
+showNotif(‘✅ Banner mới’,`"${title}" đã được tạo!`,‘coral’);
 }
 function editBanner(id){openBannerModal();}
-function pauseBanner(id){const b=DEMO_BANNERS.find(x=>x.id===id);if(b){b.status=b.status==='active'?'paused':'active';renderBannerGrid();renderBannerHistory();}showNotif('⏸','Banner đã cập nhật');}
-function deleteBanner(id){if(!confirm('Xóa banner?'))return;const i=DEMO_BANNERS.findIndex(x=>x.id===id);if(i>=0)DEMO_BANNERS.splice(i,1);renderBannerGrid();renderBannerHistory();showNotif('🗑 Đã xóa','');}
+function pauseBanner(id){const b=DEMO_BANNERS.find(x=>x.id===id);if(b){b.status=b.status===‘active’?‘paused’:‘active’;renderBannerGrid();renderBannerHistory();}showNotif(‘⏸’,‘Banner đã cập nhật’);}
+function deleteBanner(id){if(!confirm(‘Xóa banner?’))return;const i=DEMO_BANNERS.findIndex(x=>x.id===id);if(i>=0)DEMO_BANNERS.splice(i,1);renderBannerGrid();renderBannerHistory();showNotif(‘🗑 Đã xóa’,’’);}
+// –>
 </script>
 
 <!-- BANNER MODAL -->
