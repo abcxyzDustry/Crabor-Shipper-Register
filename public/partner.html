@@ -686,10 +686,10 @@ function showModuleSelect(list){
   const cfg=MOD_CONFIG;
   document.getElementById('msOpts').innerHTML=list.map(p=>`
     <div class="ms-opt" onclick="selectModuleById('${p._id||''}','${p.modType}')">
-      <div class="ms-opt-icon">${cfg[p.modType]?.icon||'🤝'}</div>
-      <div><div class="ms-opt-name">${p.bizName||p.firstName+' '+p.lastName}</div><div class="ms-opt-sub">${cfg[p.modType]?.label||p.modType}</div></div>
-      <div class="ms-badge">${statusVn(p.status)}</div>
-    </div>
+      <div class="ms-opt-icon">${cfg[p.modType]?.icon||'🤝'}<\/div>
+      <div><div class="ms-opt-name">${p.bizName||p.firstName+' '+p.lastName}<\/div><div class="ms-opt-sub">${cfg[p.modType]?.label||p.modType}<\/div><\/div>
+      <div class="ms-badge">${statusVn(p.status)}<\/div>
+    <\/div>
   `).join('');
 }
 
@@ -755,9 +755,9 @@ function renderInfoList(){
   ];
   document.getElementById('profInfoList').innerHTML=rows.map(([k,v])=>`
     <div class="info-item">
-      <div class="ii-label">${k}</div>
-      <div class="ii-val">${v}</div>
-    </div>
+      <div class="ii-label">${k}<\/div>
+      <div class="ii-val">${v}<\/div>
+    <\/div>
   `).join('');
 }
 
@@ -806,31 +806,31 @@ function renderOrders(){
   let list=allOrders;
   if(filterStatus!=='all')list=list.filter(o=>o.status===filterStatus);
   if(list.length===0){
-    document.getElementById('ordersList').innerHTML='<div class="empty-state"><div class="ei">📦</div><p>Chưa có đơn nào</p></div>';
+    document.getElementById('ordersList').innerHTML='<div class="empty-state"><div class="ei">📦<\/div><p>Chưa có đơn nào<\/p><\/div>';
     return;
   }
   document.getElementById('ordersList').innerHTML=list.map(o=>{
     const earn=Math.round((o.total||0)*(1-cfg.commission/100));
     const actions=o.status==='pending'?
-      `<button class="btn-sm btn-confirm" onclick="updateOrder('${o._id||o.orderId}','confirmed')">✅ Xác nhận</button>
-       <button class="btn-sm btn-cancel" onclick="updateOrder('${o._id||o.orderId}','cancelled')">Huỷ</button>`:
+      `<button class="btn-sm btn-confirm" onclick="updateOrder('${o._id||o.orderId}','confirmed')">✅ Xác nhận<\/button>
+       <button class="btn-sm btn-cancel" onclick="updateOrder('${o._id||o.orderId}','cancelled')">Huỷ<\/button>`:
       o.status==='confirmed'?
-      `<button class="btn-sm btn-ready" onclick="updateOrder('${o._id||o.orderId}','preparing')">🔄 Đang xử lý</button>`:'';
+      `<button class="btn-sm btn-ready" onclick="updateOrder('${o._id||o.orderId}','preparing')">🔄 Đang xử lý<\/button>`:'';
     return `<div class="order-card">
       <div class="oc-head">
-        <div><div class="oc-id">${o.orderId||'–'}</div></div>
-        <div class="oc-status s-${o.status}">${statusVn(o.status)}</div>
-      </div>
-      <div class="oc-items">${(o.items||[]).map(i=>i.name).join(', ')||'Dịch vụ'}</div>
-      <div class="oc-addr">📍 ${o.address||'–'}</div>
+        <div><div class="oc-id">${o.orderId||'–'}<\/div><\/div>
+        <div class="oc-status s-${o.status}">${statusVn(o.status)}<\/div>
+      <\/div>
+      <div class="oc-items">${(o.items||[]).map(i=>i.name).join(', ')||'Dịch vụ'}<\/div>
+      <div class="oc-addr">📍 ${o.address||'–'}<\/div>
       <div class="oc-footer">
         <div>
-          <div class="oc-total">${fmt(o.finalTotal||o.total)}</div>
-          <div class="oc-earn">+${fmt(earn)} thu nhập</div>
-        </div>
-        <div class="oc-actions">${actions}</div>
-      </div>
-    </div>`;
+          <div class="oc-total">${fmt(o.finalTotal||o.total)}<\/div>
+          <div class="oc-earn">+${fmt(earn)} thu nhập<\/div>
+        <\/div>
+        <div class="oc-actions">${actions}<\/div>
+      <\/div>
+    <\/div>`;
   }).join('');
 }
 
@@ -864,19 +864,19 @@ function renderStats(){
   const cfg=MOD_CONFIG[modType]||{color:'#E8504A'};
   document.getElementById('revenueChart').innerHTML=days.map((d,i)=>`
     <div class="bar-row">
-      <div class="bar-label">${d}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${vals[i]/max*100}%;background:${cfg.color}" ></div></div>
-      <div class="bar-val">${vals[i]}k</div>
-    </div>
+      <div class="bar-label">${d}<\/div>
+      <div class="bar-track"><div class="bar-fill" style="width:${vals[i]/max*100}%;background:${cfg.color}" ><\/div><\/div>
+      <div class="bar-val">${vals[i]}k<\/div>
+    <\/div>
   `).join('');
   const statuses=[['Chờ xác nhận',3,'#e67e22'],['Đang xử lý',8,'#2196f3'],['Hoàn thành',45,'#27ae60'],['Đã huỷ',2,'#E8504A']];
   const maxS=Math.max(...statuses.map(s=>s[1]));
   document.getElementById('statusChart').innerHTML=statuses.map(([label,val,color])=>`
     <div class="bar-row">
-      <div class="bar-label" style="font-size:.68rem">${label}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${val/maxS*100}%;background:${color}"></div></div>
-      <div class="bar-val">${val}</div>
-    </div>
+      <div class="bar-label" style="font-size:.68rem">${label}<\/div>
+      <div class="bar-track"><div class="bar-fill" style="width:${val/maxS*100}%;background:${color}"><\/div><\/div>
+      <div class="bar-val">${val}<\/div>
+    <\/div>
   `).join('');
 }
 
@@ -930,20 +930,20 @@ function renderProductsList() {
   let list = [...partnerProductsList];
   if(productCatFilter !== 'all') list = list.filter(p=>p.cat===productCatFilter);
   if(productSearch) list = list.filter(p=>p.name.toLowerCase().includes(productSearch.toLowerCase()));
-  if(list.length===0){el.innerHTML='<div class="loading-page"><div class="ei">🍽️</div><p>Không có món nào</p></div>';return;}
+  if(list.length===0){el.innerHTML='<div class="loading-page"><div class="ei">🍽️<\/div><p>Không có món nào<\/p><\/div>';return;}
   el.innerHTML = list.map(p=>`
     <div class="product-manage-card">
-      <div class="pmc-emoji">${p.emoji||'🍽️'}</div>
+      <div class="pmc-emoji">${p.emoji||'🍽️'}<\/div>
       <div class="pmc-body">
-        <div class="pmc-name">${p.name}</div>
-        <div class="pmc-cat">${p.cat}</div>
-        <div class="pmc-price">${p.price.toLocaleString('vi-VN')}đ · 🔥 ${p.sold||0} đã bán</div>
-      </div>
+        <div class="pmc-name">${p.name}<\/div>
+        <div class="pmc-cat">${p.cat}<\/div>
+        <div class="pmc-price">${p.price.toLocaleString('vi-VN')}đ · 🔥 ${p.sold||0} đã bán<\/div>
+      <\/div>
       <div class="pmc-actions">
-        <button class="pmc-toggle ${p.available?'':'off'}" onclick="toggleProductAvail(${p.id})">${p.available?'✅ Có':'❌ Hết'}</button>
-        <button class="pmc-edit" onclick="editProduct(${p.id})">✏️ Sửa</button>
-      </div>
-    </div>
+        <button class="pmc-toggle ${p.available?'':'off'}" onclick="toggleProductAvail(${p.id})">${p.available?'✅ Có':'❌ Hết'}<\/button>
+        <button class="pmc-edit" onclick="editProduct(${p.id})">✏️ Sửa<\/button>
+      <\/div>
+    <\/div>
   `).join('');
 }
 
@@ -1025,7 +1025,7 @@ function createPromo() {
   const el = document.getElementById('promoList');
   const card = document.createElement('div');
   card.className='promo-card';
-  card.innerHTML=`<div class="promo-badge-tag" style="background:#6c63ff">${badge} OFF</div><div class="promo-body"><div class="promo-title">${name}</div><div class="promo-sub">Đơn từ ${parseInt(minOrder||0).toLocaleString('vi-VN')}đ · Vừa tạo</div></div><button class="promo-del" onclick="deletePromo(this)">✕</button>`;
+  card.innerHTML=`<div class="promo-badge-tag" style="background:#6c63ff">${badge} OFF<\/div><div class="promo-body"><div class="promo-title">${name}<\/div><div class="promo-sub">Đơn từ ${parseInt(minOrder||0).toLocaleString('vi-VN')}đ · Vừa tạo<\/div><\/div><button class="promo-del" onclick="deletePromo(this)">✕<\/button>`;
   el.insertBefore(card, el.firstChild);
   document.getElementById('promoName').value='';
   document.getElementById('promoValue').value='';
@@ -1090,17 +1090,17 @@ function renderStatsDetailed() {
   if(el.querySelector('.top-selling-list')) return;
   const topDiv = document.createElement('div');
   topDiv.className='chart-placeholder';
-  topDiv.innerHTML=`<div class="cp-title">🏆 Top món bán chạy</div>
+  topDiv.innerHTML=`<div class="cp-title">🏆 Top món bán chạy<\/div>
     <div class="top-selling-list">
       ${partnerProductsList.slice(0,3).map((p,i)=>`
         <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">
-          <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#${['E8504A','777777','aaaaaa'][i]}">#${i+1}</div>
-          <div style="font-size:1.4rem">${p.emoji||'🍽️'}</div>
-          <div style="flex:1"><div style="font-weight:900;font-size:.88rem">${p.name}</div><div style="font-size:.75rem;color:#777;font-weight:700">${p.sold||0} đã bán</div></div>
-          <div style="font-family:'Fredoka One',cursive;color:#E8504A">${((p.sold||0)*p.price/1000000).toFixed(1)}M</div>
-        </div>
+          <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#${['E8504A','777777','aaaaaa'][i]}">#${i+1}<\/div>
+          <div style="font-size:1.4rem">${p.emoji||'🍽️'}<\/div>
+          <div style="flex:1"><div style="font-weight:900;font-size:.88rem">${p.name}<\/div><div style="font-size:.75rem;color:#777;font-weight:700">${p.sold||0} đã bán<\/div><\/div>
+          <div style="font-family:'Fredoka One',cursive;color:#E8504A">${((p.sold||0)*p.price/1000000).toFixed(1)}M<\/div>
+        <\/div>
       `).join('')}
-    </div>`;
+    <\/div>`;
   el.appendChild(topDiv);
 }
 
