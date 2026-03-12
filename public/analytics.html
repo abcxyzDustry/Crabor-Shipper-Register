@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRABOR — Data Flow Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --coral:#E8504A;--cream:#F5F0DC;--yellow:#FFD84D;
+  --bg:#0d0d0d;--bg2:#141414;--bg3:#1c1c1c;
+  --border:rgba(255,255,255,.08);
+  --green:#3aaa5c;--blue:#6495ed;--purple:#9b7fe8;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-sans:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:#e8e8e8;font-family:var(--font-sans);padding:40px 32px;min-height:100vh;}
+h1{font-size:1.8rem;font-weight:800;color:var(--cream);margin-bottom:6px;}
+h1 span{color:var(--coral);}
+.subtitle{font-family:var(--font-mono);font-size:.8rem;color:#666;margin-bottom:40px;}
+
+/* SECTION */
+.section{margin-bottom:44px;}
+.section-title{font-size:.75rem;letter-spacing:3px;text-transform:uppercase;color:#555;font-weight:700;margin-bottom:18px;font-family:var(--font-mono);}
+
+/* DATA FLOW DIAGRAM */
+.flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:12px;}
+.flow-node{
+  background:var(--bg2);border:1px solid var(--border);border-radius:14px;
+  padding:18px 20px;min-width:180px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:8px;position:relative;
+}
+.flow-node.highlight{border-color:var(--coral);background:rgba(232,80,74,.06);}
+.flow-node.db{border-color:rgba(58,170,92,.3);background:rgba(58,170,92,.05);}
+.flow-node-icon{font-size:1.6rem;margin-bottom:4px;}
+.flow-node-title{font-size:.85rem;font-weight:700;color:var(--cream);}
+.flow-node-sub{font-size:.72rem;font-family:var(--font-mono);color:#555;}
+.flow-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.ftag{font-size:.68rem;font-family:var(--font-mono);padding:2px 7px;border-radius:4px;font-weight:600;}
+.ftag-coral{background:rgba(232,80,74,.15);color:var(--coral);}
+.ftag-blue{background:rgba(100,149,237,.15);color:var(--blue);}
+.ftag-green{background:rgba(58,170,92,.15);color:var(--green);}
+.ftag-yellow{background:rgba(255,216,77,.1);color:#c8a020;}
+.ftag-purple{background:rgba(155,127,232,.15);color:var(--purple);}
+
+/* Arrow */
+.arrow{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px;flex-shrink:0;}
+.arrow-line{width:36px;height:2px;background:linear-gradient(90deg,rgba(232,80,74,.4),rgba(232,80,74,.8));}
+.arrow-head{width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:8px solid rgba(232,80,74,.8);}
+.arrow-label{font-size:.65rem;font-family:var(--font-mono);color:#555;margin-bottom:4px;text-align:center;white-space:nowrap;}
+.arrow-both .arrow-line{background:linear-gradient(90deg,rgba(100,149,237,.6),rgba(100,149,237,.6));}
+.arrow-both .arrow-head{border-left-color:rgba(100,149,237,.8);}
+.arrow-both .arrow-head-left{width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:8px solid rgba(100,149,237,.8);margin-bottom:2px;}
+.arrow-double{display:flex;gap:3px;}
+
+/* SOCKET TABLE */
+.event-table{width:100%;border-collapse:collapse;}
+.event-table th{
+  padding:10px 14px;text-align:left;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;
+  color:#555;font-weight:700;border-bottom:1px solid var(--border);font-family:var(--font-mono);
+}
+.event-table td{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.82rem;vertical-align:top;}
+.event-table tr:hover td{background:rgba(255,255,255,.02);}
+.event-name{font-family:var(--font-mono);font-size:.8rem;font-weight:700;}
+.e-emit{color:var(--coral);}
+.e-listen{color:var(--blue);}
+.e-both{color:var(--yellow);}
+.from-badge,.to-badge{display:inline-flex;gap:3px;flex-wrap:wrap;}
+.badge-sm{font-size:.68rem;padding:2px 7px;border-radius:4px;font-family:var(--font-mono);font-weight:600;}
+.b-admin{background:rgba(232,80,74,.15);color:var(--coral);}
+.b-shipper{background:rgba(255,216,77,.1);color:#c8a020;}
+.b-customer{background:rgba(100,149,237,.15);color:var(--blue);}
+.b-partner{background:rgba(58,170,92,.15);color:var(--green);}
+.b-server{background:rgba(155,127,232,.15);color:var(--purple);}
+.e-desc{font-size:.78rem;color:#777;font-family:var(--font-mono);}
+
+/* DB COLLECTIONS */
+.collections-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.coll{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.coll-name{font-family:var(--font-mono);font-size:.85rem;font-weight:700;color:var(--cream);margin-bottom:8px;}
+.coll-name span{font-size:.7rem;font-weight:400;color:#555;margin-left:6px;}
+.coll-fields{display:flex;flex-direction:column;gap:4px;}
+.coll-field{font-family:var(--font-mono);font-size:.72rem;color:#666;}
+.coll-field b{color:#aaa;font-weight:600;}
+.coll-ttl{font-size:.68rem;font-family:var(--font-mono);color:var(--yellow);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+
+/* API ROUTES */
+.routes-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.route-group{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.rg-head{padding:12px 16px;border-bottom:1px solid var(--border);font-size:.75rem;font-weight:700;letter-spacing:1px;font-family:var(--font-mono);}
+.rg-head.coral{background:rgba(232,80,74,.08);color:var(--coral);}
+.rg-head.blue{background:rgba(100,149,237,.08);color:var(--blue);}
+.rg-head.green{background:rgba(58,170,92,.08);color:var(--green);}
+.rg-head.yellow{background:rgba(255,216,77,.06);color:#c8a020;}
+.route-list{padding:10px 0;}
+.route-item{display:flex;align-items:center;gap:10px;padding:7px 16px;}
+.method{font-family:var(--font-mono);font-size:.68rem;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0;min-width:40px;text-align:center;}
+.m-get{background:rgba(58,170,92,.15);color:var(--green);}
+.m-post{background:rgba(100,149,237,.15);color:var(--blue);}
+.m-patch{background:rgba(255,216,77,.1);color:#c8a020;}
+.r-path{font-family:var(--font-mono);font-size:.78rem;color:var(--cream);}
+.r-desc{font-size:.72rem;color:#555;margin-left:auto;font-family:var(--font-mono);}
+
+/* SETUP GUIDE */
+.setup-steps{display:flex;flex-direction:column;gap:12px;}
+.step{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 20px;align-items:flex-start;}
+.step-num{
+  width:30px;height:30px;border-radius:8px;background:var(--coral);color:#fff;
+  font-family:var(--font-mono);font-size:.85rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.step-content{flex:1;}
+.step-title{font-size:.9rem;font-weight:700;color:var(--cream);margin-bottom:6px;}
+.step-code{
+  background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+  padding:12px 14px;font-family:var(--font-mono);font-size:.78rem;color:#ccc;
+  margin-top:8px;white-space:pre;overflow-x:auto;line-height:1.7;
+}
+.step-code .c{color:var(--green);}
+.step-code .k{color:var(--coral);}
+.step-code .s{color:var(--yellow);}
+
+/* LEGEND */
+.legend{display:flex;gap:20px;flex-wrap:wrap;padding:14px 18px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;}
+.leg{display:flex;align-items:center;gap:7px;font-size:.75rem;font-family:var(--font-mono);color:#888;}
+.leg-dot{width:10px;height:10px;border-radius:3px;}
+</style>
+</head>
+<body>
+
+<h1>🦀 <span>CRABOR</span> — Data Flow Architecture</h1>
+<div class="subtitle">Unified Server · MongoDB Atlas · Socket.io Real-time · v1.0</div>
+
+<!-- ── DATA FLOW ── -->
+<div class="section">
+  <div class="section-title">Luồng dữ liệu tổng thể</div>
+  <div class="flow">
+    <!-- Clients -->
+    <div class="flow-node">
+      <div class="flow-node-icon">📱</div>
+      <div class="flow-node-title">Client Apps</div>
+      <div class="flow-node-sub">Browser / Capacitor APK</div>
+      <div class="flow-tags">
+        <span class="ftag ftag-coral">shipper-register.html</span>
+        <span class="ftag ftag-blue">partner-register.html</span>
+        <span class="ftag ftag-green">customer app</span>
+        <span class="ftag ftag-yellow">admin.html</span>
+      </div>
+    </div>
+    <div class="arrow">
+      <div class="arrow-label">HTTP REST</div>
+      <div style="display:flex;align-items:center">
+        <div class="arrow-line"></div>
+        <div class="arrow-head"></div>
+      </div>
+      <div class="arrow-label" style="margin-top:6px;color:var(--blue)">Socket.io</div>
+      <div style="display:flex;align-items:center">
+        <div class="arrow-head-left" style="width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:8px solid rgba(100,149,237,.8);"></div>
+        <div class="arrow-line" style="background:rgba(100,149,237,.6)"></div>
+        <div class="arrow-head" style="border-left-color:rgba(100,149,237,.8)"></div>
+      </div>
+    </div>
+    <!-- Server -->
+    <div class="flow-node highlight">
+      <div class="flow-node-icon">⚙️</div>
+      <div class="flow-node-title">server.js</div>
+      <div class="flow-node-sub">Express + Socket.io · Port 3000</div>
+      <div class="flow-tags">
+        <span class="ftag ftag-coral">Auth / OTP</span>
+        <span class="ftag ftag-blue">Shipper API</span>
+        <span class="ftag ftag-green">Partner API</span>
+        <span class="ftag ftag-yellow">Orders</span>
+        <span class="ftag ftag-purple">Admin API</span>
+      </div>
+    </div>
+    <div class="arrow">
+      <div class="arrow-label">Mongoose ODM</div>
+      <div style="display:flex;align-items:center">
+        <div class="arrow-head-left" style="width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:8px solid rgba(58,170,92,.8);margin-right:0"></div>
+        <div class="arrow-line" style="background:rgba(58,170,92,.5)"></div>
+        <div class="arrow-head" style="border-left-color:rgba(58,170,92,.8)"></div>
+      </div>
+    </div>
+    <!-- DB -->
+    <div class="flow-node db">
+      <div class="flow-node-icon">🗄️</div>
+      <div class="flow-node-title">MongoDB Atlas</div>
+      <div class="flow-node-sub">DB: crabor · cluster0.fs703g5</div>
+      <div class="flow-tags">
+        <span class="ftag ftag-green">otps</span>
+        <span class="ftag ftag-green">users</span>
+        <span class="ftag ftag-green">shippers</span>
+        <span class="ftag ftag-green">orders</span>
+        <span class="ftag ftag-green">giatla_partners</span>
+        <span class="ftag ftag-green">giupviec_partners</span>
+        <span class="ftag ftag-green">chinashop_partners</span>
+      </div>
+    </div>
+    <div class="arrow">
+      <div class="arrow-label">API call</div>
+      <div style="display:flex;align-items:center">
+        <div class="arrow-line" style="background:rgba(255,216,77,.4)"></div>
+        <div class="arrow-head" style="border-left-color:rgba(255,216,77,.8)"></div>
+      </div>
+    </div>
+    <!-- ESMS -->
+    <div class="flow-node">
+      <div class="flow-node-icon">📱</div>
+      <div class="flow-node-title">ESMS SMS API</div>
+      <div class="flow-node-sub">rest.esms.vn · SmsType 8</div>
+      <div class="flow-tags">
+        <span class="ftag ftag-yellow">OTP 6 số</span>
+        <span class="ftag ftag-yellow">Thông báo duyệt</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SOCKET.IO EVENTS ── -->
+<div class="section">
+  <div class="section-title">Socket.io — Sự kiện real-time</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+    <table class="event-table">
+      <thead>
+        <tr>
+          <th>Tên sự kiện</th>
+          <th>Hướng</th>
+          <th>Emit từ</th>
+          <th>Nhận tại</th>
+          <th>Mô tả</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="event-name e-emit">newShipperApplication</span></td>
+          <td><span class="ftag ftag-coral" style="font-size:.7rem">SERVER→CLIENT</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td><span class="badge-sm b-admin">admin</span></td>
+          <td class="e-desc">Shipper mới đăng ký → Admin nhận ngay, flash card, refresh bảng</td>
+        </tr>
+        <tr>
+          <td><span class="event-name e-emit">newPartnerApplication</span></td>
+          <td><span class="ftag ftag-coral" style="font-size:.7rem">SERVER→CLIENT</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td><span class="badge-sm b-admin">admin</span></td>
+          <td class="e-desc">Đối tác Giặt Là / Giúp Việc / China Shop đăng ký mới</td>
+        </tr>
+        <tr>
+          <td><span class="event-name e-listen">registrationStatusUpdated</span></td>
+          <td><span class="ftag ftag-blue" style="font-size:.7rem">SERVER→CLIENT</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td><span class="badge-sm b-admin">admin</span></td>
+          <td class="e-desc">Admin duyệt/từ chối → tất cả tab admin cùng update</td>
+        </tr>
+        <tr>
+          <td><span class="event-name e-emit">newOrder</span></td>
+          <td><span class="ftag ftag-coral" style="font-size:.7rem">SERVER→CLIENT</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td><span class="badge-sm b-admin">admin</span> <span class="badge-sm b-shipper">shippers</span></td>
+          <td class="e-desc">Đơn mới tạo → Admin thấy ngay, shipper nhận thông báo</td>
+        </tr>
+        <tr>
+          <td><span class="event-name e-emit">orderStatusChanged</span></td>
+          <td><span class="ftag ftag-coral" style="font-size:.7rem">SERVER→CLIENT</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td><span class="badge-sm b-customer">customer_X</span> <span class="badge-sm b-admin">admin</span></td>
+          <td class="e-desc">Cập nhật trạng thái đơn → customer và admin cùng nhận</td>
+        </tr>
+        <tr>
+          <td><span class="event-name e-listen">shipperTracking</span></td>
+          <td><span class="ftag ftag-blue" style="font-size:.7rem">SERVER→CLIENT</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td><span class="badge-sm b-customer">order_X</span></td>
+          <td class="e-desc">GPS shipper → customer xem bản đồ real-time</td>
+        </tr>
+        <tr>
+          <td><span class="event-name e-listen">joinRoom</span></td>
+          <td><span class="ftag ftag-yellow" style="font-size:.7rem">CLIENT→SERVER</span></td>
+          <td><span class="badge-sm b-admin">admin</span> <span class="badge-sm b-customer">customer</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td class="e-desc">Client tự đăng ký vào phòng: 'admin', 'shippers', 'order_X', 'customer_X'</td>
+        </tr>
+        <tr>
+          <td><span class="event-name e-listen">orderUpdate</span></td>
+          <td><span class="ftag ftag-yellow" style="font-size:.7rem">CLIENT→SERVER</span></td>
+          <td><span class="badge-sm b-shipper">shipper app</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td class="e-desc">Shipper cập nhật: đã lấy hàng, đang giao, đã giao</td>
+        </tr>
+        <tr>
+          <td><span class="event-name e-listen">shipperLocation</span></td>
+          <td><span class="ftag ftag-yellow" style="font-size:.7rem">CLIENT→SERVER</span></td>
+          <td><span class="badge-sm b-shipper">shipper app</span></td>
+          <td><span class="badge-sm b-server">server.js</span></td>
+          <td class="e-desc">GPS từ app shipper → server relay đến customer + admin</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── DATABASE ── -->
+<div class="section">
+  <div class="section-title">MongoDB — Collections trong DB "crabor"</div>
+  <div class="collections-grid">
+    <div class="coll">
+      <div class="coll-name">otps <span>TTL 10 phút</span></div>
+      <div class="coll-fields">
+        <div class="coll-field"><b>phone</b> String (index)</div>
+        <div class="coll-field"><b>otp</b> String (6 số)</div>
+        <div class="coll-field"><b>type</b> 'auth' | 'shipper_register' | 'partner_register'</div>
+        <div class="coll-field"><b>attempts</b> Number</div>
+        <div class="coll-field"><b>createdAt</b> Date (TTL expires: 600s)</div>
+      </div>
+      <div class="coll-ttl">⏱ Tự xóa sau 10 phút · Rate limit 3 lần/10 phút</div>
+    </div>
+    <div class="coll">
+      <div class="coll-name">shippers</div>
+      <div class="coll-fields">
+        <div class="coll-field"><b>registerId</b> CRB-XXXXXX (unique)</div>
+        <div class="coll-field"><b>phone</b> String (unique)</div>
+        <div class="coll-field"><b>plan</b> 'early_bird' | 'standard'</div>
+        <div class="coll-field"><b>status</b> pending → approved → active</div>
+        <div class="coll-field"><b>earlyBird</b> { discountRate, ordersCompleted }</div>
+        <div class="coll-field"><b>online</b> Boolean · <b>location</b> {lat,lng}</div>
+      </div>
+    </div>
+    <div class="coll">
+      <div class="coll-name">giatla_partners</div>
+      <div class="coll-fields">
+        <div class="coll-field"><b>registerId</b> CRB-GL-XXXXXX</div>
+        <div class="coll-field"><b>bizName</b> Tên cơ sở</div>
+        <div class="coll-field"><b>services</b> ['giặt thường', 'giặt hấp'...]</div>
+        <div class="coll-field"><b>pricePerKg</b> Number</div>
+        <div class="coll-field"><b>commission</b> 18% (default)</div>
+        <div class="coll-field"><b>status</b> pending → active</div>
+      </div>
+    </div>
+    <div class="coll">
+      <div class="coll-name">giupviec_partners</div>
+      <div class="coll-fields">
+        <div class="coll-field"><b>registerId</b> CRB-GV-XXXXXX</div>
+        <div class="coll-field"><b>skills</b> ['dọn dẹp', 'nấu ăn'...]</div>
+        <div class="coll-field"><b>availableShifts</b> ['sáng','chiều','tối']</div>
+        <div class="coll-field"><b>commission</b> 15%</div>
+        <div class="coll-field"><b>completedShifts</b> · <b>rating</b></div>
+      </div>
+    </div>
+    <div class="coll">
+      <div class="coll-name">chinashop_partners</div>
+      <div class="coll-fields">
+        <div class="coll-field"><b>registerId</b> CRB-CS-XXXXXX</div>
+        <div class="coll-field"><b>sourceType</b> Nguồn hàng</div>
+        <div class="coll-field"><b>categories</b> ['thời trang', 'gia dụng'...]</div>
+        <div class="coll-field"><b>commission</b> 12%</div>
+        <div class="coll-field"><b>shopFee</b> 500k · <b>sampleSubmitted</b></div>
+      </div>
+    </div>
+    <div class="coll">
+      <div class="coll-name">orders</div>
+      <div class="coll-fields">
+        <div class="coll-field"><b>orderId</b> ORD-XXXXX (unique)</div>
+        <div class="coll-field"><b>module</b> food|laundry|cleaning|china_shop|ride</div>
+        <div class="coll-field"><b>customerId</b> ref:User</div>
+        <div class="coll-field"><b>shipperId</b> ref:Shipper</div>
+        <div class="coll-field"><b>statusHistory</b> [{status,time,by}]</div>
+        <div class="coll-field"><b>finalTotal</b> = total+ship+fee-discount</div>
+      </div>
+    </div>
+    <div class="coll">
+      <div class="coll-name">users</div>
+      <div class="coll-fields">
+        <div class="coll-field"><b>phone</b> String (unique)</div>
+        <div class="coll-field"><b>role</b> customer | admin | staff</div>
+        <div class="coll-field"><b>loyaltyPts</b> Number</div>
+        <div class="coll-field"><b>totalOrders</b> · <b>totalSpent</b></div>
+        <div class="coll-field"><b>fcmToken</b> Push notification</div>
+      </div>
+    </div>
+    <div class="coll">
+      <div class="coll-name">admins</div>
+      <div class="coll-fields">
+        <div class="coll-field"><b>username</b> / <b>password</b></div>
+        <div class="coll-field"><b>role</b> superadmin | admin | staff</div>
+        <div class="coll-field"><b>lastLogin</b> Date</div>
+      </div>
+      <div class="coll-ttl">🔑 Auth qua x-admin-key header</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── API ROUTES ── -->
+<div class="section">
+  <div class="section-title">REST API Endpoints — tất cả trên port 3000</div>
+  <div class="routes-grid">
+    <div class="route-group">
+      <div class="rg-head coral">🔑 /api/auth — OTP &amp; Login</div>
+      <div class="route-list">
+        <div class="route-item"><span class="method m-post">POST</span><span class="r-path">/api/auth/send-otp</span><span class="r-desc">Gửi SMS OTP</span></div>
+        <div class="route-item"><span class="method m-post">POST</span><span class="r-path">/api/auth/verify-otp</span><span class="r-desc">Xác minh OTP</span></div>
+        <div class="route-item"><span class="method m-post">POST</span><span class="r-path">/api/auth/login</span><span class="r-desc">Customer login</span></div>
+        <div class="route-item"><span class="method m-post">POST</span><span class="r-path">/api/auth/logout</span><span class="r-desc">Hủy session</span></div>
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/auth/me</span><span class="r-desc">User hiện tại</span></div>
+      </div>
+    </div>
+    <div class="route-group">
+      <div class="rg-head blue">🛵 /api/shipper — Đăng ký shipper</div>
+      <div class="route-list">
+        <div class="route-item"><span class="method m-post">POST</span><span class="r-path">/api/shipper/register</span><span class="r-desc">Đăng ký mới</span></div>
+      </div>
+    </div>
+    <div class="route-group">
+      <div class="rg-head green">🤝 /api/partner — Đăng ký đối tác</div>
+      <div class="route-list">
+        <div class="route-item"><span class="method m-post">POST</span><span class="r-path">/api/partner/register</span><span class="r-desc">module: gl|gv|cs</span></div>
+      </div>
+    </div>
+    <div class="route-group">
+      <div class="rg-head yellow">📦 /api/orders — Đơn hàng</div>
+      <div class="route-list">
+        <div class="route-item"><span class="method m-post">POST</span><span class="r-path">/api/orders</span><span class="r-desc">Tạo đơn mới</span></div>
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/orders</span><span class="r-desc">Danh sách đơn</span></div>
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/orders/:id</span><span class="r-desc">Chi tiết đơn</span></div>
+        <div class="route-item"><span class="method m-patch">PATCH</span><span class="r-path">/api/orders/:id/status</span><span class="r-desc">Cập nhật trạng thái</span></div>
+      </div>
+    </div>
+    <div class="route-group">
+      <div class="rg-head coral">👑 /api/admin — Quản trị (x-admin-key)</div>
+      <div class="route-list">
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/admin/stats</span><span class="r-desc">Stats tổng hợp</span></div>
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/admin/shippers</span><span class="r-desc">Danh sách shipper</span></div>
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/admin/partners?module=</span><span class="r-desc">Danh sách đối tác</span></div>
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/admin/registrations/search</span><span class="r-desc">Tìm kiếm toàn cục</span></div>
+        <div class="route-item"><span class="method m-patch">PATCH</span><span class="r-path">/api/admin/registrations/:type/:id/status</span><span class="r-desc">Duyệt/từ chối</span></div>
+      </div>
+    </div>
+    <div class="route-group">
+      <div class="rg-head blue">📊 /api/analytics — Báo cáo (x-admin-key)</div>
+      <div class="route-list">
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/analytics/overview</span><span class="r-desc">Tổng quan</span></div>
+        <div class="route-item"><span class="method m-get">GET</span><span class="r-path">/api/analytics/orders-by-module</span><span class="r-desc">Đơn theo module</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SETUP ── -->
+<div class="section">
+  <div class="section-title">Hướng dẫn cài đặt và chạy</div>
+  <div class="setup-steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Cấu trúc thư mục project</div>
+        <div class="step-code">CRABOR/
+├── <span class="k">server.js</span>               ← Server gốc (duy nhất, port 3000)
+├── package.json
+├── <span class="s">.env</span>                    ← KHÔNG push GitHub
+├── <span class="s">.env.example</span>
+├── .gitignore
+└── public/
+    ├── index.html           ← Landing (chọn vai trò)
+    ├── customer.html        ← App khách hàng
+    ├── shipper.html         ← App shipper
+    ├── partner.html         ← App đối tác
+    ├── admin.html           ← Dashboard admin (real-time)
+    ├── shipper-register.html ← Form đăng ký shipper
+    └── partner-register.html ← Form đăng ký đối tác</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">File .env (điền đầy đủ trước khi chạy)</div>
+        <div class="step-code">PORT=3000
+NODE_ENV=development
+MONGODB_URI=<span class="s">mongodb+srv://123456789a:&lt;PASS&gt;@cluster0.fs703g5.mongodb.net/crabor</span>
+SESSION_SECRET=<span class="s">crabor-session-secret-2025</span>
+ADMIN_SECRET_KEY=<span class="s">crabor-admin-secret-2025</span>
+ADMIN_DEFAULT_PASS=<span class="s">Crabor@2025</span>
+ESMS_API_KEY=<span class="s">your_esms_api_key</span>
+ESMS_SECRET_KEY=<span class="s">your_esms_secret_key</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Cài dependencies và chạy</div>
+        <div class="step-code"><span class="c"># Cài packages</span>
+npm install
+
+<span class="c"># Dev (auto-restart khi sửa code)</span>
+npm run dev
+
+<span class="c"># Production</span>
+npm start
+
+<span class="c"># Kiểm tra OK:</span>
+<span class="k">✅ MongoDB Atlas connected — DB: crabor</span>
+<span class="k">🚀 Server running on port 3000</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Các URL sau khi chạy — tất cả cùng 1 server</div>
+        <div class="step-code">http://localhost:3000/               ← Landing
+http://localhost:3000/customer       ← App khách hàng
+http://localhost:3000/shipper        ← App shipper
+http://localhost:3000/partner        ← App đối tác
+http://localhost:3000/admin          ← <span class="k">Admin real-time dashboard</span>
+http://localhost:3000/shipper/register ← Form ĐK shipper (public)
+http://localhost:3000/partner/register ← Form ĐK đối tác (public)</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <div class="step-title">Test kết nối Socket.io real-time</div>
+        <div class="step-code"><span class="c"># 1. Mở Admin Dashboard:</span>
+http://localhost:3000/admin  →  Đăng nhập  →  Thấy badge LIVE (xanh)
+
+<span class="c"># 2. Mở tab mới, vào form đăng ký:</span>
+http://localhost:3000/shipper/register
+
+<span class="c"># 3. Điền form và submit</span>
+<span class="c"># → Admin dashboard nhận thông báo ngay lập tức ⚡</span>
+<span class="c"># → Bảng shipper tự refresh không cần F5</span>
+<span class="c"># → Stats card flash và cập nhật số</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
