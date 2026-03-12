@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CRABOR Shipper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red:#E8504A; --cream:#F5F0DC; --yellow:#FFD84D;
+  --dark:#1a1a1a; --radius:18px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Nunito',sans-serif;
+  background:#111;
+  min-height:100vh;
+  max-width:430px;
+  margin:0 auto;
+}
+.screen{display:none;flex-direction:column;min-height:100vh;}
+.screen.active{display:flex;}
+
+/* LOGIN */
+#loginScreen{
+  background:linear-gradient(160deg,#E8504A 0%,#c93d37 60%,#111 100%);
+  align-items:center;justify-content:flex-end;padding-bottom:0;
+}
+.sp-hero{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:40px 30px 20px;gap:12px;
+}
+.sp-logo{
+  width:100px;height:100px;border-radius:28px;
+  background:rgba(245,240,220,.15);
+  border:2px solid rgba(245,240,220,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:3rem;
+  animation:float 3s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.sp-brand{font-family:'Fredoka One',cursive;font-size:2.5rem;color:#F5F0DC;text-shadow:3px 3px 0 rgba(0,0,0,.2);}
+.sp-sub{color:rgba(245,240,220,.8);font-weight:700;font-size:.95rem;text-align:center;}
+.login-card{
+  background:#fff;border-radius:32px 32px 0 0;
+  padding:32px 24px 40px;width:100%;
+}
+.lc-title{font-family:'Fredoka One',cursive;font-size:1.5rem;color:#1a1a1a;margin-bottom:5px;}
+.lc-sub{font-size:.85rem;color:#777;font-weight:700;margin-bottom:22px;}
+.phone-row{display:flex;gap:10px;margin-bottom:10px;}
+.inp{
+  width:100%;padding:14px 16px 14px 44px;
+  border:2px solid #e8e8e8;border-radius:14px;
+  font-family:'Nunito',sans-serif;font-size:.95rem;font-weight:700;
+  outline:none;background:#fafafa;transition:border-color .2s;
+}
+.inp:focus{border-color:#E8504A;background:#fff;}
+.inp-wrap{position:relative;flex:1;}
+.inp-wrap .ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1rem;}
+.btn-otp{
+  padding:0 14px;border-radius:14px;border:2px solid #E8504A;
+  background:transparent;color:#E8504A;
+  font-family:'Fredoka One',cursive;font-size:.9rem;
+  cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0;
+}
+.btn-otp:hover{background:#E8504A;color:#fff;}
+.btn-otp:disabled{opacity:.4;cursor:not-allowed;}
+.otp-row{display:flex;gap:8px;justify-content:center;margin:16px 0;}
+.otp-d{
+  width:48px;height:56px;border-radius:12px;
+  border:2px solid #e8e8e8;background:#fafafa;
+  font-family:'Fredoka One',cursive;font-size:1.6rem;
+  text-align:center;outline:none;transition:border-color .2s;
+}
+.otp-d:focus{border-color:#E8504A;background:#fff;}
+.otp-d.filled{border-color:#3aaa5c;}
+.btn-main{
+  width:100%;padding:16px;border-radius:60px;border:none;
+  background:#E8504A;color:#fff;
+  font-family:'Fredoka One',cursive;font-size:1.1rem;
+  cursor:pointer;transition:all .2s;margin-top:6px;
+  box-shadow:0 8px 25px rgba(232,80,74,.4);
+}
+.btn-main:hover{transform:translateY(-2px);background:#c93d37;}
+.btn-main:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.countdown{font-size:.78rem;color:#777;font-weight:700;margin-top:5px;display:none;}
+.err{color:#ff4d4d;font-size:.83rem;font-weight:800;margin-top:4px;display:none;}
+.err.show{display:block;}
+
+/* MAIN APP - DARK THEME */
+#appScreen{background:#111;color:#fff;}
+
+.topbar{
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  padding:48px 20px 20px;
+  position:relative;overflow:hidden;
+}
+.topbar::before{
+  content:'';position:absolute;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,216,77,.15),transparent 70%);
+  right:-40px;bottom:-60px;
+}
+.tb-row{display:flex;justify-content:space-between;align-items:center;}
+.tb-info .name{font-family:'Fredoka One',cursive;font-size:1.3rem;color:#F5F0DC;}
+.tb-info .sub{font-size:.8rem;color:rgba(245,240,220,.75);font-weight:700;margin-top:2px;}
+.online-toggle{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(0,0,0,.25);
+  border-radius:50px;padding:8px 14px;
+  cursor:pointer;border:none;color:#F5F0DC;
+  font-family:'Nunito',sans-serif;font-weight:900;font-size:.85rem;
+  transition:all .25s;
+}
+.online-toggle.online{background:rgba(58,170,92,.3);border:1.5px solid rgba(58,170,92,.5);}
+.toggle-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:#bbb;transition:background .3s;flex-shrink:0;
+}
+.online-toggle.online .toggle-dot{background:#3aaa5c;box-shadow:0 0 0 3px rgba(58,170,92,.3);}
+
+/* STATS ROW */
+.stats-row{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:10px;padding:14px 16px;
+}
+.stat-card{
+  background:#1e1e1e;border-radius:14px;
+  padding:14px 12px;text-align:center;
+  border:1px solid #2a2a2a;
+}
+.stat-num{
+  font-family:'Fredoka One',cursive;
+  font-size:1.4rem;
+}
+.stat-num.red{color:#E8504A;}
+.stat-num.yellow{color:#FFD84D;}
+.stat-num.green{color:#3aaa5c;}
+.stat-label{font-size:.7rem;color:#777;font-weight:700;margin-top:3px;}
+
+/* ORDER REQUEST (notification popup) */
+.order-request{
+  position:fixed;top:0;left:50%;transform:translateX(-50%);
+  max-width:430px;width:100%;
+  background:linear-gradient(135deg,#1e1e1e,#222);
+  border-bottom:2px solid #E8504A;
+  padding:16px;z-index:200;
+  display:none;
+  box-shadow:0 8px 40px rgba(232,80,74,.3);
+}
+.order-request.show{display:block;animation:slideDown .3s ease;}
+@keyframes slideDown{from{transform:translateX(-50%) translateY(-100%)}to{transform:translateX(-50%) translateY(0)}}
+.or-header{
+  display:flex;align-items:center;gap:10px;margin-bottom:10px;
+}
+.or-icon{
+  width:40px;height:40px;border-radius:50%;
+  background:#E8504A;display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;flex-shrink:0;
+  animation:pulse 1s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(232,80,74,.5)}50%{box-shadow:0 0 0 8px rgba(232,80,74,0)}}
+.or-title{font-family:'Fredoka One',cursive;font-size:1rem;color:#F5F0DC;}
+.or-sub{font-size:.78rem;color:#777;font-weight:700;}
+.or-detail{
+  background:#111;border-radius:12px;
+  padding:12px;margin-bottom:12px;
+}
+.or-row{display:flex;justify-content:space-between;padding:5px 0;font-size:.83rem;}
+.or-key{color:#777;font-weight:700;}
+.or-val{color:#F5F0DC;font-weight:900;text-align:right;max-width:60%;}
+.or-timer{
+  text-align:center;margin-bottom:10px;
+  font-family:'Fredoka One',cursive;font-size:1.5rem;
+}
+.or-timer.warn{color:#E8504A;}
+.or-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn-accept{
+  padding:13px;border-radius:50px;border:none;
+  background:#3aaa5c;color:#fff;
+  font-family:'Fredoka One',cursive;font-size:1rem;
+  cursor:pointer;transition:all .2s;
+}
+.btn-accept:hover{background:#2d8f4a;transform:translateY(-2px);}
+.btn-reject{
+  padding:13px;border-radius:50px;border:2px solid #444;
+  background:transparent;color:#777;
+  font-family:'Fredoka One',cursive;font-size:1rem;
+  cursor:pointer;transition:all .2s;
+}
+.btn-reject:hover{border-color:#E8504A;color:#E8504A;}
+
+/* ACTIVE ORDER */
+.active-order{
+  margin:0 16px 14px;
+  background:#1e1e1e;border-radius:18px;
+  border:1px solid #2a2a2a;overflow:hidden;
+}
+.ao-head{
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  padding:14px 16px;
+}
+.ao-head-row{display:flex;justify-content:space-between;align-items:center;}
+.ao-title{font-family:'Fredoka One',cursive;font-size:1rem;color:#F5F0DC;}
+.ao-id{font-size:.75rem;color:rgba(245,240,220,.7);font-weight:700;}
+.ao-body{padding:16px;}
+.ao-customer{
+  display:flex;align-items:center;gap:12px;margin-bottom:14px;
+  background:#111;border-radius:12px;padding:12px;
+}
+.ao-avatar{
+  width:42px;height:42px;border-radius:50%;
+  background:#2a2a2a;display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;flex-shrink:0;
+}
+.ao-cname{font-weight:900;font-size:.9rem;color:#F5F0DC;}
+.ao-addr{font-size:.78rem;color:#777;font-weight:700;margin-top:2px;}
+.ao-call{
+  margin-left:auto;
+  width:36px;height:36px;border-radius:50%;
+  background:#3aaa5c;border:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;cursor:pointer;flex-shrink:0;
+}
+
+/* STATUS STEPS */
+.status-steps{display:flex;align-items:center;margin-bottom:16px;}
+.step-item{display:flex;flex-direction:column;align-items:center;flex:1;}
+.step-dot{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.9rem;
+  border:2px solid #333;color:#555;
+  transition:all .3s;
+}
+.step-dot.done{background:#3aaa5c;border-color:#3aaa5c;color:#fff;}
+.step-dot.active{background:#E8504A;border-color:#E8504A;color:#fff;animation:pulse .8s ease-in-out infinite;}
+.step-lbl{font-size:.62rem;color:#555;font-weight:700;margin-top:4px;text-align:center;}
+.step-lbl.done,.step-lbl.active{color:#F5F0DC;}
+.step-line{flex:1;height:2px;background:#2a2a2a;margin:0 4px;margin-bottom:18px;transition:background .3s;}
+.step-line.done{background:#3aaa5c;}
+
+.btn-next-status{
+  width:100%;padding:15px;border-radius:50px;border:none;
+  background:#E8504A;color:#fff;
+  font-family:'Fredoka One',cursive;font-size:1.1rem;
+  cursor:pointer;transition:all .2s;
+  box-shadow:0 6px 20px rgba(232,80,74,.35);
+}
+.btn-next-status:hover{transform:translateY(-2px);background:#c93d37;}
+
+/* ORDER HISTORY */
+.sec-title{
+  padding:16px 16px 8px;
+  font-family:'Fredoka One',cursive;font-size:1.1rem;color:#F5F0DC;
+}
+.hist-card{
+  margin:0 16px 10px;
+  background:#1e1e1e;border-radius:14px;
+  padding:14px;border:1px solid #2a2a2a;
+}
+.hc-row{display:flex;justify-content:space-between;align-items:center;}
+.hc-id{font-size:.75rem;color:#555;font-weight:700;}
+.hc-earn{font-family:'Fredoka One',cursive;font-size:1.1rem;color:#FFD84D;}
+.hc-addr{font-size:.82rem;color:#777;font-weight:700;margin:6px 0;}
+.hc-time{font-size:.72rem;color:#444;font-weight:700;}
+.hc-badge{
+  background:#1a2f1a;color:#3aaa5c;
+  padding:3px 10px;border-radius:10px;
+  font-size:.72rem;font-weight:900;
+}
+
+.scroll-area{flex:1;overflow-y:auto;padding-bottom:20px;}
+.loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;gap:10px;color:#444;font-weight:700;font-size:.85rem;}
+.spinner{width:32px;height:32px;border-radius:50%;border:3px solid #222;border-top-color:#E8504A;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(100px);background:#1e1e1e;border:1px solid #333;color:#F5F0DC;border-radius:50px;padding:12px 24px;font-weight:800;font-size:.9rem;z-index:999;white-space:nowrap;transition:transform .3s;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+.empty-state{text-align:center;padding:40px 20px;color:#444;}
+.empty-state .ei{font-size:3rem;margin-bottom:12px;}
+.empty-state p{font-weight:700;font-size:.9rem;}
+
+
+</style>
+<script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="screen active" id="loginScreen">
+  <div class="sp-hero">
+    <div class="sp-logo">🛵</div>
+    <div class="sp-brand">CRABOR</div>
+    <div style="font-family:'Fredoka One',cursive;font-size:1.3rem;color:#FFD84D;">Shipper App</div>
+    <div class="sp-sub">Thu nhập 20k–50k/đơn · Nhận việc ngay</div>
+  </div>
+  <div class="login-card">
+    <div id="sp-lp1">
+      <div class="lc-title">Đăng nhập Shipper</div>
+      <div class="lc-sub">Nhập SĐT đã đăng ký tài khoản shipper</div>
+      <div class="phone-row">
+        <div class="inp-wrap">
+          <span class="ico">📱</span>
+          <input class="inp" type="tel" id="spPhone" placeholder="0901 234 567" maxlength="10">
+        </div>
+        <button class="btn-otp" id="spBtnOtp" onclick="spSendOtp()">Gửi OTP</button>
+      </div>
+      <div class="err" id="spPhoneErr">SĐT không hợp lệ</div>
+      <div class="countdown" id="spCountdown"></div>
+      <button class="btn-main" onclick="spSendOtp()" style="margin-top:14px">Tiếp tục →</button>
+      <p style="text-align:center;margin-top:16px;font-size:.83rem;color:#777;font-weight:700;">
+        Chưa đăng ký? <a href="/register" style="color:#E8504A;font-weight:900;">Đăng ký ngay</a>
+      </p>
+    </div>
+    <div id="sp-lp2" style="display:none">
+      <div class="lc-title">Nhập mã OTP</div>
+      <div class="lc-sub">Mã 6 số đã gửi về <strong id="spMask"></strong></div>
+      <div class="otp-row">
+        <input class="otp-d" type="text" maxlength="1" id="sd0" oninput="otpNav(this,0)">
+        <input class="otp-d" type="text" maxlength="1" id="sd1" oninput="otpNav(this,1)">
+        <input class="otp-d" type="text" maxlength="1" id="sd2" oninput="otpNav(this,2)">
+        <input class="otp-d" type="text" maxlength="1" id="sd3" oninput="otpNav(this,3)">
+        <input class="otp-d" type="text" maxlength="1" id="sd4" oninput="otpNav(this,4)">
+        <input class="otp-d" type="text" maxlength="1" id="sd5" oninput="otpNav(this,5)">
+      </div>
+      <div class="err" id="spOtpErr">Mã OTP không đúng</div>
+      <button class="btn-main" onclick="spVerify()">Đăng nhập 🛵</button>
+      <p style="text-align:center;margin-top:14px;font-size:.83rem;color:#777;font-weight:700;">
+        <button onclick="showPhase(1)" style="background:none;border:none;color:#E8504A;font-weight:900;cursor:pointer">← Đổi số</button>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="screen" id="appScreen">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="tb-row">
+      <div class="tb-info">
+        <div class="name" id="spName">Shipper</div>
+        <div class="sub" id="spRegId">CRB-S-XXXXXX</div>
+      </div>
+      <button class="online-toggle" id="toggleBtn" onclick="toggleOnline()">
+        <div class="toggle-dot"></div>
+        <span id="toggleLabel">Offline</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num red" id="todayOrders">0</div>
+      <div class="stat-label">Đơn hôm nay</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num yellow" id="todayEarning">0đ</div>
+      <div class="stat-label">Thu nhập</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num green" id="totalOrders">0</div>
+      <div class="stat-label">Tổng đơn</div>
+    </div>
+  </div>
+
+  <!-- ORDER REQUEST POPUP -->
+  <div class="order-request" id="orderRequest">
+    <div class="or-header">
+      <div class="or-icon">🛵</div>
+      <div>
+        <div class="or-title">Có đơn hàng mới!</div>
+        <div class="or-sub" id="orModule">Đồ ăn · Hà Nội</div>
+      </div>
+    </div>
+    <div class="or-detail">
+      <div class="or-row"><span class="or-key">Địa chỉ</span><span class="or-val" id="orAddr">–</span></div>
+      <div class="or-row"><span class="or-key">Quãng đường</span><span class="or-val" id="orDist">~2.5km</span></div>
+      <div class="or-row"><span class="or-key">Thu nhập</span><span class="or-val" style="color:#FFD84D" id="orEarn">–</span></div>
+    </div>
+    <div class="or-timer" id="orTimer">30</div>
+    <div class="or-btns">
+      <button class="btn-accept" onclick="acceptOrder()">✅ Nhận đơn</button>
+      <button class="btn-reject" onclick="rejectOrder()">❌ Từ chối</button>
+    </div>
+  </div>
+
+  <div class="scroll-area">
+
+    <!-- ACTIVE ORDER -->
+    <div id="activeOrderWrap" style="display:none">
+      <div class="sec-title">📍 Đơn đang giao</div>
+      <div class="active-order">
+        <div class="ao-head">
+          <div class="ao-head-row">
+            <div class="ao-title">Đơn hàng đang xử lý</div>
+            <div class="ao-id" id="activeOrderId">–</div>
+          </div>
+        </div>
+        <div class="ao-body">
+          <div class="ao-customer">
+            <div class="ao-avatar">👤</div>
+            <div>
+              <div class="ao-cname" id="activeCustomer">Khách hàng</div>
+              <div class="ao-addr" id="activeAddr">–</div>
+            </div>
+            <button class="ao-call">📞</button>
+          </div>
+
+          <!-- STATUS STEPS -->
+          <div class="status-steps" id="statusSteps"></div>
+
+          <button class="btn-next-status" id="btnNextStatus" onclick="advanceStatus()">
+            <span id="nextStatusLabel">Xác nhận nhận đơn</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="sec-title">📋 Lịch sử đơn hàng</div>
+    <div id="orderHistory">
+      <div class="loading-page"><div class="spinner"></div></div>
+    </div>
+
+  </div><!-- /scroll-area -->
+
+</div><!-- /appScreen -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// <!--
+// ════════
+//  STATE
+// ════════
+let shipperData = null;
+let loginPhone = '';
+let isOnline = false;
+let currentOrder = null;
+let orderTimer = null;
+let spLoginTimer = null;
+
+const STATUS_STEPS = ['confirmed','picked_up','delivering','delivered'];
+const STATUS_LABELS = {confirmed:'Nhận đơn',picked_up:'Đã lấy hàng',delivering:'Đang giao',delivered:'Đã giao'};
+const STATUS_ICONS = {confirmed:'✅',picked_up:'📦',delivering:'🛵',delivered:'🎉'};
+const NEXT_STATUS_BTN = {confirmed:'📦 Đã lấy hàng',picked_up:'🛵 Bắt đầu giao',delivering:'🎉 Đã giao thành công'};
+
+// ════════
+//  LOGIN
+// ════════
+function showPhase(n) {
+  document.getElementById('sp-lp1').style.display=n===1?'':'none';
+  document.getElementById('sp-lp2').style.display=n===2?'':'none';
+}
+
+async function spSendOtp() {
+  const phone = document.getElementById('spPhone').value.trim();
+  if(!/^0[0-9]{9}$/.test(phone)){document.getElementById('spPhoneErr').classList.add('show');return;}
+  document.getElementById('spPhoneErr').classList.remove('show');
+  loginPhone=phone;
+  const btn=document.getElementById('spBtnOtp');btn.disabled=true;
+  try{
+    const r=await fetch('/api/auth/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,type:'shipper_login'})});
+    const d=await r.json();
+    if(!d.success){ toast('❌ '+(d.message||'Không gửi được OTP')); btn.disabled=false; return; }
+  }catch(e){ toast('❌ Lỗi kết nối. Thử lại!'); btn.disabled=false; return; }
+  document.getElementById('spMask').textContent=phone.slice(0,3)+'****'+phone.slice(-3);
+  showPhase(2);
+  let s=60;const cd=document.getElementById('spCountdown');cd.style.display='block';
+  if(spLoginTimer)clearInterval(spLoginTimer);
+  spLoginTimer=setInterval(()=>{cd.textContent=`Gửi lại sau ${s}s`;s--;if(s<0){clearInterval(spLoginTimer);btn.disabled=false;cd.style.display='none';}},1000);
+}
+
+function otpNav(el,idx) {
+  el.value=el.value.replace(/\D/,'');
+  if(el.value){el.classList.add('filled');const nx=document.getElementById('sd'+(idx+1));if(nx)nx.focus();}
+  else el.classList.remove('filled');
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Backspace'){
+    const ids=['sd0','sd1','sd2','sd3','sd4','sd5'];
+    const idx=ids.indexOf(document.activeElement?.id);
+    if(idx>0&&!document.activeElement.value)document.getElementById(ids[idx-1]).focus();
+  }
+});
+
+async function spVerify() {
+  const code=[0,1,2,3,4,5].map(i=>document.getElementById('sd'+i).value).join('');
+  const errEl=document.getElementById('spOtpErr');
+  if(code.length!==6){errEl.style.display='block';return;}
+  errEl.style.display='none';
+  try {
+    // 1. Verify OTP
+    const vr=await fetch('/api/auth/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:loginPhone,otp:code,type:'shipper_login'})});
+    const vd=await vr.json();
+    if(!vd.success){ errEl.style.display='block'; errEl.textContent=vd.message||'Mã OTP không đúng. Thử lại!'; return; }
+    // 2. Create session + load shipper profile
+    const sr=await fetch('/api/shipper/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:loginPhone})});
+    const sd=await sr.json();
+    if(!sd.success){
+      if(sd.notRegistered){
+        errEl.style.display='block';
+        errEl.textContent='SĐT này chưa đăng ký shipper. Vui lòng đăng ký trước.';
+        errEl.innerHTML='SĐT này chưa đăng ký shipper.<br><a href="/register#shipper" style="color:#E8504A;font-weight:900">→ Đăng ký ngay</a>';
+        return;
+      }
+      errEl.style.display='block'; errEl.textContent=sd.message||'Lỗi đăng nhập'; return;
+    }
+    shipperData=sd.shipper;
+    onShipperLoggedIn();
+  } catch(e){
+    errEl.style.display='block';
+    errEl.textContent = 'Không thể kết nối server. Thử lại!';
+  }
+}
+
+// ════════════
+//  SHIPPER DATA
+// ════════════
+function onShipperLoggedIn() {
+  if (!shipperData) return;
+  // Kiểm tra trạng thái tài khoản
+  if (shipperData.status === 'pending' || shipperData.status === 'reviewing') {
+    showPendingScreen();
+    return;
+  }
+  if (shipperData.status === 'rejected') {
+    showRejectedScreen();
+    return;
+  }
+  // approved / active → vào app
+  updateShipperUI();
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('appScreen').classList.add('active');
+  loadOrderHistory();
+  initSocket();
+}
+
+function updateShipperUI() {
+  if (!shipperData) return;
+  document.getElementById('spName').textContent = shipperData.fullName || (shipperData.firstName||'Shipper') + ' ' + (shipperData.lastName||'');
+  document.getElementById('spRegId').textContent = shipperData.registerId || 'CRB-S-XXXXXX';
+}
+
+function showPendingScreen() {
+  document.getElementById('loginScreen').innerHTML = `
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:#0f0f1a;color:#fff;text-align:center">
+      <div style="font-size:3rem;margin-bottom:16px">⏳</div>
+      <div style="font-size:1.3rem;font-weight:900;color:#FFD84D;margin-bottom:10px">Hồ sơ đang được duyệt</div>
+      <div style="color:#aaa;line-height:1.6;margin-bottom:24px">Chúng mình đang xem xét hồ sơ của bạn.<br>Thường mất 1–2 ngày làm việc.<br>Bạn sẽ nhận SMS khi được duyệt.</div>
+      <div style="background:#1a1a2e;border-radius:16px;padding:18px;width:100%;max-width:320px;text-align:left">
+        <div style="font-size:.8rem;color:#888;margin-bottom:4px">SĐT đăng ký</div>
+        <div style="font-weight:900;color:#fff">${loginPhone}</div>
+        <div style="font-size:.8rem;color:#888;margin-top:10px;margin-bottom:4px">Mã hồ sơ</div>
+        <div style="font-weight:900;color:#FFD84D">${shipperData.registerId||'Đang cấp'}</div>
+      </div>
+      <button onclick="location.reload()" style="margin-top:24px;background:#E8504A;color:#fff;border:none;border-radius:50px;padding:14px 32px;font-weight:900;font-size:1rem;cursor:pointer">Kiểm tra lại</button>
+    </div>`;
+}
+
+function showRejectedScreen() {
+  document.getElementById('loginScreen').innerHTML = `
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:#0f0f1a;color:#fff;text-align:center">
+      <div style="font-size:3rem;margin-bottom:16px">❌</div>
+      <div style="font-size:1.3rem;font-weight:900;color:#E8504A;margin-bottom:10px">Hồ sơ không được duyệt</div>
+      <div style="color:#aaa;line-height:1.6;margin-bottom:24px">Hồ sơ của bạn chưa đáp ứng yêu cầu.<br>Vui lòng liên hệ CRABOR để được hỗ trợ.</div>
+      <a href="tel:1900xxxx" style="background:#E8504A;color:#fff;text-decoration:none;border-radius:50px;padding:14px 32px;font-weight:900;font-size:1rem">📞 Liên hệ hỗ trợ</a>
+    </div>`;
+}
+
+// ════════════
+//  ONLINE TOGGLE
+// ════════════
+function toggleOnline() {
+  isOnline=!isOnline;
+  const btn=document.getElementById('toggleBtn');
+  btn.classList.toggle('online',isOnline);
+  document.getElementById('toggleLabel').textContent=isOnline?'Online':'Offline';
+  toast(isOnline?'🟢 Bạn đang online – sẵn sàng nhận đơn!':'⚫ Bạn đã offline');
+  // Thông báo server trạng thái online
+  if (socket) socket.emit('shipperStatus', { shipperId: shipperData?._id, online: isOnline });
+  
+}
+
+function showOrderRequest(order) {
+  currentOrder=order;
+  const mod={food:'🍜 Đồ ăn',laundry:'👕 Giặt là',cleaning:'🧹 Dọn nhà'}[order.module]||order.module;
+  document.getElementById('orModule').textContent=mod+' · Hà Nội';
+  document.getElementById('orAddr').textContent=order.address;
+  document.getElementById('orEarn').textContent=fmt(Math.round(order.shipFee*0.85));
+  let t=30;
+  const el=document.getElementById('orTimer');
+  el.textContent=t;el.className='or-timer';
+  document.getElementById('orderRequest').classList.add('show');
+  if(orderTimer)clearInterval(orderTimer);
+  orderTimer=setInterval(()=>{
+    t--;el.textContent=t;
+    if(t<=10)el.className='or-timer warn';
+    if(t<=0){clearInterval(orderTimer);rejectOrder();}
+  },1000);
+}
+
+async function acceptOrder() {
+  clearInterval(orderTimer);
+  document.getElementById('orderRequest').classList.remove('show');
+  toast('✅ Đã nhận đơn! Đến lấy hàng ngay');
+  currentOrder = {...currentOrder, status:'confirmed'};
+  // Cập nhật server
+  if (currentOrder?._id) {
+    try {
+      await fetch('/api/orders/' + currentOrder._id + '/status', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ status: 'accepted', shipperId: shipperData?._id })
+      });
+    } catch(e) {}
+  }
+  if (socket) socket.emit('shipperAcceptOrder', { orderId: currentOrder._id, shipperId: shipperData?._id });
+  renderActiveOrder();
+  document.getElementById('activeOrderWrap').style.display='block';
+  // Update stats
+  const cur=parseInt(document.getElementById('todayOrders').textContent)||0;
+  document.getElementById('todayOrders').textContent=cur+1;
+}
+
+function rejectOrder() {
+  clearInterval(orderTimer);
+  document.getElementById('orderRequest').classList.remove('show');
+  currentOrder=null;
+  toast('Đã từ chối đơn');
+  // Shipper sẽ nhận đơn mới qua Socket.io
+}
+
+// ════════════
+//  ACTIVE ORDER
+// ════════════
+function renderActiveOrder() {
+  if(!currentOrder) return;
+  document.getElementById('activeOrderId').textContent=currentOrder.orderId||'–';
+  document.getElementById('activeCustomer').textContent='Khách hàng';
+  document.getElementById('activeAddr').textContent=currentOrder.address||'–';
+  renderStatusSteps();
+}
+
+function renderStatusSteps() {
+  if(!currentOrder) return;
+  const cur=STATUS_STEPS.indexOf(currentOrder.status);
+  let html='';
+  STATUS_STEPS.forEach((s,i)=>{
+    const cls=i<cur?'done':i===cur?'active':'';
+    html+=`<div class="step-item"><div class="step-dot ${cls}">${STATUS_ICONS[s]}</div><div class="step-lbl ${cls}">${STATUS_LABELS[s]}</div></div>`;
+    if(i<STATUS_STEPS.length-1)html+=`<div class="step-line ${i<cur?'done':''}"></div>`;
+  });
+  document.getElementById('statusSteps').innerHTML=html;
+  const cur2=STATUS_STEPS.indexOf(currentOrder.status);
+  const nextBtn=document.getElementById('btnNextStatus');
+  if(cur2>=STATUS_STEPS.length-1){
+    nextBtn.style.display='none';
+    // Order complete
+    setTimeout(()=>{
+      document.getElementById('activeOrderWrap').style.display='none';
+      const earn=Math.round((currentOrder.shipFee||15000)*0.85);
+      const cur3=parseInt(document.getElementById('todayEarning').textContent.replace(/\D/g,''))||0;
+      document.getElementById('todayEarning').textContent=fmt(cur3+earn);
+      const tc=parseInt(document.getElementById('totalOrders').textContent)||0;
+      document.getElementById('totalOrders').textContent=tc+1;
+      currentOrder=null;
+      toast('🎉 Hoàn thành! Thu nhập +'+fmt(earn));
+      loadOrderHistory();
+      // Shipper sẽ nhận đơn mới qua Socket.io
+    },1500);
+  } else {
+    nextBtn.style.display='block';
+    document.getElementById('nextStatusLabel').textContent=NEXT_STATUS_BTN[currentOrder.status]||'Tiếp tục';
+  }
+}
+
+async function advanceStatus() {
+  if(!currentOrder) return;
+  const cur=STATUS_STEPS.indexOf(currentOrder.status);
+  if(cur>=STATUS_STEPS.length-1) return;
+  const nextStatus=STATUS_STEPS[cur+1];
+  try{
+    await fetch(`/api/orders/${currentOrder._id}/status`,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({status:nextStatus,by:'shipper'})
+    });
+  }catch(e){}
+  currentOrder.status=nextStatus;
+  renderStatusSteps();
+  toast('✅ Cập nhật: '+STATUS_LABELS[nextStatus]);
+}
+
+// ════════════
+//  HISTORY
+// ════════════
+async function loadOrderHistory() {
+  try{
+    const r=await fetch('/api/orders?status=delivered&shipperId=me');
+    const d=await r.json();
+    renderHistory(d.orders||[]);
+  }catch(e){renderHistory([]);}
+}
+
+function renderHistory(orders) {
+  if(orders.length===0){
+    document.getElementById('orderHistory').innerHTML='<div class="empty-state"><div class="ei">📋</div><p>Chưa có đơn hoàn thành</p></div>';
+    return;
+  }
+  document.getElementById('orderHistory').innerHTML=orders.map(o=>`
+    <div class="hist-card">
+      <div class="hc-row">
+        <div class="hc-id">${o.orderId}</div>
+        <div class="hc-earn">+${fmt(Math.round((o.shipFee||15000)*0.85))}</div>
+      </div>
+      <div class="hc-addr">📍 ${o.address||'–'}</div>
+      <div class="hc-row">
+        <div class="hc-time">${timeAgo(o.deliveredAt||o.createdAt)}</div>
+        <div class="hc-badge">✅ Hoàn thành</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function fmt(n){if(!n)return'0đ';return n.toLocaleString('vi-VN')+'đ';}
+function timeAgo(date){if(!date)return'';const d=new Date(date),now=new Date(),diff=Math.floor((now-d)/60000);if(diff<1)return'Vừa xong';if(diff<60)return diff+'p trước';if(diff<1440)return Math.floor(diff/60)+'h trước';return Math.floor(diff/1440)+'ngày trước';}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+
+let socket = null;
+
+function initSocket() {
+  socket = io();
+  socket.on('connect', () => console.log('Socket connected'));
+  
+  // Nhận đơn mới từ server
+  socket.on('newOrderForShipper', (order) => {
+    if (!isOnline || currentOrder) return;
+    showOrderRequest(order);
+  });
+  
+  socket.on('orderCancelled', (data) => {
+    if (currentOrder && currentOrder._id === data.orderId) {
+      clearInterval(orderTimer);
+      document.getElementById('orderRequest').classList.remove('show');
+      document.getElementById('activeOrderWrap').style.display = 'none';
+      currentOrder = null;
+      toast('⚠️ Đơn hàng đã bị huỷ bởi khách');
+    }
+  });
+
+  // Join room của shipper
+  if (shipperData?._id) {
+    socket.emit('join', { room: 'shipper_' + shipperData._id });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const r = await fetch('/api/auth/me');
+    const d = await r.json();
+    if (d.role === 'shipper' && d.shipper) {
+      loginPhone = d.shipper.phone || '';
+      shipperData = d.shipper;
+      onShipperLoggedIn();
+    }
+  } catch(e) {}
+});
+// -->
+</script>
+</body>
+</html>
