@@ -1281,7 +1281,7 @@ function renderDistrictFilter() {
   const el = document.getElementById('districtScroll');
   if(!el) return;
   el.innerHTML = DISTRICTS.map(d=>
-    `<div class="district-chip ${d===activeDistrict?'active':''}" onclick="filterDistrict('${d}')">${d}</div>`
+    `<div class="district-chip ${d===activeDistrict?'active':''}" onclick="filterDistrict('${d}')">${d}<\/div>`
   ).join('');
 }
 
@@ -1301,7 +1301,7 @@ function renderRestaurants() {
     if (cnt) cnt.textContent = `${cards.length} nhà hàng`;
   }, 80);
   if(restaurants.length===0) {
-    el.innerHTML='<div class="empty-state"><div class="ei">🍜</div><p>Chưa có quán nào trong khu vực này</p></div>';
+    el.innerHTML='<div class="empty-state"><div class="ei">🍜<\/div><p>Chưa có quán nào trong khu vực này<\/p><\/div>';
     return;
   }
   el.innerHTML = restaurants.map(r=>{
@@ -1309,19 +1309,19 @@ function renderRestaurants() {
     const cats = (r.categories||[]).join(' · ') || r.emoji || '🍽️';
     return `<div class="rest-card" onclick="openRestaurant('${r._id}')">
       <div class="rest-cover">
-        ${r.coverImage ? `<img class="rest-cover-img" src="${r.coverImage}">` : `<span style="position:relative;z-index:1">${r.emoji||'🍜'}</span>`}
-        <div class="rest-status-badge ${isOpen?'':'closed'}">${isOpen?'🟢 Đang mở':'⚫ Đóng cửa'}</div>
-      </div>
+        ${r.coverImage ? `<img class="rest-cover-img" src="${r.coverImage}">` : `<span style="position:relative;z-index:1">${r.emoji||'🍜'}<\/span>`}
+        <div class="rest-status-badge ${isOpen?'':'closed'}">${isOpen?'🟢 Đang mở':'⚫ Đóng cửa'}<\/div>
+      <\/div>
       <div class="rest-body">
-        <div class="rest-name">${r.bizName}</div>
-        <div class="rest-cats">${cats}</div>
+        <div class="rest-name">${r.bizName}<\/div>
+        <div class="rest-cats">${cats}<\/div>
         <div class="rest-meta">
-          <div class="rest-rating">⭐ ${(r.rating||4.5).toFixed(1)}</div>
-          <div class="rest-orders">🔥 ${(r.totalOrders||0).toLocaleString('vi-VN')} đơn</div>
-          <div class="rest-dist">📍 ${r.district||'Hà Nội'}</div>
-        </div>
-      </div>
-    </div>`;
+          <div class="rest-rating">⭐ ${(r.rating||4.5).toFixed(1)}<\/div>
+          <div class="rest-orders">🔥 ${(r.totalOrders||0).toLocaleString('vi-VN')} đơn<\/div>
+          <div class="rest-dist">📍 ${r.district||'Hà Nội'}<\/div>
+        <\/div>
+      <\/div>
+    <\/div>`;
   }).join('');
 }
 
@@ -1343,13 +1343,13 @@ async function openRestaurant(id) {
   // Render info card
   const r = currentRestaurant;
   document.getElementById('restInfoCard').innerHTML = `
-    <div class="ric-name">${r.bizName}</div>
-    <div class="ric-cats">${(r.categories||[]).join(' · ')}</div>
+    <div class="ric-name">${r.bizName}<\/div>
+    <div class="ric-cats">${(r.categories||[]).join(' · ')}<\/div>
     <div class="ric-row">
-      <div class="ric-stat">⭐ <span>${(r.rating||4.5).toFixed(1)}</span></div>
-      <div class="ric-stat">🔥 <span>${(r.totalOrders||0).toLocaleString('vi-VN')}</span> đơn</div>
-      <div class="ric-stat">🕐 <span>${r.openTime||'–'}–${r.closeTime||'–'}</span></div>
-    </div>`;
+      <div class="ric-stat">⭐ <span>${(r.rating||4.5).toFixed(1)}<\/span><\/div>
+      <div class="ric-stat">🔥 <span>${(r.totalOrders||0).toLocaleString('vi-VN')}<\/span> đơn<\/div>
+      <div class="ric-stat">🕐 <span>${r.openTime||'–'}–${r.closeTime||'–'}<\/span><\/div>
+    <\/div>`;
   // Load menu
   await loadMenuForRestaurant(id);
 }
@@ -1363,7 +1363,7 @@ function backToRestaurants() {
 }
 
 async function loadMenuForRestaurant(id) {
-  document.getElementById('productList').innerHTML='<div class="loading-page"><div class="spinner"></div></div>';
+  document.getElementById('productList').innerHTML='<div class="loading-page"><div class="spinner"><\/div><\/div>';
   try {
     const r = await fetch(`/api/food-partners/${id}/products`);
     const d = await r.json();
@@ -1380,7 +1380,7 @@ function renderMenuCategories() {
   const el = document.getElementById('catScroll');
   if(!el) return;
   el.innerHTML = cats.map(c=>
-    `<div class="cat-chip ${c===activeCat?'active':''}" onclick="filterCat('${c}')">${c}</div>`
+    `<div class="cat-chip ${c===activeCat?'active':''}" onclick="filterCat('${c}')">${c}<\/div>`
   ).join('');
 }
 
@@ -1393,22 +1393,22 @@ function filterCat(cat) {
 function renderProducts() {
   const list = activeCat==='Tất cả' ? products : products.filter(p=>p.category===activeCat);
   if(list.length===0){
-    document.getElementById('productList').innerHTML='<div class="empty-state"><div class="ei">🍽️</div><p>Không có món trong danh mục này</p></div>';
+    document.getElementById('productList').innerHTML='<div class="empty-state"><div class="ei">🍽️<\/div><p>Không có món trong danh mục này<\/p><\/div>';
     return;
   }
   document.getElementById('productList').innerHTML = list.map(p=>`
     <div class="product-card">
-      <div class="prod-img">${p.emoji||'🍽️'}</div>
+      <div class="prod-img">${p.emoji||'🍽️'}<\/div>
       <div class="prod-info">
-        <div class="prod-name">${p.name}</div>
-        <div class="prod-desc">${p.description||''}</div>
+        <div class="prod-name">${p.name}<\/div>
+        <div class="prod-desc">${p.description||''}<\/div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="prod-price">${fmtPrice(p.price)}</div>
-          <div class="prod-sold">🔥 ${p.sold||0} đã bán</div>
-        </div>
-      </div>
-      <button class="prod-add" onclick="addToCart('${p._id}','${p.name.replace(/'/g,"\'")}',${p.price},'${p.emoji||'🍽️'}')">+</button>
-    </div>
+          <div class="prod-price">${fmtPrice(p.price)}<\/div>
+          <div class="prod-sold">🔥 ${p.sold||0} đã bán<\/div>
+        <\/div>
+      <\/div>
+      <button class="prod-add" onclick="addToCart('${p._id}','${p.name.replace(/'/g,"\'")}',${p.price},'${p.emoji||'🍽️'}')">+<\/button>
+    <\/div>
   `).join('');
 }
 
@@ -1445,18 +1445,18 @@ function closeCart(e) {
 }
 
 function renderCartItems() {
-  if(cart.length===0){document.getElementById('cartItemsHtml').innerHTML='<div style="text-align:center;padding:20px;color:#bbb;font-weight:700">Giỏ hàng trống</div>';return;}
+  if(cart.length===0){document.getElementById('cartItemsHtml').innerHTML='<div style="text-align:center;padding:20px;color:#bbb;font-weight:700">Giỏ hàng trống<\/div>';return;}
   document.getElementById('cartItemsHtml').innerHTML = cart.map(i=>`
     <div class="cart-item">
-      <div class="ci-icon">${i.emoji}</div>
-      <div class="ci-name">${i.name}</div>
+      <div class="ci-icon">${i.emoji}<\/div>
+      <div class="ci-name">${i.name}<\/div>
       <div class="ci-qty-row">
-        <button class="qty-btn" onclick="changeQty('${i.id}',-1)">−</button>
-        <span style="font-family:'Fredoka One',cursive;font-size:1.1rem">${i.qty}</span>
-        <button class="qty-btn" onclick="changeQty('${i.id}',1)">+</button>
-      </div>
-      <div class="ci-price">${fmtPrice(i.price*i.qty)}</div>
-    </div>
+        <button class="qty-btn" onclick="changeQty('${i.id}',-1)">−<\/button>
+        <span style="font-family:'Fredoka One',cursive;font-size:1.1rem">${i.qty}<\/span>
+        <button class="qty-btn" onclick="changeQty('${i.id}',1)">+<\/button>
+      <\/div>
+      <div class="ci-price">${fmtPrice(i.price*i.qty)}<\/div>
+    <\/div>
   `).join('');
 }
 
@@ -1504,7 +1504,7 @@ const STATUS_VN = {pending:'Đang chờ',confirmed:'Đã xác nhận',preparing:
 const MODULE_VN = {food:'🍜 Đồ ăn',laundry:'👕 Giặt là',cleaning:'🧹 Dọn nhà',china_shop:'🛍️ China Shop'};
 
 async function loadOrders() {
-  document.getElementById('ordersList').innerHTML='<div class="loading-page"><div class="spinner"></div></div>';
+  document.getElementById('ordersList').innerHTML='<div class="loading-page"><div class="spinner"><\/div><\/div>';
   try {
     const r = await fetch('/api/orders');
     const d = await r.json();
@@ -1541,20 +1541,20 @@ function loadFeaturedProducts() {
 function renderFeaturedProducts(prods, el) {
   el.innerHTML = prods.map(p => `
     <div class="feat-prod-card" onclick="openModule('food')">
-      <div class="feat-prod-img">${p.emoji||p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:p.emoji||'🍽️'}</div>
+      <div class="feat-prod-img">${p.emoji||p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:p.emoji||'🍽️'}<\/div>
       <div class="feat-prod-info">
-        <div class="feat-prod-name">${p.name}</div>
-        <div class="feat-prod-rest">📍 ${p.rest||p.restaurant||'CRABOR Food'}</div>
+        <div class="feat-prod-name">${p.name}<\/div>
+        <div class="feat-prod-rest">📍 ${p.rest||p.restaurant||'CRABOR Food'}<\/div>
         <div class="feat-prod-row">
           <div style="display:flex;align-items:center;gap:6px">
-            ${p.oldPrice?`<span class="feat-prod-old">${p.oldPrice.toLocaleString('vi-VN')}đ</span>`:''}
-            <span class="feat-prod-price">${(p.price).toLocaleString('vi-VN')}đ</span>
-            ${p.badge?`<span class="feat-prod-badge">${p.badge}</span>`:''}
-          </div>
-          <button class="feat-prod-add" onclick="event.stopPropagation();addToCart('${p.id||p._id}','${p.name.replace(/'/g,"\'")}',${p.price},'${p.emoji||'🍽️'}')">+</button>
-        </div>
-      </div>
-    </div>
+            ${p.oldPrice?`<span class="feat-prod-old">${p.oldPrice.toLocaleString('vi-VN')}đ<\/span>`:''}
+            <span class="feat-prod-price">${(p.price).toLocaleString('vi-VN')}đ<\/span>
+            ${p.badge?`<span class="feat-prod-badge">${p.badge}<\/span>`:''}
+          <\/div>
+          <button class="feat-prod-add" onclick="event.stopPropagation();addToCart('${p.id||p._id}','${p.name.replace(/'/g,"\'")}',${p.price},'${p.emoji||'🍽️'}')">+<\/button>
+        <\/div>
+      <\/div>
+    <\/div>
   `).join('');
 }
 
@@ -1564,14 +1564,14 @@ async function loadRecentOrders() {
     const d = await r.json();
     const orders = (d.orders||[]).slice(0,3);
     if(orders.length===0){
-      document.getElementById('recentOrders').innerHTML='<div class="empty-state"><div class="ei">🦀</div><p>Chưa có đơn hàng nào<br>Hãy đặt món đầu tiên!</p></div>';
+      document.getElementById('recentOrders').innerHTML='<div class="empty-state"><div class="ei">🦀<\/div><p>Chưa có đơn hàng nào<br>Hãy đặt món đầu tiên!<\/p><\/div>';
     } else renderOrdersIn('recentOrders',orders);
   } catch(e){document.getElementById('recentOrders').innerHTML='';}
 }
 
 function renderOrders(orders) {
   if(orders.length===0){
-    document.getElementById('ordersList').innerHTML='<div class="empty-state"><div class="ei">📦</div><p>Chưa có đơn hàng nào</p></div>';
+    document.getElementById('ordersList').innerHTML='<div class="empty-state"><div class="ei">📦<\/div><p>Chưa có đơn hàng nào<\/p><\/div>';
     return;
   }
   renderOrdersIn('ordersList',orders);
@@ -1582,17 +1582,17 @@ function renderOrdersIn(containerId, orders) {
     <div class="order-card">
       <div class="oc-top">
         <div>
-          <div class="oc-id">${o.orderId}</div>
-          <div class="oc-module">${MODULE_VN[o.module]||o.module}</div>
-        </div>
-        <div class="oc-status-badge s-${o.status}">${STATUS_VN[o.status]||o.status}</div>
-      </div>
-      <div class="oc-items">${(o.items||[]).map(i=>i.name).join(', ')||'–'}</div>
+          <div class="oc-id">${o.orderId}<\/div>
+          <div class="oc-module">${MODULE_VN[o.module]||o.module}<\/div>
+        <\/div>
+        <div class="oc-status-badge s-${o.status}">${STATUS_VN[o.status]||o.status}<\/div>
+      <\/div>
+      <div class="oc-items">${(o.items||[]).map(i=>i.name).join(', ')||'–'}<\/div>
       <div class="oc-bottom">
-        <div class="oc-total">${fmtPrice(o.finalTotal||o.total)}</div>
-        <div class="oc-time">${timeAgo(o.createdAt)}</div>
-      </div>
-    </div>
+        <div class="oc-total">${fmtPrice(o.finalTotal||o.total)}<\/div>
+        <div class="oc-time">${timeAgo(o.createdAt)}<\/div>
+      <\/div>
+    <\/div>
   `).join('');
 }
 
@@ -1663,17 +1663,17 @@ function handleSearch(q) {
       results.push({ type:'cat', icon:catIcons[c]||'🍽️', name:c, sub:'Danh mục', cat:c });
     });
     if(results.length === 0) {
-      dd.innerHTML = '<div style="padding:16px;text-align:center;color:#bbb;font-weight:700;font-size:.85rem">Không tìm thấy kết quả</div>';
+      dd.innerHTML = '<div style="padding:16px;text-align:center;color:#bbb;font-weight:700;font-size:.85rem">Không tìm thấy kết quả<\/div>';
     } else {
       dd.innerHTML = results.slice(0,7).map(r => `
         <div class="sd-item" onclick="selectSearchResult(${JSON.stringify(r).replace(/"/g,'&quot;')})">
-          <div class="sd-icon">${r.icon}</div>
+          <div class="sd-icon">${r.icon}<\/div>
           <div style="flex:1;min-width:0">
-            <div class="sd-name">${r.name}</div>
-            <div class="sd-sub">${r.sub}</div>
-          </div>
-          <div class="sd-type">${r.type==='rest'?'Nhà hàng':r.type==='food'?'Món ăn':'Danh mục'}</div>
-        </div>
+            <div class="sd-name">${r.name}<\/div>
+            <div class="sd-sub">${r.sub}<\/div>
+          <\/div>
+          <div class="sd-type">${r.type==='rest'?'Nhà hàng':r.type==='food'?'Món ăn':'Danh mục'}<\/div>
+        <\/div>
       `).join('');
     }
     dd.classList.add('show');
@@ -1715,18 +1715,18 @@ function openFoodCat(category) {
         const isOpen = isRestOpen(r);
         return `<div class="rest-card" onclick="openRestaurant('${r._id}')">
           <div class="rest-cover">
-            ${r.coverImage ? `<img class="rest-cover-img" src="${r.coverImage}">` : `<span style="position:relative;z-index:1">${r.emoji||'🍜'}</span>`}
-            <div class="rest-status-badge ${isOpen?'':'closed'}">${isOpen?'🟢 Đang mở':'⚫ Đóng cửa'}</div>
-          </div>
+            ${r.coverImage ? `<img class="rest-cover-img" src="${r.coverImage}">` : `<span style="position:relative;z-index:1">${r.emoji||'🍜'}<\/span>`}
+            <div class="rest-status-badge ${isOpen?'':'closed'}">${isOpen?'🟢 Đang mở':'⚫ Đóng cửa'}<\/div>
+          <\/div>
           <div class="rest-body">
-            <div class="rest-name">${r.bizName}</div>
-            <div class="rest-cats">${(r.categories||[]).join(' · ')}</div>
+            <div class="rest-name">${r.bizName}<\/div>
+            <div class="rest-cats">${(r.categories||[]).join(' · ')}<\/div>
             <div class="rest-meta">
-              <div class="rest-rating">⭐ ${(r.rating||4.5).toFixed(1)}</div>
-              <div class="rest-orders">🔥 ${(r.totalOrders||0).toLocaleString('vi-VN')} đơn</div>
-            </div>
-          </div>
-        </div>`;
+              <div class="rest-rating">⭐ ${(r.rating||4.5).toFixed(1)}<\/div>
+              <div class="rest-orders">🔥 ${(r.totalOrders||0).toLocaleString('vi-VN')} đơn<\/div>
+            <\/div>
+          <\/div>
+        <\/div>`;
       }).join('');
     } else {
       toast('🔍 Hiển thị tất cả quán cho: '+category);
@@ -1748,7 +1748,7 @@ function filterOrders(status, btn) {
 // Override loadOrders to save allOrders
 const _origLoadOrders = loadOrders;
 async function loadOrders() {
-  document.getElementById('ordersList').innerHTML='<div class="loading-page"><div class="spinner"></div></div>';
+  document.getElementById('ordersList').innerHTML='<div class="loading-page"><div class="spinner"><\/div><\/div>';
   try {
     const r = await fetch('/api/orders');
     const d = await r.json();
