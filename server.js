@@ -1,22 +1,3 @@
-/**
-
-- ==========================================================
-- CRABOR TECH CO., LTD – Unified Server
-- Super App: Food Delivery, Laundry, Cleaning, China Shop, Ride
-- 
-- DB:  MongoDB Atlas - cluster0.fs703g5.mongodb.net/crabor
-- Port: 3001 (default)
-- 
-- ENV required (.env):
-- ```
-  MONGODB_URI, SESSION_SECRET, ADMIN_SECRET_KEY,
-  ```
-- ```
-  TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SID
-  ```
-- ==========================================================
-  */
-
 ‘use strict’;
 require(‘dotenv’).config();
 
