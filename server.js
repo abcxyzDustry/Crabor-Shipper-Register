@@ -31,29 +31,29 @@ const path       = require(‘path’);
 const crypto     = require(‘crypto’);
 const axios      = require(‘axios’);
 
-// ── App & Socket bootstrap ──
+// App & Socket bootstrap ──
 const app    = express();
 const server = http.createServer(app);
 const io     = socketIo(server, {
 cors: { origin: ‘*’, methods: [‘GET’, ‘POST’] }
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  1. MONGODB CONNECTION
-// ══════════════════════════════════════
+// ==========================================
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
-console.error(‘❌ Thiếu MONGODB_URI trong .env’);
+console.error(’[ERR] Thiếu MONGODB_URI trong .env’);
 process.exit(1);
 }
 
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-.then(() => console.log(‘✅ MongoDB Atlas connected — DB: crabor’))
-.catch(err => { console.error(‘❌ MongoDB error:’, err.message); process.exit(1); });
+.then(() => console.log(’[OK] MongoDB Atlas connected — DB: crabor’))
+.catch(err => { console.error(’[ERR] MongoDB error:’, err.message); process.exit(1); });
 
-// ══════════════════════════════════════
+// ==========================================
 //  2. MIDDLEWARE
-// ══════════════════════════════════════
+// ==========================================
 app.use(cors({ origin: ‘*’, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -76,9 +76,9 @@ app.use(express.static(path.join(__dirname, ‘public’)));
 // Đưa io vào req để dùng trong route handlers
 app.use((req, res, next) => { req.io = io; next(); });
 
-// ══════════════════════════════════════
+// ==========================================
 //  3. SOCKET.IO — REAL-TIME
-// ══════════════════════════════════════
+// ==========================================
 io.on(‘connection’, (socket) => {
 console.log(‘🔌 Client connected:’, socket.id);
 
@@ -112,13 +112,13 @@ console.log(‘🔌 Client disconnected:’, socket.id);
 });
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  4. SCHEMAS & MODELS
-// ══════════════════════════════════════
+// ==========================================
 
-// ── OTP — Twilio Verify quản lý, không lưu DB ──────
+// OTP — Twilio Verify quản lý, không lưu DB ──────
 
-// ── USER (khách hàng app) ──────────────
+// USER (khách hàng app) ──────────────
 const userSchema = new mongoose.Schema({
 phone:       { type: String, required: true, unique: true },
 fullName:    String,
@@ -137,7 +137,7 @@ lastLogin:   Date,
 });
 const User = mongoose.model(‘User’, userSchema);
 
-// ── PRODUCT (menu đồ ăn) ─────────────
+// PRODUCT (menu đồ ăn) ─────────────
 const productSchema = new mongoose.Schema({
 name:        { type: String, required: true },
 description: String,
@@ -152,7 +152,7 @@ createdAt:   { type: Date, default: Date.now },
 });
 const Product = mongoose.model(‘Product’, productSchema);
 
-// ── ORDER (đơn đa module) ─────────────
+// ORDER (đơn đa module) ─────────────
 const orderSchema = new mongoose.Schema({
 orderId:     { type: String, unique: true },
 module:      { type: String, enum: [‘food’, ‘laundry’, ‘cleaning’, ‘china_shop’, ‘ride’], required: true },
@@ -190,7 +190,7 @@ next();
 });
 const Order = mongoose.model(‘Order’, orderSchema);
 
-// ── SHIPPER ───────────────────────────
+// SHIPPER ───────────────────────────
 const shipperSchema = new mongoose.Schema({
 registerId:  { type: String, unique: true },
 phone:       { type: String, required: true, unique: true },
@@ -225,7 +225,7 @@ next();
 });
 const Shipper = mongoose.model(‘Shipper’, shipperSchema);
 
-// ── PARTNER BASE FIELDS ───────────────
+// PARTNER BASE FIELDS ───────────────
 const partnerBase = {
 registerId:   { type: String, unique: true },
 phone:        { type: String, required: true, unique: true },
@@ -319,7 +319,7 @@ name:      String,
 lastLogin: Date,
 createdAt: { type: Date, default: Date.now },
 });
-// ── FOOD PARTNER (nhà hàng / quán ăn) ──
+// FOOD PARTNER (nhà hàng / quán ăn) ──
 const foodPartnerSchema = new mongoose.Schema({
 registerId:   { type: String, unique: true },
 phone:        { type: String, required: true, unique: true },
@@ -348,7 +348,7 @@ next();
 });
 const FoodPartner = mongoose.model(‘FoodPartner’, foodPartnerSchema, ‘food_partners’);
 
-// ── RIDE DRIVER (tài xế công nghệ) ──
+// RIDE DRIVER (tài xế công nghệ) ──
 const rideDriverSchema = new mongoose.Schema({
 registerId:   { type: String, unique: true },
 phone:        { type: String, required: true, unique: true },
@@ -378,9 +378,9 @@ const RideDriver = mongoose.model(‘RideDriver’, rideDriverSchema, ‘ride_dr
 
 const Admin = mongoose.model(‘Admin’, adminSchema);
 
-// ══════════════════════════════════════
+// ==========================================
 //  5. HELPERS
-// ══════════════════════════════════════
+// ==========================================
 
 function getPartnerModel(mod) {
 const slug = {
@@ -406,9 +406,9 @@ _rlMap.set(key, rec);
 return rec.count <= max;
 }
 
-// ══════════════════════════════════════
+// ==========================================
 //  TWILIO HELPERS
-// ══════════════════════════════════════
+// ==========================================
 
 // Chuyển SĐT VN sang E.164: 0912345678 → +84912345678
 function toE164(phone) {
@@ -428,7 +428,7 @@ const TWILIO_FROM    = process.env.TWILIO_PHONE_FROM; // cho SMS thông báo
 async function twilioSendOtp(phone) {
 const to = toE164(phone);
 if (!TWILIO_SID || TWILIO_SID === ‘your_twilio_sid’) {
-console.log(`📱 [DEV-OTP] ${to}: <sẽ gửi qua Twilio Verify>`);
+console.log(` [DEV-OTP] ${to}: <sẽ gửi qua Twilio Verify>`);
 return { success: true, dev: true };
 }
 const url = `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY}/Verifications`;
@@ -467,7 +467,7 @@ return false;
 async function sendSms(phone, message) {
 const to = toE164(phone);
 if (!TWILIO_SID || TWILIO_SID === ‘your_twilio_sid’ || !TWILIO_FROM) {
-console.log(`📱 [DEV-SMS] ${to}: ${message}`);
+console.log(` [DEV-SMS] ${to}: ${message}`);
 return true;
 }
 const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`;
@@ -479,9 +479,9 @@ new URLSearchParams({ To: to, From: TWILIO_FROM, Body: message }).toString(),
 return true;
 }
 
-// ══════════════════════════════════════
+// ==========================================
 //  6. ROUTES: HTML PAGES
-// ══════════════════════════════════════
+// ==========================================
 
 // Landing (root) — Màn hình chọn vai trò
 app.get(’/’, (req, res) => res.sendFile(path.join(__dirname, ‘public’, ‘index.html’)));
@@ -498,9 +498,9 @@ app.get(’/register’, (req, res) => res.sendFile(path.join(__dirname, ‘publ
 app.get(’/shipper/register’, (req, res) => res.redirect(’/register’));
 app.get(’/partner/register’, (req, res) => res.redirect(’/register’));
 
-// ══════════════════════════════════════
+// ==========================================
 //  7. API: OTP (dùng chung toàn bộ)
-// ══════════════════════════════════════
+// ==========================================
 
 // POST /api/auth/send-otp
 app.post(’/api/auth/send-otp’, async (req, res) => {
@@ -614,9 +614,9 @@ if (!user) return res.status(401).json({ success: false });
 res.json({ success: true, user });
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  8. API: USERS
-// ══════════════════════════════════════
+// ==========================================
 
 // GET /api/users/profile
 app.get(’/api/users/profile’, async (req, res) => {
@@ -648,9 +648,9 @@ res.status(500).json({ success: false, message: err.message });
 }
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  9. API: PRODUCTS
-// ══════════════════════════════════════
+// ==========================================
 
 // GET /api/products
 app.get(’/api/products’, async (req, res) => {
@@ -702,9 +702,9 @@ res.status(500).json({ success: false, message: err.message });
 }
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  10. API: ORDERS
-// ══════════════════════════════════════
+// ==========================================
 
 // POST /api/orders — Tạo đơn mới
 app.post(’/api/orders’, async (req, res) => {
@@ -797,9 +797,9 @@ res.status(500).json({ success: false, message: err.message });
 }
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  11. API: SHIPPER REGISTRATION
-// ══════════════════════════════════════
+// ==========================================
 
 // POST /api/shipper/register
 app.post(’/api/shipper/register’, async (req, res) => {
@@ -827,7 +827,7 @@ await sendSms(phone,
   `CRABOR: Ho so Shipper cua ban (${shipper.registerId}) da duoc tiep nhan. Chung toi se lien he trong 24-48h.`).catch(() => {});
 
 req.io.to('admin').emit('newShipperApplication', { registerId: shipper.registerId, phone, district });
-console.log(`🛵 Shipper mới: ${shipper.registerId} — ${phone}`);
+console.log(` Shipper mới: ${shipper.registerId} — ${phone}`);
 res.json({ success: true, message: 'Đăng ký thành công!', registerId: shipper.registerId, plan });
 ```
 
@@ -836,9 +836,9 @@ res.status(500).json({ success: false, message: err.message });
 }
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  12. API: PARTNER REGISTRATION (3 modules)
-// ══════════════════════════════════════
+// ==========================================
 
 // POST /api/partner/register
 app.post(’/api/partner/register’, async (req, res) => {
@@ -903,7 +903,7 @@ await sendSms(phone,
   `CRABOR: Ho so doi tac ${modName} (${partner.registerId}) da duoc tiep nhan. Chung toi se lien he trong 24-48h.`).catch(() => {});
 
 req.io.to('admin').emit('newPartnerApplication', { registerId: partner.registerId, module: mod, phone, district });
-console.log(`🤝 Partner mới [${mod}]: ${partner.registerId} — ${phone}`);
+console.log(` Partner mới [${mod}]: ${partner.registerId} — ${phone}`);
 res.json({ success: true, message: 'Đăng ký thành công!', registerId: partner.registerId, module: mod });
 ```
 
@@ -965,9 +965,9 @@ res.status(500).json({ success: false, message: err.message });
 }
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  13. API: ANALYTICS
-// ══════════════════════════════════════
+// ==========================================
 
 // GET /api/analytics/overview
 app.get(’/api/analytics/overview’, adminAuth, async (req, res) => {
@@ -1030,9 +1030,9 @@ res.status(500).json({ success: false, message: err.message });
 }
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  14. API: ADMIN
-// ══════════════════════════════════════
+// ==========================================
 
 function adminAuth(req, res, next) {
 const key = req.headers[‘x-admin-key’];
@@ -1246,26 +1246,26 @@ res.status(500).json({ success: false, message: err.message });
 }
 });
 
-// ══════════════════════════════════════
+// ==========================================
 //  15. SETUP DEFAULT ADMIN
-// ══════════════════════════════════════
+// ==========================================
 async function setupDefaultAdmin() {
 const count = await Admin.countDocuments().catch(() => 0);
 if (count === 0) {
 const pass = process.env.ADMIN_DEFAULT_PASS || ‘Crabor@2025’;
 await Admin.create({ username: ‘admin’, password: pass, role: ‘superadmin’, name: ‘CRABOR Admin’ }).catch(()=>{});
-console.log(‘👑 Admin mặc định: admin / ’ + pass);
-console.log(’   ⚠️  Đổi mật khẩu sau lần đăng nhập đầu!’);
+console.log(’ Admin mặc định: admin / ’ + pass);
+console.log(’   [WARN]  Đổi mật khẩu sau lần đăng nhập đầu!’);
 }
 }
 
-// ══════════════════════════════════════
+// ==========================================
 //  16. START SERVER
-// ══════════════════════════════════════
+// ==========================================
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, async () => {
 const env = process.env.NODE_ENV || ‘development’;
-console.log(` ╔════════════════════════════════════════╗ ║   🦀  CRABOR Super App — Server       ║ ╠════════════════════════════════════════╣ ║  🚀  Port        : ${PORT}                 ║ ║  🌍  Environment : ${env.padEnd(12)}      ║ ║  📦  DB          : crabor (Atlas)      ║ ╠════════════════════════════════════════╣ ║  🏠  Landing     : /                  ║ ║  👤  Customer    : /customer           ║ ║  🛵  Shipper     : /shipper            ║ ║  🤝  Partner     : /partner            ║ ║  👑  Admin       : /admin              ║ ╠════════════════════════════════════════╣ ║  📝  Shipper reg : /shipper/register   ║ ║  📝  Partner reg : /partner/register   ║ ╠════════════════════════════════════════╣ ║  🔑  Admin API   : /api/admin/stats    ║ ║  📊  Analytics   : /api/analytics/     ║ ╚════════════════════════════════════════╝`);
+console.log(` ╔════════════════════════════════════════╗ |   🦀  CRABOR Super App — Server       | ╠════════════════════════════════════════╣ |  🚀  Port        : ${PORT}                 | |  🌍  Environment : ${env.padEnd(12)}      | |  📦  DB          : crabor (Atlas)      | ╠════════════════════════════════════════╣ |  🏠  Landing     : /                  | |  👤  Customer    : /customer           | |    Shipper     : /shipper            | |    Partner     : /partner            | |    Admin       : /admin              | ╠════════════════════════════════════════╣ |    Shipper reg : /shipper/register   | |    Partner reg : /partner/register   | ╠════════════════════════════════════════╣ |  🔑  Admin API   : /api/admin/stats    | |  📊  Analytics   : /api/analytics/     | ╚════════════════════════════════════════╝`);
 await setupDefaultAdmin();
 });
 
