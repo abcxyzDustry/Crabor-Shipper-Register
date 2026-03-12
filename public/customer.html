@@ -648,13 +648,38 @@ cursor:pointer;transition:all .2s;
 .sd-name { font-weight:800;font-size:.88rem;color:#1a1a1a; }
 .sd-sub { font-size:.72rem;color:#aaa;font-weight:700; }
 .sd-type { margin-left:auto;font-size:.68rem;font-weight:900;padding:3px 8px;border-radius:20px;background:#fff3e0;color:#e67e22;flex-shrink:0; }
+
+/* DEV MODE BANNER */
+.dev-banner {
+position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+background: linear-gradient(135deg, #1a1a2e, #16213e);
+color: #FFD84D; font-size: .72rem; font-weight: 900;
+text-align: center; padding: 6px 12px;
+font-family: ‘Courier New’, monospace; letter-spacing: .5px;
+border-bottom: 2px solid #FFD84D;
+display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.dev-banner .dev-otp {
+background: #FFD84D; color: #1a1a2e;
+padding: 2px 10px; border-radius: 20px; font-size: .7rem;
+}
+.dev-banner .dev-close {
+position: absolute; right: 12px; cursor: pointer;
+color: #aaa; font-size: .9rem; line-height: 1;
+}
+body { padding-top: 36px; }
 </style>
 
 </head>
 <body>
 
+<div class="dev-banner" id="devBanner">
+  🛠️ CHẾ ĐỘ THỬ NGHIỆM &nbsp;·&nbsp; OTP bất kỳ đều được chấp nhận
+  <span class="dev-otp">OTP: 1-2-3-4-5-6</span>
+  <span class="dev-otp" style="background:#3aaa5c;color:#fff">SĐT bất kỳ</span>
+  <span class="dev-close" onclick="document.getElementById('devBanner').style.display='none'">✕</span>
+</div>
 <!-- ═══ LOGIN ═══ -->
-
 <div class="screen active" id="loginScreen">
   <div class="login-hero">
     <div class="login-crab">
@@ -1105,8 +1130,8 @@ async function loginVerify() {
   const code=[0,1,2,3,4,5].map(i=>document.getElementById('ld'+i).value).join('');
   const errEl = document.getElementById('lOtpErr');
   if(code.length!==6){errEl.classList.add('show');errEl.textContent='Nhập đủ 6 chữ số';return;}
-  // Dev-mode bypass
-  if(loginDevMode && code==='123456') {
+  // Dev-mode bypass: accept any 6-digit code
+  if(loginDevMode) {
     user = {phone:loginPhone, fullName:'Khách hàng Demo', _id:'demo'};
     document.getElementById('loginScreen').classList.remove('active');
     document.getElementById('appScreen').classList.add('active');
@@ -1129,15 +1154,11 @@ async function loginVerify() {
     }
   } catch(e){
     // Server offline fallback
-    if(code==='123456'){
-      user = {phone:loginPhone, fullName:'Demo User', _id:'demo'};
-      document.getElementById('loginScreen').classList.remove('active');
-      document.getElementById('appScreen').classList.add('active');
-      initApp();
-    } else {
-      errEl.classList.add('show');
-      errEl.textContent='⚠️ Server offline. Dev: nhập 1-2-3-4-5-6';
-    }
+    // Dev mode: accept any 6-digit code when server offline
+    user = {phone:loginPhone, fullName:'Demo User', _id:'demo'};
+    document.getElementById('loginScreen').classList.remove('active');
+    document.getElementById('appScreen').classList.add('active');
+    initApp();
   }
 }
 
@@ -1207,7 +1228,7 @@ function openModule(mod) {
 // ════════════════════════════
 let restaurants = [];
 let currentRestaurant = null;
-let products = [];
+// (products already declared above)
 let activeCat = 'Tất cả';
 let activeDistrict = 'Tất cả';
 
@@ -1679,7 +1700,6 @@ document.addEventListener('click', e => {
     document.getElementById('searchDropdown')?.classList.remove('show');
   }
 });
-}
 
 // ════════════════════════════
 //  FOOD CATEGORY FILTER  
