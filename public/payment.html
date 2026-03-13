@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CRABOR — Thanh toán kích hoạt tài khoản</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --coral:   #E8504A;
+  --coral2:  #c93d37;
+  --cream:   #F5F0DC;
+  --gold:    #F0B429;
+  --green:   #27ae60;
+  --green2:  #219a52;
+  --bg:      #0f0f18;
+  --card:    #1a1a28;
+  --border:  rgba(245,240,220,.12);
+  --font:    'Nunito', sans-serif;
+  --mono:    'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px 60px;
+  color: var(--cream);
+  overflow-x: hidden;
+}
+
+/* ── Background blobs ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(232,80,74,.18) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 35% at 80% 80%, rgba(240,180,41,.1) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Header bar ── */
+.header {
+  width: 100%; max-width: 480px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 20px 0 16px;
+  position: relative; z-index: 1;
+}
+.header-logo {
+  width: 40px; height: 40px;
+  background: var(--coral);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.header-title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.4rem;
+  color: var(--cream);
+  letter-spacing: .5px;
+}
+.header-sub { font-size: .72rem; color: rgba(245,240,220,.5); font-weight: 700; }
+
+/* ── Main card ── */
+.card {
+  width: 100%; max-width: 480px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  overflow: hidden;
+  position: relative; z-index: 1;
+  box-shadow: 0 30px 80px rgba(0,0,0,.5);
+}
+
+/* ── Plan badge strip ── */
+.plan-strip {
+  padding: 16px 24px;
+  display: flex; align-items: center; gap: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.plan-strip.early {
+  background: linear-gradient(135deg, rgba(240,180,41,.18), rgba(240,180,41,.06));
+}
+.plan-strip.standard {
+  background: linear-gradient(135deg, rgba(232,80,74,.15), rgba(232,80,74,.05));
+}
+.plan-icon { font-size: 2rem; }
+.plan-info { flex: 1; }
+.plan-name {
+  font-weight: 900;
+  font-size: 1rem;
+  color: var(--cream);
+}
+.plan-name.early { color: var(--gold); }
+.plan-name.standard { color: var(--coral); }
+.plan-tagline { font-size: .75rem; color: rgba(245,240,220,.6); margin-top: 2px; }
+.plan-slots {
+  background: rgba(240,180,41,.2);
+  color: var(--gold);
+  border-radius: 50px;
+  padding: 5px 12px;
+  font-size: .75rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.plan-slots.standard {
+  background: rgba(232,80,74,.15);
+  color: var(--coral);
+}
+
+/* ── QR Section ── */
+.qr-section {
+  padding: 24px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 16px;
+}
+
+/* Timer */
+.timer-wrap {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50px;
+  padding: 8px 18px;
+  border: 1px solid var(--border);
+}
+.timer-icon { font-size: 1rem; }
+.timer-val {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--gold);
+  min-width: 48px;
+  transition: color .3s;
+}
+.timer-val.urgent { color: var(--coral); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.timer-label { font-size: .78rem; color: rgba(245,240,220,.5); font-weight: 700; }
+
+/* QR Frame */
+.qr-frame {
+  background: #fff;
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.4);
+  position: relative;
+}
+.qr-frame img {
+  width: 210px; height: 210px;
+  border-radius: 8px;
+  display: block;
+}
+.qr-loading {
+  width: 210px; height: 210px;
+  display: flex; align-items: center; justify-content: center;
+  color: #aaa; font-size: .85rem; font-family: var(--font);
+  background: #f5f5f5; border-radius: 8px;
+}
+.qr-corner {
+  position: absolute;
+  width: 18px; height: 18px;
+  border-color: var(--coral);
+  border-style: solid;
+  border-width: 0;
+}
+.qr-corner.tl { top: 8px; left: 8px; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
+.qr-corner.tr { top: 8px; right: 8px; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
+.qr-corner.bl { bottom: 8px; left: 8px; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
+.qr-corner.br { bottom: 8px; right: 8px; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
+
+/* Bank info table */
+.bank-info {
+  width: 100%;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.bank-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: .85rem;
+}
+.bank-row:last-child { border-bottom: none; }
+.bank-key { color: rgba(245,240,220,.5); font-weight: 700; }
+.bank-val { font-weight: 900; color: var(--cream); }
+.bank-val.mono { font-family: var(--mono); font-size: .82rem; }
+.bank-val.amount { color: var(--coral); font-size: 1.05rem; }
+.bank-val.amount.early { color: var(--gold); }
+.copy-btn {
+  background: rgba(255,255,255,.08); border: none;
+  border-radius: 6px; padding: 3px 8px; color: rgba(245,240,220,.6);
+  font-size: .7rem; cursor: pointer; font-family: var(--font); font-weight: 700;
+  transition: all .2s;
+}
+.copy-btn:hover { background: rgba(255,255,255,.15); color: var(--cream); }
+
+/* Refund badge */
+.refund-badge {
+  width: 100%;
+  background: rgba(39,174,96,.1);
+  border: 1px solid rgba(39,174,96,.25);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: .82rem;
+  color: rgba(39,174,96,.9);
+  text-align: center;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+/* CTA Button */
+.btn-paid {
+  width: 100%;
+  background: linear-gradient(135deg, var(--green), var(--green2));
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  padding: 17px;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  box-shadow: 0 4px 24px rgba(39,174,96,.35);
+  transition: all .2s;
+  position: relative;
+  overflow: hidden;
+}
+.btn-paid:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(39,174,96,.4); }
+.btn-paid:active { transform: translateY(0); }
+.btn-paid:disabled { background: #444; box-shadow: none; cursor: not-allowed; transform: none; }
+.btn-paid::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.15), transparent);
+  pointer-events: none;
+}
+
+.btn-later {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 13px;
+  font-family: var(--font);
+  font-size: .9rem;
+  font-weight: 700;
+  color: rgba(245,240,220,.5);
+  cursor: pointer;
+  transition: all .2s;
+  margin-top: -4px;
+}
+.btn-later:hover { border-color: rgba(245,240,220,.3); color: rgba(245,240,220,.8); }
+
+/* ── EXPIRED state ── */
+.expired-wrap {
+  padding: 32px 24px;
+  text-align: center;
+  display: none; flex-direction: column; align-items: center; gap: 16px;
+}
+.expired-wrap.show { display: flex; }
+.expired-icon { font-size: 3rem; }
+.expired-title { font-weight: 900; font-size: 1.1rem; color: rgba(245,240,220,.6); }
+.btn-refresh {
+  background: var(--coral); color: #fff; border: none; border-radius: 50px;
+  padding: 12px 28px; font-family: var(--font); font-weight: 900;
+  font-size: .9rem; cursor: pointer;
+}
+
+/* ── THANK YOU screen ── */
+#thankYou {
+  display: none;
+  width: 100%; max-width: 480px;
+  position: relative; z-index: 1;
+}
+.ty-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0,0,0,.5);
+}
+.ty-hero {
+  background: linear-gradient(135deg, var(--coral), var(--coral2));
+  padding: 40px 24px 32px;
+  text-align: center;
+  position: relative; overflow: hidden;
+}
+.ty-hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 70% 30%, rgba(255,255,255,.15), transparent 60%);
+  pointer-events: none;
+}
+.ty-crab {
+  font-size: 4rem;
+  animation: crabDance 1.5s ease-in-out infinite;
+  display: block; margin-bottom: 16px;
+}
+@keyframes crabDance {
+  0%,100%{ transform: rotate(-5deg) scale(1); }
+  50%{ transform: rotate(5deg) scale(1.05); }
+}
+.ty-title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.8rem;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.ty-sub { font-size: .9rem; color: rgba(255,255,255,.85); font-weight: 700; line-height: 1.5; }
+
+.ty-body { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+
+.ty-block {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.ty-block-title {
+  font-size: .7rem; font-weight: 900; text-transform: uppercase;
+  letter-spacing: 1px; color: rgba(245,240,220,.5); margin-bottom: 8px;
+}
+.ty-block-body { font-size: .88rem; color: rgba(245,240,220,.85); line-height: 1.6; font-weight: 700; }
+.ty-block-body a {
+  color: var(--coral);
+  text-decoration: none;
+  font-weight: 900;
+}
+.ty-block-body a:hover { text-decoration: underline; }
+
+.ty-reg-id {
+  font-family: var(--mono);
+  background: rgba(232,80,74,.15);
+  border: 1px solid rgba(232,80,74,.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: .9rem;
+  color: var(--coral);
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.ty-uniform {
+  background: linear-gradient(135deg, rgba(240,180,41,.12), rgba(240,180,41,.04));
+  border: 1px solid rgba(240,180,41,.25);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.ty-uniform-icon { font-size: 1.6rem; flex-shrink: 0; }
+.ty-uniform-text { font-size: .82rem; color: rgba(240,180,41,.9); line-height: 1.6; font-weight: 700; }
+.ty-uniform-text strong { color: var(--gold); }
+
+.btn-check-status {
+  width: 100%;
+  background: linear-gradient(135deg, var(--coral), var(--coral2));
+  color: #fff; border: none; border-radius: 16px;
+  padding: 16px; font-family: var(--font); font-size: 1rem;
+  font-weight: 900; cursor: pointer;
+  box-shadow: 0 4px 24px rgba(232,80,74,.35);
+  text-decoration: none; display: block; text-align: center;
+  transition: all .2s;
+}
+.btn-check-status:hover { transform: translateY(-1px); }
+
+/* ── LOADING screen ── */
+#loadingScreen {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 16px; min-height: 60vh;
+  position: relative; z-index: 1;
+}
+.spinner {
+  width: 48px; height: 48px;
+  border: 3px solid rgba(245,240,220,.1);
+  border-top-color: var(--coral);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: #222; color: var(--cream);
+  border-radius: 50px; padding: 12px 24px;
+  font-weight: 800; font-size: .85rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+  z-index: 9999; transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Confetti */
+.confetti-piece {
+  position: fixed; top: -10px;
+  width: 8px; height: 14px;
+  border-radius: 2px;
+  animation: fall linear forwards;
+  z-index: 9990; pointer-events: none;
+}
+@keyframes fall {
+  to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">🦀</div>
+  <div>
+    <div class="header-title">CRABOR</div>
+    <div class="header-sub">Thanh toán kích hoạt tài khoản Shipper</div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <div style="font-size:.85rem;color:rgba(245,240,220,.5);font-weight:700">Đang tải thông tin...</div>
+</div>
+
+<!-- PAYMENT CARD (hidden until loaded) -->
+<div class="card" id="paymentCard" style="display:none">
+
+  <!-- Plan strip -->
+  <div class="plan-strip" id="planStrip">
+    <div class="plan-icon" id="planIcon">⚡</div>
+    <div class="plan-info">
+      <div class="plan-name" id="planName">Gói Early Bird</div>
+      <div class="plan-tagline" id="planTagline">Hoàn tiền sau 50 đơn thành công</div>
+    </div>
+    <div class="plan-slots" id="planSlots">Còn 50 suất</div>
+  </div>
+
+  <!-- QR content -->
+  <div class="qr-section" id="qrSection">
+    <!-- Timer -->
+    <div class="timer-wrap">
+      <span class="timer-icon">⏱️</span>
+      <span class="timer-val" id="timerVal">10:00</span>
+      <span class="timer-label">Mã QR hết hạn sau</span>
+    </div>
+
+    <!-- QR Frame -->
+    <div class="qr-frame">
+      <div class="qr-corner tl"></div>
+      <div class="qr-corner tr"></div>
+      <div class="qr-corner bl"></div>
+      <div class="qr-corner br"></div>
+      <div class="qr-loading" id="qrLoading">⏳ Đang tạo mã...</div>
+      <img id="qrImg" src="" alt="QR Thanh toán" style="display:none"
+        onload="this.style.display='block';document.getElementById('qrLoading').style.display='none'"
+        onerror="document.getElementById('qrLoading').innerHTML='⚠️ Lỗi tải QR<br>Thanh toán thủ công'">
+    </div>
+
+    <!-- Bank info -->
+    <div class="bank-info">
+      <div class="bank-row">
+        <span class="bank-key">Ngân hàng</span>
+        <span class="bank-val">VIB</span>
+      </div>
+      <div class="bank-row">
+        <span class="bank-key">Số tài khoản</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="bank-val mono" id="bankAcc">068394585</span>
+          <button class="copy-btn" onclick="copyText('068394585','Đã sao chép số TK!')">Copy</button>
+        </div>
+      </div>
+      <div class="bank-row">
+        <span class="bank-key">Số tiền</span>
+        <span class="bank-val amount" id="bankAmt">500.000đ</span>
+      </div>
+      <div class="bank-row">
+        <span class="bank-key">Nội dung CK</span>
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          <span class="bank-val mono" id="bankDesc" style="font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px"></span>
+          <button class="copy-btn" onclick="copyText(document.getElementById('bankDesc').textContent,'Đã sao chép!')">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Refund note (Early Bird only) -->
+    <div class="refund-badge" id="refundBadge">
+      ♻️ Gói Early Bird — khoản phí <strong>500.000đ hoàn lại 100%</strong> sau khi hoàn thành 50 đơn thành công trong 3 tháng đầu
+    </div>
+
+    <!-- Buttons -->
+    <button class="btn-paid" id="btnPaid" onclick="confirmPayment()">
+      <span>✅</span><span>Tôi đã thanh toán</span>
+    </button>
+    <button class="btn-later" onclick="payLater()">Thanh toán sau (lưu hồ sơ)</button>
+  </div>
+
+  <!-- Expired state -->
+  <div class="expired-wrap" id="expiredWrap">
+    <div class="expired-icon">⏰</div>
+    <div class="expired-title">Mã QR đã hết hạn</div>
+    <div style="font-size:.82rem;color:rgba(245,240,220,.4);font-weight:700">Nhấn làm mới để tạo mã mới</div>
+    <button class="btn-refresh" onclick="refreshQR()">🔄 Làm mới mã QR</button>
+  </div>
+
+</div>
+
+<!-- THANK YOU (shown after confirm) -->
+<div id="thankYou">
+  <div class="ty-card">
+    <div class="ty-hero">
+      <span class="ty-crab">🦀</span>
+      <div class="ty-title">Cảm ơn bạn!</div>
+      <div class="ty-sub">Hồ sơ đăng ký Shipper của bạn đã được ghi nhận thành công</div>
+    </div>
+    <div class="ty-body">
+
+      <!-- Mã hồ sơ -->
+      <div class="ty-block">
+        <div class="ty-block-title">📋 Mã hồ sơ của bạn</div>
+        <div class="ty-reg-id" id="tyRegId">CRB-S-XXXXXX</div>
+        <div class="ty-block-body" style="font-size:.78rem;color:rgba(245,240,220,.4);text-align:center">Lưu mã này để tra cứu tình trạng hồ sơ</div>
+      </div>
+
+      <!-- 48h notice -->
+      <div class="ty-block">
+        <div class="ty-block-title">🕐 Tiếp theo</div>
+        <div class="ty-block-body">
+          Chúng mình sẽ <strong style="color:var(--cream)">liên hệ lại bạn trong vòng 48 giờ</strong> qua số điện thoại đã đăng ký để xác nhận và hướng dẫn các bước tiếp theo.<br><br>
+          Bạn có thể kiểm tra tình trạng hồ sơ bất kỳ lúc nào tại:
+          <a href="register.html" id="tyCheckLink">register.html → Tra cứu hồ sơ →</a>
+        </div>
+      </div>
+
+      <!-- Uniform notice -->
+      <div class="ty-uniform">
+        <div class="ty-uniform-icon">👕</div>
+        <div class="ty-uniform-text">
+          <strong>Đồng phục CRABOR sẽ sớm ra mắt!</strong><br>
+          Chúng mình đang hoàn thiện thiết kế đồng phục chính thức. Bạn sẽ được thông báo và hướng dẫn nhận đồng phục khi hồ sơ được duyệt.
+        </div>
+      </div>
+
+      <!-- Check status CTA -->
+      <a href="register.html" class="btn-check-status" id="tyStatusBtn">
+        🔍 Kiểm tra tình trạng hồ sơ
+      </a>
+
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ──────────────────────────────────────
+//  STATE
+// ──────────────────────────────────────
+const params   = new URLSearchParams(location.search);
+const phone    = params.get('phone') || '';
+const regId    = params.get('id')    || '';
+let   planData = null;      // { plan, fee, slotsLeft, phone, registerId }
+let   timerInt = null;
+let   expired  = false;
+
+// ──────────────────────────────────────
+//  INIT
+// ──────────────────────────────────────
+window.addEventListener('DOMContentLoaded', init);
+
+async function init() {
+  if (!phone && !regId) {
+    showError('Thiếu thông tin. Vui lòng trở về trang đăng ký.');
+    return;
+  }
+
+  try {
+    // Fetch plan info from server
+    const q = phone ? `phone=${encodeURIComponent(phone)}` : `id=${encodeURIComponent(regId)}`;
+    const r = await fetch('/api/payment/plan?' + q);
+    const d = await r.json();
+
+    if (!d.success) {
+      showError(d.message || 'Không tìm thấy hồ sơ. Vui lòng kiểm tra lại.');
+      return;
+    }
+
+    planData = d.data;
+    renderPayment();
+  } catch(e) {
+    showError('Không kết nối được server. Vui lòng thử lại.');
+  }
+}
+
+// ──────────────────────────────────────
+//  RENDER PAYMENT
+// ──────────────────────────────────────
+function renderPayment() {
+  const { plan, fee, slotsLeft, registerId } = planData;
+  const isEarly = plan === 'early_bird';
+
+  // Plan strip
+  const strip = document.getElementById('planStrip');
+  strip.className = 'plan-strip ' + (isEarly ? 'early' : 'standard');
+  document.getElementById('planIcon').textContent  = isEarly ? '⚡' : '🛵';
+  const nameEl = document.getElementById('planName');
+  nameEl.textContent  = isEarly ? 'Gói Early Bird' : 'Gói Bình Thường';
+  nameEl.className    = 'plan-name ' + (isEarly ? 'early' : 'standard');
+  document.getElementById('planTagline').textContent = isEarly
+    ? 'Hoàn tiền 100% sau 50 đơn · Ưu tiên phân đơn'
+    : 'Kích hoạt tài khoản Shipper CRABOR';
+  const slotsEl = document.getElementById('planSlots');
+  slotsEl.textContent = isEarly ? `Còn ${slotsLeft} suất` : 'Gói tiêu chuẩn';
+  slotsEl.className   = 'plan-slots ' + (isEarly ? '' : 'standard');
+
+  // Amount
+  const amtEl = document.getElementById('bankAmt');
+  amtEl.textContent = fee.toLocaleString('vi-VN') + 'đ';
+  amtEl.className   = 'bank-val amount ' + (isEarly ? 'early' : '');
+
+  // Refund badge
+  const refund = document.getElementById('refundBadge');
+  if (!isEarly) {
+    refund.textContent = '🛵 Phí kích hoạt tài khoản Shipper — thanh toán 1 lần duy nhất';
+    refund.style.background = 'rgba(232,80,74,.08)';
+    refund.style.borderColor = 'rgba(232,80,74,.2)';
+    refund.style.color = 'rgba(232,80,74,.8)';
+  }
+
+  // Payment desc
+  const desc = 'TT phi kich hoat ' + (planData.phone || phone || regId);
+  document.getElementById('bankDesc').textContent = desc;
+
+  // QR
+  buildQR(fee, desc);
+
+  // Show card
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('paymentCard').style.display = 'block';
+
+  // Start countdown
+  startTimer(10 * 60);
+}
+
+function buildQR(fee, desc) {
+  const url = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${fee}&des=${encodeURIComponent(desc)}`;
+  document.getElementById('qrImg').src = url;
+}
+
+// ──────────────────────────────────────
+//  TIMER
+// ──────────────────────────────────────
+function startTimer(totalSec) {
+  clearInterval(timerInt);
+  expired = false;
+  let s = totalSec;
+  updateTimerUI(s);
+  timerInt = setInterval(() => {
+    s--;
+    updateTimerUI(s);
+    if (s <= 0) {
+      clearInterval(timerInt);
+      expired = true;
+      onExpired();
+    }
+  }, 1000);
+}
+
+function updateTimerUI(s) {
+  const el = document.getElementById('timerVal');
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  el.textContent = `${mm}:${ss}`;
+  el.className   = 'timer-val' + (s <= 60 ? ' urgent' : '');
+}
+
+function onExpired() {
+  document.getElementById('qrSection').style.display  = 'none';
+  document.getElementById('expiredWrap').style.display = 'flex';
+  document.getElementById('expiredWrap').classList.add('show');
+}
+
+function refreshQR() {
+  if (!planData) return;
+  document.getElementById('qrSection').style.display  = 'flex';
+  document.getElementById('expiredWrap').classList.remove('show');
+  document.getElementById('expiredWrap').style.display = 'none';
+  const desc = 'TT phi kich hoat ' + (planData.phone || phone);
+  buildQR(planData.fee, desc);
+  startTimer(10 * 60);
+}
+
+// ──────────────────────────────────────
+//  ACTIONS
+// ──────────────────────────────────────
+async function confirmPayment() {
+  if (expired) { toast('⚠️ Mã QR đã hết hạn — vui lòng làm mới'); return; }
+
+  const btn = document.getElementById('btnPaid');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;width:18px;height:18px;animation:spin .7s linear infinite;display:inline-block"></span><span>Đang xác nhận...</span>';
+
+  try {
+    const q = phone ? `phone=${encodeURIComponent(phone)}` : `id=${encodeURIComponent(regId)}`;
+    const r = await fetch('/api/payment/confirm?' + q, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paid: true })
+    });
+    const d = await r.json();
+
+    if (d.success) {
+      clearInterval(timerInt);
+      showThankYou(d.data);
+    } else {
+      toast('❌ ' + (d.message || 'Lỗi xác nhận'));
+      btn.disabled = false;
+      btn.innerHTML = '<span>✅</span><span>Tôi đã thanh toán</span>';
+    }
+  } catch(e) {
+    toast('❌ Không kết nối được server');
+    btn.disabled = false;
+    btn.innerHTML = '<span>✅</span><span>Tôi đã thanh toán</span>';
+  }
+}
+
+async function payLater() {
+  clearInterval(timerInt);
+  // Still save "unpaid" status
+  try {
+    const q = phone ? `phone=${encodeURIComponent(phone)}` : `id=${encodeURIComponent(regId)}`;
+    await fetch('/api/payment/confirm?' + q, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paid: false })
+    });
+  } catch(e) {}
+  showThankYou({ registerId: planData?.registerId || regId, paid: false });
+}
+
+// ──────────────────────────────────────
+//  THANK YOU
+// ──────────────────────────────────────
+function showThankYou(data) {
+  const rId = data.registerId || regId || planData?.registerId || '';
+  document.getElementById('tyRegId').textContent = rId || 'CRB-S-XXXXXX';
+  document.getElementById('tyCheckLink').href    = `register.html#lookup`;
+  document.getElementById('tyStatusBtn').href    = `register.html#lookup`;
+
+  document.getElementById('paymentCard').style.display = 'none';
+  const ty = document.getElementById('thankYou');
+  ty.style.display = 'block';
+  ty.style.opacity = '0';
+  ty.style.transform = 'translateY(20px)';
+  requestAnimationFrame(() => {
+    ty.style.transition = 'opacity .5s, transform .5s';
+    ty.style.opacity = '1';
+    ty.style.transform = 'translateY(0)';
+  });
+
+  if (data.paid !== false) {
+    setTimeout(launchConfetti, 300);
+  }
+}
+
+// ──────────────────────────────────────
+//  HELPERS
+// ──────────────────────────────────────
+function copyText(txt, msg) {
+  navigator.clipboard.writeText(txt).then(() => toast(msg || '✅ Đã sao chép')).catch(() => {
+    // Fallback
+    const el = document.createElement('textarea');
+    el.value = txt; document.body.appendChild(el);
+    el.select(); document.execCommand('copy');
+    document.body.removeChild(el);
+    toast(msg || '✅ Đã sao chép');
+  });
+}
+
+function toast(msg, dur = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+function showError(msg) {
+  document.getElementById('loadingScreen').innerHTML = `
+    <div style="text-align:center;padding:32px 24px">
+      <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
+      <div style="font-weight:900;color:var(--coral);margin-bottom:8px">Không tải được thông tin</div>
+      <div style="font-size:.85rem;color:rgba(245,240,220,.5);font-weight:700;margin-bottom:24px">${msg}</div>
+      <a href="register.html" style="background:var(--coral);color:#fff;border:none;border-radius:50px;padding:12px 28px;font-family:var(--font);font-weight:900;text-decoration:none;font-size:.9rem">← Về trang đăng ký</a>
+    </div>`;
+}
+
+function launchConfetti() {
+  const colors = ['#E8504A','#F0B429','#27ae60','#F5F0DC','#fff'];
+  for (let i = 0; i < 60; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.cssText = `
+      left:${Math.random()*100}vw;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-duration:${1.5 + Math.random()*2}s;
+      animation-delay:${Math.random()*.8}s;
+      transform:rotate(${Math.random()*360}deg);
+      width:${6+Math.random()*6}px;
+      height:${10+Math.random()*8}px;
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 4000);
+  }
+}
+</script>
+</body>
+</html>
