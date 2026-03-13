@@ -1,0 +1,1962 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CRABOR – Đặt hàng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red: #E8504A;
+  --cream: #F5F0DC;
+  --yellow: #FFD84D;
+  --dark: #1a1a1a;
+  --gray: #777;
+  --light: #f5f5f5;
+  --white: #fff;
+  --radius: 20px;
+  --shadow: 0 8px 30px rgba(0,0,0,.12);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  font-family: 'Nunito', sans-serif;
+  background: #f0ede6;
+  min-height: 100vh;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  overflow-x: hidden;
+}
+/* ── SCREENS ── */
+.screen { display:none; flex-direction:column; min-height:100vh; }
+.screen.active { display:flex; }
+
+/* ══ LOGIN SCREEN ══ */
+#loginScreen {
+  background: linear-gradient(160deg, #E8504A 0%, #c93d37 55%, #1a1a1a 100%);
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 40px;
+}
+.login-hero {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60px 30px 30px;
+  flex: 1;
+}
+.login-crab {
+  width: 110px; height: 110px;
+  background: rgba(245,240,220,.15);
+  border-radius: 35px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+  border: 2px solid rgba(245,240,220,.25);
+  animation: floatAnim 3s ease-in-out infinite;
+}
+@keyframes floatAnim { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.login-brand {
+  font-family: 'Fredoka One', cursive;
+  font-size: 3.5rem;
+  color: #F5F0DC;
+  text-shadow: 4px 4px 0 rgba(0,0,0,.2);
+  margin-bottom: 8px;
+}
+.login-sub { font-size: 1rem; color: rgba(245,240,220,.8); font-weight: 700; text-align:center; }
+.login-card {
+  background: #fff;
+  border-radius: 32px 32px 0 0;
+  padding: 35px 28px 30px;
+  width: 100%;
+}
+.login-title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.6rem;
+  color: #1a1a1a;
+  margin-bottom: 6px;
+}
+.login-hint { font-size: 0.9rem; color: #777; font-weight: 700; margin-bottom: 25px; }
+.inp-wrap { position: relative; margin-bottom: 14px; }
+.inp-wrap .ico { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; }
+.inp {
+  width: 100%; padding: 15px 16px 15px 46px;
+  border: 2px solid #e8e8e8; border-radius: 14px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem; font-weight: 700;
+  outline: none; background: #fafafa;
+  transition: border-color .2s;
+}
+.inp:focus { border-color: #E8504A; background: #fff; }
+.phone-row { display:flex; gap:10px; }
+.phone-row .inp { flex:1; }
+.btn-otp {
+  padding: 0 16px; border-radius: 14px;
+  border: 2px solid #E8504A; background: transparent;
+  color: #E8504A; font-family: 'Fredoka One', cursive;
+  font-size: 0.95rem; cursor: pointer; white-space: nowrap;
+  transition: all .2s; flex-shrink: 0;
+}
+.btn-otp:hover { background: #E8504A; color: #fff; }
+.btn-otp:disabled { opacity:.4; cursor:not-allowed; }
+.otp-row { display:flex; gap:10px; justify-content:center; margin: 18px 0; }
+.otp-d {
+  width: 52px; height: 60px; border-radius: 14px;
+  border: 2px solid #e8e8e8; background: #fafafa;
+  font-family: 'Fredoka One', cursive; font-size: 1.8rem;
+  text-align: center; outline: none; transition: border-color .2s;
+}
+.otp-d:focus { border-color: #E8504A; background: #fff; }
+.otp-d.filled { border-color: #3aaa5c; }
+.btn-main {
+  width: 100%; padding: 17px;
+  border-radius: 60px; border: none;
+  background: #E8504A;
+  box-shadow: 0 8px 25px rgba(232,80,74,.4);
+  color: #fff;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.2rem; cursor: pointer;
+  transition: all .2s; margin-top: 8px;
+}
+.btn-main:hover { transform: translateY(-2px); background: #c93d37; }
+.btn-main:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+.err { color:#ff4d4d; font-size:.85rem; font-weight:800; margin-top:5px; display:none; }
+.err.show { display:block; }
+.countdown { font-size:.8rem; color:#777; font-weight:700; margin-top:5px; display:none; }
+
+/* ══ MAIN APP ══ */
+#appScreen { background: #f0ede6; }
+.topbar {
+  background: linear-gradient(135deg, #E8504A, #c93d37);
+  padding: 50px 20px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.topbar::after {
+  content:'';
+  position: absolute;
+  width: 250px; height: 250px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,216,77,.15), transparent 70%);
+  right: -60px; bottom: -80px;
+}
+.topbar-row { display:flex; justify-content:space-between; align-items:center; position:relative; }
+.topbar-left .greeting { font-size:.85rem; color:rgba(245,240,220,.8); font-weight:700; }
+.topbar-left .uname {
+  font-family:'Fredoka One',cursive;
+  font-size:1.3rem; color:#F5F0DC;
+}
+.topbar-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(245,240,220,.2);
+  border: 2px solid rgba(245,240,220,.4);
+  display: flex; align-items:center; justify-content:center;
+  font-size: 1.3rem; cursor:pointer;
+}
+.topbar-location {
+  display: flex; align-items:center; gap:6px;
+  color: rgba(245,240,220,.85); font-size:.85rem; font-weight:700;
+  margin-top: 12px; position:relative;
+}
+.topbar-search {
+  background: rgba(255,255,255,.15);
+  border: 1.5px solid rgba(245,240,220,.25);
+  border-radius: 14px;
+  padding: 11px 16px 11px 40px;
+  color: rgba(245,240,220,.9);
+  font-family:'Nunito',sans-serif;
+  font-size:.95rem; font-weight:700;
+  width:100%; outline:none; margin-top:14px; position:relative;
+}
+.search-icon {
+  position:absolute; left:16px; bottom:16px;
+  font-size:1rem; pointer-events:none;
+}
+
+/* TABS CONTENT */
+.tab-content { flex:1; overflow-y:auto; padding-bottom: 85px; }
+.tab-page { display:none; }
+.tab-page.active { display:block; }
+
+/* HOME TAB */
+.promo-banner {
+  margin: 16px; border-radius: var(--radius);
+  background: linear-gradient(135deg, #1a1a1a, #333);
+  padding: 22px 20px;
+  display: flex; align-items:center; gap:16px;
+  overflow:hidden; position:relative;
+}
+.promo-banner::before {
+  content:'';
+  position:absolute;
+  width:150px; height:150px; border-radius:50%;
+  background: radial-gradient(circle, rgba(232,80,74,.3), transparent 70%);
+  right:-30px; top:-30px;
+}
+.promo-text h3 {
+  font-family:'Fredoka One',cursive;
+  font-size:1.3rem; color:#FFD84D;
+  margin-bottom:5px;
+}
+.promo-text p { font-size:.85rem; color:rgba(255,255,255,.8); font-weight:700; }
+.promo-badge {
+  background:#E8504A; color:#fff;
+  padding:6px 12px; border-radius:20px;
+  font-size:.75rem; font-weight:900;
+  margin-top:8px; display:inline-block;
+}
+
+.section-title {
+  font-family:'Fredoka One',cursive;
+  font-size:1.2rem; color:#1a1a1a;
+  padding: 16px 16px 10px;
+}
+
+/* SERVICE MODULES */
+.modules-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 16px 4px;
+}
+.module-card {
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  display:flex; flex-direction:column; gap:10px;
+  position:relative; overflow:hidden;
+}
+.module-card:hover { transform:translateY(-4px); box-shadow:var(--shadow); }
+.module-card.food { background: linear-gradient(135deg, #E8504A, #c93d37); }
+.module-card.laundry { background: linear-gradient(135deg, #2d3d7a, #1a2040); }
+.module-card.cleaning { background: linear-gradient(135deg, #2d5a2d, #1a2f1a); }
+.module-card.china { background: linear-gradient(135deg, #7a2d2d, #4a1a1a); }
+.module-card .mc-icon { font-size: 2.2rem; }
+.module-card .mc-name {
+  font-family:'Fredoka One',cursive;
+  font-size:1.1rem; color:#F5F0DC;
+}
+.module-card .mc-sub { font-size:.75rem; color:rgba(245,240,220,.75); font-weight:700; }
+.mc-badge {
+  position:absolute; top:12px; right:12px;
+  background:#FFD84D; color:#7a3a00;
+  padding:3px 8px; border-radius:10px;
+  font-size:.65rem; font-weight:900;
+}
+
+/* FOOD PAGE */
+.cat-scroll {
+  display:flex; gap:10px; padding:14px 16px;
+  overflow-x:auto; scrollbar-width:none;
+}
+.cat-scroll::-webkit-scrollbar { display:none; }
+.cat-chip {
+  flex-shrink:0;
+  background:#fff; border: 2px solid #e8e8e8;
+  padding:8px 16px; border-radius:30px;
+  font-size:.85rem; font-weight:800; color:#555;
+  cursor:pointer; transition:all .2s; white-space:nowrap;
+}
+.cat-chip.active { background:#E8504A; border-color:#E8504A; color:#fff; }
+.products-list { padding: 0 16px 16px; }
+.product-card {
+  background:#fff; border-radius:16px;
+  display:flex; align-items:center; gap:14px;
+  padding:14px; margin-bottom:10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+  cursor:pointer; transition:transform .15s;
+}
+.product-card:hover { transform:translateY(-2px); }
+.prod-img {
+  width:72px; height:72px; border-radius:12px;
+  background:#f0ede6;
+  display:flex; align-items:center; justify-content:center;
+  font-size:2rem; flex-shrink:0;
+}
+.prod-info { flex:1; }
+.prod-name { font-weight:900; font-size:.95rem; color:#1a1a1a; margin-bottom:3px; }
+.prod-desc { font-size:.8rem; color:#777; font-weight:600; margin-bottom:6px; line-height:1.4; }
+.prod-price {
+  font-family:'Fredoka One',cursive;
+  font-size:1.1rem; color:#E8504A;
+}
+.prod-sold { font-size:.75rem; color:#bbb; font-weight:700; }
+.prod-add {
+  width:34px; height:34px; border-radius:50%;
+  background:#E8504A; border:none; color:#fff;
+  font-size:1.2rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; transition:transform .15s;
+}
+.prod-add:hover { transform:scale(1.1); }
+
+/* CART */
+.cart-fab {
+  position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+  max-width:398px; width:calc(100% - 32px);
+  background:#1a1a1a;
+  border-radius:16px; padding:14px 18px;
+  display:flex; align-items:center; gap:12px;
+  cursor:pointer; z-index:50;
+  box-shadow:0 8px 30px rgba(0,0,0,.3);
+  transition:transform .2s;
+  display:none;
+}
+.cart-fab.show { display:flex; }
+.cart-fab:hover { transform:translateX(-50%) translateY(-2px); }
+.cart-count {
+  background:#E8504A; color:#fff;
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Fredoka One',cursive; font-size:.9rem;
+  flex-shrink:0;
+}
+.cart-label { flex:1; color:#F5F0DC; font-weight:800; font-size:.9rem; }
+.cart-total { font-family:'Fredoka One',cursive; color:#FFD84D; font-size:1rem; }
+
+/* CART SHEET */
+.sheet-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.5);
+  z-index:100; display:none; align-items:flex-end;
+}
+.sheet-overlay.show { display:flex; }
+.sheet {
+  background:#fff; border-radius:28px 28px 0 0;
+  padding:24px; width:100%; max-height:85vh;
+  overflow-y:auto;
+  animation:slideUp .3s ease;
+  max-width:430px; margin:0 auto;
+}
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.sheet-handle {
+  width:40px; height:4px; background:#e8e8e8;
+  border-radius:2px; margin:0 auto 20px;
+}
+.sheet-title {
+  font-family:'Fredoka One',cursive;
+  font-size:1.4rem; color:#1a1a1a; margin-bottom:16px;
+}
+.cart-item {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 0; border-bottom:1px solid #f5f5f5;
+}
+.ci-icon { font-size:1.5rem; }
+.ci-name { flex:1; font-weight:800; font-size:.9rem; }
+.ci-qty-row { display:flex; align-items:center; gap:8px; }
+.qty-btn {
+  width:28px; height:28px; border-radius:50%;
+  border:2px solid #e8e8e8; background:#fff;
+  font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-weight:900; color:#555; transition:all .15s;
+}
+.qty-btn:hover { border-color:#E8504A; color:#E8504A; }
+.ci-price { font-family:'Fredoka One',cursive; color:#E8504A; font-size:.95rem; min-width:60px; text-align:right; }
+.cart-total-row {
+  display:flex; justify-content:space-between;
+  padding:14px 0; font-weight:900;
+}
+.cart-grand { font-family:'Fredoka One',cursive; font-size:1.1rem; color:#E8504A; }
+.addr-field {
+  width:100%; padding:13px 16px;
+  border:2px solid #e8e8e8; border-radius:14px;
+  font-family:'Nunito',sans-serif; font-size:.9rem; font-weight:700;
+  outline:none; resize:none; background:#fafafa;
+  transition:border-color .2s; margin-bottom:10px;
+}
+.addr-field:focus { border-color:#E8504A; background:#fff; }
+.pay-opts { display:flex; gap:8px; margin-bottom:16px; }
+.pay-opt {
+  flex:1; padding:10px;
+  border:2px solid #e8e8e8; border-radius:12px;
+  text-align:center; font-size:.8rem; font-weight:800;
+  color:#555; cursor:pointer; transition:all .2s;
+}
+.pay-opt.sel { border-color:#E8504A; background:#fff5f5; color:#E8504A; }
+
+/* ORDERS TAB */
+.order-card {
+  background:#fff; border-radius:16px;
+  margin:0 16px 10px;
+  padding:16px;
+  box-shadow:0 2px 10px rgba(0,0,0,.06);
+}
+.oc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.oc-id { font-size:.75rem; font-weight:800; color:#bbb; }
+.oc-status-badge {
+  padding:4px 10px; border-radius:20px;
+  font-size:.72rem; font-weight:900;
+}
+.s-pending    { background:#fff3e0; color:#e67e22; }
+.s-confirmed  { background:#e8f5e9; color:#27ae60; }
+.s-preparing  { background:#e3f2fd; color:#2196f3; }
+.s-picked_up  { background:#f3e5f5; color:#9c27b0; }
+.s-delivering { background:#fff8e1; color:#f57f17; }
+.s-delivered  { background:#e8f5e9; color:#1b5e20; }
+.s-cancelled  { background:#fce4ec; color:#c62828; }
+.oc-module { font-weight:900; font-size:.95rem; color:#1a1a1a; }
+.oc-items { font-size:.83rem; color:#777; font-weight:700; margin-bottom:8px; }
+.oc-bottom { display:flex; justify-content:space-between; }
+.oc-total { font-family:'Fredoka One',cursive; color:#E8504A; font-size:1.05rem; }
+.oc-time { font-size:.75rem; color:#bbb; font-weight:700; }
+
+/* PROFILE TAB */
+.profile-header {
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  padding:40px 20px 30px;
+  display:flex; flex-direction:column; align-items:center; gap:12px;
+}
+.prof-avatar {
+  width:80px; height:80px; border-radius:50%;
+  background:rgba(245,240,220,.2);
+  border:3px solid rgba(245,240,220,.4);
+  display:flex; align-items:center; justify-content:center; font-size:2.5rem;
+}
+.prof-name { font-family:'Fredoka One',cursive; font-size:1.5rem; color:#F5F0DC; }
+.prof-phone { font-size:.9rem; color:rgba(245,240,220,.8); font-weight:700; }
+.prof-stats {
+  display:flex; gap:20px; margin-top:8px;
+}
+.ps-item { text-align:center; }
+.ps-num { font-family:'Fredoka One',cursive; font-size:1.4rem; color:#FFD84D; }
+.ps-label { font-size:.72rem; color:rgba(245,240,220,.75); font-weight:700; }
+.menu-list { background:#fff; margin:0; }
+.menu-item {
+  display:flex; align-items:center; gap:14px;
+  padding:16px 20px; border-bottom:1px solid #f5f5f5;
+  cursor:pointer; transition:background .15s;
+}
+.menu-item:hover { background:#fafafa; }
+.mi-icon {
+  width:40px; height:40px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem; flex-shrink:0;
+}
+.mi-icon.red { background:#fff5f5; }
+.mi-icon.blue { background:#f0f4ff; }
+.mi-icon.green { background:#f0fff5; }
+.mi-icon.yellow { background:#fffbf0; }
+.mi-label { flex:1; font-weight:800; font-size:.95rem; color:#1a1a1a; }
+.mi-arrow { color:#ddd; font-size:1rem; }
+
+/* BOTTOM NAV */
+.bottom-nav {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  max-width:430px; width:100%;
+  background:#fff;
+  border-top:1px solid #f0f0f0;
+  display:flex;
+  padding:8px 0 20px;
+  z-index:60;
+  box-shadow:0 -4px 20px rgba(0,0,0,.08);
+}
+.nav-item {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; gap:4px;
+  cursor:pointer; padding:4px;
+  transition:color .15s; position:relative;
+}
+.nav-icon { font-size:1.4rem; }
+.nav-label { font-size:.68rem; font-weight:800; color:#bbb; }
+.nav-item.active .nav-label { color:#E8504A; }
+.nav-dot {
+  position:absolute; top:2px; right:calc(50% - 18px);
+  width:8px; height:8px; border-radius:50%;
+  background:#E8504A; display:none;
+}
+.nav-dot.show { display:block; }
+
+/* ── AD SCROLL ── */
+.ad-scroll{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:0 16px 4px;margin-bottom:4px;}
+.ad-scroll::-webkit-scrollbar{display:none;}
+.ad-card{min-width:180px;border-radius:16px;padding:16px;position:relative;cursor:pointer;flex-shrink:0;}
+.ad-text{color:#fff;}
+.ad-title{font-family:'Fredoka One',cursive;font-size:1.1rem;color:#fff;margin-bottom:4px;}
+.ad-sub{font-size:.78rem;color:rgba(255,255,255,.85);font-weight:700;}
+.ad-badge{position:absolute;top:10px;right:10px;background:#FFD84D;color:#7a3a00;font-size:.65rem;font-weight:900;padding:3px 8px;border-radius:20px;}
+/* ── FOOD CATS ── */
+.food-cats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:0 16px;margin-bottom:8px;}
+.fcat{background:#fff;border-radius:14px;padding:10px 4px;text-align:center;cursor:pointer;transition:.2s;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.fcat:active{transform:scale(.95);}
+.fcat-icon{font-size:1.6rem;margin-bottom:4px;}
+.fcat-name{font-size:.68rem;font-weight:800;color:#333;}
+/* ── FILTER CHIPS ── */
+.filter-chip{background:#f0f0f0;border:none;border-radius:20px;padding:7px 14px;font-size:.78rem;font-weight:900;color:#555;cursor:pointer;white-space:nowrap;transition:.2s;}
+.filter-chip.active{background:#E8504A;color:#fff;}
+/* ── VOUCHER / LOYALTY ── */
+.voucher-list{padding:0 16px;display:flex;flex-direction:column;gap:10px;}
+.voucher-card{background:#fff;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid #E8504A;}
+.vc-icon{font-size:2rem;}
+.vc-body{flex:1;}
+.vc-title{font-weight:900;font-size:.9rem;color:#1a1a1a;margin-bottom:2px;}
+.vc-sub{font-size:.78rem;color:#777;font-weight:600;}
+.vc-exp{font-size:.72rem;color:#E8504A;font-weight:800;margin-top:4px;}
+.vc-btn{background:#E8504A;color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:.75rem;font-weight:900;cursor:pointer;}
+/* ── LOYALTY POINTS ── */
+.loyalty-card{background:linear-gradient(135deg,#E8504A,#c93d37);border-radius:20px;padding:20px;margin:0 16px 16px;color:#fff;}
+.lc-pts{font-family:'Fredoka One',cursive;font-size:2.5rem;color:#FFD84D;margin-bottom:4px;}
+.lc-label{font-size:.85rem;color:rgba(255,255,255,.85);font-weight:700;margin-bottom:14px;}
+.lc-row{display:flex;gap:8px;}
+.lc-action{flex:1;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:12px;padding:10px;font-size:.78rem;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;}
+/* ── SAVED ADDRESS ── */
+.addr-list{padding:0 16px;display:flex;flex-direction:column;gap:10px;}
+.addr-card{background:#fff;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.addr-icon{font-size:1.5rem;}
+.addr-body{flex:1;}
+.addr-label{font-weight:900;font-size:.88rem;color:#1a1a1a;}
+.addr-detail{font-size:.78rem;color:#777;font-weight:600;margin-top:2px;}
+.addr-del{background:none;border:none;color:#ccc;font-size:1.1rem;cursor:pointer;}
+.addr-add{background:#fff;border:2px dashed #E8504A;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;color:#E8504A;font-weight:900;font-size:.88rem;}
+/* LOADING */
+.loading-page {
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  min-height:60vh; gap:12px;
+  color:#bbb; font-weight:800; font-size:.9rem;
+}
+.spinner {
+  width:36px; height:36px; border-radius:50%;
+  border:3px solid #f0f0f0;
+  border-top-color:#E8504A;
+  animation:spin .6s linear infinite;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:100px; left:50%; transform:translateX(-50%) translateY(100px);
+  background:#1a1a1a; color:#fff;
+  border-radius:50px; padding:12px 24px;
+  font-weight:800; font-size:.9rem;
+  z-index:999; white-space:nowrap;
+  transition:transform .3s;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+/* BACK BTN */
+.page-header {
+  display:flex; align-items:center; gap:12px;
+  padding:16px;
+  position:sticky; top:0; background:#f0ede6; z-index:10;
+}
+.back-btn {
+  width:38px; height:38px; border-radius:50%;
+  background:#fff; border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem; box-shadow:0 2px 8px rgba(0,0,0,.1);
+  flex-shrink:0;
+}
+.page-title { font-family:'Fredoka One',cursive; font-size:1.2rem; color:#1a1a1a; }
+
+/* RESTAURANT LIST */
+.rest-card {
+  background:#fff; border-radius:18px;
+  margin:0 16px 12px; overflow:hidden;
+  box-shadow:0 3px 14px rgba(0,0,0,.08);
+  cursor:pointer; transition:transform .2s;
+}
+.rest-card:hover { transform:translateY(-3px); }
+.rest-cover {
+  width:100%; height:130px;
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  display:flex; align-items:center; justify-content:center;
+  font-size:3.5rem; position:relative; overflow:hidden;
+}
+.rest-cover::after {
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.35));
+}
+.rest-cover-img { width:100%;height:100%;object-fit:cover;position:absolute;inset:0; }
+.rest-status-badge {
+  position:absolute;bottom:10px;left:12px;z-index:2;
+  background:#3aaa5c;color:#fff;
+  padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:900;
+}
+.rest-status-badge.closed { background:#999; }
+.rest-body { padding:14px; }
+.rest-name { font-family:'Fredoka One',cursive;font-size:1.1rem;color:#1a1a1a;margin-bottom:4px; }
+.rest-cats { font-size:.78rem;color:#777;font-weight:700;margin-bottom:8px; }
+.rest-meta { display:flex;gap:14px;align-items:center; }
+.rest-rating { font-size:.82rem;font-weight:900;color:#ff9500; }
+.rest-orders { font-size:.78rem;color:#bbb;font-weight:700; }
+.rest-dist { font-size:.78rem;color:#bbb;font-weight:700;margin-left:auto; }
+
+/* RESTAURANT INFO CARD (inside menu view) */
+.rest-info-card {
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  margin:0 16px 14px; border-radius:18px;
+  padding:16px; color:#F5F0DC; position:relative;overflow:hidden;
+}
+.rest-info-card::before {
+  content:'';position:absolute;width:150px;height:150px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,216,77,.2),transparent 70%);
+  right:-30px;bottom:-40px;
+}
+.ric-name { font-family:'Fredoka One',cursive;font-size:1.2rem;margin-bottom:4px; }
+.ric-cats { font-size:.78rem;opacity:.8;font-weight:700;margin-bottom:8px; }
+.ric-row { display:flex;gap:16px; }
+.ric-stat { font-size:.8rem;font-weight:800; }
+.ric-stat span { font-family:'Fredoka One',cursive;font-size:1rem;color:#FFD84D; }
+
+.district-chip {
+  flex-shrink:0;background:#fff;border:2px solid #e8e8e8;
+  padding:8px 14px;border-radius:30px;font-size:.82rem;
+  font-weight:800;color:#555;cursor:pointer;transition:all .2s;white-space:nowrap;
+}
+.district-chip.active { background:#E8504A;border-color:#E8504A;color:#fff; }
+
+/* Empty state */
+.empty-state {
+  text-align:center; padding:60px 30px;
+  color:#bbb;
+}
+.empty-state .ei { font-size:3.5rem; margin-bottom:14px; }
+.empty-state p { font-weight:700; font-size:.95rem; }
+
+/* ── FOOD TAB ENHANCEMENTS ── */
+#foodCatChips { gap: 6px; }
+#foodCatChips .dist-chip { white-space: nowrap; flex-shrink: 0; }
+
+/* FEATURED PRODUCTS */
+.feat-prod-card {
+  display:flex;align-items:center;gap:12px;
+  background:#fff;border-radius:16px;padding:12px;
+  margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,.06);
+  cursor:pointer;transition:all .2s;
+}
+.feat-prod-card:active { transform:scale(.98); }
+.feat-prod-img { width:64px;height:64px;border-radius:12px;object-fit:cover;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0; }
+.feat-prod-info { flex:1;min-width:0; }
+.feat-prod-name { font-weight:800;font-size:.95rem;color:#1a1a1a;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.feat-prod-rest { font-size:.75rem;color:#aaa;font-weight:700;margin-bottom:5px; }
+.feat-prod-row { display:flex;align-items:center;justify-content:space-between; }
+.feat-prod-price { font-family:'Fredoka One',cursive;font-size:1rem;color:#E8504A; }
+.feat-prod-old { font-size:.78rem;color:#bbb;text-decoration:line-through;margin-right:4px; }
+.feat-prod-badge { background:#E8504A;color:#fff;font-size:.65rem;font-weight:900;padding:2px 7px;border-radius:20px; }
+.feat-prod-add { width:34px;height:34px;border-radius:50%;background:#E8504A;color:#fff;border:none;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s; }
+.feat-prod-add:active { transform:scale(.9); }
+/* SEARCH DROPDOWN */
+.search-dropdown { position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.15);z-index:50;max-height:280px;overflow-y:auto;display:none; }
+.search-dropdown.show { display:block; }
+.sd-item { display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #f5f5f5;transition:background .15s; }
+.sd-item:last-child { border:none; }
+.sd-item:active { background:#f9f9f9; }
+.sd-icon { font-size:1.4rem;width:34px;height:34px;border-radius:10px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+.sd-name { font-weight:800;font-size:.88rem;color:#1a1a1a; }
+.sd-sub { font-size:.72rem;color:#aaa;font-weight:700; }
+.sd-type { margin-left:auto;font-size:.68rem;font-weight:900;padding:3px 8px;border-radius:20px;background:#fff3e0;color:#e67e22;flex-shrink:0; }
+
+
+body { padding-top: 36px; }
+</style>
+</head>
+<body>
+
+
+<!-- ═══ LOGIN ═══ -->
+<div class="screen active" id="loginScreen">
+  <div class="login-hero">
+    <div class="login-crab">
+      <svg width="70" height="70" viewBox="0 0 140 140" fill="none">
+        <path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/>
+        <ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/>
+        <circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/><circle cx="54" cy="49" r="2.5" fill="#F5F0DC"/>
+        <circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/><circle cx="82" cy="49" r="2.5" fill="#F5F0DC"/>
+        <path d="M28 73 Q8 60 7 47 Q17 33 27 43 Q21 52 28 61Z" fill="#F5F0DC"/>
+        <path d="M112 73 Q132 60 133 47 Q123 33 113 43 Q119 52 112 61Z" fill="#F5F0DC"/>
+        <path d="M57 96 Q70 107 83 96" stroke="#E8504A" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="login-brand">CRABOR</div>
+    <div class="login-sub">Đặt đồ ăn · Giặt là · Dọn nhà · Hàng Trung</div>
+  </div>
+  <div class="login-card">
+    <!-- Phase 1: Phone -->
+    <div id="lp1">
+      <div class="login-title">Đăng nhập / Đăng ký</div>
+      <div class="login-hint">Nhập SĐT để nhận mã OTP xác minh</div>
+      <div class="phone-row">
+        <div class="inp-wrap" style="flex:1;margin-bottom:0">
+          <span class="ico">📱</span>
+          <input class="inp" type="tel" id="lPhone" placeholder="0901 234 567" maxlength="10">
+        </div>
+        <button class="btn-otp" id="lBtnOtp" onclick="loginSendOtp()">Gửi OTP</button>
+      </div>
+      <div class="err show" id="lPhoneErr" style="display:none">Vui lòng nhập SĐT hợp lệ</div>
+      <div class="countdown" id="lCountdown"></div>
+      <button class="btn-main" onclick="loginSendOtp()" style="margin-top:16px">Tiếp tục →</button>
+    </div>
+    <!-- Phase 2: OTP -->
+    <div id="lp2" style="display:none">
+      <div class="login-title">Nhập mã OTP</div>
+      <div class="login-hint">Mã 6 số đã gửi về <strong id="lMask"></strong></div>
+      <div class="otp-row">
+        <input class="otp-d" type="text" maxlength="1" id="ld0" oninput="otpNav(this,0,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld1" oninput="otpNav(this,1,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld2" oninput="otpNav(this,2,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld3" oninput="otpNav(this,3,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld4" oninput="otpNav(this,4,'ld')">
+        <input class="otp-d" type="text" maxlength="1" id="ld5" oninput="otpNav(this,5,'ld')">
+      </div>
+      <div class="err" id="lOtpErr">Mã OTP không đúng</div>
+      <button class="btn-main" onclick="loginVerify()">Đăng nhập 🦀</button>
+      <p style="text-align:center;margin-top:14px;font-size:.85rem;color:#777;font-weight:700;">
+        <button onclick="showLoginPhase(1)" style="background:none;border:none;color:#E8504A;font-weight:900;cursor:pointer">← Đổi số</button>
+      </p>
+    </div>
+    <!-- Phase 3: Tạo tài khoản (chỉ hiện với user mới) -->
+    <div id="lp3" style="display:none">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-size:2.2rem">🦀</div>
+        <div class="login-title" style="margin-top:6px">Tạo tài khoản</div>
+        <div class="login-hint">Chỉ cần 30 giây — nhập thông tin để hoàn tất</div>
+      </div>
+      <div class="inp-wrap">
+        <span class="ico">👤</span>
+        <input class="inp" type="text" id="regFullName" placeholder="Họ và tên *" maxlength="50">
+      </div>
+      <div class="err" id="regNameErr" style="display:none">Vui lòng nhập họ tên (ít nhất 2 ký tự)</div>
+      <div class="inp-wrap" style="margin-top:10px">
+        <span class="ico">📧</span>
+        <input class="inp" type="email" id="regEmail" placeholder="Email (không bắt buộc)" maxlength="100">
+      </div>
+      <div class="inp-wrap" style="margin-top:10px">
+        <span class="ico">📍</span>
+        <select class="inp" id="regDistrict" style="background:transparent">
+          <option value="">Quận/Huyện của bạn</option>
+          <option>Ba Đình</option><option>Hoàn Kiếm</option><option>Tây Hồ</option>
+          <option>Long Biên</option><option>Cầu Giấy</option><option>Đống Đa</option>
+          <option>Hai Bà Trưng</option><option>Hoàng Mai</option><option>Thanh Xuân</option>
+          <option>Nam Từ Liêm</option><option>Bắc Từ Liêm</option><option>Hà Đông</option>
+          <option>Gia Lâm</option><option>Đông Anh</option><option>Sóc Sơn</option>
+          <option>Mê Linh</option><option>Thạch Thất</option><option>Quốc Oai</option>
+        </select>
+      </div>
+      <div class="field" style="margin:12px 0 4px">
+        <label style="font-size:.8rem;color:#888;font-weight:700">Mã giới thiệu <span style="font-weight:400">(không bắt buộc)</span></label>
+        <input type="text" id="regRefCode" placeholder="Nhập mã giới thiệu nếu có"
+          style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:10px;font-family:inherit;font-size:.9rem;font-weight:700;text-transform:uppercase;outline:none;margin-top:4px"
+          oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <button class="btn-main" onclick="completeProfile()" style="margin-top:14px">Bắt đầu trải nghiệm 🚀</button>
+      <div id="regSaving" style="display:none;text-align:center;color:#E8504A;margin-top:10px;font-weight:700">⏳ Đang lưu...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div class="screen" id="appScreen">
+  <!-- TOP BAR -->
+  <div class="topbar" id="topbar">
+    <div class="topbar-row">
+      <div class="topbar-left">
+        <div class="greeting">Xin chào 👋</div>
+        <div class="uname" id="tbName">Bạn ơi!</div>
+      </div>
+      <div class="topbar-avatar" onclick="switchTab('profile')">👤</div>
+    </div>
+    <div class="topbar-location">📍 <span id="tbDistrict">Hà Nội</span></div>
+    <!-- Thanh tìm địa chỉ giao hàng -->
+    <div id="addressBar" onclick="openAddressSearch()" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.18);border:1.5px solid rgba(245,240,220,.3);border-radius:14px;padding:11px 16px;margin-top:12px;cursor:pointer">
+      <span style="font-size:1.1rem">📍</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.7rem;color:rgba(245,240,220,.65);font-weight:700;letter-spacing:.5px">GIAO ĐẾN</div>
+        <div id="addrBarText" style="color:#F5F0DC;font-weight:800;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bạn muốn đến đâu? 🏠</div>
+      </div>
+      <span style="color:rgba(245,240,220,.5);font-size:.85rem">✏️</span>
+    </div>
+    <div style="position:relative;margin-top:10px;">
+      <span class="search-icon">🔍</span>
+      <input class="topbar-search" id="globalSearch" type="text" placeholder="Tìm món ăn, nhà hàng, dịch vụ..." oninput="handleSearch(this.value)" onkeydown="if(event.key==='Enter'){doSearch();this.blur()}" autocomplete="off">
+      <div class="search-dropdown" id="searchDropdown"></div>
+    </div>
+  </div>
+
+  <!-- ADDRESS SEARCH MODAL -->
+  <div id="addrModal" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center">
+    <div style="background:#fff;border-radius:28px 28px 0 0;width:100%;max-width:480px;padding:20px;max-height:85vh;display:flex;flex-direction:column">
+      <div style="width:40px;height:4px;background:#e0e0e0;border-radius:4px;margin:0 auto 20px"></div>
+      <div style="font-weight:900;font-size:1.1rem;color:#333;margin-bottom:16px">📍 Bạn muốn giao đến đâu?</div>
+      <div style="position:relative;margin-bottom:12px">
+        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1rem">🔍</span>
+        <input id="addrSearchInput" type="text" placeholder="Nhập địa chỉ, tên đường, khu vực..."
+          style="width:100%;border:2px solid #e0e0e0;border-radius:14px;padding:13px 14px 13px 40px;font-size:.95rem;font-family:inherit;outline:none"
+          oninput="searchAddress(this.value)"
+          onfocus="this.style.borderColor='#E8504A'" onblur="this.style.borderColor='#e0e0e0'">
+      </div>
+      <!-- Recent / suggestions -->
+      <div id="addrSuggestions" style="overflow-y:auto;flex:1">
+        <div style="font-size:.78rem;color:#aaa;font-weight:800;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Gần đây</div>
+        <div id="addrRecent"></div>
+        <div id="addrList" style="margin-top:8px"></div>
+      </div>
+      <button onclick="closeAddressSearch()" style="margin-top:12px;width:100%;background:#f0f0f0;border:none;border-radius:14px;padding:13px;font-weight:900;font-size:.95rem;cursor:pointer;color:#555">Đóng</button>
+    </div>
+  </div>
+
+  <!-- TAB CONTENTS -->
+  <div class="tab-content">
+
+    <!-- HOME -->
+    <div class="tab-page active" id="tab-home">
+      <!-- PROMO BANNER SLIDER -->
+      <div class="promo-banner" id="promoBanner" onclick="openModule('food')">
+        <div style="font-size:3rem">🦀</div>
+        <div class="promo-text">
+          <h3>CRABOR Super App</h3>
+          <p>Giao đồ ăn · Giặt là · Dọn nhà · Hàng Trung</p>
+          <div class="promo-badge">⚡ Giao trong 30 phút</div>
+        </div>
+      </div>
+      <!-- AD BANNERS -->
+      <div class="ad-scroll" id="adBanners">
+        <div class="ad-card" style="background:linear-gradient(135deg,#E8504A,#c93d37)">
+          <div class="ad-text"><div class="ad-title">🍜 Đặt đồ ăn</div><div class="ad-sub">Giao trong 30 phút</div></div>
+          <div class="ad-badge">MỚI</div>
+        </div>
+        <div class="ad-card" style="background:linear-gradient(135deg,#6495ed,#2d3d7a)">
+          <div class="ad-text"><div class="ad-title">👕 Giặt là</div><div class="ad-sub">Lấy & trả tận nơi</div></div>
+          <div class="ad-badge">PHỔ BIẾN</div>
+        </div>
+        <div class="ad-card" style="background:linear-gradient(135deg,#3aaa5c,#2d5a2d)">
+          <div class="ad-text"><div class="ad-title">🧹 Dọn nhà</div><div class="ad-sub">200k–350k/ca</div></div>
+          <div class="ad-badge">HOT</div>
+        </div>
+      </div>
+      <!-- FOOD CATEGORIES -->
+      <div class="section-title">🍽️ Danh mục món ăn</div>
+      <div class="food-cats-grid" id="foodCatsGrid">
+        <div class="fcat" onclick="openFoodCat('Cơm')"><div class="fcat-icon">🍚</div><div class="fcat-name">Cơm</div></div>
+        <div class="fcat" onclick="openFoodCat('Bún/Phở')"><div class="fcat-icon">🍜</div><div class="fcat-name">Bún/Phở</div></div>
+        <div class="fcat" onclick="openFoodCat('Bánh mì')"><div class="fcat-icon">🥖</div><div class="fcat-name">Bánh mì</div></div>
+        <div class="fcat" onclick="openFoodCat('Đồ uống')"><div class="fcat-icon">🧋</div><div class="fcat-name">Đồ uống</div></div>
+        <div class="fcat" onclick="openFoodCat('Ăn vặt')"><div class="fcat-icon">🍟</div><div class="fcat-name">Ăn vặt</div></div>
+        <div class="fcat" onclick="openFoodCat('Tráng miệng')"><div class="fcat-icon">🍰</div><div class="fcat-name">Tráng miệng</div></div>
+        <div class="fcat" onclick="openFoodCat('Combo')"><div class="fcat-icon">🎁</div><div class="fcat-name">Combo</div></div>
+        <div class="fcat" onclick="openFoodCat('Đồ chay')"><div class="fcat-icon">🌱</div><div class="fcat-name">Đồ chay</div></div>
+        <div class="fcat" onclick="openFoodCat('Nướng/BBQ')"><div class="fcat-icon">🍖</div><div class="fcat-name">BBQ</div></div>
+        <div class="fcat" onclick="openFoodCat('Sushi')"><div class="fcat-icon">🍣</div><div class="fcat-name">Sushi</div></div>
+      </div>
+      <!-- FEATURED PRODUCTS -->
+      <div class="section-title">🔥 Món nổi bật hôm nay</div>
+      <div id="featuredProducts" style="padding:0 16px 4px">
+        <div class="loading-page" style="padding:20px"><div class="spinner"></div></div>
+      </div>
+      <div class="section-title">Dịch vụ của CRABOR</div>
+      <div class="modules-grid">
+        <div class="module-card food" onclick="openModule('food')">
+          <div class="mc-icon">🍜</div>
+          <div class="mc-name">Giao đồ ăn</div>
+          <div class="mc-sub">Giao trong 30 phút</div>
+          <div class="mc-badge">HOT</div>
+        </div>
+        <div class="module-card laundry" onclick="openModule('laundry')">
+          <div class="mc-icon">👕</div>
+          <div class="mc-name">Giặt là</div>
+          <div class="mc-sub">Lấy & trả tận nơi</div>
+        </div>
+        <div class="module-card cleaning" onclick="openModule('cleaning')">
+          <div class="mc-icon">🧹</div>
+          <div class="mc-name">Dọn nhà</div>
+          <div class="mc-sub">200k–350k/ca</div>
+        </div>
+        <div class="module-card china" onclick="openModule('china')">
+          <div class="mc-icon">🛍️</div>
+          <div class="mc-name">China Shop</div>
+          <div class="mc-sub">Hàng nội địa Trung</div>
+        </div>
+      </div>
+      <div class="section-title">Đơn gần đây</div>
+      <div id="recentOrders">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- FOOD MODULE: Danh sách tiệm -->
+    <div class="tab-page" id="tab-food">
+      <div class="page-header">
+        <button class="back-btn" onclick="switchTab('home')">←</button>
+        <div class="page-title">🍜 Giao đồ ăn</div>
+      </div>
+      <!-- Search bar -->
+      <div style="padding:10px 16px">
+        <div style="background:#f5f5f5;border-radius:14px;padding:11px 16px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1rem">🔍</span>
+          <input type="text" id="foodSearch" placeholder="Tìm nhà hàng, món ăn..." oninput="searchRestaurants(this.value)" style="border:none;background:none;font-family:'Nunito',sans-serif;font-size:.9rem;font-weight:700;flex:1;outline:none;color:#1a1a1a">
+          <button onclick="document.getElementById('foodSearch').value='';searchRestaurants('')" style="border:none;background:none;color:#aaa;font-size:1rem;cursor:pointer;padding:0">✕</button>
+        </div>
+      </div>
+      <!-- Food category chips -->
+      <div class="cat-scroll" id="foodCatChips" style="padding:4px 16px 0">
+        <button class="dist-chip active" onclick="filterFoodCat('all',this)">🍽 Tất cả</button>
+        <button class="dist-chip" onclick="filterFoodCat('Cơm',this)">🍚 Cơm</button>
+        <button class="dist-chip" onclick="filterFoodCat('Bún/Phở',this)">🍜 Bún/Phở</button>
+        <button class="dist-chip" onclick="filterFoodCat('Bánh mì',this)">🥖 Bánh mì</button>
+        <button class="dist-chip" onclick="filterFoodCat('Đồ uống',this)">🧋 Đồ uống</button>
+        <button class="dist-chip" onclick="filterFoodCat('Ăn vặt',this)">🍟 Ăn vặt</button>
+        <button class="dist-chip" onclick="filterFoodCat('Fast food',this)">🍔 Fast food</button>
+        <button class="dist-chip" onclick="filterFoodCat('Lẩu',this)">🥘 Lẩu</button>
+        <button class="dist-chip" onclick="filterFoodCat('Tráng miệng',this)">🍰 Tráng miệng</button>
+      </div>
+      <!-- District filter -->
+      <div class="cat-scroll" id="districtScroll" style="padding-top:4px"></div>
+      <!-- Sort/filter bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px">
+        <div style="font-size:.78rem;font-weight:700;color:#aaa" id="restCount">Đang tải...</div>
+        <div style="display:flex;gap:6px">
+          <button id="sortRating" onclick="sortRestaurants('rating',this)" style="background:#fff3e0;color:#e67e22;border:none;padding:5px 12px;border-radius:20px;font-size:.72rem;font-weight:800;cursor:pointer">⭐ Đánh giá</button>
+          <button id="sortNearest" onclick="sortRestaurants('nearest',this)" style="background:#f0f7ff;color:#2196f3;border:none;padding:5px 12px;border-radius:20px;font-size:.72rem;font-weight:800;cursor:pointer">📍 Gần nhất</button>
+        </div>
+      </div>
+      <!-- Restaurant list -->
+      <div id="restaurantList">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- FOOD MODULE: Menu của tiệm -->
+    <div class="tab-page" id="tab-menu">
+      <div class="page-header">
+        <button class="back-btn" onclick="backToRestaurants()">←</button>
+        <div class="page-title" id="menuTitle">🍜 Thực đơn</div>
+      </div>
+      <!-- Restaurant info card -->
+      <div class="rest-info-card" id="restInfoCard"></div>
+      <!-- Category filter -->
+      <div class="cat-scroll" id="catScroll"></div>
+      <!-- Products -->
+      <div class="products-list" id="productList">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ORDERS TAB -->
+    <div class="tab-page" id="tab-orders">
+      <div style="padding:20px 16px 10px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#1a1a1a">Đơn hàng của tôi</div>
+          <div style="font-size:.85rem;color:#777;font-weight:700;margin-top:2px">Theo dõi tất cả đơn</div>
+        </div>
+      </div>
+      <!-- Order status filter -->
+      <div style="display:flex;gap:8px;padding:4px 16px 12px;overflow-x:auto;scrollbar-width:none;">
+        <button class="filter-chip active" onclick="filterOrders('all',this)">Tất cả</button>
+        <button class="filter-chip" onclick="filterOrders('pending',this)">Đang chờ</button>
+        <button class="filter-chip" onclick="filterOrders('delivering',this)">Đang giao</button>
+        <button class="filter-chip" onclick="filterOrders('delivered',this)">Hoàn thành</button>
+        <button class="filter-chip" onclick="filterOrders('cancelled',this)">Đã huỷ</button>
+      </div>
+      <div id="ordersList">
+        <div class="loading-page"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- VOUCHERS TAB -->
+    <div class="tab-page" id="tab-vouchers">
+      <div style="padding:20px 16px 10px">
+        <div style="font-family:'Fredoka One',cursive;font-size:1.4rem;color:#1a1a1a">🎁 Ưu đãi của tôi</div>
+        <div style="font-size:.85rem;color:#777;font-weight:700;margin-top:2px">Voucher & khuyến mãi</div>
+      </div>
+      <div class="loyalty-card">
+        <div class="lc-pts" id="vcPts">0</div>
+        <div class="lc-label">🦀 Điểm thưởng CRABOR của bạn</div>
+        <div class="lc-row">
+          <button class="lc-action" onclick="toast('🔜 Tính năng đang phát triển')">🎁 Đổi điểm</button>
+          <button class="lc-action" onclick="toast('🔜 Tính năng đang phát triển')">📋 Lịch sử điểm</button>
+        </div>
+      </div>
+      <div style="padding:0 16px;margin-bottom:12px;font-weight:900;font-size:.88rem;color:#444;text-transform:uppercase;letter-spacing:.5px">Voucher của bạn</div>
+      <div class="voucher-list" id="voucherList">
+        <div class="voucher-card">
+          <div class="vc-icon">🍜</div>
+          <div class="vc-body">
+            <div class="vc-title">Giảm 30k đơn đầu tiên</div>
+            <div class="vc-sub">Áp dụng cho đơn từ 100k · Giao đồ ăn</div>
+            <div class="vc-exp">HSD: 31/12/2025</div>
+          </div>
+          <button class="vc-btn" onclick="applyVoucher('FIRST30')">Dùng</button>
+        </div>
+        <div class="voucher-card" style="border-left-color:#6495ed">
+          <div class="vc-icon">👕</div>
+          <div class="vc-body">
+            <div class="vc-title">Miễn phí lần giặt đầu tiên</div>
+            <div class="vc-sub">Giặt là · Đơn từ 2 kg</div>
+            <div class="vc-exp">HSD: 30/06/2025</div>
+          </div>
+          <button class="vc-btn" style="background:#6495ed" onclick="applyVoucher('WASH1FREE')">Dùng</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILE TAB -->
+    <div class="tab-page" id="tab-profile">
+      <div class="profile-header">
+        <div class="prof-avatar">👤</div>
+        <div class="prof-name" id="profName">–</div>
+        <div class="prof-phone" id="profPhone">–</div>
+        <div class="prof-stats">
+          <div class="ps-item"><div class="ps-num" id="profOrders">0</div><div class="ps-label">Đơn hàng</div></div>
+          <div class="ps-item"><div class="ps-num" id="profPts">0</div><div class="ps-label">Điểm thưởng</div></div>
+          <div class="ps-item"><div class="ps-num" id="profSpent">0</div><div class="ps-label">Đã chi (k)</div></div>
+        </div>
+      </div>
+      <div class="menu-list">
+        <div class="menu-item" onclick="switchTab('orders')"><div class="mi-icon red">📦</div><div class="mi-label">Lịch sử đơn hàng</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="showSavedAddresses()"><div class="mi-icon blue">📍</div><div class="mi-label">Địa chỉ đã lưu</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="showPaymentMethods()"><div class="mi-icon green">💰</div><div class="mi-label">Phương thức thanh toán</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="switchTab('vouchers')"><div class="mi-icon yellow">🎁</div><div class="mi-label">Ưu đãi & Voucher</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="switchTab('vouchers')"><div class="mi-icon red">⭐</div><div class="mi-label">Điểm thưởng CRABOR</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="showSettings()"><div class="mi-icon" style="background:#f3e5f5">⚙️</div><div class="mi-label">Cài đặt tài khoản</div><span class="mi-arrow">›</span></div>
+        <div class="menu-item" onclick="logout()"><div class="mi-icon" style="background:#fce4ec">🚪</div><div class="mi-label" style="color:#c62828">Đăng xuất</div><span class="mi-arrow">›</span></div>
+      </div>
+      <!-- SAVED ADDRESSES MODAL -->
+      <div id="addrModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center">
+        <div style="background:#fff;border-radius:24px 24px 0 0;padding:24px 0 40px;width:100%;max-width:430px;max-height:80vh;overflow-y:auto;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 16px">
+            <div style="font-family:'Fredoka One',cursive;font-size:1.2rem">📍 Địa chỉ đã lưu</div>
+            <button onclick="document.getElementById('addrModal').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer">✕</button>
+          </div>
+          <div class="addr-list">
+            <div class="addr-card"><div class="addr-icon">🏠</div><div class="addr-body"><div class="addr-label">Nhà</div><div class="addr-detail">123 Nguyễn Trãi, Thanh Xuân, Hà Nội</div></div><button class="addr-del">🗑️</button></div>
+            <div class="addr-card"><div class="addr-icon">💼</div><div class="addr-body"><div class="addr-label">Cơ quan</div><div class="addr-detail">45 Đống Đa, Ba Đình, Hà Nội</div></div><button class="addr-del">🗑️</button></div>
+            <div class="addr-add" onclick="toast('🔜 Thêm địa chỉ mới')">➕ Thêm địa chỉ mới</div>
+          </div>
+        </div>
+      </div>
+      <!-- PAYMENT METHODS MODAL -->
+      <div id="payModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center">
+        <div style="background:#fff;border-radius:24px 24px 0 0;padding:24px 0 40px;width:100%;max-width:430px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 16px">
+            <div style="font-family:'Fredoka One',cursive;font-size:1.2rem">💳 Phương thức thanh toán</div>
+            <button onclick="document.getElementById('payModal').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer">✕</button>
+          </div>
+          <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;">
+            <div class="addr-card"><div class="addr-icon">💵</div><div class="addr-body"><div class="addr-label">Tiền mặt khi nhận hàng</div><div class="addr-detail">Thanh toán trực tiếp cho shipper</div></div><span style="color:#3aaa5c;font-size:1.2rem">✓</span></div>
+            <div class="addr-card" onclick="toast('🔜 Sắp hỗ trợ MoMo')"><div class="addr-icon">💜</div><div class="addr-body"><div class="addr-label">MoMo</div><div class="addr-detail">Liên kết ví MoMo</div></div><span style="color:#ccc">›</span></div>
+            <div class="addr-card" onclick="toast('🔜 Sắp hỗ trợ ZaloPay')"><div class="addr-icon">🔵</div><div class="addr-body"><div class="addr-label">ZaloPay</div><div class="addr-detail">Liên kết ví ZaloPay</div></div><span style="color:#ccc">›</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
+
+  <!-- CART FAB -->
+  <div class="cart-fab" id="cartFab" onclick="openCart()">
+    <div class="cart-count" id="cartCount">0</div>
+    <div class="cart-label">Xem giỏ hàng</div>
+    <div class="cart-total" id="cartTotalFab">0đ</div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="nav-item active" id="nav-home" onclick="switchTab('home')">
+      <div class="nav-icon">🏠</div><div class="nav-label">Trang chủ</div>
+    </div>
+    <div class="nav-item" id="nav-food" onclick="switchTab('food')">
+      <div class="nav-icon">🍜</div><div class="nav-label">Đặt đồ ăn</div>
+    </div>
+    <div class="nav-item" id="nav-orders" onclick="switchTab('orders')">
+      <div class="nav-icon">📦</div><div class="nav-label">Đơn hàng</div>
+      <div class="nav-dot" id="orderDot"></div>
+    </div>
+    <div class="nav-item" id="nav-vouchers" onclick="switchTab('vouchers')">
+      <div class="nav-icon">🎁</div><div class="nav-label">Ưu đãi</div>
+    </div>
+    <div class="nav-item" id="nav-profile" onclick="switchTab('profile')">
+      <div class="nav-icon">👤</div><div class="nav-label">Cá nhân</div>
+    </div>
+  </div>
+</div>
+
+<!-- CART SHEET -->
+<div class="sheet-overlay" id="cartOverlay" onclick="closeCart(event)">
+  <div class="sheet" id="cartSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🛒 Giỏ hàng</div>
+    <div id="cartItemsHtml"></div>
+    <div class="cart-total-row">
+      <span style="font-weight:800">Tổng đơn</span>
+      <span class="cart-grand" id="cartGrand">0đ</span>
+    </div>
+    <div style="font-weight:900;font-size:.85rem;color:#444;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Địa chỉ giao hàng</div>
+    <textarea class="addr-field" id="orderAddr" rows="2" placeholder="Nhập địa chỉ giao hàng của bạn..."></textarea>
+    <div style="font-weight:900;font-size:.85rem;color:#444;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Thanh toán</div>
+    <div class="pay-opts">
+      <div class="pay-opt sel" onclick="selPay(this,'cash')">💵 Tiền mặt</div>
+      <div class="pay-opt" onclick="selPay(this,'momo')">💜 MoMo</div>
+      <div class="pay-opt" onclick="selPay(this,'zalopay')">🔵 ZaloPay</div>
+    </div>
+    <button class="btn-main" onclick="placeOrder()">🦀 Đặt hàng ngay</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// <!--
+// ════════════════════════════
+//  STATE
+// ════════════════════════════
+let user = null;
+let loginPhone = '';
+
+let cart = [];
+let products = [];
+let payMethod = 'cash';
+let currentTab = 'home';
+let loginTimer = null;
+
+// ════════════════════════════
+//  LOGIN
+// ════════════════════════════
+function showLoginPhase(n) {
+  [1,2,3].forEach(i => { const el=document.getElementById('lp'+i); if(el) el.style.display = i===n ? '' : 'none'; });
+}
+
+async function loginSendOtp() {
+  const phone = document.getElementById('lPhone').value.trim();
+  if (!/^0[0-9]{9}$/.test(phone)) {
+    document.getElementById('lPhoneErr').style.display = 'block'; return;
+  }
+  document.getElementById('lPhoneErr').style.display = 'none';
+  loginPhone = phone;
+  const btn = document.getElementById('lBtnOtp'); btn.disabled = true;
+  try {
+    const r = await fetch('/api/auth/send-otp', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ phone, type:'user_login' })
+    });
+    const d = await r.json();
+    if (!d.success) {
+      toast('❌ ' + (d.message || 'Không gửi được OTP'));
+      btn.disabled = false;
+      return;
+    }
+  } catch(e) {
+    toast('❌ Không thể kết nối server. Vui lòng thử lại.');
+    btn.disabled = false;
+    return;
+  }
+  document.getElementById('lMask').textContent = phone.slice(0,3)+'****'+phone.slice(-3);
+  showLoginPhase(2);
+  let s=60;
+  const cd = document.getElementById('lCountdown'); cd.style.display='block';
+  if(loginTimer) clearInterval(loginTimer);
+  loginTimer=setInterval(()=>{cd.textContent=`Gửi lại sau ${s}s`;s--;if(s<0){clearInterval(loginTimer);btn.disabled=false;cd.style.display='none';}},1000);
+}
+
+function otpNav(el, idx, prefix) {
+  el.value = el.value.replace(/\D/,'');
+  if(el.value){el.classList.add('filled');const nx=document.getElementById(prefix+(idx+1));if(nx)nx.focus();}
+  else el.classList.remove('filled');
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Backspace'){
+    const ids=['ld0','ld1','ld2','ld3','ld4','ld5'];
+    const idx=ids.indexOf(document.activeElement?.id);
+    if(idx>0&&!document.activeElement.value)document.getElementById(ids[idx-1]).focus();
+  }
+});
+
+async function loginVerify() {
+  const code=[0,1,2,3,4,5].map(i=>document.getElementById('ld'+i).value).join('');
+  const errEl = document.getElementById('lOtpErr');
+  if(code.length!==6){errEl.classList.add('show');errEl.textContent='Nhập đủ 6 chữ số';return;}
+  errEl.classList.remove('show');
+  try {
+    const vr = await fetch('/api/auth/verify-otp',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:loginPhone,otp:code,type:'user_login'})
+    });
+    const vd = await vr.json();
+    if(!vd.success){
+      errEl.classList.add('show');
+      errEl.textContent = vd.message || 'Mã OTP không đúng. Thử lại!';
+      return;
+    }
+    // OTP đúng → tạo/lấy session
+    const lr = await fetch('/api/auth/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:loginPhone})
+    });
+    const ld = await lr.json();
+    if (!ld.success) {
+      errEl.classList.add('show');
+      errEl.textContent = ld.message || 'Lỗi đăng nhập';
+      return;
+    }
+    user = ld.user;
+    if (ld.isNewUser) {
+      // User mới → hiện màn hình tạo tài khoản
+      showLoginPhase(3);
+    } else {
+      // User cũ → vào app luôn
+      document.getElementById('loginScreen').classList.remove('active');
+      document.getElementById('appScreen').classList.add('active');
+      initApp();
+    }
+  } catch(e){
+    errEl.classList.add('show');
+    errEl.textContent = 'Không thể kết nối server. Vui lòng thử lại.';
+  }
+}
+
+
+async function completeProfile() {
+  const fullName = document.getElementById('regFullName').value.trim();
+  const errEl = document.getElementById('regNameErr');
+  if (fullName.length < 2) {
+    errEl.style.display = 'block'; return;
+  }
+  errEl.style.display = 'none';
+  const email = document.getElementById('regEmail').value.trim();
+  const district = document.getElementById('regDistrict').value;
+  document.getElementById('regSaving').style.display = 'block';
+  try {
+    const r = await fetch('/api/auth/complete-profile', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ fullName, email, district, refCode: document.getElementById('regRefCode')?.value?.trim() || '' })
+    });
+    const d = await r.json();
+    if (!d.success) {
+      document.getElementById('regSaving').style.display = 'none';
+      toast('❌ ' + (d.message || 'Lỗi lưu thông tin'));
+      return;
+    }
+    user = d.user;
+    document.getElementById('loginScreen').classList.remove('active');
+    document.getElementById('appScreen').classList.add('active');
+    initApp();
+  } catch(e) {
+    document.getElementById('regSaving').style.display = 'none';
+    toast('❌ Không thể kết nối server');
+  }
+}
+
+
+// ══════════════════════════════════════
+//  ADDRESS SEARCH
+// ══════════════════════════════════════
+let deliveryAddress = localStorage.getItem('craborAddr') || '';
+let addrSearchTimer = null;
+
+function openAddressSearch() {
+  document.getElementById('addrModal').style.display = 'flex';
+  renderRecentAddresses();
+  setTimeout(() => document.getElementById('addrSearchInput').focus(), 200);
+}
+
+function closeAddressSearch() {
+  document.getElementById('addrModal').style.display = 'none';
+}
+
+function renderRecentAddresses() {
+  const recent = JSON.parse(localStorage.getItem('craborRecentAddr') || '[]');
+  const el = document.getElementById('addrRecent');
+  if (!recent.length) {
+    el.innerHTML = '<div style="color:#ccc;font-size:.85rem;text-align:center;padding:10px">Chưa có địa chỉ gần đây</div>';
+    return;
+  }
+  el.innerHTML = recent.slice(0,5).map(a => `
+    <div onclick="selectAddress('${a.replace(/'/g,"&#39;")}',true)" style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5;cursor:pointer">
+      <span style="font-size:1.1rem">🕐</span>
+      <div style="font-size:.9rem;color:#333;font-weight:700">${a}</div>
+    </div>
+  `).join('');
+}
+
+function searchAddress(q) {
+  clearTimeout(addrSearchTimer);
+  if (!q.trim()) { document.getElementById('addrList').innerHTML = ''; return; }
+  addrSearchTimer = setTimeout(async () => {
+    // Use Nominatim OpenStreetMap (free, no API key)
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' Hà Nội')}&format=json&limit=5&addressdetails=1&accept-language=vi`);
+      const data = await r.json();
+      const el = document.getElementById('addrList');
+      if (!data.length) {
+        el.innerHTML = '<div style="color:#aaa;font-size:.85rem;text-align:center;padding:10px">Không tìm thấy địa chỉ</div>';
+        return;
+      }
+      el.innerHTML = data.map(item => {
+        const short = item.display_name.split(',').slice(0,3).join(', ');
+        return `<div onclick="selectAddress('${short.replace(/'/g,"&#39;")}',false)" style="display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5;cursor:pointer">
+          <span style="font-size:1.1rem;margin-top:2px">📍</span>
+          <div style="font-size:.88rem;color:#333;font-weight:700;line-height:1.4">${short}</div>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      // Fallback: just use typed text
+      const el = document.getElementById('addrList');
+      el.innerHTML = `<div onclick="selectAddress('${q}',false)" style="display:flex;align-items:center;gap:10px;padding:12px 0;cursor:pointer">
+        <span style="font-size:1.1rem">✏️</span>
+        <div style="font-size:.9rem;color:#333;font-weight:700">Dùng: "${q}"</div>
+      </div>`;
+    }
+  }, 500);
+}
+
+function selectAddress(addr, isRecent) {
+  deliveryAddress = addr;
+  localStorage.setItem('craborAddr', addr);
+  // Save to recent (avoid duplicates)
+  if (!isRecent) {
+    let recent = JSON.parse(localStorage.getItem('craborRecentAddr') || '[]');
+    recent = [addr, ...recent.filter(a => a !== addr)].slice(0, 10);
+    localStorage.setItem('craborRecentAddr', JSON.stringify(recent));
+  }
+  // Update UI
+  document.getElementById('addrBarText').textContent = addr;
+  closeAddressSearch();
+  toast('📍 Giao đến: ' + addr.split(',')[0]);
+}
+
+// ════════════════════════════
+//  APP INIT
+// ════════════════════════════
+async function initApp() {
+  // Check existing session
+  try {
+    const r = await fetch('/api/auth/me');
+    const d = await r.json();
+    if(d.user) user = d.user;
+  } catch(e){
+    // Server offline — nếu đã login qua dev mode thì user đã được set
+  }
+  
+  if(!user) {
+    document.getElementById('loginScreen').classList.add('active');
+    document.getElementById('appScreen').classList.remove('active');
+    return;
+  }
+  
+  updateTopBar();
+  loadRestaurants();
+  loadOrders();
+  loadRecentOrders();
+  loadFeaturedProducts();
+  initSearch();
+  // Restore saved delivery address
+  const savedAddr = localStorage.getItem('craborAddr');
+  if (savedAddr) document.getElementById('addrBarText').textContent = savedAddr;
+  // Update voucher points display
+  const pts = document.getElementById('vcPts');
+  if(pts && user) pts.textContent = user.loyaltyPts || 0;
+}
+
+function updateTopBar() {
+  if(!user) return;
+  document.getElementById('tbName').textContent = user.fullName || 'Bạn ơi!';
+  document.getElementById('tbDistrict').textContent = user.district || 'Hà Nội';
+  document.getElementById('profName').textContent = user.fullName || 'Người dùng CRABOR';
+  document.getElementById('profPhone').textContent = user.phone || '';
+  document.getElementById('profOrders').textContent = user.totalOrders || 0;
+  document.getElementById('profPts').textContent = user.loyaltyPts || 0;
+  document.getElementById('profSpent').textContent = Math.round((user.totalSpent||0)/1000);
+}
+
+// ════════════════════════════
+//  NAVIGATION
+// ════════════════════════════
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const page = document.getElementById('tab-'+tab);
+  if(page) page.classList.add('active');
+  const nav = document.getElementById('nav-'+tab);
+  if(nav) nav.classList.add('active');
+  // Hide topbar for food/menu pages
+  document.getElementById('topbar').style.display = (tab==='food'||tab==='menu')?'none':'';
+}
+
+function openModule(mod) {
+  if(mod==='food') switchTab('food');
+  else toast('🔜 Module '+mod+' sắp ra mắt!');
+}
+
+// ════════════════════════════
+//  RESTAURANTS & FOOD
+// ════════════════════════════
+let restaurants = [];
+let currentRestaurant = null;
+// (products already declared above)
+let activeCat = 'Tất cả';
+let activeDistrict = 'Tất cả';
+
+
+
+
+
+const DISTRICTS = ['Tất cả','Hoàn Kiếm','Đống Đa','Ba Đình','Cầu Giấy','Thanh Xuân','Hoàng Mai','Hai Bà Trưng','Tây Hồ'];
+
+async function loadRestaurants() {
+  const el = document.getElementById('restaurantList');
+  if(el) el.innerHTML = '<div class="loading-page"><div class="spinner"></div></div>';
+  try {
+    const q = activeDistrict!=='Tất cả' ? `?district=${encodeURIComponent(activeDistrict)}` : '';
+    const r = await fetch('/api/food-partners'+q);
+    const d = await r.json();
+    // Only show REAL partners — never show demo data
+    restaurants = (d.partners && d.partners.length > 0) ? d.partners : [];
+  } catch(e) {
+    restaurants = [];
+  }
+  renderDistrictFilter();
+  renderRestaurants();
+}
+
+function renderDistrictFilter() {
+  const el = document.getElementById('districtScroll');
+  if(!el) return;
+  el.innerHTML = DISTRICTS.map(d=>
+    `<div class="district-chip ${d===activeDistrict?'active':''}" onclick="filterDistrict('${d}')">${d}</div>`
+  ).join('');
+}
+
+function filterDistrict(d) {
+  activeDistrict = d;
+  renderDistrictFilter();
+  loadRestaurants();
+}
+
+function renderRestaurants() {
+  const el = document.getElementById('restaurantList');
+  if(!el) return;
+  // Update count
+  setTimeout(() => {
+    const cards = el.querySelectorAll('.rest-card');
+    const cnt = document.getElementById('restCount');
+    if (cnt) cnt.textContent = `${cards.length} nhà hàng`;
+  }, 80);
+  if(restaurants.length===0) {
+    el.innerHTML=`<div class="empty-state" style="padding:40px 20px;text-align:center">
+      <div style="font-size:3rem;margin-bottom:12px">🚀</div>
+      <div style="font-weight:900;font-size:1rem;color:#222;margin-bottom:8px">Sắp ra mắt tại ${activeDistrict==='Tất cả'?'Hà Nội':activeDistrict}!</div>
+      <div style="font-size:.85rem;color:#888;line-height:1.6;max-width:260px;margin:0 auto">
+        CRABOR đang tuyển đối tác nhà hàng. Hãy quay lại sớm nhé 🦀
+      </div>
+      <button onclick="window.location.href='/register'" style="margin-top:18px;background:#E8504A;color:#fff;border:none;border-radius:50px;padding:11px 24px;font-weight:900;font-size:.85rem;cursor:pointer;font-family:inherit">
+        🍜 Mở tiệm đối tác CRABOR
+      </button>
+    </div>\`;
+    return;
+  }
+  el.innerHTML = restaurants.map(r=>{
+    const isOpen = isRestOpen(r);
+    const cats = (r.categories||[]).join(' · ') || r.emoji || '🍽️';
+    return `<div class="rest-card" onclick="openRestaurant('${r._id}')">
+      <div class="rest-cover">
+        ${r.coverImage ? `<img class="rest-cover-img" src="${r.coverImage}">` : `<span style="position:relative;z-index:1">${r.emoji||'🍜'}</span>`}
+        <div class="rest-status-badge ${isOpen?'':'closed'}">${isOpen?'🟢 Đang mở':'⚫ Đóng cửa'}</div>
+      </div>
+      <div class="rest-body">
+        <div class="rest-name">${r.bizName}</div>
+        <div class="rest-cats">${cats}</div>
+        <div class="rest-meta">
+          <div class="rest-rating">⭐ ${(r.rating||4.5).toFixed(1)}</div>
+          <div class="rest-orders">🔥 ${(r.totalOrders||0).toLocaleString('vi-VN')} đơn</div>
+          <div class="rest-dist">📍 ${r.district||'Hà Nội'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function isRestOpen(r) {
+  if(!r.openTime||!r.closeTime) return true;
+  const now = new Date();
+  const [oh,om] = r.openTime.split(':').map(Number);
+  const [ch,cm] = r.closeTime.split(':').map(Number);
+  const cur = now.getHours()*60+now.getMinutes();
+  return cur>=oh*60+om && cur<=ch*60+cm;
+}
+
+async function openRestaurant(id) {
+  currentRestaurant = restaurants.find(r=>r._id===id) || restaurants[0];
+  // Switch to menu tab
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-menu').classList.add('active');
+  document.getElementById('menuTitle').textContent = currentRestaurant.bizName;
+  // Render info card
+  const r = currentRestaurant;
+  document.getElementById('restInfoCard').innerHTML = `
+    <div class="ric-name">${r.bizName}</div>
+    <div class="ric-cats">${(r.categories||[]).join(' · ')}</div>
+    <div class="ric-row">
+      <div class="ric-stat">⭐ <span>${(r.rating||4.5).toFixed(1)}</span></div>
+      <div class="ric-stat">🔥 <span>${(r.totalOrders||0).toLocaleString('vi-VN')}</span> đơn</div>
+      <div class="ric-stat">🕐 <span>${r.openTime||'–'}–${r.closeTime||'–'}</span></div>
+    </div>`;
+  // Load menu
+  await loadMenuForRestaurant(id);
+}
+
+function backToRestaurants() {
+  currentRestaurant = null;
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-food').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('nav-food').classList.add('active');
+}
+
+async function loadMenuForRestaurant(id) {
+  document.getElementById('productList').innerHTML='<div class="loading-page"><div class="spinner"></div></div>';
+  try {
+    const r = await fetch(`/api/food-partners/${id}/products`);
+    const d = await r.json();
+    products = (d.products && d.products.length > 0) ? d.products : [];
+  } catch(e) { products = []; }
+  activeCat = 'Tất cả';
+  renderMenuCategories();
+  renderProducts();
+}
+
+function renderMenuCategories() {
+  const cats = ['Tất cả',...new Set(products.map(p=>p.category).filter(Boolean))];
+  const el = document.getElementById('catScroll');
+  if(!el) return;
+  el.innerHTML = cats.map(c=>
+    `<div class="cat-chip ${c===activeCat?'active':''}" onclick="filterCat('${c}')">${c}</div>`
+  ).join('');
+}
+
+function filterCat(cat) {
+  activeCat = cat;
+  renderMenuCategories();
+  renderProducts();
+}
+
+function renderProducts() {
+  const list = activeCat==='Tất cả' ? products : products.filter(p=>p.category===activeCat);
+  if(list.length===0){
+    document.getElementById('productList').innerHTML='<div class="empty-state"><div class="ei">🍽️</div><p>Không có món trong danh mục này</p></div>';
+    return;
+  }
+  document.getElementById('productList').innerHTML = list.map(p=>`
+    <div class="product-card">
+      <div class="prod-img">${p.emoji||'🍽️'}</div>
+      <div class="prod-info">
+        <div class="prod-name">${p.name}</div>
+        <div class="prod-desc">${p.description||''}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="prod-price">${fmtPrice(p.price)}</div>
+          <div class="prod-sold">🔥 ${p.sold||0} đã bán</div>
+        </div>
+      </div>
+      <button class="prod-add" onclick="addToCart('${p._id}','${p.name.replace(/'/g,"\'")}',${p.price},'${p.emoji||'🍽️'}')">+</button>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════
+//  CART
+// ════════════════════════════
+function addToCart(id, name, price, emoji) {
+  const existing = cart.find(i=>i.id===id);
+  if(existing) existing.qty++;
+  else cart.push({id,name,price,emoji,qty:1});
+  updateCartUI();
+  toast('✅ Đã thêm '+name);
+}
+
+function updateCartUI() {
+  const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const count = cart.reduce((s,i)=>s+i.qty,0);
+  const fab = document.getElementById('cartFab');
+  if(count>0){ fab.classList.add('show'); document.getElementById('nav-food').querySelector('.nav-dot').classList.add('show');}
+  else{ fab.classList.remove('show'); document.getElementById('nav-food').querySelector('.nav-dot').classList.remove('show');}
+  document.getElementById('cartCount').textContent = count;
+  document.getElementById('cartTotalFab').textContent = fmtPrice(total);
+  document.getElementById('cartGrand').textContent = fmtPrice(total);
+}
+
+function openCart() {
+  renderCartItems();
+  document.getElementById('cartOverlay').classList.add('show');
+}
+
+function closeCart(e) {
+  if(e.target===document.getElementById('cartOverlay'))
+    document.getElementById('cartOverlay').classList.remove('show');
+}
+
+function renderCartItems() {
+  if(cart.length===0){document.getElementById('cartItemsHtml').innerHTML='<div style="text-align:center;padding:20px;color:#bbb;font-weight:700">Giỏ hàng trống</div>';return;}
+  document.getElementById('cartItemsHtml').innerHTML = cart.map(i=>`
+    <div class="cart-item">
+      <div class="ci-icon">${i.emoji}</div>
+      <div class="ci-name">${i.name}</div>
+      <div class="ci-qty-row">
+        <button class="qty-btn" onclick="changeQty('${i.id}',-1)">−</button>
+        <span style="font-family:'Fredoka One',cursive;font-size:1.1rem">${i.qty}</span>
+        <button class="qty-btn" onclick="changeQty('${i.id}',1)">+</button>
+      </div>
+      <div class="ci-price">${fmtPrice(i.price*i.qty)}</div>
+    </div>
+  `).join('');
+}
+
+function changeQty(id, delta) {
+  const item = cart.find(i=>i.id===id);
+  if(!item) return;
+  item.qty += delta;
+  if(item.qty<=0) cart = cart.filter(i=>i.id!==id);
+  renderCartItems(); updateCartUI();
+}
+
+function selPay(el, method) {
+  document.querySelectorAll('.pay-opt').forEach(o=>o.classList.remove('sel'));
+  el.classList.add('sel'); payMethod = method;
+}
+
+async function placeOrder() {
+  const addr = document.getElementById('orderAddr').value.trim();
+  if(!addr){toast('❌ Vui lòng nhập địa chỉ giao hàng');return;}
+  if(cart.length===0){toast('❌ Giỏ hàng trống');return;}
+  const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
+  try {
+    const r = await fetch('/api/orders',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        module:'food', address:addr,
+        items:cart.map(i=>({productId:i.id,name:i.name,qty:i.qty,price:i.price})),
+        total, paymentMethod:payMethod
+      })
+    });
+    const d = await r.json();
+    if(d.success||d.order){
+      cart=[];updateCartUI();
+      document.getElementById('cartOverlay').classList.remove('show');
+      toast('🎉 Đặt hàng thành công! '+d.order?.orderId||'');
+      switchTab('orders'); loadOrders();
+    } else toast('❌ '+(d.message||'Lỗi đặt hàng'));
+  } catch(e){toast('❌ Lỗi kết nối');}
+}
+
+// ════════════════════════════
+//  ORDERS
+// ════════════════════════════
+const STATUS_VN = {pending:'Đang chờ',confirmed:'Đã xác nhận',preparing:'Đang chuẩn bị',picked_up:'Đã lấy hàng',delivering:'Đang giao',delivered:'Đã giao',cancelled:'Đã huỷ',refunded:'Đã hoàn'};
+const MODULE_VN = {food:'🍜 Đồ ăn',laundry:'👕 Giặt là',cleaning:'🧹 Dọn nhà',china_shop:'🛍️ China Shop'};
+
+async function loadOrders() {
+  document.getElementById('ordersList').innerHTML='<div class="loading-page"><div class="spinner"></div></div>';
+  try {
+    const r = await fetch('/api/orders');
+    const d = await r.json();
+    renderOrders(d.orders||[]);
+  } catch(e){renderOrders([]);}
+}
+
+// ════════════════════════════
+//  FEATURED PRODUCTS
+// ════════════════════════════
+const FEATURED_PRODUCTS = [
+  { id:'fp1', name:'Pizza Hải Sản', rest:'Nhà hàng ABC', price:189000, oldPrice:239000, emoji:'🍕', badge:'Bán chạy' },
+  { id:'fp2', name:'Bánh Mì Thịt Nướng', rest:'Tiệm Bánh Mì 5K', price:35000, emoji:'🥖' },
+  { id:'fp3', name:'Cơm Gà Xối Mỡ', rest:'Quán Cơm Ngon', price:55000, emoji:'🍛' },
+  { id:'fp4', name:'Trà Sữa Trân Châu', rest:'TocoToco', price:35000, oldPrice:45000, emoji:'🧋', badge:'Sale 20%' },
+  { id:'fp5', name:'Bánh Flan Caramen', rest:'Tiệm Bánh Ngọt', price:25000, emoji:'🍮' },
+  { id:'fp6', name:'Combo Gia Đình', rest:'Pizza Hut', price:399000, oldPrice:550000, emoji:'🎁', badge:'Combo HOT' },
+];
+
+function loadFeaturedProducts() {
+  const el = document.getElementById('featuredProducts');
+  if(!el) return;
+  // Try API first
+  fetch('/api/products?featured=true&limit=6')
+    .then(r=>r.json())
+    .then(d => {
+      const prods = d.products || d || [];
+      if(prods.length > 0) renderFeaturedProducts(prods, el);
+      else renderFeaturedProducts(FEATURED_PRODUCTS, el);
+    })
+    .catch(() => renderFeaturedProducts(FEATURED_PRODUCTS, el));
+}
+
+function renderFeaturedProducts(prods, el) {
+  el.innerHTML = prods.map(p => `
+    <div class="feat-prod-card" onclick="openModule('food')">
+      <div class="feat-prod-img">${p.emoji||p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:p.emoji||'🍽️'}</div>
+      <div class="feat-prod-info">
+        <div class="feat-prod-name">${p.name}</div>
+        <div class="feat-prod-rest">📍 ${p.rest||p.restaurant||'CRABOR Food'}</div>
+        <div class="feat-prod-row">
+          <div style="display:flex;align-items:center;gap:6px">
+            ${p.oldPrice?`<span class="feat-prod-old">${p.oldPrice.toLocaleString('vi-VN')}đ</span>`:''}
+            <span class="feat-prod-price">${(p.price).toLocaleString('vi-VN')}đ</span>
+            ${p.badge?`<span class="feat-prod-badge">${p.badge}</span>`:''}
+          </div>
+          <button class="feat-prod-add" onclick="event.stopPropagation();addToCart('${p.id||p._id}','${p.name.replace(/'/g,"\'")}',${p.price},'${p.emoji||'🍽️'}')">+</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadRecentOrders() {
+  try {
+    const r = await fetch('/api/orders');
+    const d = await r.json();
+    const orders = (d.orders||[]).slice(0,3);
+    if(orders.length===0){
+      document.getElementById('recentOrders').innerHTML='<div class="empty-state"><div class="ei">🦀</div><p>Chưa có đơn hàng nào<br>Hãy đặt món đầu tiên!</p></div>';
+    } else renderOrdersIn('recentOrders',orders);
+  } catch(e){document.getElementById('recentOrders').innerHTML='';}
+}
+
+function renderOrders(orders) {
+  if(orders.length===0){
+    document.getElementById('ordersList').innerHTML='<div class="empty-state"><div class="ei">📦</div><p>Chưa có đơn hàng nào</p></div>';
+    return;
+  }
+  renderOrdersIn('ordersList',orders);
+}
+
+function renderOrdersIn(containerId, orders) {
+  document.getElementById(containerId).innerHTML = orders.map(o=>`
+    <div class="order-card">
+      <div class="oc-top">
+        <div>
+          <div class="oc-id">${o.orderId}</div>
+          <div class="oc-module">${MODULE_VN[o.module]||o.module}</div>
+        </div>
+        <div class="oc-status-badge s-${o.status}">${STATUS_VN[o.status]||o.status}</div>
+      </div>
+      <div class="oc-items">${(o.items||[]).map(i=>i.name).join(', ')||'–'}</div>
+      <div class="oc-bottom">
+        <div class="oc-total">${fmtPrice(o.finalTotal||o.total)}</div>
+        <div class="oc-time">${timeAgo(o.createdAt)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════
+//  UTILS
+// ════════════════════════════
+function fmtPrice(n) {
+  if(!n) return '0đ';
+  return n.toLocaleString('vi-VN')+'đ';
+}
+function timeAgo(date) {
+  if(!date) return '';
+  const d = new Date(date), now = new Date();
+  const diff = Math.floor((now-d)/60000);
+  if(diff<1) return 'Vừa xong';
+  if(diff<60) return diff+'p trước';
+  if(diff<1440) return Math.floor(diff/60)+'h trước';
+  return Math.floor(diff/1440)+'ngày trước';
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+async function logout() {
+  try{await fetch('/api/auth/logout',{method:'POST'});}catch(e){}
+  user=null; cart=[];
+  document.getElementById('appScreen').classList.remove('active');
+  document.getElementById('loginScreen').classList.add('active');
+  showLoginPhase(1);
+}
+
+// ════════════════════════════
+//  SEARCH
+// ════════════════════════════
+function initSearch() {
+  // Search is now handled by handleSearch() and doSearch()
+}
+
+// ════════════════════════════
+//  SEARCH WITH DROPDOWN
+// ════════════════════════════
+let searchTimer = null;
+function handleSearch(q) {
+  clearTimeout(searchTimer);
+  const dd = document.getElementById('searchDropdown');
+  if(!dd) return;
+  if(!q || q.trim().length < 2) { dd.classList.remove('show'); return; }
+  searchTimer = setTimeout(() => {
+    const query = q.trim().toLowerCase();
+    const results = [];
+    // Search restaurants
+    restaurants.slice(0,20).forEach(r => {
+      if(r.bizName.toLowerCase().includes(query) || (r.categories||[]).some(c=>c.toLowerCase().includes(query))) {
+        results.push({ type:'rest', icon:r.emoji||'🍜', name:r.bizName, sub:(r.categories||[]).slice(0,2).join(' · '), id:r._id });
+      }
+    });
+    // Search menu items from currently loaded products (real data only)
+    if (products && products.length > 0) {
+      products.filter(p=>p.name.toLowerCase().includes(query)).forEach(p => {
+        results.push({ type:'food', icon:p.emoji||'🍽️', name:p.name, sub:p.price.toLocaleString('vi-VN')+'đ', id:p._id||p.id });
+      });
+    }
+    // Search categories
+    const cats = ['Cơm','Bún/Phở','Bánh mì','Đồ uống','Ăn vặt','Tráng miệng','Combo','Đồ chay','Nướng/BBQ','Sushi'];
+    const catIcons = {'Cơm':'🍚','Bún/Phở':'🍜','Bánh mì':'🥖','Đồ uống':'🧋','Ăn vặt':'🍟','Tráng miệng':'🍰','Combo':'🎁','Đồ chay':'🌱','Nướng/BBQ':'🍖','Sushi':'🍣'};
+    cats.filter(c=>c.toLowerCase().includes(query)).forEach(c => {
+      results.push({ type:'cat', icon:catIcons[c]||'🍽️', name:c, sub:'Danh mục', cat:c });
+    });
+    if(results.length === 0) {
+      dd.innerHTML = '<div style="padding:16px;text-align:center;color:#bbb;font-weight:700;font-size:.85rem">Không tìm thấy kết quả</div>';
+    } else {
+      dd.innerHTML = results.slice(0,7).map(r => `
+        <div class="sd-item" onclick="selectSearchResult(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+          <div class="sd-icon">${r.icon}</div>
+          <div style="flex:1;min-width:0">
+            <div class="sd-name">${r.name}</div>
+            <div class="sd-sub">${r.sub}</div>
+          </div>
+          <div class="sd-type">${r.type==='rest'?'Nhà hàng':r.type==='food'?'Món ăn':'Danh mục'}</div>
+        </div>
+      `).join('');
+    }
+    dd.classList.add('show');
+  }, 250);
+}
+
+function selectSearchResult(r) {
+  document.getElementById('searchDropdown').classList.remove('show');
+  document.getElementById('globalSearch').value = '';
+  if(r.type==='rest') { openRestaurant(r.id); }
+  else if(r.type==='food') { openModule('food'); }
+  else if(r.type==='cat') { openFoodCat(r.cat); }
+}
+
+function doSearch() {
+  const q = document.getElementById('globalSearch')?.value.trim();
+  if(q) { openModule('food'); }
+  document.getElementById('searchDropdown')?.classList.remove('show');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if(!e.target.closest('#globalSearch') && !e.target.closest('#searchDropdown')) {
+    document.getElementById('searchDropdown')?.classList.remove('show');
+  }
+});
+
+// ════════════════════════════
+//  FOOD CATEGORY FILTER  
+// ════════════════════════════
+function openFoodCat(category) {
+  switchTab('food');
+  setTimeout(() => {
+    // Filter restaurants by category
+    const filtered = restaurants.filter(r => (r.categories||[]).includes(category));
+    if(filtered.length > 0) {
+      const el = document.getElementById('restaurantList');
+      if(el) el.innerHTML = filtered.map(r=>{
+        const isOpen = isRestOpen(r);
+        return `<div class="rest-card" onclick="openRestaurant('${r._id}')">
+          <div class="rest-cover">
+            ${r.coverImage ? `<img class="rest-cover-img" src="${r.coverImage}">` : `<span style="position:relative;z-index:1">${r.emoji||'🍜'}</span>`}
+            <div class="rest-status-badge ${isOpen?'':'closed'}">${isOpen?'🟢 Đang mở':'⚫ Đóng cửa'}</div>
+          </div>
+          <div class="rest-body">
+            <div class="rest-name">${r.bizName}</div>
+            <div class="rest-cats">${(r.categories||[]).join(' · ')}</div>
+            <div class="rest-meta">
+              <div class="rest-rating">⭐ ${(r.rating||4.5).toFixed(1)}</div>
+              <div class="rest-orders">🔥 ${(r.totalOrders||0).toLocaleString('vi-VN')} đơn</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      toast('🔍 Hiển thị tất cả quán cho: '+category);
+    }
+  }, 100);
+}
+
+// ════════════════════════════
+//  ORDER FILTER
+// ════════════════════════════
+let allOrders = [];
+function filterOrders(status, btn) {
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const filtered = status==='all' ? allOrders : allOrders.filter(o=>o.status===status);
+  renderOrdersIn('ordersList', filtered);
+}
+
+// Override loadOrders to save allOrders
+const _origLoadOrders = loadOrders;
+async function loadOrders() {
+  document.getElementById('ordersList').innerHTML='<div class="loading-page"><div class="spinner"></div></div>';
+  try {
+    const r = await fetch('/api/orders');
+    const d = await r.json();
+    allOrders = d.orders||[];
+    renderOrders(allOrders);
+  } catch(e){allOrders=[];renderOrders([]);}
+}
+
+// ════════════════════════════
+//  VOUCHERS
+// ════════════════════════════
+function applyVoucher(code) {
+  toast('✅ Đã áp dụng voucher '+code+'! Giảm giá sẽ được tính khi đặt hàng.');
+}
+
+// ════════════════════════════
+//  PROFILE HELPERS
+// ════════════════════════════
+function showSavedAddresses() {
+  const m = document.getElementById('addrModal');
+  if(m) m.style.display='flex';
+}
+function showPaymentMethods() {
+  const m = document.getElementById('payModal');
+  if(m) m.style.display='flex';
+}
+function showSettings() {
+  toast('🔜 Cài đặt tài khoản sắp ra mắt!');
+}
+
+// Close modals on backdrop click
+['addrModal','payModal'].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('click', e => { if(e.target===el) el.style.display='none'; });
+});
+
+// ════════════════════════════
+//  BOOT
+// ════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const r = await fetch('/api/auth/me');
+    const d = await r.json();
+    if(d.user && d.user.phone){
+      user = d.user;
+      document.getElementById('loginScreen').classList.remove('active');
+      document.getElementById('appScreen').classList.add('active');
+      initApp();
+    }
+  } catch(e){}
+});
+// -->
+
+// Auto-fill refCode from URL ?ref=XXXX when Phase 3 is shown
+(function() {
+  const urlRef = new URLSearchParams(location.search).get('ref');
+  if (!urlRef) return;
+  // Watch for regRefCode to appear (it's in Phase 3 which renders dynamically)
+  const observer = new MutationObserver(() => {
+    const el = document.getElementById('regRefCode');
+    if (el && !el.value) { el.value = urlRef.toUpperCase(); observer.disconnect(); }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  // Also try immediately
+  const el = document.getElementById('regRefCode');
+  if (el) el.value = urlRef.toUpperCase();
+})();
+</script>
+</body>
+</html>
