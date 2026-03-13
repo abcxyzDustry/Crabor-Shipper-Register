@@ -1004,14 +1004,16 @@ const MODULES = {
     steps: ['SĐT', 'Xác minh', 'Thông tin', 'Giấy tờ', 'Xác nhận'],
     successIcon: '🛵', successClass: 'success-title-sp',
     nextSteps: '📞 Chờ cuộc gọi xác nhận trong 24–48h<br>📱 Tải app CRABOR Shipper để sẵn sàng<br>💸 Thanh toán phí 500k khi nhận kit<br>🚀 Bắt đầu nhận đơn và kiếm tiền',
-    showUniform: true, // ← Hiện thông báo đồng phục
+    showUniform: true,
     step3Extra: `
       <div class="field"><label>Ngày sinh <span class="req">*</span></label><div class="input-wrap"><span class="icon">📅</span><input type="text" id="dob" placeholder="DD/MM/YYYY" maxlength="10"></div><div class="err-msg" id="dobErr">Bạn phải từ 18 tuổi trở lên</div></div>
       <div class="field">
         <label>Phương tiện <span class="req">*</span></label>
         <div class="radio-group">
-          <div class="radio-card"><input type="radio" name="vehicle" id="v1" value="Xe máy"><label for="v1"><span class="r-icon">🛵</span>Xe máy</label></div>
-          <div class="radio-card"><input type="radio" name="vehicle" id="v2" value="Xe đạp điện"><label for="v2"><span class="r-icon">🚲</span>Xe đạp điện</label></div>
+          <!-- 👇 ĐÃ SỬA: value="motorbike" thay vì "Xe máy" -->
+          <div class="radio-card"><input type="radio" name="vehicle" id="v1" value="motorbike"><label for="v1"><span class="r-icon">🛵</span>Xe máy</label></div>
+          <!-- 👇 ĐÃ SỬA: value="bicycle" thay vì "Xe đạp điện" -->
+          <div class="radio-card"><input type="radio" name="vehicle" id="v2" value="bicycle"><label for="v2"><span class="r-icon">🚲</span>Xe đạp điện</label></div>
         </div>
         <div class="err-msg" id="vehicleErr">Vui lòng chọn phương tiện</div>
       </div>`,
@@ -1500,7 +1502,7 @@ function buildSummary() {
   if(mod!=='sp'&&mod!=='rx'){rows.push(['Tên cơ sở',document.getElementById('bizName')?.value||'']);rows.push(['Địa chỉ',document.getElementById('address')?.value||'']);}
   if(mod==='rx'){rows.push(['Loại xe',document.querySelector('input[name=vehicleType]:checked')?.value||'']);rows.push(['Biển số',document.getElementById('vehiclePlate')?.value||'']);}
   rows.push(['Quận/Huyện',document.getElementById('district')?.value||'']);
-  if(mod==='sp') rows.push(['Phương tiện',state.vehicle||'']);
+  if(mod==='sp') rows.push(['Phương tiện',document.querySelector('input[name=vehicle]:checked')?.value||'']);
   rows.push([mod!=='sp'?'Hoa hồng CRABOR':'Phí kích hoạt',cfg.feeAmt]);
   document.getElementById('summaryBox').innerHTML=rows.map(([k,v])=>`<div class="summary-row"><span class="key">${k}</span><span class="val">${v}</span></div>`).join('');
 }
