@@ -21,10 +21,47 @@ const io     = socketIo(server, {
 // ==========================================
 //  1. MONGODB CONNECTION
 // ==========================================
-const MONGODB_URI = process.env.MONGODB_URI;
+let MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
   console.error("[ERR] Thiếu MONGODB_URI trong .env");
   process.exit(1);
+}
+
+// Fix: nếu URI có dạng mongodb+srv://user@domain:pass@host (username chứa @)
+// thì encode @ trong username thành %40 để driver parse đúng
+try {
+  // Tách scheme ra
+  const schemeMatch = MONGODB_URI.match(/^(mongodb(?:\+srv)?:\/\/)(.*)/s);
+  if (schemeMatch) {
+    const scheme = schemeMatch[1];
+    const rest   = schemeMatch[2];
+    // Tìm @ cuối cùng phân cách credentials và host
+    const lastAt = rest.lastIndexOf("@");
+    if (lastAt > 0) {
+      const credentials = rest.substring(0, lastAt);   // user:pass
+      const hostPart    = rest.substring(lastAt + 1);  // host/db?params
+      // Tìm : phân cách user và password (lấy : cuối trong credentials)
+      const colonIdx = credentials.lastIndexOf(":");
+      if (colonIdx > 0) {
+        const rawUser = credentials.substring(0, colonIdx);
+        const rawPass = credentials.substring(colonIdx + 1);
+        // Encode @ trong username nếu có
+        const safeUser = rawUser.replace(/@/g, "%40");
+        const safePass = encodeURIComponent(decodeURIComponent(rawPass)); // normalize
+        // Đảm bảo có /crabor database name
+        const hostFixed = hostPart.includes("/crabor") ? hostPart
+          : hostPart.replace(/^([^/?]+)(\/?)(\?|$)/, "$1/crabor$2$3");
+        MONGODB_URI = `${scheme}${safeUser}:${safePass}@${hostFixed}`;
+        // Thêm retryWrites nếu chưa có
+        if (!MONGODB_URI.includes("retryWrites")) {
+          MONGODB_URI += (MONGODB_URI.includes("?") ? "&" : "?") + "retryWrites=true&w=majority";
+        }
+      }
+    }
+  }
+  console.log("[DB] Connecting to MongoDB...");
+} catch(e) {
+  console.error("[WARN] URI parse error:", e.message);
 }
 
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -2070,7 +2107,7 @@ app.patch("/api/admin/registrations/:type/:id/status", adminAuth, async (req, re
 async function setupDefaultAdmin() {
   const count = await Admin.countDocuments().catch(() => 0);
   if (count === 0) {
-    const pass = process.env.ADMIN_DEFAULT_PASS || "Crabor@2025";
+    const pass = process.env.ADMIN_DEFAULT_PASS || "admin123";
     await Admin.create({ username: "admin", password: pass, role: "superadmin", name: "CRABOR Admin" }).catch(()=>{});
     console.log(" Admin mặc định: admin / " + pass);
     console.log("   [WARN]  Đổi mật khẩu sau lần đăng nhập đầu!");
