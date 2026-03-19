@@ -569,8 +569,8 @@ async function speedSmsSendOtp(phone) {
   const body = JSON.stringify({
     to: [to],
     content: `Ma OTP CRABOR: ${code}. Het han sau 5 phut. Khong chia se ma nay cho bat ky ai.`,
-    sms_type: 4,  // brandname "Verify" mặc định — không cần đăng ký
-    sender: "Verify",
+    sms_type: 2,  // đầu số ngẫu nhiên — không cần đăng ký brandname
+    sender: "",
   });
 
   const auth = Buffer.from(`${SPEEDSMS_TOKEN}:x`).toString("base64");
@@ -611,8 +611,8 @@ async function sendSms(phone, message) {
     await axios.post("https://api.speedsms.vn/index.php/sms/send", JSON.stringify({
       to: [to],
       content: message,
-      sms_type: 4,
-      sender: "Verify",
+      sms_type: 2,
+      sender: "",
     }), {
       headers: { "Authorization": `Basic ${auth}`, "Content-Type": "application/json" },
       timeout: 12000,
