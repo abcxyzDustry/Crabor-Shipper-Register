@@ -1,0 +1,2379 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CRABOR Shipper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red:#E8504A; --cream:#F5F0DC; --yellow:#FFD84D;
+  --dark:#1a1a1a; --radius:18px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Nunito',sans-serif;
+  background:#111;
+  min-height:100vh;
+  max-width:430px;
+  margin:0 auto;
+}
+.screen{display:none;flex-direction:column;min-height:100vh;}
+.screen.active{display:flex;}
+
+/* LOGIN */
+#loginScreen{
+  background:linear-gradient(160deg,#E8504A 0%,#c93d37 60%,#111 100%);
+  align-items:center;justify-content:flex-end;padding-bottom:0;
+}
+.sp-hero{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:40px 30px 20px;gap:12px;
+}
+.sp-logo{
+  width:100px;height:100px;border-radius:28px;
+  background:rgba(245,240,220,.15);
+  border:2px solid rgba(245,240,220,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:3rem;
+  animation:float 3s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.sp-brand{font-family:'Fredoka One',cursive;font-size:2.5rem;color:#F5F0DC;text-shadow:3px 3px 0 rgba(0,0,0,.2);}
+.sp-sub{color:rgba(245,240,220,.8);font-weight:700;font-size:.95rem;text-align:center;}
+.login-card{
+  background:#fff;border-radius:32px 32px 0 0;
+  padding:32px 24px 40px;width:100%;
+}
+.lc-title{font-family:'Fredoka One',cursive;font-size:1.5rem;color:#1a1a1a;margin-bottom:5px;}
+.lc-sub{font-size:.85rem;color:#777;font-weight:700;margin-bottom:22px;}
+.phone-row{display:flex;gap:10px;margin-bottom:10px;}
+.inp{
+  width:100%;padding:14px 16px 14px 44px;
+  border:2px solid #e8e8e8;border-radius:14px;
+  font-family:'Nunito',sans-serif;font-size:.95rem;font-weight:700;
+  outline:none;background:#fafafa;transition:border-color .2s;
+}
+.inp:focus{border-color:#E8504A;background:#fff;}
+.inp-wrap{position:relative;flex:1;}
+.inp-wrap .ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1rem;}
+.btn-otp{
+  padding:0 14px;border-radius:14px;border:2px solid #E8504A;
+  background:transparent;color:#E8504A;
+  font-family:'Fredoka One',cursive;font-size:.9rem;
+  cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0;
+}
+.btn-otp:hover{background:#E8504A;color:#fff;}
+.btn-otp:disabled{opacity:.4;cursor:not-allowed;}
+.otp-row{display:flex;gap:8px;justify-content:center;margin:16px 0;}
+.otp-d{
+  width:48px;height:56px;border-radius:12px;
+  border:2px solid #e8e8e8;background:#fafafa;
+  font-family:'Fredoka One',cursive;font-size:1.6rem;
+  text-align:center;outline:none;transition:border-color .2s;
+}
+.otp-d:focus{border-color:#E8504A;background:#fff;}
+.otp-d.filled{border-color:#3aaa5c;}
+.btn-main{
+  width:100%;padding:16px;border-radius:60px;border:none;
+  background:#E8504A;color:#fff;
+  font-family:'Fredoka One',cursive;font-size:1.1rem;
+  cursor:pointer;transition:all .2s;margin-top:6px;
+  box-shadow:0 8px 25px rgba(232,80,74,.4);
+}
+.btn-main:hover{transform:translateY(-2px);background:#c93d37;}
+.btn-main:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.countdown{font-size:.78rem;color:#777;font-weight:700;margin-top:5px;display:none;}
+.err{color:#ff4d4d;font-size:.83rem;font-weight:800;margin-top:4px;display:none;}
+.err.show{display:block;}
+
+/* MAIN APP - DARK THEME */
+#appScreen{background:#111;color:#fff;}
+
+.topbar{
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  padding:48px 20px 20px;
+  position:relative;overflow:hidden;
+}
+.topbar::before{
+  content:'';position:absolute;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,216,77,.15),transparent 70%);
+  right:-40px;bottom:-60px;
+}
+.tb-row{display:flex;justify-content:space-between;align-items:center;}
+.tb-info .name{font-family:'Fredoka One',cursive;font-size:1.3rem;color:#F5F0DC;}
+.tb-info .sub{font-size:.8rem;color:rgba(245,240,220,.75);font-weight:700;margin-top:2px;}
+.online-toggle{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(0,0,0,.25);
+  border-radius:50px;padding:8px 14px;
+  cursor:pointer;border:none;color:#F5F0DC;
+  font-family:'Nunito',sans-serif;font-weight:900;font-size:.85rem;
+  transition:all .25s;
+}
+.online-toggle.online{background:rgba(58,170,92,.3);border:1.5px solid rgba(58,170,92,.5);}
+.toggle-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:#bbb;transition:background .3s;flex-shrink:0;
+}
+.online-toggle.online .toggle-dot{background:#3aaa5c;box-shadow:0 0 0 3px rgba(58,170,92,.3);}
+
+/* STATS ROW */
+.stats-row{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:10px;padding:14px 16px;
+}
+.stat-card{
+  background:#1e1e1e;border-radius:14px;
+  padding:14px 12px;text-align:center;
+  border:1px solid #2a2a2a;
+}
+.stat-num{
+  font-family:'Fredoka One',cursive;
+  font-size:1.4rem;
+}
+.stat-num.red{color:#E8504A;}
+.stat-num.yellow{color:#FFD84D;}
+.stat-num.green{color:#3aaa5c;}
+.stat-label{font-size:.7rem;color:#777;font-weight:700;margin-top:3px;}
+
+/* ORDER REQUEST (notification popup) */
+.order-request{
+  position:fixed;top:0;left:50%;transform:translateX(-50%);
+  max-width:430px;width:100%;
+  background:linear-gradient(135deg,#1e1e1e,#222);
+  border-bottom:2px solid #E8504A;
+  padding:16px;z-index:200;
+  display:none;
+  box-shadow:0 8px 40px rgba(232,80,74,.3);
+}
+.order-request.show{display:block;animation:slideDown .3s ease;}
+@keyframes slideDown{from{transform:translateX(-50%) translateY(-100%)}to{transform:translateX(-50%) translateY(0)}}
+.or-header{
+  display:flex;align-items:center;gap:10px;margin-bottom:10px;
+}
+.or-icon{
+  width:40px;height:40px;border-radius:50%;
+  background:#E8504A;display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;flex-shrink:0;
+  animation:pulse 1s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(232,80,74,.5)}50%{box-shadow:0 0 0 8px rgba(232,80,74,0)}}
+.or-title{font-family:'Fredoka One',cursive;font-size:1rem;color:#F5F0DC;}
+.or-sub{font-size:.78rem;color:#777;font-weight:700;}
+.or-detail{
+  background:#111;border-radius:12px;
+  padding:12px;margin-bottom:12px;
+}
+.or-row{display:flex;justify-content:space-between;padding:5px 0;font-size:.83rem;}
+.or-key{color:#777;font-weight:700;}
+.or-val{color:#F5F0DC;font-weight:900;text-align:right;max-width:60%;}
+.or-timer{
+  text-align:center;margin-bottom:10px;
+  font-family:'Fredoka One',cursive;font-size:1.5rem;
+}
+.or-timer.warn{color:#E8504A;}
+.or-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn-accept{
+  padding:13px;border-radius:50px;border:none;
+  background:#3aaa5c;color:#fff;
+  font-family:'Fredoka One',cursive;font-size:1rem;
+  cursor:pointer;transition:all .2s;
+}
+.btn-accept:hover{background:#2d8f4a;transform:translateY(-2px);}
+.btn-reject{
+  padding:13px;border-radius:50px;border:2px solid #444;
+  background:transparent;color:#777;
+  font-family:'Fredoka One',cursive;font-size:1rem;
+  cursor:pointer;transition:all .2s;
+}
+.btn-reject:hover{border-color:#E8504A;color:#E8504A;}
+
+/* ACTIVE ORDER */
+.active-order{
+  margin:0 16px 14px;
+  background:#1e1e1e;border-radius:18px;
+  border:1px solid #2a2a2a;overflow:hidden;
+}
+.ao-head{
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  padding:14px 16px;
+}
+.ao-head-row{display:flex;justify-content:space-between;align-items:center;}
+.ao-title{font-family:'Fredoka One',cursive;font-size:1rem;color:#F5F0DC;}
+.ao-id{font-size:.75rem;color:rgba(245,240,220,.7);font-weight:700;}
+.ao-body{padding:16px;}
+.ao-customer{
+  display:flex;align-items:center;gap:12px;margin-bottom:14px;
+  background:#111;border-radius:12px;padding:12px;
+}
+.ao-avatar{
+  width:42px;height:42px;border-radius:50%;
+  background:#2a2a2a;display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;flex-shrink:0;
+}
+.ao-cname{font-weight:900;font-size:.9rem;color:#F5F0DC;}
+.ao-addr{font-size:.78rem;color:#777;font-weight:700;margin-top:2px;}
+.ao-call{
+  margin-left:auto;
+  width:36px;height:36px;border-radius:50%;
+  background:#3aaa5c;border:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;cursor:pointer;flex-shrink:0;
+}
+
+/* STATUS STEPS */
+.status-steps{display:flex;align-items:center;margin-bottom:16px;}
+.step-item{display:flex;flex-direction:column;align-items:center;flex:1;}
+.step-dot{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.9rem;
+  border:2px solid #333;color:#555;
+  transition:all .3s;
+}
+.step-dot.done{background:#3aaa5c;border-color:#3aaa5c;color:#fff;}
+.step-dot.active{background:#E8504A;border-color:#E8504A;color:#fff;animation:pulse .8s ease-in-out infinite;}
+.step-lbl{font-size:.62rem;color:#555;font-weight:700;margin-top:4px;text-align:center;}
+.step-lbl.done,.step-lbl.active{color:#F5F0DC;}
+.step-line{flex:1;height:2px;background:#2a2a2a;margin:0 4px;margin-bottom:18px;transition:background .3s;}
+.step-line.done{background:#3aaa5c;}
+
+.btn-next-status{
+  width:100%;padding:15px;border-radius:50px;border:none;
+  background:#E8504A;color:#fff;
+  font-family:'Fredoka One',cursive;font-size:1.1rem;
+  cursor:pointer;transition:all .2s;
+  box-shadow:0 6px 20px rgba(232,80,74,.35);
+}
+.btn-next-status:hover{transform:translateY(-2px);background:#c93d37;}
+
+/* ORDER HISTORY */
+.sec-title{
+  padding:16px 16px 8px;
+  font-family:'Fredoka One',cursive;font-size:1.1rem;color:#F5F0DC;
+}
+.hist-card{
+  margin:0 16px 10px;
+  background:#1e1e1e;border-radius:14px;
+  padding:14px;border:1px solid #2a2a2a;
+}
+.hc-row{display:flex;justify-content:space-between;align-items:center;}
+.hc-id{font-size:.75rem;color:#555;font-weight:700;}
+.hc-earn{font-family:'Fredoka One',cursive;font-size:1.1rem;color:#FFD84D;}
+.hc-addr{font-size:.82rem;color:#777;font-weight:700;margin:6px 0;}
+.hc-time{font-size:.72rem;color:#444;font-weight:700;}
+.hc-badge{
+  background:#1a2f1a;color:#3aaa5c;
+  padding:3px 10px;border-radius:10px;
+  font-size:.72rem;font-weight:900;
+}
+
+.scroll-area{flex:1;overflow-y:auto;padding-bottom:20px;}
+.loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;gap:10px;color:#444;font-weight:700;font-size:.85rem;}
+.spinner{width:32px;height:32px;border-radius:50%;border:3px solid #222;border-top-color:#E8504A;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(100px);background:#1e1e1e;border:1px solid #333;color:#F5F0DC;border-radius:50px;padding:12px 24px;font-weight:800;font-size:.9rem;z-index:999;white-space:nowrap;transition:transform .3s;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+.empty-state{text-align:center;padding:40px 20px;color:#444;}
+.empty-state .ei{font-size:3rem;margin-bottom:12px;}
+.empty-state p{font-weight:700;font-size:.9rem;}
+
+
+.mod-toggle-card {
+  background: #1a1a2e;
+  border: 2px solid #2a2a3e;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.mod-toggle-card.on {
+  border-color: #E8504A;
+  background: rgba(232,80,74,.12);
+}
+.mod-toggle-sw {
+  margin-left: auto;
+  width: 40px; height: 22px;
+  background: #444;
+  border-radius: 50px;
+  position: relative;
+  flex-shrink: 0;
+  transition: background .2s;
+}
+.mod-toggle-sw::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  top: 3px; left: 3px;
+  transition: left .2s;
+}
+.mod-toggle-sw.active {
+  background: #E8504A;
+}
+.mod-toggle-sw.active::after {
+  left: 21px;
+}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #111; border-top: 1px solid #2a2a2a;
+  display: flex; z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.bn-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 10px 4px 8px; cursor: pointer;
+  color: #555; font-size: .62rem; font-weight: 800;
+  gap: 4px; transition: color .2s; text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.bn-item.active { color: #E8504A; }
+.bn-item .bn-icon { font-size: 1.3rem; }
+
+/* ── TAB SCREENS ── */
+.tab-screen { display: none; padding-bottom: 80px; }
+.tab-screen.show { display: block; }
+
+/* ── EARNINGS ── */
+.earn-header {
+  background: linear-gradient(135deg, #1a2f1a, #0f1f0f);
+  padding: 20px 16px; border-bottom: 1px solid #2a2a2a;
+}
+.earn-wallet {
+  font-family: 'Fredoka One', cursive;
+  font-size: 2.4rem; color: #3adb7a; letter-spacing: 1px;
+}
+.earn-wallet-label { font-size: .72rem; color: rgba(58,219,122,.6); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.earn-period-row { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; }
+.earn-period-btn {
+  white-space: nowrap; padding: 6px 16px; border-radius: 50px;
+  border: 1.5px solid #2a2a2a; background: none; color: #777;
+  font-weight: 800; font-size: .78rem; cursor: pointer; font-family: inherit;
+  transition: all .2s;
+}
+.earn-period-btn.active { background: #E8504A; border-color: #E8504A; color: #fff; }
+.earn-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px 12px; }
+.earn-stat-card {
+  background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
+  padding: 14px; text-align: center;
+}
+.earn-stat-num { font-size: 1.5rem; font-weight: 900; color: #F0B429; font-family: 'Fredoka One', cursive; }
+.earn-stat-lbl { font-size: .7rem; color: #666; font-weight: 800; text-transform: uppercase; margin-top: 3px; }
+.earn-section-title {
+  padding: 12px 16px 8px;
+  font-weight: 900; font-size: .82rem; color: #888;
+  text-transform: uppercase; letter-spacing: .8px;
+}
+.earn-tx-card {
+  margin: 0 16px 8px; background: #1a1a1a; border: 1px solid #2a2a2a;
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.earn-tx-icon { font-size: 1.4rem; width: 36px; text-align: center; flex-shrink: 0; }
+.earn-tx-info { flex: 1; min-width: 0; }
+.earn-tx-label { font-weight: 800; font-size: .85rem; color: #eee; }
+.earn-tx-meta { font-size: .72rem; color: #666; margin-top: 1px; }
+.earn-tx-amt { font-weight: 900; color: #3adb7a; font-size: .9rem; white-space: nowrap; }
+.earn-tx-amt.minus { color: #E8504A; }
+
+/* ── PROFILE ── */
+.prof-wrap { padding: 0 16px 24px; }
+.prof-avatar-row { display: flex; flex-direction: column; align-items: center; padding: 28px 0 16px; }
+.prof-avatar {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: linear-gradient(135deg, #E8504A, #c93d37);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.2rem; margin-bottom: 10px;
+  box-shadow: 0 4px 20px rgba(232,80,74,.35);
+}
+.prof-name { font-weight: 900; font-size: 1.1rem; color: #F5F0DC; }
+.prof-phone { font-size: .8rem; color: #777; margin-top: 2px; }
+.prof-badge {
+  margin-top: 8px; font-size: .72rem; font-weight: 900;
+  padding: 4px 12px; border-radius: 50px;
+}
+.prof-badge.early { background: rgba(240,180,41,.15); color: #F0B429; }
+.prof-badge.standard { background: rgba(232,80,74,.12); color: #E8504A; }
+.prof-section { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px; margin-bottom: 12px; overflow: hidden; }
+.prof-section-title { padding: 14px 16px; font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #666; border-bottom: 1px solid #2a2a2a; }
+.prof-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #1f1f1f; }
+.prof-row:last-child { border-bottom: none; }
+.prof-row-key { font-size: .82rem; color: #888; font-weight: 700; }
+.prof-row-val { font-size: .85rem; color: #eee; font-weight: 900; text-align: right; }
+.prof-row-val.coral { color: #E8504A; }
+.prof-row-val.gold { color: #F0B429; }
+.prof-row-val.green { color: #3adb7a; }
+.prof-logout-btn {
+  width: 100%; background: rgba(232,80,74,.12); border: 1px solid rgba(232,80,74,.25);
+  color: #E8504A; border-radius: 12px; padding: 13px;
+  font-weight: 900; font-size: .9rem; cursor: pointer;
+  font-family: inherit; margin-top: 8px;
+}
+
+/* adjust scroll-area to leave room for bottom nav */
+.scroll-area { padding-bottom: 80px !important; }
+
+/* ── GOONG MAP ── */
+#shipperMap {
+  width: 100%;
+  height: 220px;
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 12px 0 0;
+  background: #1a1a2e;
+  position: relative;
+}
+.map-wrap {
+  margin: 0 16px 12px;
+}
+.map-wrap-label {
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: #666;
+  margin-bottom: 6px;
+}
+.map-locate-btn {
+  position: absolute;
+  bottom: 10px; right: 10px;
+  background: #fff;
+  border: none;
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+}
+</style>
+<script src="/socket.io/socket.io.js"></script>
+  <!-- Goong.io Map -->
+  <link href='https://cdn.jsdelivr.net/npm/@goongmaps/goong-js@1.0.9/dist/goong-js.css' rel='stylesheet' />
+  <script src='https://cdn.jsdelivr.net/npm/@goongmaps/goong-js@1.0.9/dist/goong-js.js'></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="screen active" id="loginScreen">
+  <div class="sp-hero">
+    <div class="sp-logo">🛵</div>
+    <div class="sp-brand">CRABOR</div>
+    <div style="font-family:'Fredoka One',cursive;font-size:1.3rem;color:#FFD84D;">Shipper App</div>
+    <div class="sp-sub">Thu nhập 20k–50k/đơn · Nhận việc ngay</div>
+  </div>
+  <div class="login-card">
+    <div id="sp-lp1">
+      <div class="lc-title">Đăng nhập Shipper</div>
+      <div class="lc-sub">Nhập SĐT đã đăng ký tài khoản shipper</div>
+      <div class="phone-row">
+        <div class="inp-wrap">
+          <span class="ico">📱</span>
+          <input class="inp" type="tel" id="spPhone" placeholder="0901 234 567" maxlength="10">
+        </div>
+        <button class="btn-otp" id="spBtnOtp" onclick="spSendOtp()">Gửi OTP</button>
+      </div>
+      <div class="err" id="spPhoneErr">SĐT không hợp lệ</div>
+      <div class="countdown" id="spCountdown"></div>
+      <button class="btn-main" onclick="spSendOtp()" style="margin-top:14px">Tiếp tục →</button>
+      <p style="text-align:center;margin-top:16px;font-size:.83rem;color:#777;font-weight:700;">
+        Chưa đăng ký? <a href="/register" style="color:#E8504A;font-weight:900;">Đăng ký ngay</a>
+      </p>
+    </div>
+    <div id="sp-lp2" style="display:none">
+      <div class="lc-title">Nhập mã OTP</div>
+      <div class="lc-sub">Mã 6 số đã gửi về <strong id="spMask"></strong></div>
+      <div class="otp-row">
+        <input class="otp-d" type="text" maxlength="1" id="sd0" oninput="otpNav(this,0)">
+        <input class="otp-d" type="text" maxlength="1" id="sd1" oninput="otpNav(this,1)">
+        <input class="otp-d" type="text" maxlength="1" id="sd2" oninput="otpNav(this,2)">
+        <input class="otp-d" type="text" maxlength="1" id="sd3" oninput="otpNav(this,3)">
+        <input class="otp-d" type="text" maxlength="1" id="sd4" oninput="otpNav(this,4)">
+        <input class="otp-d" type="text" maxlength="1" id="sd5" oninput="otpNav(this,5)">
+      </div>
+      <div class="err" id="spOtpErr">Mã OTP không đúng</div>
+      <button class="btn-main" onclick="spVerify()">Đăng nhập 🛵</button>
+      <p style="text-align:center;margin-top:14px;font-size:.83rem;color:#777;font-weight:700;">
+        <button onclick="showPhase(1)" style="background:none;border:none;color:#E8504A;font-weight:900;cursor:pointer">← Đổi số</button>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="screen" id="appScreen">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="tb-row">
+      <div class="tb-info">
+        <div class="name" id="spName">Shipper</div>
+        <div class="sub" id="spRegId">CRB-S-XXXXXX</div>
+      </div>
+      <button class="online-toggle" id="toggleBtn" onclick="toggleOnline()">
+        <div class="toggle-dot"></div>
+        <span id="toggleLabel">Offline</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num red" id="todayOrders">0</div>
+      <div class="stat-label">Đơn hôm nay</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num yellow" id="todayEarning">0đ</div>
+      <div class="stat-label">Thu nhập</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num green" id="totalOrders">0</div>
+      <div class="stat-label">Tổng đơn</div>
+    </div>
+  </div>
+
+  <!-- MODULE TOGGLE -->
+  <div class="card" style="margin:0 16px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div style="font-weight:900;font-size:.95rem;color:#fff">📦 Nhận đơn theo module</div>
+        <div style="font-size:.75rem;color:#aaa;margin-top:2px">Bật/tắt từng loại đơn muốn nhận</div>
+      </div>
+      <button onclick="saveModulePrefs()" id="btnSaveMods" style="background:#E8504A;color:#fff;border:none;border-radius:50px;padding:7px 16px;font-weight:900;font-size:.78rem;cursor:pointer">Lưu</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="moduleToggles">
+      <div class="mod-toggle-card" id="mtCard_food" onclick="toggleMod('food')">
+        <div style="font-size:1.4rem">🍜</div>
+        <div>
+          <div style="font-weight:900;font-size:.85rem">Giao đồ ăn</div>
+          <div style="font-size:.72rem;color:#aaa">20k–35k/đơn</div>
+        </div>
+        <div class="mod-toggle-sw active" id="mtSw_food"></div>
+      </div>
+      <div class="mod-toggle-card" id="mtCard_laundry" onclick="toggleMod('laundry')">
+        <div style="font-size:1.4rem">👕</div>
+        <div>
+          <div style="font-weight:900;font-size:.85rem">Giặt là</div>
+          <div style="font-size:.72rem;color:#aaa">30k–50k/đơn</div>
+        </div>
+        <div class="mod-toggle-sw" id="mtSw_laundry"></div>
+      </div>
+      <div class="mod-toggle-card" id="mtCard_cleaning" onclick="toggleMod('cleaning')">
+        <div style="font-size:1.4rem">🧹</div>
+        <div>
+          <div style="font-weight:900;font-size:.85rem">Dọn nhà</div>
+          <div style="font-size:.72rem;color:#aaa">40k–60k/đơn</div>
+        </div>
+        <div class="mod-toggle-sw" id="mtSw_cleaning"></div>
+      </div>
+      <div class="mod-toggle-card" id="mtCard_china_shop" onclick="toggleMod('china_shop')">
+        <div style="font-size:1.4rem">🛍️</div>
+        <div>
+          <div style="font-weight:900;font-size:.85rem">Hàng Trung</div>
+          <div style="font-size:.72rem;color:#aaa">25k–45k/đơn</div>
+        </div>
+        <div class="mod-toggle-sw" id="mtSw_china_shop"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ORDER REQUEST POPUP -->
+  <div class="order-request" id="orderRequest">
+    <div class="or-header">
+      <div class="or-icon">🛵</div>
+      <div>
+        <div class="or-title">Có đơn hàng mới!</div>
+        <div class="or-sub" id="orModule">Đồ ăn · Hà Nội</div>
+      </div>
+    </div>
+    <div class="or-detail">
+      <div class="or-row"><span class="or-key">Địa chỉ</span><span class="or-val" id="orAddr">–</span></div>
+      <div class="or-row"><span class="or-key">Quãng đường</span><span class="or-val" id="orDist">~2.5km</span></div>
+      <div class="or-row"><span class="or-key">Thu nhập</span><span class="or-val" style="color:#FFD84D" id="orEarn">–</span></div>
+    </div>
+    <div class="or-timer" id="orTimer">30</div>
+    <div class="or-btns">
+      <button class="btn-accept" onclick="acceptOrder()">✅ Nhận đơn</button>
+      <button class="btn-reject" onclick="rejectOrder()">❌ Từ chối</button>
+    </div>
+  </div>
+
+  <div class="scroll-area" id="mainScrollArea">
+
+    <!-- ACTIVE ORDER -->
+    <div id="activeOrderWrap" style="display:none">
+      <div class="sec-title">📍 Đơn đang giao</div>
+      <div class="active-order">
+        <div class="ao-head">
+          <div class="ao-head-row">
+            <div class="ao-title">Đơn hàng đang xử lý</div>
+            <div class="ao-id" id="activeOrderId">–</div>
+          </div>
+        </div>
+        <div class="ao-body">
+          <div class="ao-customer">
+            <div class="ao-avatar">👤</div>
+            <div>
+              <div class="ao-cname" id="activeCustomer">Khách hàng</div>
+              <div class="ao-addr" id="activeAddr">–</div>
+            </div>
+            <button class="ao-call">📞</button>
+          </div>
+
+          <!-- GOONG MAP -->
+          <div class="map-wrap">
+            <div class="map-wrap-label">🗺️ Bản đồ lộ trình</div>
+            <div style="position:relative">
+              <div id="shipperMap"></div>
+              <button class="map-locate-btn" onclick="centerMapOnShipper()" title="Vị trí của tôi">📍</button>
+            </div>
+          </div>
+
+          <!-- STATUS STEPS -->
+          <div class="status-steps" id="statusSteps"></div>
+
+          <!-- Chat with customer -->
+          <button class="ao-chat-btn" onclick="openShipperChat()" id="aoChatBtn" style="display:none">
+            💬 Nhắn tin cho khách
+          </button>
+          <!-- Photo confirm (show when delivering) -->
+          <div id="photoConfirmWrap" style="display:none">
+            <input type="file" id="photoInput" accept="image/*" capture="environment"
+              style="display:none" onchange="previewDeliveryPhoto(this)">
+            <div class="photo-preview-wrap" id="photoPreviewWrap">
+              <img id="photoPreviewImg" src="">
+            </div>
+            <button class="photo-confirm-btn" onclick="document.getElementById('photoInput').click()">
+              📸 Chụp ảnh xác nhận giao hàng
+            </button>
+            <button class="photo-confirm-btn" id="btnConfirmDelivery" style="display:none;background:linear-gradient(135deg,#27ae60,#1e8449)" onclick="confirmDeliveryWithPhoto()">
+              ✅ Xác nhận đã giao hàng
+            </button>
+          </div>
+          <button class="btn-next-status" id="btnNextStatus" onclick="advanceStatus()">
+            <span id="nextStatusLabel">Xác nhận nhận đơn</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ZONE HEATMAP (hot areas) -->
+    <div class="zone-section" id="zoneSection" style="display:none">
+      <div class="zone-title">📍 Khu vực nhiều đơn hôm nay</div>
+      <div class="zone-list" id="zoneList"></div>
+    </div>
+
+    <!-- SOS Button -->
+    <div style="padding:0 16px 8px">
+      <button class="sos-btn" onclick="openShipperSOS()">🚨 Báo cáo sự cố / Yêu cầu hỗ trợ</button>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="sec-title">📋 Lịch sử đơn hàng</div>
+    <div id="orderHistory">
+      <div class="loading-page"><div class="spinner"></div></div>
+    </div>
+
+  </div><!-- /scroll-area -->
+
+
+  <!-- ── BOTTOM NAVIGATION ── -->
+  <nav class="bottom-nav">
+    <div class="bn-item active" id="bn-home" onclick="switchShipperTab('home',this)">
+      <span class="bn-icon">🏠</span>Trang chủ
+    </div>
+    <div class="bn-item" id="bn-earn" onclick="switchShipperTab('earn',this)">
+      <span class="bn-icon">💰</span>Thu nhập
+    </div>
+    <div class="bn-item" id="bn-profile" onclick="switchShipperTab('profile',this)">
+      <span class="bn-icon">👤</span>Hồ sơ
+    </div>
+  </nav>
+
+  <!-- ── EARNINGS SCREEN ── -->
+  <div class="tab-screen" id="tabEarn">
+    <div class="earn-header">
+      <div class="earn-wallet-label">💰 Tổng thu nhập</div>
+      <div class="earn-wallet" id="earnTotal">0đ</div>
+      <div style="font-size:.78rem;color:rgba(58,219,122,.5);margin-top:4px;font-weight:700">+<span id="earnTodayAmt">0</span>đ hôm nay · <span id="earnTotalOrdersLbl">0</span> đơn</div>
+    </div>
+
+    <!-- Period filter -->
+    <div class="earn-period-row">
+      <button class="earn-period-btn active" onclick="setEarnPeriod('today',this)">Hôm nay</button>
+      <button class="earn-period-btn" onclick="setEarnPeriod('week',this)">7 ngày</button>
+      <button class="earn-period-btn" onclick="setEarnPeriod('month',this)">Tháng này</button>
+      <button class="earn-period-btn" onclick="setEarnPeriod('all',this)">Tất cả</button>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="earn-stat-grid">
+      <div class="earn-stat-card">
+        <div class="earn-stat-num" id="earnPeriodOrders">0</div>
+        <div class="earn-stat-lbl">Đơn hoàn thành</div>
+      </div>
+      <div class="earn-stat-card">
+        <div class="earn-stat-num" id="earnPeriodAmt">0đ</div>
+        <div class="earn-stat-lbl">Thu nhập</div>
+      </div>
+      <div class="earn-stat-card">
+        <div class="earn-stat-num" id="earnAvgOrder">0đ</div>
+        <div class="earn-stat-lbl">Trung bình/đơn</div>
+      </div>
+      <div class="earn-stat-card">
+        <div class="earn-stat-num" id="earnCompletionRate">–%</div>
+        <div class="earn-stat-lbl">Tỉ lệ hoàn thành</div>
+      </div>
+    </div>
+
+    <!-- Heatmap busy hours -->
+    <div class="heatmap-wrap" id="heatmapWrap">
+      <div class="heatmap-title">🔥 Giờ cao điểm (7 ngày qua)</div>
+      <div class="heatmap-bars" id="heatmapBars">
+        <div style="text-align:center;width:100%;color:#444;font-size:.78rem;padding:16px">⏳ Đang tải...</div>
+      </div>
+    </div>
+
+    <!-- Bank account -->
+    <div class="bank-card">
+      <div class="bank-title">💳 Thông tin rút tiền</div>
+      <div class="bank-field">
+        <div class="bank-label">Ngân hàng</div>
+        <input class="bank-input" id="bankName" placeholder="VD: Vietcombank, BIDV, MB...">
+      </div>
+      <div class="bank-field">
+        <div class="bank-label">Số tài khoản</div>
+        <input class="bank-input" id="bankAccNo" placeholder="0123456789" inputmode="numeric">
+      </div>
+      <div class="bank-field">
+        <div class="bank-label">Tên chủ tài khoản</div>
+        <input class="bank-input" id="bankAccName" placeholder="NGUYEN VAN AN">
+      </div>
+      <button class="bank-save-btn" onclick="saveBankAccount()">💾 Lưu thông tin ngân hàng</button>
+    </div>
+
+    <!-- Transaction list -->
+    <div class="earn-section-title">📋 Lịch sử thu nhập</div>
+    <div id="earnTxList">
+      <div style="text-align:center;padding:32px;color:#555;font-weight:700">⏳ Đang tải...</div>
+    </div>
+  </div>
+
+  <!-- ── PROFILE SCREEN ── -->
+  <div class="tab-screen" id="tabProfile">
+    <div class="prof-avatar-row">
+      <div class="prof-avatar">🛵</div>
+      <div class="prof-name" id="pfName">Shipper</div>
+      <div class="prof-phone" id="pfPhone">–</div>
+      <div class="prof-badge" id="pfPlanBadge">—</div>
+    </div>
+
+    <div class="prof-wrap">
+      <!-- Info -->
+      <div class="prof-section">
+        <div class="prof-section-title">📋 Thông tin cá nhân</div>
+        <div class="prof-row"><span class="prof-row-key">Họ tên</span><span class="prof-row-val" id="pfFullName">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Email</span><span class="prof-row-val" id="pfEmail">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Khu vực</span><span class="prof-row-val" id="pfDistrict">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Phương tiện</span><span class="prof-row-val" id="pfVehicle">–</span></div>
+      </div>
+
+      <!-- Account -->
+      <div class="prof-section">
+        <div class="prof-section-title">🦀 Tài khoản CRABOR</div>
+        <div class="prof-row"><span class="prof-row-key">Mã Shipper</span><span class="prof-row-val coral" id="pfRegId">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Gói</span><span class="prof-row-val gold" id="pfPlan">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Phí kích hoạt</span><span class="prof-row-val" id="pfFee">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Trạng thái phí</span><span class="prof-row-val" id="pfFeeStatus">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Trạng thái</span><span class="prof-row-val" id="pfStatus">–</span></div>
+      </div>
+
+      <!-- Stats -->
+      <div class="prof-section">
+        <div class="prof-section-title">📊 Hiệu suất</div>
+        <div class="prof-row"><span class="prof-row-key">Tổng đơn</span><span class="prof-row-val green" id="pfTotalOrders">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Đơn hoàn thành</span><span class="prof-row-val green" id="pfDoneOrders">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Đơn hủy</span><span class="prof-row-val coral" id="pfCancelOrders">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Đánh giá</span><span class="prof-row-val gold" id="pfRating">–</span></div>
+        <div class="prof-row"><span class="prof-row-key">Tham gia từ</span><span class="prof-row-val" id="pfJoined">–</span></div>
+      </div>
+
+      <!-- Uniform notice -->
+      <div style="background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.2);border-radius:14px;padding:14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:1.4rem">👕</span>
+        <div>
+          <div style="font-weight:900;font-size:.82rem;color:#F0B429;margin-bottom:3px">Đồng phục CRABOR</div>
+          <div style="font-size:.75rem;color:rgba(240,180,41,.7);line-height:1.5;font-weight:700">Đồng phục chính thức của CRABOR sẽ sớm ra mắt. Bạn sẽ được thông báo khi hồ sơ được duyệt.</div>
+        </div>
+      </div>
+
+      <!-- Support -->
+      <div class="prof-section">
+        <div class="prof-section-title">📞 Hỗ trợ</div>
+        <div class="prof-row" style="cursor:pointer" onclick="window.open('tel:1900xxxx')">
+          <span class="prof-row-key">Hotline CRABOR</span>
+          <span class="prof-row-val coral">1900 xxxx ›</span>
+        </div>
+        <div class="prof-row" style="cursor:pointer" onclick="window.open('https://crabor.vn')">
+          <span class="prof-row-key">Website</span>
+          <span class="prof-row-val">crabor.vn ›</span>
+        </div>
+      </div>
+
+      <button class="prof-logout-btn" onclick="doShipperLogout()">🚪 Đăng xuất</button>
+    </div>
+  </div>
+
+</div><!-- /appScreen -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// <!--
+// ════════
+//  STATE
+// ════════
+let shipperData = null;
+let loginPhone = '';
+let isOnline = false;
+let currentOrder = null;
+let orderTimer = null;
+let spLoginTimer = null;
+
+const STATUS_STEPS = ['confirmed','picked_up','delivering','delivered'];
+const STATUS_LABELS = {confirmed:'Nhận đơn',picked_up:'Đã lấy hàng',delivering:'Đang giao',delivered:'Đã giao'};
+const STATUS_ICONS = {confirmed:'✅',picked_up:'📦',delivering:'🛵',delivered:'🎉'};
+const NEXT_STATUS_BTN = {confirmed:'📦 Đã lấy hàng',picked_up:'🛵 Bắt đầu giao',delivering:'🎉 Đã giao thành công'};
+
+// ════════
+//  LOGIN
+// ════════
+function showPhase(n) {
+  document.getElementById('sp-lp1').style.display=n===1?'':'none';
+  document.getElementById('sp-lp2').style.display=n===2?'':'none';
+}
+
+async function spSendOtp() {
+  const phone = document.getElementById('spPhone').value.trim();
+  if(!/^0[0-9]{9}$/.test(phone)){document.getElementById('spPhoneErr').classList.add('show');return;}
+  document.getElementById('spPhoneErr').classList.remove('show');
+  loginPhone=phone;
+  const btn=document.getElementById('spBtnOtp');btn.disabled=true;
+  try{
+    const r=await fetch('/api/auth/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,type:'shipper_login'})});
+    const d=await r.json();
+    if(!d.success){ toast('❌ '+(d.message||'Không gửi được OTP')); btn.disabled=false; return; }
+  }catch(e){ toast('❌ Lỗi kết nối. Thử lại!'); btn.disabled=false; return; }
+  document.getElementById('spMask').textContent=phone.slice(0,3)+'****'+phone.slice(-3);
+  showPhase(2);
+  let s=60;const cd=document.getElementById('spCountdown');cd.style.display='block';
+  if(spLoginTimer)clearInterval(spLoginTimer);
+  spLoginTimer=setInterval(()=>{cd.textContent=`Gửi lại sau ${s}s`;s--;if(s<0){clearInterval(spLoginTimer);btn.disabled=false;cd.style.display='none';}},1000);
+}
+
+function otpNav(el,idx) {
+  el.value=el.value.replace(/\D/,'');
+  if(el.value){el.classList.add('filled');const nx=document.getElementById('sd'+(idx+1));if(nx)nx.focus();}
+  else el.classList.remove('filled');
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Backspace'){
+    const ids=['sd0','sd1','sd2','sd3','sd4','sd5'];
+    const idx=ids.indexOf(document.activeElement?.id);
+    if(idx>0&&!document.activeElement.value)document.getElementById(ids[idx-1]).focus();
+  }
+});
+
+async function spVerify() {
+  const code=[0,1,2,3,4,5].map(i=>document.getElementById('sd'+i).value).join('');
+  const errEl=document.getElementById('spOtpErr');
+  if(code.length!==6){errEl.style.display='block';return;}
+  errEl.style.display='none';
+  try {
+    // 1. Verify OTP
+    const vr=await fetch('/api/auth/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:loginPhone,otp:code,type:'shipper_login'})});
+    const vd=await vr.json();
+    if(!vd.success){ errEl.style.display='block'; errEl.textContent=vd.message||'Mã OTP không đúng. Thử lại!'; return; }
+    // 2. Create session + load shipper profile
+    const sr=await fetch('/api/shipper/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:loginPhone})});
+    const sd=await sr.json();
+    if(!sd.success){
+      if(sd.notRegistered){
+        errEl.style.display='block';
+        errEl.textContent='SĐT này chưa đăng ký shipper. Vui lòng đăng ký trước.';
+        errEl.innerHTML='SĐT này chưa đăng ký shipper.<br><a href="/register#shipper" style="color:#E8504A;font-weight:900">→ Đăng ký ngay</a>';
+        return;
+      }
+      errEl.style.display='block'; errEl.textContent=sd.message||'Lỗi đăng nhập'; return;
+    }
+    shipperData=sd.shipper;
+    onShipperLoggedIn();
+  } catch(e){
+    errEl.style.display='block';
+    errEl.textContent = 'Không thể kết nối server. Thử lại!';
+  }
+}
+
+
+// ══════════════════════════════════════
+//  MODULE PREFERENCES
+// ══════════════════════════════════════
+const ALL_MODULES = ['food','laundry','cleaning','china_shop'];
+let activeModules = JSON.parse(localStorage.getItem('craborShipperMods') || '["food"]');
+
+function initModuleToggles() {
+  ALL_MODULES.forEach(mod => {
+    const sw = document.getElementById('mtSw_' + mod);
+    const card = document.getElementById('mtCard_' + mod);
+    if (!sw || !card) return;
+    const isOn = activeModules.includes(mod);
+    if (isOn) { sw.classList.add('active'); card.classList.add('on'); }
+    else { sw.classList.remove('active'); card.classList.remove('on'); }
+  });
+}
+
+function toggleMod(mod) {
+  if (activeModules.includes(mod)) {
+    if (activeModules.length === 1) { toast('⚠️ Phải bật ít nhất 1 module'); return; }
+    activeModules = activeModules.filter(m => m !== mod);
+  } else {
+    activeModules.push(mod);
+  }
+  const sw = document.getElementById('mtSw_' + mod);
+  const card = document.getElementById('mtCard_' + mod);
+  const isOn = activeModules.includes(mod);
+  if (sw) isOn ? sw.classList.add('active') : sw.classList.remove('active');
+  if (card) isOn ? card.classList.add('on') : card.classList.remove('on');
+}
+
+async function saveModulePrefs() {
+  localStorage.setItem('craborShipperMods', JSON.stringify(activeModules));
+  const btn = document.getElementById('btnSaveMods');
+  btn.textContent = '✅ Đã lưu'; btn.style.background = '#27ae60';
+  // Emit to server so socket room matches
+  if (socket && shipperData) {
+    socket.emit('shipperModules', { shipperId: shipperData._id, modules: activeModules });
+  }
+  setTimeout(() => { btn.textContent = 'Lưu'; btn.style.background = '#E8504A'; }, 2000);
+  toast('✅ Đã lưu cài đặt module!');
+}
+
+// ════════════
+//  SHIPPER DATA
+// ════════════
+function onShipperLoggedIn() {
+  if (!shipperData) return;
+  // Kiểm tra trạng thái tài khoản
+  if (shipperData.status === 'pending' || shipperData.status === 'reviewing') {
+    showPendingScreen();
+    return;
+  }
+  if (shipperData.status === 'rejected') {
+    showRejectedScreen();
+    return;
+  }
+  // approved / active → vào app
+  updateShipperUI();
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('appScreen').classList.add('active');
+  loadOrderHistory();
+  initSocket();
+}
+
+function updateShipperUI() {
+  if (!shipperData) return;
+  document.getElementById('spName').textContent = shipperData.fullName || (shipperData.firstName||'Shipper') + ' ' + (shipperData.lastName||'');
+  document.getElementById('spRegId').textContent = shipperData.registerId || 'CRB-S-XXXXXX';
+  initModuleToggles();
+}
+
+function showPendingScreen() {
+  document.getElementById('loginScreen').innerHTML = `
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:#0f0f1a;color:#fff;text-align:center">
+      <div style="font-size:3rem;margin-bottom:16px">⏳</div>
+      <div style="font-size:1.3rem;font-weight:900;color:#FFD84D;margin-bottom:10px">Hồ sơ đang được duyệt</div>
+      <div style="color:#aaa;line-height:1.6;margin-bottom:24px">Chúng mình đang xem xét hồ sơ của bạn.<br>Thường mất 1–2 ngày làm việc.<br>Bạn sẽ nhận SMS khi được duyệt.</div>
+      <div style="background:#1a1a2e;border-radius:16px;padding:18px;width:100%;max-width:320px;text-align:left">
+        <div style="font-size:.8rem;color:#888;margin-bottom:4px">SĐT đăng ký</div>
+        <div style="font-weight:900;color:#fff">${loginPhone}</div>
+        <div style="font-size:.8rem;color:#888;margin-top:10px;margin-bottom:4px">Mã hồ sơ</div>
+        <div style="font-weight:900;color:#FFD84D">${shipperData.registerId||'Đang cấp'}</div>
+      </div>
+      <button onclick="location.reload()" style="margin-top:24px;background:#E8504A;color:#fff;border:none;border-radius:50px;padding:14px 32px;font-weight:900;font-size:1rem;cursor:pointer">Kiểm tra lại</button>
+    </div>`;
+}
+
+function showRejectedScreen() {
+  document.getElementById('loginScreen').innerHTML = `
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:#0f0f1a;color:#fff;text-align:center">
+      <div style="font-size:3rem;margin-bottom:16px">❌</div>
+      <div style="font-size:1.3rem;font-weight:900;color:#E8504A;margin-bottom:10px">Hồ sơ không được duyệt</div>
+      <div style="color:#aaa;line-height:1.6;margin-bottom:24px">Hồ sơ của bạn chưa đáp ứng yêu cầu.<br>Vui lòng liên hệ CRABOR để được hỗ trợ.</div>
+      <a href="tel:1900xxxx" style="background:#E8504A;color:#fff;text-decoration:none;border-radius:50px;padding:14px 32px;font-weight:900;font-size:1rem">📞 Liên hệ hỗ trợ</a>
+    </div>`;
+}
+
+// ════════════
+//  ONLINE TOGGLE
+// ════════════
+function toggleOnline() {
+  isOnline=!isOnline;
+  const btn=document.getElementById('toggleBtn');
+  btn.classList.toggle('online',isOnline);
+  document.getElementById('toggleLabel').textContent=isOnline?'Online':'Offline';
+  toast(isOnline?'🟢 Bạn đang online – sẵn sàng nhận đơn!':'⚫ Bạn đã offline');
+  // Thông báo server trạng thái online
+  if (socket) socket.emit('shipperStatus', { shipperId: shipperData?._id, online: isOnline });
+  
+}
+
+function showOrderRequest(order) {
+  currentOrder=order;
+  const mod={food:'🍜 Đồ ăn',laundry:'👕 Giặt là',cleaning:'🧹 Dọn nhà'}[order.module]||order.module;
+  document.getElementById('orModule').textContent=mod+' · Hà Nội';
+  document.getElementById('orAddr').textContent=order.address;
+  document.getElementById('orEarn').textContent=fmt(Math.round(order.shipFee*0.85));
+  let t=30;
+  const el=document.getElementById('orTimer');
+  el.textContent=t;el.className='or-timer';
+  document.getElementById('orderRequest').classList.add('show');
+  if(orderTimer)clearInterval(orderTimer);
+  orderTimer=setInterval(()=>{
+    t--;el.textContent=t;
+    if(t<=10)el.className='or-timer warn';
+    if(t<=0){clearInterval(orderTimer);rejectOrder();}
+  },1000);
+}
+
+async function acceptOrder() {
+  clearInterval(orderTimer);
+  document.getElementById('orderRequest').classList.remove('show');
+  toast('✅ Đã nhận đơn! Đến lấy hàng ngay');
+  currentOrder = {...currentOrder, status:'confirmed'};
+  // Cập nhật server
+  if (currentOrder?._id) {
+    try {
+      await fetch('/api/orders/' + currentOrder._id + '/status', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ status: 'accepted', shipperId: shipperData?._id })
+      });
+    } catch(e) {}
+  }
+  if (socket) socket.emit('shipperAcceptOrder', { orderId: currentOrder._id, shipperId: shipperData?._id });
+  renderActiveOrder();
+  document.getElementById('activeOrderWrap').style.display='block';
+  // Khởi tạo Goong map
+  setTimeout(() => initMapForOrder(currentOrder), 300);
+  // Update stats
+  const cur=parseInt(document.getElementById('todayOrders').textContent)||0;
+  document.getElementById('todayOrders').textContent=cur+1;
+}
+
+function rejectOrder() {
+  clearInterval(orderTimer);
+  document.getElementById('orderRequest').classList.remove('show');
+  currentOrder=null;
+  toast('Đã từ chối đơn');
+  // Shipper sẽ nhận đơn mới qua Socket.io
+}
+
+// ════════════
+//  ACTIVE ORDER
+// ════════════
+function renderActiveOrder() {
+  if(!currentOrder) return;
+  document.getElementById('activeOrderId').textContent=currentOrder.orderId||'–';
+  document.getElementById('activeCustomer').textContent='Khách hàng';
+  document.getElementById('activeAddr').textContent=currentOrder.address||'–';
+  renderStatusSteps();
+}
+
+function renderStatusSteps() {
+  if(!currentOrder) return;
+  const cur=STATUS_STEPS.indexOf(currentOrder.status);
+  let html='';
+  STATUS_STEPS.forEach((s,i)=>{
+    const cls=i<cur?'done':i===cur?'active':'';
+    html+=`<div class="step-item"><div class="step-dot ${cls}">${STATUS_ICONS[s]}</div><div class="step-lbl ${cls}">${STATUS_LABELS[s]}</div></div>`;
+    if(i<STATUS_STEPS.length-1)html+=`<div class="step-line ${i<cur?'done':''}"></div>`;
+  });
+  document.getElementById('statusSteps').innerHTML=html;
+  const cur2=STATUS_STEPS.indexOf(currentOrder.status);
+  const nextBtn=document.getElementById('btnNextStatus');
+  if(cur2>=STATUS_STEPS.length-1){
+    nextBtn.style.display='none';
+    // Order complete
+    setTimeout(()=>{
+      document.getElementById('activeOrderWrap').style.display='none';
+  destroyShipperMap();
+      const earn=Math.round((currentOrder.shipFee||15000)*0.85);
+      const cur3=parseInt(document.getElementById('todayEarning').textContent.replace(/\D/g,''))||0;
+      document.getElementById('todayEarning').textContent=fmt(cur3+earn);
+      const tc=parseInt(document.getElementById('totalOrders').textContent)||0;
+      document.getElementById('totalOrders').textContent=tc+1;
+      currentOrder=null;
+      toast('🎉 Hoàn thành! Thu nhập +'+fmt(earn));
+      loadOrderHistory();
+      // Shipper sẽ nhận đơn mới qua Socket.io
+    },1500);
+  } else {
+    nextBtn.style.display='block';
+    document.getElementById('nextStatusLabel').textContent=NEXT_STATUS_BTN[currentOrder.status]||'Tiếp tục';
+  }
+}
+
+async function advanceStatus() {
+  if(!currentOrder) return;
+  const cur=STATUS_STEPS.indexOf(currentOrder.status);
+  if(cur>=STATUS_STEPS.length-1) return;
+  const nextStatus=STATUS_STEPS[cur+1];
+  try{
+    await fetch(`/api/orders/${currentOrder._id}/status`,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({status:nextStatus,by:'shipper'})
+    });
+  }catch(e){}
+  currentOrder.status=nextStatus;
+  renderStatusSteps();
+  toast('✅ Cập nhật: '+STATUS_LABELS[nextStatus]);
+}
+
+// ════════════
+//  HISTORY
+// ════════════
+async function loadOrderHistory() {
+  try{
+    const r=await fetch('/api/orders?status=delivered&shipperId=me');
+    const d=await r.json();
+    renderHistory(d.orders||[]);
+  }catch(e){renderHistory([]);}
+}
+
+function renderHistory(orders) {
+  if(orders.length===0){
+    document.getElementById('orderHistory').innerHTML='<div class="empty-state"><div class="ei">📋</div><p>Chưa có đơn hoàn thành</p></div>';
+    return;
+  }
+  document.getElementById('orderHistory').innerHTML=orders.map(o=>`
+    <div class="hist-card">
+      <div class="hc-row">
+        <div class="hc-id">${o.orderId}</div>
+        <div class="hc-earn">+${fmt(Math.round((o.shipFee||15000)*0.85))}</div>
+      </div>
+      <div class="hc-addr">📍 ${o.address||'–'}</div>
+      <div class="hc-row">
+        <div class="hc-time">${timeAgo(o.deliveredAt||o.createdAt)}</div>
+        <div class="hc-badge">✅ Hoàn thành</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function fmt(n){if(!n)return'0đ';return n.toLocaleString('vi-VN')+'đ';}
+function timeAgo(date){if(!date)return'';const d=new Date(date),now=new Date(),diff=Math.floor((now-d)/60000);if(diff<1)return'Vừa xong';if(diff<60)return diff+'p trước';if(diff<1440)return Math.floor(diff/60)+'h trước';return Math.floor(diff/1440)+'ngày trước';}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+
+let socket = null;
+
+function initSocket() {
+  socket = io();
+  socket.on('connect', () => console.log('Socket connected'));
+  
+  // Nhận đơn mới từ server
+  socket.on('newOrderForShipper', (order) => {
+    if (!isOnline || currentOrder) return;
+    showOrderRequest(order);
+  });
+  
+  socket.on('orderCancelled', (data) => {
+    if (currentOrder && currentOrder._id === data.orderId) {
+      clearInterval(orderTimer);
+      document.getElementById('orderRequest').classList.remove('show');
+      document.getElementById('activeOrderWrap').style.display = 'none';
+      currentOrder = null;
+      toast('⚠️ Đơn hàng đã bị huỷ bởi khách');
+    }
+  });
+
+  // Join room của shipper
+  if (shipperData?._id) {
+    socket.emit('join', { room: 'shipper_' + shipperData._id });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const r = await fetch('/api/auth/me');
+    const d = await r.json();
+    if (d.role === 'shipper' && d.shipper) {
+      loginPhone = d.shipper.phone || '';
+      shipperData = d.shipper;
+      onShipperLoggedIn();
+    }
+  } catch(e) {}
+});
+
+// ══════════════════════════════════════
+//  BOTTOM NAV / TAB SWITCHING
+// ══════════════════════════════════════
+let currentShipperTab = 'home';
+
+function switchShipperTab(tab, el) {
+  currentShipperTab = tab;
+  // Nav items
+  document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  // Home tab = scroll-area
+  const scrollArea = document.getElementById('mainScrollArea') || document.querySelector('.scroll-area');
+  const tabEarn    = document.getElementById('tabEarn');
+  const tabProfile = document.getElementById('tabProfile');
+
+  if (tab === 'home') {
+    if (scrollArea) scrollArea.style.display = 'block';
+    if (tabEarn)    tabEarn.classList.remove('show');
+    if (tabProfile) tabProfile.classList.remove('show');
+    loadShipperMissions();
+  } else if (tab === 'earn') {
+    if (scrollArea) scrollArea.style.display = 'none';
+    if (tabEarn)    tabEarn.classList.add('show');
+    if (tabProfile) tabProfile.classList.remove('show');
+    loadEarnings('today');
+  } else if (tab === 'profile') {
+    if (scrollArea) scrollArea.style.display = 'none';
+    if (tabEarn)    tabEarn.classList.remove('show');
+    if (tabProfile) tabProfile.classList.add('show');
+    loadShipperProfile();
+  }
+}
+
+// ══════════════════════════════════════
+//  EARNINGS
+// ══════════════════════════════════════
+let earnPeriod = 'today';
+
+function setEarnPeriod(p, btn) {
+  earnPeriod = p;
+  document.querySelectorAll('.earn-period-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  loadEarnings(p);
+}
+
+async function loadEarnings(period) {
+  const listEl = document.getElementById('earnTxList');
+  if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:32px;color:#555;font-weight:700">⏳ Đang tải...</div>';
+  try {
+    const r = await fetch('/api/shipper/earnings?period=' + period, {
+      credentials: 'include'
+    });
+    if (!r.ok) { renderEarningsFallback(); return; }
+    const d = await r.json();
+    if (!d.success) { renderEarningsFallback(); return; }
+    const data = d.data;
+    // Update header
+    const t = (v) => (v||0).toLocaleString('vi-VN');
+    document.getElementById('earnTotal').textContent        = t(data.totalEarnings) + 'đ';
+    document.getElementById('earnTodayAmt').textContent     = t(data.todayEarnings);
+    document.getElementById('earnTotalOrdersLbl').textContent = data.totalOrders || 0;
+    document.getElementById('earnPeriodOrders').textContent = data.periodOrders || 0;
+    document.getElementById('earnPeriodAmt').textContent    = t(data.periodEarnings) + 'đ';
+    document.getElementById('earnAvgOrder').textContent     = t(data.avgPerOrder) + 'đ';
+    document.getElementById('earnCompletionRate').textContent = (data.completionRate||0) + '%';
+    // Render tx list
+    renderEarningsTx(data.transactions || []);
+  } catch(e) { renderEarningsFallback(); }
+}
+
+function renderEarningsFallback() {
+  // Use local data from shipperData
+  const orders = window._shipperOrders || [];
+  const done   = orders.filter(o => o.status === 'delivered');
+  const total  = done.reduce((s,o) => s + (o.shipperEarning || o.deliveryFee || 15000), 0);
+  document.getElementById('earnTotal').textContent        = total.toLocaleString('vi-VN') + 'đ';
+  document.getElementById('earnPeriodOrders').textContent = done.length;
+  document.getElementById('earnPeriodAmt').textContent    = total.toLocaleString('vi-VN') + 'đ';
+  document.getElementById('earnAvgOrder').textContent     = done.length ? Math.round(total/done.length).toLocaleString('vi-VN') + 'đ' : '0đ';
+  document.getElementById('earnCompletionRate').textContent = orders.length ? Math.round(done.length/orders.length*100) + '%' : '–%';
+  renderEarningsTx(done.map(o => ({
+    type: 'delivery', label: 'Phí giao hàng', orderId: o.orderId || o._id,
+    amount: o.shipperEarning || o.deliveryFee || 15000, createdAt: o.createdAt
+  })));
+}
+
+function renderEarningsTx(txs) {
+  const el = document.getElementById('earnTxList');
+  if (!el) return;
+  if (!txs.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:#555;font-weight:700"><div style="font-size:2rem;margin-bottom:8px">💸</div>Chưa có thu nhập trong kỳ này</div>';
+    return;
+  }
+  const typeIcon = { delivery:'🛵', bonus:'⭐', fee_back:'♻️', penalty:'⚠️' };
+  el.innerHTML = txs.map(tx => `
+    <div class="earn-tx-card">
+      <div class="earn-tx-icon">${typeIcon[tx.type]||'💰'}</div>
+      <div class="earn-tx-info">
+        <div class="earn-tx-label">${tx.label || 'Phí giao hàng'}</div>
+        <div class="earn-tx-meta">${tx.orderId ? '#'+String(tx.orderId).slice(-6) : ''} ${tx.createdAt ? '· ' + new Date(tx.createdAt).toLocaleDateString('vi-VN') : ''}</div>
+      </div>
+      <div class="earn-tx-amt ${(tx.amount||0)<0?'minus':''}">${(tx.amount||0)>=0?'+':''}${(tx.amount||0).toLocaleString('vi-VN')}đ</div>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════
+//  PROFILE
+// ══════════════════════════════════════
+async function loadShipperProfile() {
+  // Try to refresh from API
+  try {
+    const r = await fetch('/api/shipper/profile', { credentials: 'include' });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.success) { shipperData = d.data; }
+    }
+  } catch(e) {}
+  if (!shipperData) return;
+  const d = shipperData;
+  const vn = { motorbike:'🛵 Xe máy', bicycle:'🚲 Xe đạp điện', car:'🚗 Ô tô' };
+  const planLbl = { early_bird:'⚡ Early Bird (Hoàn tiền sau 50 đơn)', standard:'🛵 Gói bình thường' };
+  const feeStLbl = { paid:'✅ Đã thanh toán', unpaid:'⏳ Chưa thanh toán' };
+  const statusLbl = { pending:'⏳ Chờ duyệt', approved:'✅ Đã duyệt', active:'🟢 Đang hoạt động', rejected:'❌ Bị từ chối', suspended:'🔴 Tạm khóa' };
+
+  setText('pfName',      (d.lastName||'') + ' ' + (d.firstName||''));
+  setText('pfPhone',     d.phone || '–');
+  setText('pfFullName',  (d.lastName||'') + ' ' + (d.firstName||''));
+  setText('pfEmail',     d.email || '–');
+  setText('pfDistrict',  d.district || '–');
+  setText('pfVehicle',   vn[d.vehicle] || d.vehicle || '–');
+  setText('pfRegId',     d.registerId || '–');
+  setText('pfPlan',      planLbl[d.plan] || d.plan || '–');
+  setText('pfFee',       d.fee ? d.fee.toLocaleString('vi-VN') + 'đ' : '–');
+  setText('pfFeeStatus', feeStLbl[d.feeStatus] || d.feeStatus || '–');
+  setText('pfStatus',    statusLbl[d.status] || d.status || '–');
+  setText('pfTotalOrders',  d.totalOrders  || 0);
+  setText('pfDoneOrders',   d.ordersCompleted || 0);
+  setText('pfCancelOrders', d.ordersCancelled || 0);
+  setText('pfRating',    d.rating ? '⭐ ' + d.rating.toFixed(1) : '–');
+  setText('pfJoined',    d.createdAt ? new Date(d.createdAt).toLocaleDateString('vi-VN') : '–');
+
+  // Plan badge
+  const badge = document.getElementById('pfPlanBadge');
+  if (badge) {
+    badge.textContent = d.plan === 'early_bird' ? '⚡ Early Bird' : '🛵 Gói bình thường';
+    badge.className   = 'prof-badge ' + (d.plan === 'early_bird' ? 'early' : 'standard');
+  }
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function doShipperLogout() {
+  if (!confirm('Đăng xuất khỏi CRABOR Shipper?')) return;
+  fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    .catch(()=>{})
+    .finally(() => { location.reload(); });
+}
+
+
+// ══════════════════════════════════════
+//  GOONG MAP
+// ══════════════════════════════════════
+const GOONG_MAPTILES_KEY = 'AdezWvRvTH38q6DflXd3G3uxVADQ78GOsyZmhtzp';
+let shipperMap   = null;
+let shipperMarker = null;
+let pickupMarker  = null;
+let dropoffMarker = null;
+let routeLayerId  = 'route-layer';
+let watchId       = null;
+let currentLngLat = [105.8412, 21.0245]; // default Hà Nội
+
+function initShipperMap(pickupCoords, dropoffCoords) {
+  // Nếu map đã tồn tại, chỉ cập nhật markers
+  if (shipperMap) {
+    updateMapMarkers(pickupCoords, dropoffCoords);
+    return;
+  }
+
+  // Khởi tạo map
+  goongjs.accessToken = GOONG_MAPTILES_KEY;
+  const center = pickupCoords || currentLngLat;
+
+  shipperMap = new goongjs.Map({
+    container: 'shipperMap',
+    style: 'https://tiles.goong.io/assets/goong_map_web.json',
+    center: center,
+    zoom: 14,
+  });
+
+  shipperMap.on('load', () => {
+    // Marker: vị trí shipper
+    const shipperEl = document.createElement('div');
+    shipperEl.innerHTML = '🛵';
+    shipperEl.style.cssText = 'font-size:1.6rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));cursor:pointer';
+    shipperMarker = new goongjs.Marker({ element: shipperEl })
+      .setLngLat(currentLngLat)
+      .addTo(shipperMap);
+
+    if (pickupCoords) addPickupDropoffMarkers(pickupCoords, dropoffCoords);
+    startWatchPosition();
+  });
+}
+
+function addPickupDropoffMarkers(pickup, dropoff) {
+  // Pickup marker (nhà hàng)
+  if (pickup) {
+    const pEl = document.createElement('div');
+    pEl.innerHTML = '🍜';
+    pEl.style.cssText = 'font-size:1.5rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))';
+    if (pickupMarker) pickupMarker.remove();
+    pickupMarker = new goongjs.Marker({ element: pEl })
+      .setLngLat(pickup)
+      .setPopup(new goongjs.Popup({ offset: 25 }).setText('📍 Lấy hàng tại đây'))
+      .addTo(shipperMap);
+  }
+
+  // Dropoff marker (khách hàng)
+  if (dropoff) {
+    const dEl = document.createElement('div');
+    dEl.innerHTML = '📦';
+    dEl.style.cssText = 'font-size:1.5rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))';
+    if (dropoffMarker) dropoffMarker.remove();
+    dropoffMarker = new goongjs.Marker({ element: dEl })
+      .setLngLat(dropoff)
+      .setPopup(new goongjs.Popup({ offset: 25 }).setText('🏠 Giao hàng tại đây'))
+      .addTo(shipperMap);
+  }
+
+  // Draw route nếu có cả 2
+  if (pickup && dropoff) drawRoute(pickup, dropoff);
+}
+
+async function drawRoute(pickup, dropoff) {
+  try {
+    const origin      = currentLngLat[1] + ',' + currentLngLat[0]; // lat,lng
+    const destination = dropoff[1] + ',' + dropoff[0];
+    const via         = pickup[1] + ',' + pickup[0];
+    // Route: shipper → pickup → dropoff
+    const r = await fetch(
+      `/api/map/directions?origin=${origin}&destination=${via}&vehicle=motorbike`
+    );
+    const d = await r.json();
+    const routes = d.routes;
+    if (!routes || !routes.length) return;
+
+    const coords = routes[0].overview_polyline?.points;
+    if (!coords) return;
+
+    // Decode polyline
+    const decoded = decodePolyline(coords);
+
+    // Remove old route layer
+    if (shipperMap.getLayer(routeLayerId)) shipperMap.removeLayer(routeLayerId);
+    if (shipperMap.getSource('route')) shipperMap.removeSource('route');
+
+    shipperMap.addSource('route', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: decoded }
+      }
+    });
+    shipperMap.addLayer({
+      id: routeLayerId,
+      type: 'line',
+      source: 'route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#E8504A', 'line-width': 4, 'line-opacity': 0.85 }
+    });
+
+    // Fit bounds
+    const bounds = decoded.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(decoded[0], decoded[0]));
+    shipperMap.fitBounds(bounds, { padding: 40, maxZoom: 16 });
+  } catch(e) {
+    console.log('[Map] drawRoute error:', e.message);
+  }
+}
+
+// Google Polyline decode
+function decodePolyline(str) {
+  const coords = [];
+  let idx = 0, lat = 0, lng = 0;
+  while (idx < str.length) {
+    let b, shift = 0, result = 0;
+    do { b = str.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    shift = 0; result = 0;
+    do { b = str.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    coords.push([lng / 1e5, lat / 1e5]);
+  }
+  return coords;
+}
+
+function updateMapMarkers(pickup, dropoff) {
+  if (!shipperMap) return;
+  if (pickupMarker)  pickupMarker.remove();
+  if (dropoffMarker) dropoffMarker.remove();
+  addPickupDropoffMarkers(pickup, dropoff);
+}
+
+function startWatchPosition() {
+  if (!navigator.geolocation) return;
+  if (watchId) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      currentLngLat = [pos.coords.longitude, pos.coords.latitude];
+      if (shipperMarker) shipperMarker.setLngLat(currentLngLat);
+      // Emit vị trí tới server để relay cho khách đang theo dõi
+      emitShipperGPS(pos.coords.longitude, pos.coords.latitude, pos.coords.heading || 0);
+    },
+    (err) => console.log('[GPS]', err.message),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+function centerMapOnShipper() {
+  if (shipperMap && currentLngLat) {
+    shipperMap.flyTo({ center: currentLngLat, zoom: 15, duration: 800 });
+  }
+}
+
+function destroyShipperMap() {
+  if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (shipperMap) { shipperMap.remove(); shipperMap = null; }
+  shipperMarker = pickupMarker = dropoffMarker = null;
+}
+
+// Geocode địa chỉ → [lng, lat]
+async function geocodeAddress(address) {
+  try {
+    const r = await fetch('/api/map/geocode?address=' + encodeURIComponent(address));
+    const d = await r.json();
+    const loc = d.results?.[0]?.geometry?.location;
+    if (loc) return [loc.lng, loc.lat];
+  } catch(e) {}
+  return null;
+}
+
+// Hook vào showActiveOrder — khởi tạo map khi có đơn
+const _origShowActiveOrder = typeof showActiveOrder === 'function' ? showActiveOrder : null;
+
+async function initMapForOrder(order) {
+  if (!order) return;
+  // Geocode địa chỉ pickup (nhà hàng) và dropoff (khách)
+  const pickupAddr  = order.restaurantAddress || order.pickupAddress || '';
+  const dropoffAddr = order.deliveryAddress   || order.address       || '';
+  const [pickup, dropoff] = await Promise.all([
+    pickupAddr  ? geocodeAddress(pickupAddr)  : Promise.resolve(null),
+    dropoffAddr ? geocodeAddress(dropoffAddr) : Promise.resolve(null),
+  ]);
+  initShipperMap(pickup, dropoff);
+  if (pickup && dropoff) addPickupDropoffMarkers(pickup, dropoff);
+}
+
+
+// ── Emit GPS tới server (relay cho customer tracking) ──
+let _shipperSocket = null;
+let _lastEmitTime  = 0;
+let _activeShipperOrderId = null; // set khi shipper nhận đơn
+
+function initShipperSocket() {
+  if(_shipperSocket) return;
+  _shipperSocket = io({ transports: ['websocket','polling'] });
+  _shipperSocket.on('connect', () => console.log('[Socket] Shipper connected'));
+  _shipperSocket.on('orderStatusChanged', (d) => {
+    if(d.status === 'delivered' || d.status === 'cancelled') {
+      _activeShipperOrderId = null;
+    }
+  });
+}
+
+function emitShipperGPS(lng, lat, heading) {
+  if(!_activeShipperOrderId) return;
+  const now = Date.now();
+  if(now - _lastEmitTime < 3000) return; // max 1 lần / 3 giây
+  _lastEmitTime = now;
+  if(!_shipperSocket) initShipperSocket();
+  _shipperSocket.emit('shipperLocation', {
+    orderId: _activeShipperOrderId,
+    lng, lat, heading: heading || 0,
+  });
+}
+
+
+// ══════════════════════════════════════
+//  TIER 1 SHIPPER FEATURES
+// ══════════════════════════════════════
+
+// ── MISSIONS ──────────────────────────
+async function loadShipperMissions() {
+  try {
+    const r = await fetch('/api/shipper/missions', { credentials:'include' });
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!d.success) return;
+    renderMissions(d.missions);
+    renderTierStrip();
+  } catch(e) {}
+}
+
+function renderMissions(missions) {
+  // Remove old mission section
+  document.getElementById('missionSection')?.remove();
+  const scrollArea = document.getElementById('mainScrollArea');
+  if(!scrollArea) return;
+  const sec = document.createElement('div');
+  sec.id = 'missionSection';
+  sec.innerHTML = `
+    <div class="sec-title">🎯 Nhiệm vụ hôm nay</div>
+    ${missions.map(m => {
+      const pct = m.target > 0 ? Math.min(100, Math.round(m.current/m.target*100)) : 0;
+      const done = m.current >= m.target;
+      return `<div class="mission-card" style="${done?'border-color:#27ae60':''}" >
+        <div class="mission-head">
+          <div class="mission-icon">${m.icon}</div>
+          <div class="mission-title">${m.title}</div>
+          <div class="mission-reward">+${m.reward.toLocaleString('vi-VN')}đ</div>
+          ${done?'<span style="color:#27ae60;font-size:.75rem;font-weight:900">✅</span>':''}
+        </div>
+        <div class="mission-bar-wrap"><div class="mission-bar" style="width:${pct}%"></div></div>
+        <div class="mission-prog">${m.current}/${m.target} · ${pct}%</div>
+      </div>`;
+    }).join('')}
+  `;
+  // Insert before stats row
+  const statsRow = scrollArea.querySelector('.stats-row');
+  if(statsRow) scrollArea.insertBefore(sec, statsRow);
+  else scrollArea.prepend(sec);
+}
+
+async function renderTierStrip() {
+  try {
+    const r = await fetch('/api/shipper/tier', { credentials:'include' });
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!d.success) return;
+    const t = d.currentTier, next = d.nextTier;
+    document.getElementById('tierStripWrap')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'tierStripWrap';
+    const prog = next ? Math.min(100, Math.round((d.orders - t.minOrders) / Math.max(1, next.minOrders - t.minOrders) * 100)) : 100;
+    wrap.innerHTML = `
+      <div class="tier-strip">
+        <div class="tier-icon">${t.icon}</div>
+        <div style="flex:1">
+          <div class="tier-name" style="color:${t.color}">${t.name}</div>
+          <div class="tier-sub">${d.orders} đơn · ⭐${d.rating.toFixed(1)}</div>
+          ${next ? `<div class="tier-progress" style="margin-top:5px"><div class="tier-progress-fill" style="width:${prog}%"></div></div>
+          <div style="font-size:.65rem;color:#555;margin-top:2px">→ ${next.name}: còn ${next.minOrders - d.orders} đơn</div>` : '<div style="font-size:.72rem;color:#FFD84D;margin-top:3px">🏆 Hạng cao nhất!</div>'}
+        </div>
+      </div>`;
+    const statsRow = document.querySelector('.stats-row');
+    if(statsRow) statsRow.parentNode.insertBefore(wrap, statsRow.nextSibling);
+  } catch(e) {}
+}
+
+// ── DELIVERY PHOTO ──────────────────────
+let deliveryPhotoData = null;
+
+function previewDeliveryPhoto(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    deliveryPhotoData = e.target.result;
+    const preview = document.getElementById('photoPreviewWrap');
+    const img = document.getElementById('photoPreviewImg');
+    const confirmBtn = document.getElementById('btnConfirmDelivery');
+    if(preview) preview.style.display = 'block';
+    if(img) img.src = deliveryPhotoData;
+    if(confirmBtn) confirmBtn.style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function confirmDeliveryWithPhoto() {
+  if(!deliveryPhotoData || !currentOrder) return;
+  const btn = document.getElementById('btnConfirmDelivery');
+  if(btn) { btn.disabled=true; btn.textContent='⏳ Đang xác nhận...'; }
+  try {
+    const r = await fetch('/api/orders/'+(currentOrder.orderId||currentOrder._id)+'/delivery-photo', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ photo: deliveryPhotoData }),
+      credentials: 'include',
+    });
+    const d = await r.json();
+    if(d.success) {
+      toast('✅ Đã xác nhận giao hàng thành công!');
+      document.getElementById('photoConfirmWrap').style.display = 'none';
+      deliveryPhotoData = null;
+    } else {
+      toast('❌ ' + d.message);
+      if(btn) { btn.disabled=false; btn.textContent='✅ Xác nhận đã giao hàng'; }
+    }
+  } catch(e) {
+    toast('❌ Lỗi kết nối');
+    if(btn) { btn.disabled=false; btn.textContent='✅ Xác nhận đã giao hàng'; }
+  }
+}
+
+// Show photo confirm when status is 'delivering'
+const _origAdvanceStatus = typeof advanceStatus === 'function' ? advanceStatus : null;
+
+// Show chat + photo buttons based on order status
+function updateShipperActionBtns(status) {
+  const chatBtn    = document.getElementById('aoChatBtn');
+  const photoWrap  = document.getElementById('photoConfirmWrap');
+  if(chatBtn)   chatBtn.style.display   = ['picked_up','delivering'].includes(status) ? 'block' : 'none';
+  if(photoWrap) photoWrap.style.display = status === 'delivering' ? 'block' : 'none';
+}
+
+// ── SHIPPER CHAT ──────────────────────
+let shipperChatOrderId = null;
+
+function openShipperChat() {
+  if(!currentOrder) return;
+  shipperChatOrderId = currentOrder.orderId || currentOrder._id;
+  document.getElementById('shipperChatWrap').classList.add('open');
+  loadShipperChatHistory();
+  // Listen for incoming messages
+  if(_shipperSocket) {
+    _shipperSocket.off('chatMessage');
+    _shipperSocket.on('chatMessage', (msg) => {
+      if(msg.orderId !== shipperChatOrderId) return;
+      appendShipperChatMsg(msg);
+    });
+  }
+}
+function closeShipperChat() { document.getElementById('shipperChatWrap').classList.remove('open'); }
+
+async function loadShipperChatHistory() {
+  if(!shipperChatOrderId) return;
+  const el = document.getElementById('scMsgs');
+  try {
+    const r = await fetch('/api/orders/'+shipperChatOrderId+'/chat');
+    const d = await r.json();
+    if(d.messages && d.messages.length > 0) {
+      el.innerHTML = '';
+      d.messages.forEach(m => appendShipperChatMsg(m, false));
+    }
+    el.scrollTop = el.scrollHeight;
+  } catch(e) {}
+}
+
+function appendShipperChatMsg(msg, scroll=true) {
+  const el = document.getElementById('scMsgs');
+  if(!el) return;
+  const mine = msg.from === 'shipper';
+  const div  = document.createElement('div');
+  div.className = 'sc-msg ' + (mine?'mine':'theirs');
+  const t = msg.time ? new Date(msg.time).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}) : '';
+  div.innerHTML = `${msg.text}<span class="sc-msg-time">${t}</span>`;
+  el.appendChild(div);
+  if(scroll) el.scrollTop = el.scrollHeight;
+}
+
+async function sendShipperChatMsg() {
+  const inp = document.getElementById('scInput');
+  const text = inp.value.trim();
+  if(!text || !shipperChatOrderId) return;
+  inp.value = '';
+  appendShipperChatMsg({ from:'shipper', text, time: new Date() });
+  if(!_shipperSocket) initShipperSocket();
+  _shipperSocket.emit('sendChatMessage', { orderId: shipperChatOrderId, from:'shipper', text });
+  try {
+    await fetch('/api/orders/'+shipperChatOrderId+'/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ from:'shipper', text })
+    });
+  } catch(e) {}
+}
+
+// Init on app start
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    loadShipperMissions();
+    renderTierStrip();
+    initShipperSocket();
+  }, 1500);
+});
+
+// ══════════════════════════════════════
+//  TIER 2 SHIPPER FEATURES
+// ══════════════════════════════════════
+
+// ── HEATMAP ──────────────────────────
+async function loadHeatmap() {
+  try {
+    const r = await fetch('/api/shipper/heatmap', { credentials:'include' });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.success) return;
+    const el = document.getElementById('heatmapBars');
+    if (!el) return;
+    const peakLabels = ['12a','1','2','3','4','5','6','7','8','9','10','11','12p','1','2','3','4','5','6','7','8','9','10','11'];
+    const peakColors = d.hours.map(h => {
+      if (h.pct >= 80) return '#E8504A';
+      if (h.pct >= 50) return '#F0B429';
+      if (h.pct >= 20) return '#3adb7a';
+      return '#1e1e2e';
+    });
+    el.innerHTML = d.hours.map((h, i) => `
+      <div class="hm-bar-wrap">
+        <div class="hm-bar" style="height:${Math.max(4,h.pct*0.55)}px;background:${peakColors[i]};opacity:${h.pct?1:.3}"></div>
+        ${i%4===0 ? `<div class="hm-label">${peakLabels[i]}</div>` : '<div class="hm-label" style="opacity:0">.</div>'}
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// Override loadEarnings to also load heatmap
+const _origLoadEarnings = typeof loadEarnings === 'function' ? loadEarnings : null;
+async function loadEarnings(period) {
+  if (_origLoadEarnings) await _origLoadEarnings(period);
+  loadHeatmap();
+  loadBankInfo();
+}
+
+// ── BANK ACCOUNT ──────────────────────
+async function loadBankInfo() {
+  try {
+    const r = await fetch('/api/auth/me', { credentials:'include' });
+    const d = await r.json();
+    if (!d.success || !d.user?.bankAccount) return;
+    const b = d.user.bankAccount;
+    if (b.bankName)    { const el=document.getElementById('bankName');    if(el) el.value=b.bankName; }
+    if (b.accountNo)   { const el=document.getElementById('bankAccNo');   if(el) el.value=b.accountNo; }
+    if (b.accountName) { const el=document.getElementById('bankAccName'); if(el) el.value=b.accountName; }
+  } catch(e) {}
+}
+
+async function saveBankAccount() {
+  const bankName    = document.getElementById('bankName')?.value?.trim();
+  const accountNo   = document.getElementById('bankAccNo')?.value?.trim();
+  const accountName = document.getElementById('bankAccName')?.value?.trim().toUpperCase();
+  if (!bankName || !accountNo || !accountName) { toast('⚠️ Nhập đầy đủ thông tin ngân hàng'); return; }
+  try {
+    const r = await fetch('/api/users/bank', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ bankName, accountNo, accountName }),
+      credentials:'include',
+    });
+    const d = await r.json();
+    if (d.success) toast('✅ Đã lưu thông tin ngân hàng');
+    else toast('❌ ' + d.message);
+  } catch(e) { toast('❌ Lỗi kết nối'); }
+}
+
+// ── WEEKLY MISSIONS ──────────────────
+async function loadWeeklyMissions() {
+  try {
+    const r = await fetch('/api/shipper/missions', { credentials:'include' });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.success) return;
+    // Weekly missions (harder targets, bigger rewards)
+    const weekly = [
+      { id:'w1', title:'Giao 40 đơn trong tuần', target:40, current:Math.min(d.todayOrders*5,40), reward:50000, icon:'🏆' },
+      { id:'w2', title:'Duy trì ⭐4.7 cả tuần',  target:1,  current:d.rating>=4.7?1:0, reward:30000, icon:'⭐' },
+      { id:'w3', title:'Giao 7 ngày liên tiếp',  target:7,  current:Math.min(Math.floor(Math.random()*5)+1,7), reward:80000, icon:'🔥' },
+    ];
+    const oldSec = document.getElementById('weeklyMissionSection');
+    if (oldSec) oldSec.remove();
+    const missionSec = document.getElementById('missionSection');
+    if (!missionSec) return;
+    const sec = document.createElement('div');
+    sec.id = 'weeklyMissionSection';
+    sec.innerHTML = `
+      <div class="sec-title">📅 Nhiệm vụ tuần <span class="weekly-miss-label">+bonus</span></div>
+      ${weekly.map(m => {
+        const pct  = Math.min(100, Math.round(m.current/m.target*100));
+        const done = m.current >= m.target;
+        return `<div class="mission-card" style="${done?'border-color:#F0B429':''}" >
+          <div class="mission-head">
+            <div class="mission-icon">${m.icon}</div>
+            <div class="mission-title">${m.title}</div>
+            <div class="mission-reward" style="color:#F0B429">+${m.reward.toLocaleString('vi-VN')}đ</div>
+            ${done?'<span style="color:#F0B429;font-size:.8rem">🏆</span>':''}
+          </div>
+          <div class="mission-bar-wrap"><div class="mission-bar" style="width:${pct}%;background:linear-gradient(90deg,#F0B429,#E8504A)"></div></div>
+          <div class="mission-prog">${m.current}/${m.target} · ${pct}%</div>
+        </div>`;
+      }).join('')}
+    `;
+    missionSec.parentNode.insertBefore(sec, missionSec.nextSibling);
+  } catch(e) {}
+}
+
+// Enhance loadShipperMissions to also load weekly
+const _origLoadMissions = typeof loadShipperMissions === 'function' ? loadShipperMissions : null;
+async function loadShipperMissions() {
+  if (_origLoadMissions) await _origLoadMissions();
+  loadWeeklyMissions();
+}
+
+
+// ══════════════════════════════════════
+//  TIER 3 SHIPPER FEATURES
+// ══════════════════════════════════════
+
+// ── ORDER ZONES HEATMAP ──────────────
+async function loadOrderZones() {
+  try {
+    const r = await fetch('/api/analytics/zones');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.success || !d.zones?.length) return;
+    const sec  = document.getElementById('zoneSection');
+    const list = document.getElementById('zoneList');
+    if (!sec || !list) return;
+    sec.style.display = 'block';
+    const max = d.zones[0]?.count || 1;
+    const colors = ['#E8504A','#F0B429','#3adb7a','#6495ed','#aaa'];
+    list.innerHTML = d.zones.slice(0,6).map((z, i) => `
+      <div class="zone-row">
+        <div class="zone-name">${z._id || 'Khác'}</div>
+        <div class="zone-bar-wrap">
+          <div class="zone-bar-fill" style="width:${Math.round(z.count/max*100)}%;background:${colors[Math.min(i,4)]}"></div>
+        </div>
+        <div class="zone-count">${z.count} đơn</div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── SOS / REPORT ISSUE ───────────────
+async function openShipperSOS() {
+  const types = ['order_issue','sos','other'];
+  const type = confirm('🚨 Đây có phải tình huống khẩn cấp không? (OK = Khẩn cấp, Hủy = Báo cáo thường)') ? 'sos' : 'order_issue';
+  const msg = prompt(type==='sos' ? '🚨 Mô tả tình huống khẩn cấp:' : '📋 Mô tả vấn đề bạn gặp phải:');
+  if (!msg) return;
+  try {
+    const r = await fetch('/api/support', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        message: msg, type, role:'shipper',
+        orderId: _activeShipperOrderId || null
+      })
+    });
+    const d = await r.json();
+    toast(d.success ? (type==='sos'?'🚨 Đã gửi SOS! Admin đang xử lý.':'📋 Đã gửi báo cáo!') : '❌ '+d.message);
+  } catch(e) { toast('❌ Lỗi kết nối'); }
+}
+
+// Enhance home tab load
+const _origSwitchTabHome = typeof switchShipperTab === 'function' ? null : null;
+const _prevSwitchShipperTab = typeof switchShipperTab === 'function' ? switchShipperTab : null;
+function switchShipperTab(tab, el) {
+  if (_prevSwitchShipperTab) _prevSwitchShipperTab(tab, el);
+  if (tab === 'home') loadOrderZones();
+}
+
+// Load on init
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(loadOrderZones, 2000);
+});
+// -->
+</script>
+
+
+  <!-- ── MISSIONS SECTION (injected into scroll-area dynamically) ── -->
+  <!-- ── SHIPPER CHAT WINDOW ── -->
+  <div class="shipper-chat-wrap" id="shipperChatWrap">
+    <div class="sc-head">
+      <button class="sc-back" onclick="closeShipperChat()">←</button>
+      <div style="flex:1">
+        <div style="font-weight:900;font-size:.95rem;color:#fff">💬 Chat với khách</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.7)" id="scCustomerName">Khách hàng</div>
+      </div>
+    </div>
+    <div class="sc-msgs" id="scMsgs">
+      <div style="text-align:center;padding:20px;color:#555;font-size:.82rem">
+        Khách hàng có thể nhắn tin cho bạn ở đây 👋
+      </div>
+    </div>
+    <div class="sc-input-row">
+      <input class="sc-input" id="scInput" placeholder="Nhập tin nhắn..."
+        onkeydown="if(event.key==='Enter')sendShipperChatMsg()">
+      <button class="sc-send" onclick="sendShipperChatMsg()">➤</button>
+    </div>
+  </div>
+
+<!-- ══════════════════════════════════════
+     CRABOR THEME SWITCHER
+══════════════════════════════════════ -->
+<style>
+/* ── Theme variables injected on <html> ── */
+html.theme-light {
+  --th-bg:       #f4f1eb;
+  --th-bg2:      #ffffff;
+  --th-bg3:      #ede9e0;
+  --th-card:     #ffffff;
+  --th-border:   rgba(0,0,0,.1);
+  --th-text:     #1a1a1a;
+  --th-muted:    #777;
+  --th-surface:  rgba(255,255,255,.9);
+  --th-coral:    #E8504A;
+  filter: none;
+}
+html.theme-dark {
+  --th-bg:       #0f0f18;
+  --th-bg2:      #1a1a28;
+  --th-bg3:      #20202e;
+  --th-card:     #1a1a28;
+  --th-border:   rgba(255,255,255,.08);
+  --th-text:     #F5F0DC;
+  --th-muted:    rgba(245,240,220,.45);
+  --th-surface:  rgba(26,26,40,.9);
+  --th-coral:    #E8504A;
+  filter: none;
+}
+html.theme-glass-dark {
+  --th-bg:       #0a0a12;
+  --th-bg2:      rgba(255,255,255,.04);
+  --th-bg3:      rgba(255,255,255,.02);
+  --th-card:     rgba(255,255,255,.06);
+  --th-border:   rgba(255,255,255,.12);
+  --th-text:     #F5F0DC;
+  --th-muted:    rgba(245,240,220,.5);
+  --th-surface:  rgba(255,255,255,.08);
+  --th-coral:    #E8504A;
+}
+html.theme-glass-light {
+  --th-bg:       #dce4f0;
+  --th-bg2:      rgba(255,255,255,.35);
+  --th-bg3:      rgba(255,255,255,.2);
+  --th-card:     rgba(255,255,255,.45);
+  --th-border:   rgba(255,255,255,.6);
+  --th-text:     #1a1a2e;
+  --th-muted:    rgba(30,30,60,.5);
+  --th-surface:  rgba(255,255,255,.55);
+  --th-coral:    #c93d37;
+}
+
+/* Glass effect — applies when glass theme active */
+html.theme-glass-dark body,
+html.theme-glass-light body {
+  background-attachment: fixed;
+}
+html.theme-glass-dark body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(232,80,74,.18) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(100,149,237,.15) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 60% at 60% 30%, rgba(240,180,41,.1) 0%, transparent 65%),
+    #0a0a12;
+}
+html.theme-glass-light body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(232,80,74,.2) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(100,149,237,.18) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 60% at 60% 30%, rgba(240,180,41,.15) 0%, transparent 65%),
+    #dce4f0;
+}
+
+/* Glass card style */
+html.theme-glass-dark .panel,
+html.theme-glass-dark .card,
+html.theme-glass-dark .stat-card,
+html.theme-glass-dark .active-order,
+html.theme-glass-dark .hist-card,
+html.theme-glass-dark .wallet-card,
+html.theme-glass-dark .share-card,
+html.theme-glass-dark .ref-panel,
+html.theme-glass-dark .auth-card,
+html.theme-glass-dark .earn-stat-card,
+html.theme-glass-dark .prof-section {
+  background: rgba(255,255,255,.06) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.1) !important;
+}
+html.theme-glass-light .panel,
+html.theme-glass-light .card,
+html.theme-glass-light .stat-card,
+html.theme-glass-light .active-order,
+html.theme-glass-light .hist-card,
+html.theme-glass-light .wallet-card,
+html.theme-glass-light .share-card,
+html.theme-glass-light .ref-panel,
+html.theme-glass-light .auth-card,
+html.theme-glass-light .earn-stat-card,
+html.theme-glass-light .prof-section {
+  background: rgba(255,255,255,.45) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255,255,255,.65) !important;
+  box-shadow: 0 8px 32px rgba(31,38,135,.1), inset 0 1px 0 rgba(255,255,255,.8) !important;
+}
+
+/* Light mode — override dark backgrounds */
+html.theme-light body {
+  background: #f4f1eb !important;
+  color: #1a1a1a !important;
+}
+html.theme-light .sidebar      { background: #fff !important; border-color: #eee !important; }
+html.theme-light .panel        { background: #fff !important; border-color: #eee !important; color: #1a1a1a !important; }
+html.theme-light .card         { background: #fff !important; }
+html.theme-light .auth-card    { background: #fff !important; }
+html.theme-light .topbar       { background: linear-gradient(135deg,#E8504A,#c93d37) !important; }
+html.theme-light .nav-item     { color: #555 !important; }
+html.theme-light .nav-item.active { color: #E8504A !important; background: rgba(232,80,74,.08) !important; }
+html.theme-light .stat-card    { background: #fff !important; border-color: #eee !important; }
+html.theme-light .reg-table tbody tr:hover { background: #fafafa !important; }
+html.theme-light .modal-body, html.theme-light #overlay .inner { background: #fff !important; }
+html.theme-light input, html.theme-light select { background: #f9f9f9 !important; color: #1a1a1a !important; border-color: #ddd !important; }
+html.theme-light .bottom-nav   { background: #fff !important; border-color: #eee !important; }
+html.theme-light .bn-item      { color: #aaa !important; }
+html.theme-light .bn-item.active { color: #E8504A !important; }
+
+/* ── Switcher button ── */
+#themeSwitcherBtn {
+  position: fixed;
+  bottom: 90px; /* above bot button */
+  right: 20px;
+  z-index: 9899;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(26,26,40,.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.15);
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s, box-shadow .2s;
+  color: #F5F0DC;
+}
+html.theme-light #themeSwitcherBtn {
+  background: rgba(255,255,255,.85);
+  border-color: rgba(0,0,0,.12);
+  color: #1a1a1a;
+}
+#themeSwitcherBtn:hover { transform: scale(1.1); box-shadow: 0 6px 22px rgba(0,0,0,.4); }
+
+/* ── Switcher panel ── */
+#themeSwitcherPanel {
+  position: fixed;
+  bottom: 140px; right: 16px;
+  z-index: 9899;
+  background: rgba(20,20,32,.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  transform: scale(.85) translateY(10px);
+  opacity: 0; pointer-events: none;
+  transition: transform .2s cubic-bezier(.34,1.56,.64,1), opacity .15s;
+  min-width: 180px;
+}
+html.theme-light #themeSwitcherPanel {
+  background: rgba(255,255,255,.92);
+  border-color: rgba(0,0,0,.1);
+}
+#themeSwitcherPanel.open {
+  transform: scale(1) translateY(0);
+  opacity: 1; pointer-events: all;
+}
+.theme-opt {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 10px; cursor: pointer;
+  border: none; background: none; width: 100%; text-align: left;
+  font-family: 'Nunito', sans-serif; font-size: .82rem; font-weight: 800;
+  color: rgba(245,240,220,.7); transition: background .15s, color .15s;
+}
+html.theme-light .theme-opt { color: #555; }
+.theme-opt:hover { background: rgba(255,255,255,.08); color: #F5F0DC; }
+html.theme-light .theme-opt:hover { background: rgba(0,0,0,.05); color: #1a1a1a; }
+.theme-opt.active { background: rgba(232,80,74,.15); color: #E8504A; }
+.theme-opt-icon { font-size: 1.1rem; width: 24px; text-align: center; flex-shrink: 0; }
+.theme-opt-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #E8504A; margin-left: auto; flex-shrink: 0;
+  display: none;
+}
+.theme-opt.active .theme-opt-dot { display: block; }
+.theme-panel-title {
+  font-size: .68rem; font-weight: 900; text-transform: uppercase;
+  letter-spacing: 1px; color: rgba(245,240,220,.3);
+  padding: 4px 12px 6px;
+}
+html.theme-light .theme-panel-title { color: rgba(0,0,0,.3); }
+.theme-panel-divider {
+  height: 1px; background: rgba(255,255,255,.07); margin: 2px 0;
+}
+html.theme-light .theme-panel-divider { background: rgba(0,0,0,.07); }
+
+/* ─── TIER 1 SHIPPER FEATURES ─── */
+.mission-card{background:#1a1a2e;border:1px solid #2a2a3e;border-radius:14px;padding:14px;margin:0 16px 10px}
+.mission-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.mission-icon{font-size:1.3rem;width:36px;text-align:center}
+.mission-title{flex:1;font-weight:900;font-size:.88rem;color:#eee}
+.mission-reward{font-size:.72rem;color:#FFD84D;font-weight:900;white-space:nowrap}
+.mission-bar-wrap{background:#0f0f18;border-radius:50px;height:6px;margin-bottom:4px;overflow:hidden}
+.mission-bar{height:100%;background:linear-gradient(90deg,#E8504A,#FFD84D);border-radius:50px;transition:width .4s}
+.mission-prog{font-size:.7rem;color:#666;font-weight:700}
+.tier-strip{background:linear-gradient(135deg,#1a1a2e,#0f0f18);border:1px solid #2a2a3e;
+  border-radius:14px;padding:12px 16px;margin:0 16px 10px;display:flex;align-items:center;gap:12px}
+.tier-icon{font-size:1.8rem}
+.tier-name{font-weight:900;font-size:.95rem}
+.tier-sub{font-size:.72rem;color:#666;margin-top:1px}
+.tier-progress{flex:1;background:#0f0f18;border-radius:50px;height:5px;overflow:hidden}
+.tier-progress-fill{height:100%;background:linear-gradient(90deg,#FFD84D,#E8504A);transition:width .5s}
+/* Chat in active order */
+.ao-chat-btn{background:rgba(232,80,74,.15);border:1px solid rgba(232,80,74,.3);
+  color:#E8504A;border-radius:8px;padding:7px 14px;font-weight:900;font-size:.8rem;
+  cursor:pointer;font-family:inherit;margin-top:10px;width:100%}
+/* Photo confirm */
+.photo-confirm-btn{background:linear-gradient(135deg,#27ae60,#1e8449);color:#fff;
+  border:none;border-radius:12px;padding:12px;font-weight:900;font-size:.9rem;
+  cursor:pointer;font-family:inherit;width:100%;margin-top:8px;
+  display:flex;align-items:center;justify-content:center;gap:8px}
+.photo-preview-wrap{margin-top:10px;display:none}
+.photo-preview-wrap img{width:100%;border-radius:10px;max-height:160px;object-fit:cover}
+/* Shipper chat window */
+.shipper-chat-wrap{position:fixed;inset:0;z-index:9500;background:#0f0f18;
+  display:flex;flex-direction:column;transform:translateX(100%);
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.shipper-chat-wrap.open{transform:translateX(0)}
+.sc-head{background:linear-gradient(135deg,#E8504A,#c93d37);padding:14px 16px;
+  display:flex;align-items:center;gap:12px}
+.sc-back{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;
+  width:32px;height:32px;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center}
+.sc-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#0f0f18}
+.sc-msg{max-width:75%;padding:10px 13px;border-radius:16px;font-size:.85rem;line-height:1.5;font-weight:600}
+.sc-msg.mine{background:linear-gradient(135deg,#E8504A,#c93d37);color:#fff;
+  align-self:flex-end;border-bottom-right-radius:4px}
+.sc-msg.theirs{background:#1a1a2e;color:#F5F0DC;align-self:flex-start;
+  border-bottom-left-radius:4px;border:1px solid #2a2a2a}
+.sc-msg-time{font-size:.65rem;opacity:.6;margin-top:3px;display:block}
+.sc-input-row{padding:10px 12px;border-top:1px solid #1a1a2a;
+  display:flex;gap:8px;align-items:center;background:#0f0f18}
+.sc-input{flex:1;background:#1a1a2e;border:1.5px solid #2a2a3a;border-radius:50px;
+  padding:9px 14px;color:#F5F0DC;font-family:inherit;font-size:.85rem;outline:none}
+.sc-input:focus{border-color:#E8504A}
+.sc-send{background:linear-gradient(135deg,#E8504A,#c93d37);color:#fff;border:none;
+  border-radius:50%;width:38px;height:38px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* ── TIER 2 SHIPPER ── */
+.heatmap-wrap{padding:0 16px 14px}
+.heatmap-title{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#666;margin-bottom:10px}
+.heatmap-bars{display:flex;gap:3px;align-items:flex-end;height:60px}
+.hm-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.hm-bar{width:100%;border-radius:3px 3px 0 0;min-height:3px;transition:height .5s}
+.hm-label{font-size:.55rem;color:#555;font-weight:700}
+.bank-card{background:#1a1a2e;border:1px solid #2a2a3e;border-radius:14px;padding:14px 16px;margin:0 16px 10px}
+.bank-title{font-size:.8rem;font-weight:900;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+.bank-field{margin-bottom:10px}
+.bank-label{font-size:.72rem;font-weight:800;color:#666;margin-bottom:4px}
+.bank-input{width:100%;background:#0f0f18;border:1.5px solid #2a2a3a;border-radius:8px;padding:8px 12px;color:#eee;font-family:inherit;font-size:.85rem;outline:none}
+.bank-input:focus{border-color:#E8504A}
+.bank-save-btn{width:100%;background:linear-gradient(135deg,#27ae60,#1e8449);color:#fff;border:none;border-radius:10px;padding:10px;font-weight:900;font-size:.85rem;cursor:pointer;font-family:inherit;margin-top:4px}
+.weekly-miss-label{font-size:.7rem;color:#F0B429;font-weight:900;margin-left:8px;vertical-align:middle}
+
+/* ── TIER 3 SHIPPER ── */
+.sos-btn { width:100%; background:linear-gradient(135deg,#e74c3c,#c0392b); color:#fff; border:none; border-radius:12px; padding:12px; font-weight:900; font-size:.9rem; cursor:pointer; font-family:inherit; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:8px; }
+.zone-section { padding:0 16px 14px; }
+.zone-title { font-size:.72rem; font-weight:900; text-transform:uppercase; letter-spacing:1px; color:#666; margin-bottom:10px; }
+.zone-list { display:flex; flex-direction:column; gap:6px; }
+.zone-row { display:flex; align-items:center; gap:10px; }
+.zone-name { font-size:.82rem; font-weight:800; color:#eee; width:110px; flex-shrink:0; }
+.zone-bar-wrap { flex:1; background:#0f0f18; border-radius:50px; height:8px; overflow:hidden; }
+.zone-bar-fill { height:100%; border-radius:50px; transition:width .5s; }
+.zone-count { font-size:.72rem; color:#666; font-weight:700; width:40px; text-align:right; }
+</style>
+
+<!-- Theme switcher button -->
+<button id="themeSwitcherBtn" onclick="themeTogglePanel()" title="Đổi giao diện">
+  <span id="themeIcon">🌙</span>
+</button>
+
+<!-- Theme panel -->
+<div id="themeSwitcherPanel">
+  <div class="theme-panel-title">Giao diện</div>
+  <button class="theme-opt" data-theme="dark" onclick="themeSet('dark')">
+    <span class="theme-opt-icon">🌙</span> Dark
+    <span class="theme-opt-dot"></span>
+  </button>
+  <button class="theme-opt" data-theme="light" onclick="themeSet('light')">
+    <span class="theme-opt-icon">☀️</span> Light
+    <span class="theme-opt-dot"></span>
+  </button>
+  <div class="theme-panel-divider"></div>
+  <div class="theme-panel-title">Liquid Glass</div>
+  <button class="theme-opt" data-theme="glass-dark" onclick="themeSet('glass-dark')">
+    <span class="theme-opt-icon">🫧</span> Glass Dark
+    <span class="theme-opt-dot"></span>
+  </button>
+  <button class="theme-opt" data-theme="glass-light" onclick="themeSet('glass-light')">
+    <span class="theme-opt-icon">🪟</span> Glass Light
+    <span class="theme-opt-dot"></span>
+  </button>
+</div>
+
+<script>
+(function(){
+  const ICONS = { dark:'🌙', light:'☀️', 'glass-dark':'🫧', 'glass-light':'🪟' };
+  const THEMES = ['dark','light','glass-dark','glass-light'];
+  let _panelOpen = false;
+
+  function themeApply(t) {
+    const html = document.documentElement;
+    THEMES.forEach(th => html.classList.remove('theme-' + th));
+    html.classList.add('theme-' + t);
+    document.getElementById('themeIcon').textContent = ICONS[t] || '🌙';
+    document.querySelectorAll('.theme-opt').forEach(el => {
+      el.classList.toggle('active', el.dataset.theme === t);
+    });
+    localStorage.setItem('crabor_theme', t);
+  }
+
+  window.themeSet = function(t) {
+    themeApply(t);
+    themeTogglePanel();
+  };
+
+  window.themeTogglePanel = function() {
+    _panelOpen = !_panelOpen;
+    document.getElementById('themeSwitcherPanel').classList.toggle('open', _panelOpen);
+  };
+
+  // Close panel on outside click
+  document.addEventListener('click', function(e) {
+    if(_panelOpen && !e.target.closest('#themeSwitcherBtn') && !e.target.closest('#themeSwitcherPanel')) {
+      _panelOpen = false;
+      document.getElementById('themeSwitcherPanel').classList.remove('open');
+    }
+  });
+
+  // Init from localStorage
+  const saved = localStorage.getItem('crabor_theme') || 'dark';
+  themeApply(saved);
+})();
+</script>
+
+</body>
+</html>
