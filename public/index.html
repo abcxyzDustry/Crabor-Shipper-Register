@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<meta name="theme-color" content="#E8504A">
+<title>CRABOR – Ứng dụng All-in-One #1 Hà Nội</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════
+   TOKENS & RESET
+══════════════════════════════════════ */
+:root {
+  --red:    #E8504A;
+  --red2:   #c93d37;
+  --cream:  #F5F0DC;
+  --yellow: #FFD84D;
+  --dark:   #111111;
+  --dark2:  #1c1c1c;
+  --gray:   #777;
+  --light:  #f7f4ee;
+  --white:  #ffffff;
+  --ff-brand: 'Fredoka One', cursive;
+  --ff-body:  'Be Vietnam Pro', sans-serif;
+  --radius:   22px;
+  --shadow:   0 16px 60px rgba(0,0,0,.13);
+  color-scheme: light;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;color-scheme:light;}
+body{
+  font-family:'Be Vietnam Pro', sans-serif !important;
+  background:#f7f4ee !important;
+  color:#111111 !important;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;display:block;}
+a{text-decoration:none;color:inherit;}
+/* Force explicit colors on dark backgrounds */
+.dark-section{background:#111111 !important;color:#F5F0DC !important;}
+
+/* ══════════════════════════════════════
+   NOISE TEXTURE OVERLAY
+══════════════════════════════════════ */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;
+}
+
+/* ══════════════════════════════════════
+   NAV
+══════════════════════════════════════ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 40px;
+  background:rgba(247,244,238,.92);
+  -webkit-backdrop-filter:blur(20px);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(232,80,74,.08);
+  transition:all .3s;
+  color:#111111;
+}
+nav.scrolled{
+  background:#f7f4ee !important;
+  box-shadow:0 4px 24px rgba(0,0,0,.07);
+}
+.nav-logo{
+  font-family:'Fredoka One', cursive;
+  font-size:1.7rem;color:#E8504A;
+  display:flex;align-items:center;gap:8px;
+}
+.nav-logo .crab-dot{
+  width:32px;height:32px;background:#E8504A;
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;
+}
+.nav-links{
+  display:flex;align-items:center;gap:28px;
+  list-style:none;
+}
+.nav-links a{
+  font-weight:700;font-size:.9rem;color:#555;
+  transition:color .2s;letter-spacing:.3px;
+}
+.nav-links a:hover{color:#E8504A;}
+.nav-cta{
+  background:#E8504A;color:#fff;
+  padding:11px 24px;border-radius:50px;
+  font-weight:800;font-size:.9rem;
+  border:none;cursor:pointer;
+  transition:all .2s;
+  box-shadow:0 6px 20px rgba(232,80,74,.3);
+}
+.nav-cta:hover{background:#c93d37;transform:translateY(-1px);}
+.burger{display:none;flex-direction:column;gap:5px;cursor:pointer;border:none;background:none;}
+.burger span{width:24px;height:2.5px;background:#111111;border-radius:2px;transition:.3s;}
+@media(max-width:768px){
+  nav{padding:14px 20px;}
+  .nav-links{display:none;}
+  .burger{display:flex;}
+  .nav-cta{padding:9px 18px;font-size:.82rem;}
+}
+
+/* ══════════════════════════════════════
+   HERO
+══════════════════════════════════════ */
+#hero{
+  min-height:100vh;
+  background:linear-gradient(145deg,#E8504A 0%,#c93d37 45%,#111 100%) !important;
+  color:#F5F0DC !important;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+  padding:100px 40px 60px;
+}
+.hero-bg-circle{
+  position:absolute;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,216,77,.18),transparent 70%);
+}
+.hero-bg-circle:nth-child(1){width:700px;height:700px;right:-200px;top:-200px;}
+.hero-bg-circle:nth-child(2){width:400px;height:400px;left:-100px;bottom:-100px;background:radial-gradient(circle,rgba(245,240,220,.08),transparent 70%);}
+
+.hero-content{
+  max-width:1100px;width:100%;
+  display:grid;grid-template-columns:1fr auto;
+  gap:60px;align-items:center;
+  position:relative;z-index:2;
+}
+.hero-tag{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(245,240,220,.15);
+  border:1px solid rgba(245,240,220,.25);
+  border-radius:50px;padding:7px 16px;
+  font-size:.8rem;font-weight:700;color:rgba(245,240,220,.85);
+  margin-bottom:24px;
+  animation:fadeDown .6s .1s both;
+}
+.hero-tag span{background:#FFD84D;color:#a06b00;border-radius:50px;padding:2px 8px;font-size:.72rem;font-weight:900;}
+.hero-title{
+  font-family:'Fredoka One', cursive;
+  font-size:clamp(3rem,7vw,5.5rem);
+  color:#F5F0DC !important;
+  line-height:1.05;
+  margin-bottom:20px;
+  animation:fadeDown .6s .2s both;
+}
+.hero-title em{
+  font-style:normal;
+  color:#FFD84D;
+  text-shadow:0 4px 20px rgba(255,216,77,.4);
+}
+.hero-sub{
+  font-size:clamp(1rem,2vw,1.2rem);
+  color:rgba(245,240,220,.9) !important;
+  font-weight:500;line-height:1.65;
+  max-width:520px;
+  margin-bottom:40px;
+  animation:fadeDown .6s .3s both;
+}
+.hero-btns{
+  display:flex;flex-wrap:wrap;gap:14px;
+  animation:fadeDown .6s .4s both;
+}
+.btn-primary{
+  background:#FFD84D;color:#111;
+  padding:16px 32px;border-radius:60px;
+  font-weight:900;font-size:1rem;
+  border:none;cursor:pointer;
+  transition:all .25s;
+  box-shadow:0 8px 30px rgba(255,216,77,.35);
+  display:flex;align-items:center;gap:8px;
+}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 14px 40px rgba(255,216,77,.45);}
+.btn-outline{
+  background:rgba(245,240,220,.12);
+  border:2px solid rgba(245,240,220,.35);
+  color:#F5F0DC;
+  padding:14px 28px;border-radius:60px;
+  font-weight:800;font-size:.95rem;
+  cursor:pointer;transition:all .25s;
+  display:flex;align-items:center;gap:8px;
+}
+.btn-outline:hover{background:rgba(245,240,220,.22);transform:translateY(-2px);}
+.btn-outline.register{
+  border-color:rgba(255,216,77,.4);color:#FFD84D;
+}
+.btn-outline.register:hover{background:rgba(255,216,77,.1);}
+
+/* HERO PHONE MOCKUP */
+.hero-phone{
+  width:220px;flex-shrink:0;
+  animation:floatPhone 4s ease-in-out infinite;
+  position:relative;
+}
+.hero-phone-frame{
+  width:220px;height:440px;
+  background:#111;border-radius:40px;
+  border:3px solid rgba(255,255,255,.15);
+  overflow:hidden;position:relative;
+  box-shadow:0 40px 80px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.phone-screen{
+  width:100%;height:100%;
+  background:linear-gradient(160deg,#E8504A,#c93d37 50%,#111);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;position:relative;
+}
+.phone-logo-big{
+  font-family:'Fredoka One', cursive;
+  font-size:2.2rem;color:#F5F0DC;
+  text-shadow:3px 3px 0 rgba(0,0,0,.2);
+}
+.phone-crab-big{font-size:3rem;animation:floatAnim 3s ease-in-out infinite;}
+.phone-chips{
+  display:flex;flex-direction:column;gap:6px;
+  padding:0 20px;width:100%;
+}
+.phone-chip{
+  background:rgba(245,240,220,.12);
+  border:1px solid rgba(245,240,220,.2);
+  border-radius:10px;padding:7px 12px;
+  font-size:.7rem;font-weight:700;color:rgba(245,240,220,.8);
+  display:flex;align-items:center;gap:6px;
+}
+.phone-badge{
+  position:absolute;top:-8px;right:-12px;
+  background:#FFD84D;color:#a06b00;
+  border-radius:50px;padding:5px 10px;
+  font-size:.68rem;font-weight:900;
+  box-shadow:0 4px 14px rgba(255,216,77,.4);
+}
+
+@keyframes floatPhone{0%,100%{transform:translateY(0) rotate(1deg)}50%{transform:translateY(-16px) rotate(-1deg)}}
+@keyframes floatAnim{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:none}}
+
+.hero-stats{
+  display:flex;gap:24px;flex-wrap:wrap;
+  margin-top:36px;
+  animation:fadeDown .6s .5s both;
+}
+.hero-stat{
+  text-align:center;
+}
+.hs-num{
+  font-family:'Fredoka One', cursive;font-size:1.7rem;color:#FFD84D !important;
+}
+.hs-label{font-size:.75rem;color:rgba(245,240,220,.65);font-weight:700;}
+
+@media(max-width:768px){
+  #hero{padding:80px 20px 50px;}
+  .hero-content{grid-template-columns:1fr;text-align:center;gap:40px;}
+  .hero-phone{margin:0 auto;}
+  .hero-sub{margin-left:auto;margin-right:auto;}
+  .hero-btns{justify-content:center;}
+  .hero-stats{justify-content:center;}
+}
+
+/* ══════════════════════════════════════
+   STICKY ROLE BANNER (ghim dưới)
+══════════════════════════════════════ */
+.sticky-banner{
+  position:fixed;bottom:0;left:0;right:0;z-index:90;
+  background:rgba(17,17,17,.97) !important;
+  color:#ffffff !important;
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-top:1px solid rgba(255,255,255,.07);
+  padding:14px 20px;
+}
+.sticky-inner{
+  max-width:900px;margin:0 auto;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;
+}
+.sticky-label{
+  font-size:.8rem;font-weight:700;color:#777;
+  margin-right:4px;white-space:nowrap;
+}
+.sticky-btn{
+  padding:10px 20px;border-radius:50px;
+  font-weight:800;font-size:.82rem;
+  cursor:pointer;border:none;transition:all .2s;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.sticky-user{background:#FFD84D;color:#111;}
+.sticky-user:hover{background:#ffd024;}
+.sticky-shipper{background:#E8504A;color:#fff;}
+.sticky-shipper:hover{background:#c93d37;}
+.sticky-partner{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.18);}
+.sticky-partner:hover{background:rgba(255,255,255,.18);}
+
+/* ══════════════════════════════════════
+   SECTION BASE
+══════════════════════════════════════ */
+section{padding:90px 40px;position:relative;z-index:1;}
+.section-label{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#ffffff;border:1.5px solid #efe8d8;
+  border-radius:50px;padding:5px 14px;
+  font-size:.75rem;font-weight:800;color:#E8504A;
+  margin-bottom:14px;letter-spacing:.5px;text-transform:uppercase;
+}
+.section-title{
+  font-family:'Fredoka One', cursive;
+  font-size:clamp(1.8rem,4vw,2.8rem);
+  color:#111111;line-height:1.1;margin-bottom:14px;
+}
+.section-title em{font-style:normal;color:#E8504A;}
+.section-sub{
+  font-size:1rem;color:#777777;font-weight:500;
+  line-height:1.65;max-width:560px;
+}
+.container{max-width:1100px;margin:0 auto;}
+@media(max-width:768px){section{padding:60px 20px;}}
+
+/* ══════════════════════════════════════
+   SERVICES / MODULES
+══════════════════════════════════════ */
+#services{background:#ffffff !important;color:#111111 !important;}
+.services-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:20px;margin-top:50px;
+}
+.srv-card{
+  border-radius:24px;padding:30px 24px;
+  position:relative;overflow:hidden;
+  cursor:pointer;transition:transform .25s;
+}
+.srv-card:hover{transform:translateY(-6px);}
+.srv-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 80% 20%,rgba(255,255,255,.15),transparent 60%);
+}
+.srv-food{background:linear-gradient(145deg,#E8504A,#c93d37);}
+.srv-laundry{background:linear-gradient(145deg,#2d3d7a,#1a264d);}
+.srv-clean{background:linear-gradient(145deg,#1a5c2e,#0d3018);}
+.srv-china{background:linear-gradient(145deg,#7a2020,#4a1010);}
+.srv-ride{background:linear-gradient(145deg,#1a1a6a,#0d0d40);}
+.srv-icon{font-size:2.5rem;margin-bottom:16px;position:relative;}
+.srv-name{
+  font-family:'Fredoka One', cursive;font-size:1.3rem;
+  color:#F5F0DC;margin-bottom:6px;position:relative;
+}
+.srv-sub{font-size:.8rem;color:rgba(245,240,220,.7);font-weight:600;line-height:1.5;position:relative;}
+.srv-badge{
+  position:absolute;top:14px;right:14px;
+  background:#FFD84D;color:#a06b00;
+  border-radius:50px;padding:3px 10px;
+  font-size:.68rem;font-weight:900;
+}
+
+/* ══════════════════════════════════════
+   FEATURES
+══════════════════════════════════════ */
+#features{background:#f7f4ee !important;color:#111111 !important;}
+.features-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:24px;margin-top:50px;
+}
+.feat-card{
+  background:#ffffff !important;
+  color:#111111 !important;
+  border-radius:20px;
+  padding:28px 24px;
+  border:1.5px solid #ede7d8;
+  transition:all .25s;
+}
+.feat-card:hover{
+  border-color:#E8504A;
+  box-shadow:0 12px 40px rgba(232,80,74,.1);
+  transform:translateY(-4px);
+}
+.feat-icon{
+  width:52px;height:52px;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;margin-bottom:16px;
+}
+.fi-red{background:#fff0ef;}
+.fi-yellow{background:#fffbe6;}
+.fi-green{background:#edfbf1;}
+.fi-blue{background:#eff4ff;}
+.fi-purple{background:#f5f0ff;}
+.fi-orange{background:#fff5ec;}
+.feat-name{
+  font-weight:900;font-size:1rem;color:#111111;margin-bottom:6px;
+}
+.feat-desc{font-size:.85rem;color:#777777;font-weight:500;line-height:1.6;}
+@media(max-width:900px){.features-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:600px){.features-grid{grid-template-columns:1fr;}}
+
+/* ══════════════════════════════════════
+   FOUNDER / ABOUT
+══════════════════════════════════════ */
+#about{
+  background:#111111 !important;
+  color:#F5F0DC !important;
+  position:relative;overflow:hidden;
+}
+#about::before{
+  content:'';position:absolute;
+  width:600px;height:600px;border-radius:50%;
+  background:radial-gradient(circle,rgba(232,80,74,.15),transparent 70%);
+  right:-200px;top:-100px;
+}
+.about-content{
+  display:grid;grid-template-columns:auto 1fr;
+  gap:60px;align-items:center;position:relative;z-index:2;
+}
+.founder-card{
+  width:300px;flex-shrink:0;
+  background:#1c1c1c;border-radius:24px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.07);
+}
+.founder-avatar{
+  width:100%;height:200px;
+  background:linear-gradient(135deg,#E8504A,#c93d37);
+  display:flex;align-items:center;justify-content:center;
+  font-size:4rem;position:relative;overflow:hidden;
+}
+.founder-avatar::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(to bottom,transparent 50%,rgba(0,0,0,.4));
+}
+.founder-body{padding:20px;}
+.founder-name{
+  font-family:'Fredoka One', cursive;font-size:1.3rem;
+  color:#F5F0DC;margin-bottom:4px;
+}
+.founder-title{font-size:.78rem;color:rgba(245,240,220,.6);font-weight:600;margin-bottom:12px;}
+.founder-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.founder-tag{
+  background:rgba(232,80,74,.2);color:#E8504A;
+  padding:4px 10px;border-radius:10px;
+  font-size:.7rem;font-weight:800;
+}
+.about-text{color:rgba(245,240,220,.8);}
+.about-text .section-label{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.1);color:#FFD84D;}
+.about-text .section-title{color:#F5F0DC;}
+.about-text p{
+  font-size:.95rem;font-weight:400;line-height:1.75;
+  color:rgba(245,240,220,.7);margin-bottom:16px;
+}
+.about-quote{
+  background:rgba(255,216,77,.07);
+  border-left:3px solid #FFD84D;
+  border-radius:0 14px 14px 0;
+  padding:16px 20px;margin:24px 0;
+  font-style:italic;font-size:1rem;
+  color:rgba(245,240,220,.85);font-weight:600;line-height:1.6;
+}
+.about-milestones{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px;
+}
+.milestone{
+  background:rgba(255,255,255,.04);border-radius:14px;
+  border:1px solid rgba(255,255,255,.06);
+  padding:14px;text-align:center;
+}
+.ms-num{font-family:'Fredoka One', cursive;font-size:1.6rem;color:#FFD84D;}
+.ms-label{font-size:.72rem;color:rgba(245,240,220,.5);font-weight:700;}
+@media(max-width:900px){
+  .about-content{grid-template-columns:1fr;}
+  .founder-card{width:100%;}
+  .founder-avatar{height:160px;}
+}
+
+/* ══════════════════════════════════════
+   JOIN / CTA CARDS
+══════════════════════════════════════ */
+#join{background:#f7f4ee !important;color:#111111 !important;}
+.join-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:24px;margin-top:50px;
+}
+.join-card{
+  border-radius:24px;overflow:hidden;
+  border:2px solid #ede7d8;
+  background:#ffffff !important;
+  color:#111111 !important;
+  transition:all .3s;
+}
+.join-card:hover{transform:translateY(-6px);box-shadow:0 16px 60px rgba(0,0,0,.13);}
+.jc-header{
+  padding:32px 28px;display:flex;flex-direction:column;gap:12px;
+}
+.jc-h-user{background:linear-gradient(135deg,#FFD84D,#ffc107);}
+.jc-h-shipper{background:linear-gradient(135deg,#E8504A,#c93d37);}
+.jc-h-partner{background:linear-gradient(135deg,#1a1a6a,#2d2d9a);}
+.jc-icon{font-size:2.5rem;}
+.jc-role{
+  font-family:'Fredoka One', cursive;font-size:1.4rem;
+  color:#fff;
+}
+.jc-h-user .jc-role{color:#111;}
+.jc-tagline{font-size:.82rem;font-weight:700;color:rgba(255,255,255,.8);}
+.jc-h-user .jc-tagline{color:rgba(17,17,17,.6);}
+.jc-body{padding:24px 28px;}
+.jc-perks{list-style:none;margin-bottom:20px;}
+.jc-perks li{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:7px 0;font-size:.85rem;font-weight:600;color:#444;
+  border-bottom:1px solid #f5f0e8;
+}
+.jc-perks li:last-child{border:none;}
+.jc-perks .perk-ico{font-size:1rem;flex-shrink:0;}
+.jc-btn{
+  width:100%;padding:14px;border-radius:50px;
+  border:none;cursor:pointer;font-weight:900;font-size:.9rem;
+  transition:all .2s;
+}
+.jc-btn-user{background:#FFD84D;color:#111;box-shadow:0 6px 20px rgba(255,216,77,.3);}
+.jc-btn-user:hover{background:#ffd024;}
+.jc-btn-shipper{background:#E8504A;color:#fff;box-shadow:0 6px 20px rgba(232,80,74,.3);}
+.jc-btn-shipper:hover{background:#c93d37;}
+.jc-btn-partner{background:#1a1a6a;color:#fff;box-shadow:0 6px 20px rgba(26,26,106,.25);}
+.jc-btn-partner:hover{background:#0d0d50;}
+@media(max-width:900px){.join-grid{grid-template-columns:1fr;}}
+
+/* ══════════════════════════════════════
+   DOWNLOAD
+══════════════════════════════════════ */
+#download{
+  background:linear-gradient(145deg,#E8504A,#c93d37) !important;
+  color:#F5F0DC !important;
+  text-align:center;
+  position:relative;overflow:hidden;
+}
+#download::before{
+  content:'';position:absolute;
+  width:500px;height:500px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,216,77,.15),transparent 70%);
+  right:-100px;bottom:-100px;
+}
+#download .section-title{color:#F5F0DC;text-align:center;}
+#download .section-sub{color:rgba(245,240,220,.75);text-align:center;margin:0 auto 40px;}
+.dl-buttons{
+  display:flex;justify-content:center;gap:16px;flex-wrap:wrap;
+  position:relative;z-index:2;
+}
+.dl-btn{
+  display:flex;align-items:center;gap:12px;
+  background:rgba(17,17,17,.85);color:#fff;
+  border:1px solid rgba(255,255,255,.15);
+  padding:14px 28px;border-radius:16px;
+  cursor:pointer;transition:all .25s;
+  backdrop-filter:blur(10px);
+}
+.dl-btn:hover{background:rgba(17,17,17,.95);transform:translateY(-2px);}
+.dl-btn-icon{font-size:1.8rem;}
+.dl-btn-text{}
+.dl-small{font-size:.7rem;color:rgba(255,255,255,.55);font-weight:600;}
+.dl-store{font-weight:800;font-size:1rem;}
+.dl-note{
+  margin-top:20px;font-size:.82rem;
+  color:rgba(245,240,220,.55);font-weight:600;
+  position:relative;z-index:2;
+}
+
+/* ══════════════════════════════════════
+   FOOTER
+══════════════════════════════════════ */
+footer{
+  background:#111111 !important;
+  color:#F5F0DC !important;
+  padding:60px 40px 120px;
+}
+.footer-inner{
+  max-width:1100px;margin:0 auto;
+  display:grid;grid-template-columns:auto 1fr 1fr 1fr;
+  gap:50px;
+}
+.footer-brand .fl{
+  font-family:'Fredoka One', cursive;font-size:2rem;color:#F5F0DC;
+  margin-bottom:10px;
+}
+.footer-brand p{
+  font-size:.82rem;color:rgba(255,255,255,.4);
+  font-weight:500;line-height:1.7;max-width:220px;
+}
+.footer-col h4{
+  font-weight:900;font-size:.82rem;
+  letter-spacing:1.5px;text-transform:uppercase;
+  color:rgba(255,255,255,.35);margin-bottom:18px;
+}
+.footer-col ul{list-style:none;}
+.footer-col ul li{
+  margin-bottom:10px;
+  font-size:.85rem;font-weight:600;color:rgba(255,255,255,.55);
+  cursor:pointer;transition:color .2s;
+}
+.footer-col ul li:hover{color:#F5F0DC;}
+.footer-bottom{
+  max-width:1100px;margin:40px auto 0;
+  border-top:1px solid rgba(255,255,255,.06);
+  padding-top:28px;
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:14px;
+}
+.footer-bottom p{font-size:.78rem;color:rgba(255,255,255,.3);font-weight:600;}
+.footer-tos{
+  background:none;border:1px solid rgba(232,80,74,.3);
+  color:#E8504A;
+  padding:9px 20px;border-radius:50px;
+  font-weight:800;font-size:.8rem;cursor:pointer;
+  transition:all .2s;
+}
+.footer-tos:hover{background:rgba(232,80,74,.1);}
+@media(max-width:900px){
+  footer{padding:50px 20px 130px;}
+  .footer-inner{grid-template-columns:1fr 1fr;gap:30px;}
+  .footer-brand{grid-column:span 2;}
+  .footer-bottom{flex-direction:column;text-align:center;}
+}
+@media(max-width:500px){
+  .footer-inner{grid-template-columns:1fr;gap:24px;}
+  .footer-brand{grid-column:auto;}
+}
+
+/* ══════════════════════════════════════
+   MODAL (TERMS)
+══════════════════════════════════════ */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75) !important;
+  z-index:1000;display:none;align-items:flex-end;justify-content:center;
+  -webkit-backdrop-filter:blur(6px);
+  backdrop-filter:blur(6px);
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:#ffffff !important;
+  color:#111111 !important;
+  width:100%;max-width:800px;
+  border-radius:28px 28px 0 0;
+  max-height:90vh;overflow-y:auto;
+  animation:slideUp .35s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+.modal-header{
+  position:sticky;top:0;background:#fff;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:24px 28px 18px;
+  border-bottom:1px solid #f0ede6;z-index:10;
+}
+.modal-title{
+  font-family:'Fredoka One', cursive;font-size:1.3rem;color:#111111;
+}
+.modal-close{
+  width:36px;height:36px;border-radius:50%;
+  background:#f5f0e8;border:none;cursor:pointer;
+  font-size:1.1rem;display:flex;align-items:center;justify-content:center;
+  transition:background .2s;
+}
+.modal-close:hover{background:#ede8de;}
+.modal-body{padding:28px;}
+.tos-part{margin-bottom:36px;}
+.tos-part-title{
+  font-family:'Fredoka One', cursive;font-size:1.15rem;
+  color:#E8504A;margin-bottom:16px;
+  padding-bottom:8px;border-bottom:2px solid #ffe8e7;
+}
+.tos-section{margin-bottom:20px;}
+.tos-section h4{
+  font-weight:900;font-size:.9rem;color:#111111;
+  margin-bottom:8px;
+}
+.tos-section p,.tos-section ul{
+  font-size:.85rem;color:#555;font-weight:500;line-height:1.75;
+}
+.tos-section ul{padding-left:20px;margin-top:6px;}
+.tos-section ul li{margin-bottom:5px;}
+.tos-section ul li ul{margin-top:4px;}
+.tos-divider{
+  height:1px;background:#f0ede6;margin:28px 0;
+}
+
+/* ══════════════════════════════════════
+   SCROLL ANIMATIONS
+══════════════════════════════════════ */
+.reveal{
+  opacity:0;transform:translateY(30px);
+  transition:opacity .6s ease,transform .6s ease;
+}
+.reveal.visible{opacity:1;transform:none;}
+.reveal-delay-1{transition-delay:.1s;}
+.reveal-delay-2{transition-delay:.2s;}
+.reveal-delay-3{transition-delay:.3s;}
+.reveal-delay-4{transition-delay:.4s;}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav id="mainNav">
+  <div class="nav-logo">
+    <div class="nav-logo">
+      <div class="crab-dot">🦀</div>
+      CRABOR
+    </div>
+  </div>
+  <ul class="nav-links">
+    <li><a href="#services">Dịch vụ</a></li>
+    <li><a href="#features">Tính năng</a></li>
+    <li><a href="#about">Về chúng tôi</a></li>
+    <li><a href="#join">Tham gia</a></li>
+    <li><a href="#download">Tải app</a></li>
+  </ul>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="/sales" style="font-size:.78rem;font-weight:800;color:#E8504A;text-decoration:none;padding:6px 14px;border:1.5px solid rgba(232,80,74,.3);border-radius:50px;transition:.2s" onmouseover="this.style.background='rgba(232,80,74,.08)'" onmouseout="this.style.background='transparent'">🎯 Sales</a>
+    <button class="nav-cta" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">Tải ngay 🦀</button>
+  </div>
+  <div class="burger" onclick="toggleMobileMenu()">
+    <span></span><span></span><span></span>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section id="hero">
+  <div class="hero-bg-circle"></div>
+  <div class="hero-bg-circle"></div>
+
+  <div class="hero-content">
+    <div class="hero-text">
+      <div class="hero-tag"><span>🆕 Mới</span>Ra mắt tháng 7/2025 tại Hà Nội</div>
+      <h1 class="hero-title">
+        CRABOR<br>
+        <em>All-in-One</em><br>
+        Super App
+      </h1>
+      <p class="hero-sub">
+        Một ứng dụng duy nhất — Giao đồ ăn, Giặt là, Dọn nhà, China Shop, Xe công nghệ.
+        Tất cả trong lòng bàn tay. <strong style="color:var(--yellow)">Tải ngay thôi nào!</strong>
+      </p>
+      <div class="hero-btns">
+        <button class="btn-primary" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">
+          📱 Tải ứng dụng ngay
+        </button>
+        <button class="btn-outline register" onclick="window.location.href='/register#partner'">
+          🤝 Đăng ký đối tác
+        </button>
+        <button class="btn-outline" onclick="window.location.href='/register#shipper'">
+          🛵 Trở thành Shipper
+        </button>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="hs-num">5+</div><div class="hs-label">Dịch vụ</div></div>
+        <div class="hero-stat"><div class="hs-num">30'</div><div class="hs-label">Giao hàng</div></div>
+        <div class="hero-stat"><div class="hs-num">24/7</div><div class="hs-label">Hỗ trợ</div></div>
+        <div class="hero-stat"><div class="hs-num">0đ</div><div class="hs-label">Phí đăng ký</div></div>
+      </div>
+    </div>
+    <div class="hero-phone">
+      <div class="phone-badge">⚡ LIVE</div>
+      <div class="hero-phone-frame">
+        <div class="phone-screen">
+          <div class="phone-crab-big">🦀</div>
+          <div class="phone-logo-big">CRABOR</div>
+          <div class="phone-chips">
+            <div class="phone-chip">🍜 Giao đồ ăn · 30 phút</div>
+            <div class="phone-chip">👕 Giặt là · Lấy tận nơi</div>
+            <div class="phone-chip">🧹 Dọn nhà · Từ 200k</div>
+            <div class="phone-chip">🛍️ China Shop · Chính hãng</div>
+            <div class="phone-chip">🚗 Xe công nghệ · Sắp ra</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SERVICES ═══ -->
+<section id="services">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">🎯 Dịch vụ</div>
+      <h2 class="section-title">Một app — <em>Mọi nhu cầu</em></h2>
+      <p class="section-sub">Từ bữa ăn đến dọn nhà, giặt đồ đến mua sắm hàng Trung — CRABOR lo hết cho bạn.</p>
+    </div>
+    <div class="services-grid">
+      <div class="srv-card srv-food reveal reveal-delay-1">
+        <div class="srv-icon">🍜</div>
+        <div class="srv-name">Giao đồ ăn</div>
+        <div class="srv-sub">Hàng trăm quán ăn · Giao trong 30 phút · Theo dõi real-time</div>
+        <div class="srv-badge">HOT</div>
+      </div>
+      <div class="srv-card srv-laundry reveal reveal-delay-2">
+        <div class="srv-icon">👕</div>
+        <div class="srv-name">Giặt là</div>
+        <div class="srv-sub">Shipper lấy & trả tận nơi · Hoa hồng 18% · Q1/2026</div>
+      </div>
+      <div class="srv-card srv-clean reveal reveal-delay-3">
+        <div class="srv-icon">🧹</div>
+        <div class="srv-name">Dọn nhà</div>
+        <div class="srv-sub">Người giúp việc xác minh · 200k–350k/ca · Q2/2026</div>
+      </div>
+      <div class="srv-card srv-china reveal reveal-delay-4">
+        <div class="srv-icon">🛍️</div>
+        <div class="srv-name">China Shop</div>
+        <div class="srv-sub">Hàng nội địa Trung chính hãng · Giao tận nhà · Q4/2026</div>
+      </div>
+      <div class="srv-card srv-ride reveal" style="transition-delay:.5s">
+        <div class="srv-icon">🚗</div>
+        <div class="srv-name">Xe công nghệ</div>
+        <div class="srv-sub">Đặt xe 4/7 chỗ và xe máy · Giá minh bạch · Q3/2026</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section id="features">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">✨ Tính năng</div>
+      <h2 class="section-title">Được xây dựng để <em>bạn yêu thích</em></h2>
+      <p class="section-sub">Công nghệ hiện đại, giao diện thân thiện, trải nghiệm mượt mà từ khi mở app đến khi nhận hàng.</p>
+    </div>
+    <div class="features-grid" style="margin-top:50px">
+      <div class="feat-card reveal reveal-delay-1">
+        <div class="feat-icon fi-red">📍</div>
+        <div class="feat-name">Theo dõi đơn Real-time</div>
+        <div class="feat-desc">Biết ngay shipper đang ở đâu, đơn đang ở bước nào — không cần gọi điện hỏi.</div>
+      </div>
+      <div class="feat-card reveal reveal-delay-2">
+        <div class="feat-icon fi-yellow">⚡</div>
+        <div class="feat-name">Đặt hàng siêu nhanh</div>
+        <div class="feat-desc">Chỉ 3 bước: chọn món → địa chỉ → thanh toán. Xong trong chưa đầy 60 giây.</div>
+      </div>
+      <div class="feat-card reveal reveal-delay-3">
+        <div class="feat-icon fi-green">💳</div>
+        <div class="feat-name">Đa phương thức thanh toán</div>
+        <div class="feat-desc">Tiền mặt (COD), MoMo, ZaloPay, chuyển khoản — chọn cách bạn thích nhất.</div>
+      </div>
+      <div class="feat-card reveal reveal-delay-1">
+        <div class="feat-icon fi-blue">🔔</div>
+        <div class="feat-name">Thông báo thông minh</div>
+        <div class="feat-desc">Push notification mỗi bước: xác nhận, đang chuẩn bị, shipper đến, giao xong.</div>
+      </div>
+      <div class="feat-card reveal reveal-delay-2">
+        <div class="feat-icon fi-purple">⭐</div>
+        <div class="feat-name">Hệ thống đánh giá</div>
+        <div class="feat-desc">Đánh giá shipper và đối tác sau mỗi đơn — giúp cộng đồng luôn chất lượng.</div>
+      </div>
+      <div class="feat-card reveal reveal-delay-3">
+        <div class="feat-icon fi-orange">🎁</div>
+        <div class="feat-name">Điểm thưởng CRABOR</div>
+        <div class="feat-desc">Mỗi đơn tích điểm thưởng, đổi voucher giảm giá cho lần đặt tiếp theo.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ABOUT / FOUNDER ═══ -->
+<section id="about">
+  <div class="container">
+    <div class="about-content">
+      <div class="founder-card reveal">
+        <div class="founder-avatar">👤</div>
+        <div class="founder-body">
+          <div class="founder-name">Nhà sáng lập CRABOR</div>
+          <div class="founder-title">CEO & Co-Founder · CRABOR TECH CO., LTD</div>
+          <div class="founder-tags">
+            <div class="founder-tag">🎓 Logistics</div>
+            <div class="founder-tag">💡 Startup</div>
+            <div class="founder-tag">🏙️ Hà Nội</div>
+          </div>
+        </div>
+      </div>
+      <div class="about-text reveal reveal-delay-2">
+        <div class="section-label">🏢 Về chúng tôi</div>
+        <h2 class="section-title" style="color:var(--cream)">Câu chuyện<br>đằng sau <em style="color:var(--yellow)">CRABOR</em></h2>
+        <p>CRABOR được thành lập bởi một sinh viên năm 2 ngành Logistics tại Hà Nội với mong muốn giải quyết những bất tiện mà người trẻ thường xuyên gặp phải: đặt đồ ăn không tiện, giặt đồ không có chỗ tín nhiệm, thuê người giúp việc mất thời gian...</p>
+        <p>Chúng tôi bắt đầu từ con số 0, từng dòng code, từng đối tác đầu tiên — với niềm tin rằng công nghệ có thể làm cho cuộc sống hàng ngày nhẹ nhàng hơn.</p>
+        <div class="about-quote">
+          "Tôi muốn xây dựng một ứng dụng mà mọi người Hà Nội đều muốn có trong điện thoại — không chỉ để đặt đồ ăn, mà để giải quyết mọi nhu cầu của cuộc sống hiện đại."
+        </div>
+        <div class="about-milestones">
+          <div class="milestone">
+            <div class="ms-num">2025</div>
+            <div class="ms-label">Năm thành lập</div>
+          </div>
+          <div class="milestone">
+            <div class="ms-num">T7/2025</div>
+            <div class="ms-label">Ra mắt chính thức</div>
+          </div>
+          <div class="milestone">
+            <div class="ms-num">5+</div>
+            <div class="ms-label">Modules dịch vụ</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ JOIN / ROLES ═══ -->
+<section id="join">
+  <div class="container">
+    <div class="reveal" style="text-align:center;margin-bottom:0">
+      <div class="section-label" style="margin:0 auto 14px">🤝 Tham gia CRABOR</div>
+      <h2 class="section-title">Bạn muốn là <em>ai?</em></h2>
+      <p class="section-sub" style="margin:0 auto">Chọn vai trò phù hợp với bạn và bắt đầu hành trình cùng CRABOR ngay hôm nay.</p>
+    </div>
+    <div class="join-grid">
+      <!-- USER -->
+      <div class="join-card reveal reveal-delay-1">
+        <div class="jc-header jc-h-user">
+          <div class="jc-icon">😊</div>
+          <div class="jc-role">Người dùng</div>
+          <div class="jc-tagline">Đặt hàng mọi lúc · Giao siêu nhanh</div>
+        </div>
+        <div class="jc-body">
+          <ul class="jc-perks">
+            <li><span class="perk-ico">📍</span>Theo dõi đơn real-time</li>
+            <li><span class="perk-ico">💳</span>Thanh toán đa phương thức</li>
+            <li><span class="perk-ico">⭐</span>Tích điểm thưởng mỗi đơn</li>
+            <li><span class="perk-ico">🎁</span>Khuyến mãi độc quyền</li>
+            <li><span class="perk-ico">🔔</span>Thông báo từng bước đơn hàng</li>
+          </ul>
+          <button class="jc-btn jc-btn-user" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">
+            📱 Tải app ngay — Miễn phí
+          </button>
+        </div>
+      </div>
+      <!-- SHIPPER -->
+      <div class="join-card reveal reveal-delay-2">
+        <div class="jc-header jc-h-shipper">
+          <div class="jc-icon">🛵</div>
+          <div class="jc-role">Shipper</div>
+          <div class="jc-tagline">Thu nhập 20k–50k/đơn · Chủ động giờ</div>
+        </div>
+        <div class="jc-body">
+          <ul class="jc-perks">
+            <li><span class="perk-ico">💰</span>Thu nhập 20k–50k/đơn giao hàng</li>
+            <li><span class="perk-ico">🕐</span>Tự chọn giờ làm — không ép ca</li>
+            <li><span class="perk-ico">⚡</span>Nhận tiền hàng ngày, không chờ</li>
+            <li><span class="perk-ico">🦺</span>Đồng phục CRABOR chính hãng</li>
+            <li><span class="perk-ico">📱</span>App shipper chuyên dụng, dễ dùng</li>
+          </ul>
+          <button class="jc-btn jc-btn-shipper" onclick="window.location.href='/register#shipper'">
+            🛵 Đăng ký Shipper — 700k kích hoạt
+          </button>
+        </div>
+      </div>
+      <!-- PARTNER -->
+      <div class="join-card reveal reveal-delay-3">
+        <div class="jc-header jc-h-partner">
+          <div class="jc-icon">🤝</div>
+          <div class="jc-role">Đối tác</div>
+          <div class="jc-tagline">Nhà hàng · Giặt là · Dọn nhà · China Shop</div>
+        </div>
+        <div class="jc-body">
+          <ul class="jc-perks">
+            <li><span class="perk-ico">👥</span>Tiếp cận hàng nghìn khách hàng</li>
+            <li><span class="perk-ico">🚀</span>Shipper CRABOR giao hàng cho bạn</li>
+            <li><span class="perk-ico">📊</span>Dashboard quản lý đơn real-time</li>
+            <li><span class="perk-ico">💸</span>Thanh toán minh bạch theo kỳ</li>
+            <li><span class="perk-ico">✅</span>Đăng ký miễn phí — hoa hồng 12–20%</li>
+          </ul>
+          <button class="jc-btn jc-btn-partner" onclick="window.location.href='/register#partner'">
+            🤝 Đăng ký đối tác ngay
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DOWNLOAD ═══ -->
+<section id="download">
+  <div class="container" style="position:relative;z-index:2;text-align:center">
+    <div class="reveal">
+      <div class="section-label" style="margin:0 auto 16px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.2);color:var(--cream)">📱 Tải xuống</div>
+      <h2 class="section-title" style="color:var(--cream)">Tải ngay — <em style="color:var(--yellow)">Miễn phí!</em></h2>
+      <p class="section-sub">Có mặt trên cả iOS và Android. Đặt hàng đầu tiên, nhận ngay ưu đãi đặc biệt từ CRABOR.</p>
+    </div>
+    <div class="dl-buttons reveal">
+      <div class="dl-btn">
+        <div class="dl-btn-icon">🍎</div>
+        <div class="dl-btn-text">
+          <div class="dl-small">Tải trên</div>
+          <div class="dl-store">App Store</div>
+        </div>
+      </div>
+      <div class="dl-btn">
+        <div class="dl-btn-icon">▶️</div>
+        <div class="dl-btn-text">
+          <div class="dl-small">Tải trên</div>
+          <div class="dl-store">Google Play</div>
+        </div>
+      </div>
+      <div class="dl-btn" onclick="window.location.href='/customer'">
+        <div class="dl-btn-icon">🌐</div>
+        <div class="dl-btn-text">
+          <div class="dl-small">Dùng ngay</div>
+          <div class="dl-store">Web App</div>
+        </div>
+      </div>
+    </div>
+    <p class="dl-note reveal">⚡ Hoàn toàn miễn phí · Không cần thẻ tín dụng · Đăng ký trong 30 giây</p>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<!-- Theme selector -->
+<div class="settings-theme-row">
+  <div class="settings-theme-label">🎨 Giao diện</div>
+  <div class="settings-theme-opts">
+    <button class="sth-btn" data-theme="dark"        onclick="themeSet('dark')">🌙 Dark</button>
+    <button class="sth-btn" data-theme="light"       onclick="themeSet('light')">☀️ Light</button>
+    <button class="sth-btn" data-theme="glass-dark"  onclick="themeSet('glass-dark')">🫧 Glass Dark</button>
+    <button class="sth-btn" data-theme="glass-light" onclick="themeSet('glass-light')">🪟 Glass Light</button>
+  </div>
+</div>
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="fl">🦀 CRABOR</div>
+      <p>Nền tảng công nghệ kết nối dịch vụ All-in-One tại Hà Nội.</p>
+      <p style="margin-top:10px">CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ CRABOR</p>
+    </div>
+    <div class="footer-col">
+      <h4>Dịch vụ</h4>
+      <ul>
+        <li>🍜 Giao đồ ăn</li>
+        <li>👕 Giặt là</li>
+        <li>🧹 Giúp việc/Dọn nhà</li>
+        <li>🛍️ China Shop</li>
+        <li>🚗 Xe công nghệ</li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Đối tác</h4>
+      <ul>
+        <li onclick="window.location.href='/register#shipper'">Đăng ký Shipper</li>
+        <li onclick="window.location.href='/register#food'">Đăng ký nhà hàng</li>
+        <li onclick="window.location.href='/register#giatla'">Đối tác giặt là</li>
+        <li onclick="window.location.href='/register#giupviec'">Đối tác dọn nhà</li>
+        <li onclick="window.location.href='/register#china'">China Shop partner</li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Kiếm thêm thu nhập</h4>
+      <ul>
+        <li onclick="window.location.href='/sales'">🎯 Trở thành CTV Sales</li>
+        <li onclick="window.location.href='/register'">🛵 Đăng ký Shipper</li>
+        <li onclick="window.location.href='/register'">🍜 Mở tiệm đối tác</li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Hỗ trợ</h4>
+      <ul>
+        <li onclick="openModal()">Điều khoản & Chính sách</li>
+        <li>Chính sách bảo mật</li>
+        <li>Trung tâm trợ giúp</li>
+        <li>Liên hệ</li>
+        <li>FAQ</li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2025 CRABOR TECH CO., LTD. Đã đăng ký bản quyền.</p>
+    <div style="display:flex;gap:16px;font-size:.72rem">
+      <a href="/admin.html" style="color:rgba(255,255,255,.2);text-decoration:none;transition:.2s" onmouseover="this.style.color='rgba(255,255,255,.5)'" onmouseout="this.style.color='rgba(255,255,255,.2)'">⚙️ Admin</a>
+      <a href="/sales" style="color:rgba(255,255,255,.2);text-decoration:none;transition:.2s" onmouseover="this.style.color='rgba(255,255,255,.5)'" onmouseout="this.style.color='rgba(255,255,255,.2)'">🎯 CTV Sales</a>
+    </div>
+    <button class="footer-tos" onclick="openModal()">📜 Điều khoản & Chính sách pháp lý</button>
+  </div>
+</footer>
+
+<!-- ═══ STICKY BANNER ═══ -->
+<div class="sticky-banner" id="stickyBanner">
+  <div class="sticky-inner">
+    <span class="sticky-label">Bạn muốn là:</span>
+    <button class="sticky-btn sticky-user" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">😊 Người dùng — Tải app</button>
+    <button class="sticky-btn sticky-shipper" onclick="window.location.href='/register#shipper'">🛵 Shipper — 700k kích hoạt</button>
+    <button class="sticky-btn sticky-partner" onclick="window.location.href='/register#partner'">🤝 Đối tác — Miễn phí đăng ký</button>
+  </div>
+</div>
+
+<!-- ═══ MODAL TERMS ═══ -->
+<div class="modal-overlay" id="tosModal" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📜 Bộ Chính Sách Pháp Lý CRABOR</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN I. ĐIỀU KHOẢN SỬ DỤNG CHUNG</div>
+        <div class="tos-section">
+          <h4>1. Giới thiệu</h4>
+          <p>Crabor là nền tảng công nghệ trung gian kết nối Người dùng, Đối tác cung cấp dịch vụ/nhà hàng và Đối tác giao hàng (Shipper). Crabor không trực tiếp bán hàng, không trực tiếp giao hàng và không phải là bên lao động với shipper.</p>
+          <p>Việc truy cập, đăng ký và sử dụng ứng dụng Crabor đồng nghĩa với việc bạn đã đọc, hiểu và đồng ý với toàn bộ điều khoản này.</p>
+        </div>
+        <div class="tos-section">
+          <h4>2. Phạm vi áp dụng</h4>
+          <p>Điều khoản này áp dụng cho:</p>
+          <ul><li>Người dùng đặt dịch vụ/đặt món</li><li>Đối tác nhà hàng/quán ăn</li><li>Đối tác giao hàng (shipper)</li></ul>
+        </div>
+        <div class="tos-section">
+          <h4>3. Quyền sửa đổi</h4>
+          <p>Crabor có quyền thay đổi, cập nhật điều khoản vào bất kỳ thời điểm nào. Phiên bản mới có hiệu lực ngay khi được công bố trên ứng dụng/website.</p>
+        </div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN II. CHÍNH SÁCH DÀNH CHO NGƯỜI DÙNG</div>
+        <div class="tos-section"><h4>1. Điều kiện sử dụng</h4><ul><li>Từ 18 tuổi trở lên, có đầy đủ năng lực hành vi dân sự</li><li>Cung cấp thông tin cá nhân chính xác</li><li>Không sử dụng Crabor cho mục đích trái pháp luật</li></ul></div>
+        <div class="tos-section"><h4>2. Quy trình đặt đơn</h4><ul><li>Khi người dùng xác nhận đặt hàng, đơn hàng được xem là đã phát sinh hiệu lực giao dịch</li><li>Giá hiển thị bao gồm: giá món/dịch vụ, phí giao hàng, các phụ phí (nếu có)</li></ul></div>
+        <div class="tos-section"><h4>3. Hủy đơn & hoàn tiền</h4><ul><li>Người dùng chỉ được hủy đơn trong các trạng thái hệ thống cho phép</li><li>Trường hợp nhà hàng đã chuẩn bị món hoặc shipper đã nhận đơn, Crabor có quyền từ chối hoàn tiền hoặc hoàn một phần</li></ul></div>
+        <div class="tos-section"><h4>4. Trách nhiệm & giới hạn trách nhiệm</h4><p>Crabor không chịu trách nhiệm đối với: Chất lượng, an toàn thực phẩm; Dị ứng, vấn đề sức khỏe cá nhân; Hành vi cá nhân của shipper hoặc đối tác; Thiệt hại gián tiếp, mất mát ngoài phạm vi giao dịch.</p></div>
+        <div class="tos-section"><h4>5. Dữ liệu cá nhân</h4><p>Crabor thu thập và sử dụng dữ liệu người dùng nhằm vận hành dịch vụ, cải thiện trải nghiệm, marketing và chăm sóc khách hàng. Crabor cam kết bảo mật dữ liệu theo quy định pháp luật hiện hành.</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN III. CHÍNH SÁCH DÀNH CHO ĐỐI TÁC (NHÀ HÀNG)</div>
+        <div class="tos-section"><h4>1. Điều kiện hợp tác</h4><ul><li>Có giấy phép kinh doanh hợp pháp</li><li>Đảm bảo an toàn vệ sinh thực phẩm</li><li>Chịu trách nhiệm về nguồn gốc và chất lượng sản phẩm</li></ul></div>
+        <div class="tos-section"><h4>2. Hoa hồng & thanh toán</h4><ul><li>Crabor thu 20% hoa hồng trên mỗi đơn hàng thành công</li><li>Thanh toán cho đối tác được thực hiện theo chu kỳ do Crabor quy định</li></ul></div>
+        <div class="tos-section"><h4>3. Nghĩa vụ đối tác</h4><ul><li>Cung cấp món đúng mô tả, đúng giá</li><li>Chuẩn bị món đúng thời gian cam kết</li><li>Không tự ý hủy đơn hoặc gian lận</li></ul></div>
+        <div class="tos-section"><h4>4. Chấm dứt hợp tác</h4><p>Crabor có quyền tạm ngưng hoặc chấm dứt hợp tác nếu đối tác vi phạm pháp luật, gian lận, hoặc gây ảnh hưởng nghiêm trọng đến uy tín nền tảng.</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN IV. CHÍNH SÁCH DÀNH CHO SHIPPER</div>
+        <div class="tos-section"><h4>1. Tư cách pháp lý</h4><ul><li>Shipper là đối tác độc lập, không phải nhân viên của Crabor</li><li>Tự chịu trách nhiệm về thuế, bảo hiểm và rủi ro cá nhân</li></ul></div>
+        <div class="tos-section"><h4>2. Phí đăng ký</h4><ul><li>Phí đăng ký ban đầu: <strong>700.000 VNĐ</strong></li><li>Bao gồm: kích hoạt tài khoản, đồng phục, xác minh & lưu trữ thông tin giấy tờ</li></ul></div>
+        <div class="tos-section"><h4>3. Thu nhập & khấu trừ</h4><ul><li>Phí giao hàng ~3.000đ/km (giai đoạn đầu)</li><li>Crabor khấu trừ 10% phí giao hàng như phí nền tảng</li></ul></div>
+        <div class="tos-section"><h4>4. Nghĩa vụ shipper</h4><ul><li>Giao hàng đúng đơn, đúng người nhận</li><li>Không gian lận GPS, không nhận tiền ngoài hệ thống</li><li>Tuân thủ luật giao thông và quy định ứng dụng</li></ul></div>
+        <div class="tos-section"><h4>5. Kỷ luật & xử lý vi phạm</h4><p>Crabor có quyền: Cảnh cáo, Tạm khóa, Khóa vĩnh viễn tài khoản shipper trong trường hợp vi phạm nghiêm trọng, không cần báo trước.</p></div>
+        <div class="tos-section"><h4>6. Miễn trừ trách nhiệm</h4><p>Crabor không chịu trách nhiệm đối với: Tai nạn giao thông; Tranh chấp giữa shipper và người dùng; Vi phạm pháp luật cá nhân của shipper.</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN V–VI. GIẢI QUYẾT TRANH CHẤP & HIỆU LỰC</div>
+        <div class="tos-section"><p>Mọi tranh chấp phát sinh sẽ được ưu tiên giải quyết bằng thương lượng. Trường hợp không đạt được thỏa thuận, tranh chấp sẽ được giải quyết theo pháp luật Việt Nam.</p><p style="margin-top:8px">Điều khoản này có hiệu lực kể từ ngày được công bố trên nền tảng Crabor. Người dùng, đối tác và shipper có trách nhiệm đọc kỹ trước khi sử dụng dịch vụ.</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN VII. CHÍNH SÁCH XỬ LÝ SỰ CỐ & KHIẾU NẠI</div>
+        <div class="tos-section"><h4>1. Nguyên tắc chung</h4><ul><li>Crabor đóng vai trò nền tảng trung gian và không trực tiếp cung cấp hàng hóa hoặc dịch vụ giao hàng</li><li>Mọi sự cố được xử lý trên nguyên tắc: minh bạch – có bằng chứng – theo mức độ lỗi</li><li>Crabor có quyền đưa ra quyết định cuối cùng dựa trên dữ liệu hệ thống</li></ul></div>
+        <div class="tos-section"><h4>2. Quy trình khiếu nại</h4><ul><li>Khiếu nại phải được gửi trong vòng 24 giờ kể từ thời điểm hoàn tất/hủy đơn</li><li>Cung cấp đầy đủ bằng chứng: hình ảnh, chat, lịch sử đơn</li><li>Crabor có thời gian xử lý từ 3–7 ngày làm việc</li></ul></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN VIII. CHÍNH SÁCH HOÀN TIỀN</div>
+        <div class="tos-section"><h4>Trường hợp được hoàn tiền</h4><ul><li>Đơn bị hủy do lỗi hệ thống</li><li>Đối tác xác nhận không thể cung cấp dịch vụ</li><li>Shipper không thể hoàn thành đơn và không có shipper thay thế</li></ul></div>
+        <div class="tos-section"><h4>Trường hợp không hoàn tiền</h4><ul><li>Người dùng hủy đơn sau khi đối tác đã chuẩn bị món</li><li>Shipper đã nhận đơn và đang giao</li><li>Lý do cá nhân từ phía người dùng</li></ul></div>
+        <div class="tos-section"><h4>Hình thức hoàn tiền</h4><p>Hoàn về phương thức thanh toán ban đầu hoặc ví Crabor. Thời gian xử lý: 5–10 ngày làm việc.</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN IX. CHÍNH SÁCH PHẠT & KHÓA TÀI KHOẢN</div>
+        <div class="tos-section"><h4>Đối với người dùng</h4><p>Vi phạm: Hủy đơn nhiều lần không lý do chính đáng, gian lận mã khuyến mãi, hành vi xúc phạm. Hình thức xử lý: cảnh cáo, hạn chế chức năng, khóa tài khoản vĩnh viễn.</p></div>
+        <div class="tos-section"><h4>Đối với đối tác</h4><p>Vi phạm: Chuẩn bị món sai nhiều lần, tự ý hủy đơn, vi phạm VSATTP. Hình thức xử lý: phạt tài chính, giảm hiển thị, tạm ngưng hoặc chấm dứt hợp tác.</p></div>
+        <div class="tos-section"><h4>Đối với shipper</h4><p>Vi phạm: Gian lận GPS, nhận đơn nhưng không giao, thu tiền ngoài hệ thống, vi phạm pháp luật nghiêm trọng. Hình thức xử lý: trừ thu nhập, tạm khóa, khóa vĩnh viễn (không hoàn phí đăng ký).</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN X. FAQ PHÁP LÝ</div>
+        <div class="tos-section"><h4>1. Crabor có chịu trách nhiệm về chất lượng đồ ăn không?</h4><p>Không. Trách nhiệm thuộc về đối tác cung cấp.</p></div>
+        <div class="tos-section"><h4>2. Shipper có phải nhân viên Crabor không?</h4><p>Không. Shipper là đối tác độc lập.</p></div>
+        <div class="tos-section"><h4>3. Phí đăng ký shipper có được hoàn lại không?</h4><p>Phí đăng ký không hoàn lại trừ khi có chính sách đặc biệt được công bố riêng.</p></div>
+        <div class="tos-section"><h4>4. Crabor có quyền khóa tài khoản không cần báo trước không?</h4><p>Có, trong trường hợp vi phạm nghiêm trọng hoặc ảnh hưởng đến hệ thống.</p></div>
+        <div class="tos-section"><h4>5. Dữ liệu cá nhân có được bảo mật không?</h4><p>Crabor cam kết bảo mật theo quy định pháp luật Việt Nam.</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">BỔ SUNG — PHÍ KÍCH HOẠT SHIPPER 700.000 VNĐ</div>
+        <div class="tos-section"><h4>1. Bản chất của phí 700.000 VNĐ</h4><p>Phí 700.000 VNĐ là chi phí cố định để kích hoạt và duy trì trạng thái hoạt động của tài khoản Shipper trên nền tảng Crabor. Khoản phí này không phải tiền lương, tiền đặt cọc lao động, hay bảo đảm thực hiện nghĩa vụ lao động.</p><p>Phí bao gồm: Kích hoạt tài khoản, cấp quyền truy cập ứng dụng, cấp phát/thu xếp đồng phục, chi phí quản lý hồ sơ và xác minh thông tin.</p></div>
+        <div class="tos-section"><h4>2. Không hoàn lại phí trong đa số trường hợp</h4><p>Phí kích hoạt 700.000 VNĐ không được hoàn lại trong các trường hợp: Shipper tự ý ngừng hoạt động; Shipper vi phạm điều khoản dẫn đến khóa tài khoản; Hủy hợp tác trước thời hạn cam kết (nếu có). Trường hợp hoàn phí chỉ được xem xét khi lỗi hoàn toàn phát sinh từ hệ thống Crabor.</p></div>
+        <div class="tos-section"><h4>3. Cam kết pháp lý</h4><p>Shipper xác nhận đã đọc, hiểu rõ và đồng ý rằng phí 700.000 VNĐ là điều kiện cần để tài khoản được kích hoạt và duy trì hoạt động. Việc tiếp tục sử dụng ứng dụng đồng nghĩa với việc Shipper chấp thuận toàn bộ quy định nêu trên.</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN XI–XII. CAM KẾT SHIPPER & CHUẨN HÓA TMĐT</div>
+        <div class="tos-section"><h4>Cam kết riêng dành cho Shipper (bắt buộc khi kích hoạt)</h4><ul><li>Shipper xác nhận là đối tác độc lập, không phát sinh quan hệ lao động với Crabor</li><li>Hiểu và đồng ý rằng 700.000 VNĐ là phí kích hoạt, không phải tiền đặt cọc, không hoàn lại</li><li>Không gian lận GPS, không thu tiền ngoài hệ thống</li><li>Chấp thuận các biện pháp: trừ thu nhập, khóa tài khoản tạm thời hoặc vĩnh viễn khi vi phạm</li></ul></div>
+        <div class="tos-section"><h4>Vai trò của Crabor theo pháp luật TMĐT</h4><p>Crabor là sàn giao dịch thương mại điện tử theo Nghị định 52/2013/NĐ-CP. Crabor không trực tiếp bán hàng, không trực tiếp tuyển dụng Shipper. Crabor thực hiện thủ tục đăng ký sàn TMĐT tại Cổng thông tin Bộ Công Thương.</p></div>
+      </div>
+
+      <div class="tos-divider"></div>
+
+      <div class="tos-part">
+        <div class="tos-part-title">PHẦN XVIII. CHÍNH SÁCH THANH TOÁN, THU PHÍ & ĐỐI SOÁT</div>
+        <div class="tos-section"><h4>Điều 1. Nguyên tắc</h4><p>Mọi khoản phí dịch vụ phát sinh giữa Đối tác/Shipper và Crabor được coi là một khoản "Nợ phải trả" trong hệ thống. Crabor được quyền thiết lập các cơ chế tạm giữ/gạch nợ từ các khoản thanh toán sắp tới để đảm bảo việc thu đủ, đúng hạn.</p></div>
+        <div class="tos-section"><h4>Điều 2. Mô hình xử lý COD và Chuyển khoản</h4><p><strong>Chuyển khoản:</strong> Khách hàng chuyển trực tiếp vào tài khoản Đối tác. Crabor ghi nhận nợ phí và khấu trừ vào tiền ký quỹ hoặc khoản sàn sắp chi trả.</p><p><strong>Tiền mặt (COD):</strong> Shipper thu tiền mặt từ khách. Ngay khi Shipper xác nhận "Đã thu tiền", hệ thống tự động hạch toán doanh thu, tính phí và ghi nợ. Phần tiền còn lại chuyển cho Đối tác sau khi đã trừ nợ.</p></div>
+        <div class="tos-section"><h4>Điều 3. Hệ thống Ghi nợ & Nhắc nợ tự động</h4><ul><li>Mọi khoản phí phát sinh được ghi nhận ngay lập tức vào tài khoản công nợ của từng Đối tác/Shipper</li><li>Hệ thống gửi thông báo nhắc nợ tự động: trước hạn 3 ngày, ngày hết hạn, và hàng ngày/tuần khi quá hạn</li><li>Trong mỗi kỳ đối soát (hàng tuần), hệ thống tự động khấu trừ toàn bộ số dư nợ trước khi chuyển khoản số tiền còn lại</li></ul></div>
+        <div class="tos-section"><h4>Điều 4. Chế tài nợ quá hạn</h4><ul><li>Áp dụng phí phạt cố định hoặc theo tỷ lệ %/ngày trên số nợ gốc quá hạn</li><li>Tạm khóa tính năng quảng cáo, ngừng nhận đơn hàng mới cho đến khi nợ được thanh toán</li><li>Trường hợp nợ nghiêm trọng: Crabor bảo lưu quyền khởi kiện dân sự và chấm dứt hợp đồng vĩnh viễn</li></ul></div>
+      </div>
+
+      <div style="text-align:center;padding:20px 0 10px">
+        <p style="font-size:.8rem;color:#999;font-weight:600">Crabor · Bản chính sách có hiệu lực từ ngày công bố trên nền tảng.</p>
+        <button onclick="closeModal()" style="margin-top:14px;background:var(--red);color:#fff;border:none;padding:13px 36px;border-radius:50px;font-weight:900;font-size:.9rem;cursor:pointer">✓ Đã đọc & Đồng ý</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── NAV SCROLL ──
+window.addEventListener('scroll',()=>{
+  document.getElementById('mainNav').classList.toggle('scrolled',window.scrollY>30);
+});
+
+// ── MOBILE MENU ──
+function toggleMobileMenu(){
+  const links = document.querySelector('.nav-links');
+  links.style.display = links.style.display==='flex'?'none':'flex';
+  links.style.flexDirection='column';
+  links.style.position='absolute';
+  links.style.top='64px';links.style.right='20px';
+  links.style.background='#fff';links.style.padding='20px';
+  links.style.borderRadius='16px';links.style.boxShadow='0 8px 30px rgba(0,0,0,.15)';
+  links.style.zIndex='200';
+}
+
+// ── MODAL ──
+function openModal(){document.getElementById('tosModal').classList.add('open');}
+function closeModal(){document.getElementById('tosModal').classList.remove('open');}
+function closeModalOutside(e){if(e.target===document.getElementById('tosModal'))closeModal();}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+// ── SCROLL REVEAL ──
+const observer = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});
+},{threshold:0.12});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+// ── STICKY BANNER: hide on hero, show after ──
+const heroBanner = document.getElementById('stickyBanner');
+const heroSection = document.getElementById('hero');
+const heroObserver = new IntersectionObserver((entries)=>{
+  heroBanner.style.opacity = entries[0].isIntersecting ? '0' : '1';
+  heroBanner.style.pointerEvents = entries[0].isIntersecting ? 'none' : 'auto';
+},{threshold:0.2});
+heroObserver.observe(heroSection);
+</script>
+
+<!-- ══════════════════════════════════════
+     CRABOR THEME SWITCHER
+══════════════════════════════════════ -->
+<style>
+/* ── Theme variables injected on <html> ── */
+html.theme-light {
+  --th-bg:       #f4f1eb;
+  --th-bg2:      #ffffff;
+  --th-bg3:      #ede9e0;
+  --th-card:     #ffffff;
+  --th-border:   rgba(0,0,0,.1);
+  --th-text:     #1a1a1a;
+  --th-muted:    #777;
+  --th-surface:  rgba(255,255,255,.9);
+  --th-coral:    #E8504A;
+  filter: none;
+}
+html.theme-dark {
+  --th-bg:       #0f0f18;
+  --th-bg2:      #1a1a28;
+  --th-bg3:      #20202e;
+  --th-card:     #1a1a28;
+  --th-border:   rgba(255,255,255,.08);
+  --th-text:     #F5F0DC;
+  --th-muted:    rgba(245,240,220,.45);
+  --th-surface:  rgba(26,26,40,.9);
+  --th-coral:    #E8504A;
+  filter: none;
+}
+html.theme-glass-dark {
+  --th-bg:       #0a0a12;
+  --th-bg2:      rgba(255,255,255,.04);
+  --th-bg3:      rgba(255,255,255,.02);
+  --th-card:     rgba(255,255,255,.06);
+  --th-border:   rgba(255,255,255,.12);
+  --th-text:     #F5F0DC;
+  --th-muted:    rgba(245,240,220,.5);
+  --th-surface:  rgba(255,255,255,.08);
+  --th-coral:    #E8504A;
+}
+html.theme-glass-light {
+  --th-bg:       #dce4f0;
+  --th-bg2:      rgba(255,255,255,.35);
+  --th-bg3:      rgba(255,255,255,.2);
+  --th-card:     rgba(255,255,255,.45);
+  --th-border:   rgba(255,255,255,.6);
+  --th-text:     #1a1a2e;
+  --th-muted:    rgba(30,30,60,.5);
+  --th-surface:  rgba(255,255,255,.55);
+  --th-coral:    #c93d37;
+}
+
+/* Glass effect — applies when glass theme active */
+html.theme-glass-dark body,
+html.theme-glass-light body {
+  background-attachment: fixed;
+}
+html.theme-glass-dark body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(232,80,74,.18) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(100,149,237,.15) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 60% at 60% 30%, rgba(240,180,41,.1) 0%, transparent 65%),
+    #0a0a12;
+}
+html.theme-glass-light body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(232,80,74,.2) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(100,149,237,.18) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 60% at 60% 30%, rgba(240,180,41,.15) 0%, transparent 65%),
+    #dce4f0;
+}
+
+/* Glass card style */
+html.theme-glass-dark .panel,
+html.theme-glass-dark .card,
+html.theme-glass-dark .stat-card,
+html.theme-glass-dark .active-order,
+html.theme-glass-dark .hist-card,
+html.theme-glass-dark .wallet-card,
+html.theme-glass-dark .share-card,
+html.theme-glass-dark .ref-panel,
+html.theme-glass-dark .auth-card,
+html.theme-glass-dark .earn-stat-card,
+html.theme-glass-dark .prof-section {
+  background: rgba(255,255,255,.06) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.1) !important;
+}
+html.theme-glass-light .panel,
+html.theme-glass-light .card,
+html.theme-glass-light .stat-card,
+html.theme-glass-light .active-order,
+html.theme-glass-light .hist-card,
+html.theme-glass-light .wallet-card,
+html.theme-glass-light .share-card,
+html.theme-glass-light .ref-panel,
+html.theme-glass-light .auth-card,
+html.theme-glass-light .earn-stat-card,
+html.theme-glass-light .prof-section {
+  background: rgba(255,255,255,.45) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255,255,255,.65) !important;
+  box-shadow: 0 8px 32px rgba(31,38,135,.1), inset 0 1px 0 rgba(255,255,255,.8) !important;
+}
+
+/* Light mode — override dark backgrounds */
+html.theme-light body {
+  background: #f4f1eb !important;
+  color: #1a1a1a !important;
+}
+html.theme-light .sidebar      { background: #fff !important; border-color: #eee !important; }
+html.theme-light .panel        { background: #fff !important; border-color: #eee !important; color: #1a1a1a !important; }
+html.theme-light .card         { background: #fff !important; }
+html.theme-light .auth-card    { background: #fff !important; }
+html.theme-light .topbar       { background: linear-gradient(135deg,#E8504A,#c93d37) !important; }
+html.theme-light .nav-item     { color: #555 !important; }
+html.theme-light .nav-item.active { color: #E8504A !important; background: rgba(232,80,74,.08) !important; }
+html.theme-light .stat-card    { background: #fff !important; border-color: #eee !important; }
+html.theme-light .reg-table tbody tr:hover { background: #fafafa !important; }
+html.theme-light .modal-body, html.theme-light #overlay .inner { background: #fff !important; }
+html.theme-light input, html.theme-light select { background: #f9f9f9 !important; color: #1a1a1a !important; border-color: #ddd !important; }
+html.theme-light .bottom-nav   { background: #fff !important; border-color: #eee !important; }
+html.theme-light .bn-item      { color: #aaa !important; }
+html.theme-light .bn-item.active { color: #E8504A !important; }
+
+
+
+/* ── Switcher panel ── */
+
+
+html.theme-light .theme-panel-divider { background: rgba(0,0,0,.07); }
+</style>
+
+
+
+<script>
+(function(){
+  const ICONS = { dark:'🌙', light:'☀️', 'glass-dark':'🫧', 'glass-light':'🪟' };
+  const THEMES = ['dark','light','glass-dark','glass-light'];
+  let _panelOpen = false;
+
+  function themeApply(t) {
+    const html = document.documentElement;
+    THEMES.forEach(th => html.classList.remove('theme-' + th));
+    html.classList.add('theme-' + t);
+    document.getElementById('themeIcon').textContent = ICONS[t] || '🌙';
+    document.querySelectorAll('.theme-opt').forEach(el => {
+      el.classList.toggle('active', el.dataset.theme === t);
+    });
+    localStorage.setItem('crabor_theme', t);
+  }
+
+  window.themeSet = function(t) {
+    themeApply(t);
+    // Update active state on inline buttons
+    document.querySelectorAll('.sth-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.theme === t);
+    });
+    // Close panel if open
+    if (typeof _panelOpen !== 'undefined') _panelOpen = false;
+    const panel = document.getElementById('themeSwitcherPanel');
+    if (panel) panel.classList.remove('open');
+  };
+
+  window.themeTogglePanel = function() {
+    // Panel removed - theme now in settings
+  };
+
+  // Close panel on outside click
+  document.addEventListener('click', function(e) {
+    if(_panelOpen && !e.target.closest('#themeSwitcherPanel')) {
+      _panelOpen = false;
+      document.getElementById('themeSwitcherPanel').classList.remove('open');
+    }
+  });
+
+  // Init from localStorage
+  const saved = localStorage.getItem('crabor_theme') || 'dark';
+  themeApply(saved);
+})();
+</script>
+
+
+<!-- ════════════════════════════════════
+     CRABOR CHATBOT WIDGET
+════════════════════════════════════ -->
+<style>
+.crabot-fab{position:fixed;bottom:80px;right:16px;z-index:8500;width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#E8504A,#c93d37);border:none;color:#fff;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 16px rgba(232,80,74,.5);display:flex;align-items:center;justify-content:center;transition:transform .2s}
+.crabot-fab:hover{transform:scale(1.1)}
+.crabot-fab .cb-badge{position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:#27ae60;border-radius:50%;font-size:.6rem;color:#fff;border:2px solid #fff;display:none;align-items:center;justify-content:center;font-weight:900}
+.crabot-window{position:fixed;bottom:140px;right:16px;width:340px;max-height:480px;background:#fff;border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:8500;display:none;flex-direction:column;overflow:hidden;animation:cbSlide .25s ease}
+@keyframes cbSlide{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.crabot-window.open{display:flex}
+.cb-head{background:linear-gradient(135deg,#E8504A,#c93d37);padding:12px 14px;display:flex;align-items:center;gap:10px}
+.cb-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.cb-head-info{flex:1}
+.cb-head-name{color:#fff;font-weight:900;font-size:.9rem}
+.cb-head-status{color:rgba(255,255,255,.8);font-size:.7rem}
+.cb-close{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center}
+.cb-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#f8f8f8;min-height:200px;max-height:320px}
+.cb-msgs::-webkit-scrollbar{width:3px}
+.cb-msgs::-webkit-scrollbar-thumb{background:rgba(232,80,74,.3);border-radius:3px}
+.cmsg{max-width:82%;padding:9px 12px;border-radius:14px;font-size:.82rem;line-height:1.5;font-weight:600}
+.cmsg.bot{background:#fff;color:#333;align-self:flex-start;border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.1);display:flex;gap:8px;align-items:flex-start}
+.cmsg.bot .cmsg-icon{font-size:1rem;flex-shrink:0;margin-top:1px}
+.cmsg.bot .cmsg-bubble{flex:1}
+.cmsg.user{background:linear-gradient(135deg,#E8504A,#c93d37);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.cb-quick{display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border-top:1px solid #f0f0f0;background:#fff}
+.cb-qbtn{background:rgba(232,80,74,.08);border:1px solid rgba(232,80,74,.2);color:#E8504A;border-radius:50px;padding:4px 10px;font-size:.7rem;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;transition:.15s}
+.cb-qbtn:hover{background:rgba(232,80,74,.18)}
+.cb-input-row{padding:8px 10px;border-top:1px solid #eee;display:flex;gap:8px;align-items:center;background:#fff}
+.cb-input{flex:1;border:1.5px solid #eee;border-radius:50px;padding:8px 12px;font-family:inherit;font-size:.82rem;outline:none;color:#333}
+.cb-input:focus{border-color:#E8504A}
+.cb-send{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#E8504A,#c93d37);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
+.cb-send:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── Inline theme selector in settings ── */
+.settings-theme-row { margin: 14px 0; }
+.settings-theme-label { font-size:.75rem; font-weight:900; text-transform:uppercase; letter-spacing:.8px; color:var(--muted,#888); margin-bottom:8px; }
+.settings-theme-opts { display:flex; gap:8px; flex-wrap:wrap; }
+.sth-btn {
+  padding:7px 14px; border-radius:50px;
+  border:1.5px solid rgba(232,80,74,.25);
+  background:rgba(232,80,74,.06);
+  color:var(--cream,#333); font-size:.78rem; font-weight:800;
+  cursor:pointer; font-family:inherit; transition:.15s; white-space:nowrap;
+}
+.sth-btn:hover { background:rgba(232,80,74,.18); border-color:#E8504A; }
+.sth-btn.active { background:#E8504A; color:#fff; border-color:#E8504A; }
+html.theme-light .sth-btn { color:#333; }
+</style>
+
+<button class="crabot-fab" id="crabotFab" onclick="toggleCrabot()">🦀<div class="cb-badge" id="crabotBadge"></div></button>
+<div class="crabot-window" id="crabotWindow">
+  <div class="cb-head">
+    <div class="cb-avatar">🦀</div>
+    <div class="cb-head-info">
+      <div class="cb-head-name">CRABOR Assistant</div>
+      <div class="cb-head-status">🟢 Luôn sẵn sàng hỗ trợ</div>
+    </div>
+    <button class="cb-close" onclick="toggleCrabot()">✕</button>
+  </div>
+  <div class="cb-msgs" id="crabotMsgs">
+    <div class="cmsg bot"><span class="cmsg-icon">🦀</span><div class="cmsg-bubble">Xin chào! Tôi là CRABOR Assistant 🦀<br>Tôi có thể giúp bạn tìm hiểu về CRABOR, hướng dẫn đăng ký, hoặc trả lời bất kỳ câu hỏi nào!</div></div>
+  </div>
+  <div class="cb-quick" id="crabotQuick">
+    <button class="cb-qbtn" onclick="crabotAsk('CRABOR là gì?')">CRABOR là gì?</button>
+    <button class="cb-qbtn" onclick="crabotAsk('Ai là người sáng lập CRABOR?')">Ai sáng lập?</button>
+    <button class="cb-qbtn" onclick="crabotAsk('Đăng ký shipper như thế nào?')">Đăng ký shipper</button>
+    <button class="cb-qbtn" onclick="crabotAsk('CRABOR có những dịch vụ gì?')">Dịch vụ</button>
+  </div>
+  <div class="cb-input-row">
+    <input class="cb-input" id="crabotInput" placeholder="Nhập câu hỏi..." onkeydown="if(event.key==='Enter')crabotSend()">
+    <button class="cb-send" id="crabotSendBtn" onclick="crabotSend()">➤</button>
+  </div>
+</div>
+
+<script>
+(function() {
+// ══════════════════════════════════════
+//  CRABOR CHATBOT — Tĩnh (FAQ)
+// ══════════════════════════════════════
+const FAQ = [
+  { keys:['crabor là gì','crabor','giới thiệu','app gì','ứng dụng gì'], q:'CRABOR là gì?', a:'🦀 CRABOR là super app All-in-One tại Hà Nội:\n• 🍜 Giao đồ ăn\n• 👕 Giặt là lấy & trả tận nơi\n• 🧹 Giúp việc nhà\n• 🛍️ China Shop\n• 🚗 Xe công nghệ (sắp ra)\n\n🚀 Ra mắt chính thức tháng 7/2025 tại Hà Nội!'},
+  { keys:['người sáng lập','sáng lập','founder','ai làm','ai tạo','ai xây','của ai','thuộc về','chủ','ceo','kiều thanh hải','hành trình','câu chuyện'], q:'Ai là người sáng lập CRABOR?', a:'👨‍💻 CRABOR được sáng lập bởi **Kiều Thanh Hải** — sinh viên năm 2 ngành Logistics, Đại học Đại Nam, Hà Nội.\n\n🚀 Hành trình:\n• 20 tuổi, tự học code từ con số 0\n• Ngân sách chỉ 3 triệu/tháng, không nhà đầu tư, không mentor\n• Một mình xây toàn bộ: 21.000+ dòng code, 100+ API\n• Tích hợp AI, bản đồ realtime, OTP thật\n\n💬 "Tôi muốn xây dựng một ứng dụng mà mọi người Hà Nội đều muốn có trong điện thoại."\n— Kiều Thanh Hải, Founder & CEO'},
+  { keys:['đăng ký shipper','shipper','giao hàng','trở thành shipper','phí shipper','700','500','early bird'], q:'Đăng ký Shipper như thế nào?', a:'🛵 Đăng ký Shipper CRABOR:\n\n1️⃣ Vào /register → chọn "Shipper"\n2️⃣ Nhập thông tin + upload giấy tờ\n3️⃣ Thanh toán phí kích hoạt\n4️⃣ Tự động duyệt sau khi thanh toán\n\n💰 Gói phí:\n• ⚡ Early Bird: 500.000đ (hoàn tiền sau 1.000 đơn)\n• 🛵 Standard: 700.000đ\n\n📱 Thu nhập 20.000–50.000đ/đơn, nhận 85% phí giao'},
+  { keys:['thu nhập shipper','kiếm được bao nhiêu','lương','tiền giao hàng'], q:'Shipper thu nhập bao nhiêu?', a:'💰 Thu nhập Shipper CRABOR:\n\n• Nhận 85% phí giao hàng mỗi đơn\n• Ước tính 20.000–50.000đ/đơn tùy khoảng cách\n• ⚡ Bonus nhiệm vụ ngày: +5.000–15.000đ\n• 📅 Bonus nhiệm vụ tuần: +30.000–80.000đ\n• 🏆 Hạng Kim Cương: bonus x1.5\n\nChủ động giờ làm, nhận tiền hàng ngày!'},
+  { keys:['đối tác','nhà hàng','quán','mở tiệm','đăng ký đối tác','hoa hồng','18%','20%'], q:'Đăng ký làm đối tác?', a:'🤝 Đăng ký đối tác CRABOR:\n\n1️⃣ Vào /register → chọn loại đối tác\n2️⃣ Điền thông tin cửa hàng\n3️⃣ Tự động duyệt trong 1 giờ ✅\n\n📊 Hoa hồng: CRABOR thu 18–20%/đơn\n✅ Đăng ký miễn phí\n🚀 Shipper CRABOR giao hàng cho bạn\n📱 Dashboard quản lý đơn + doanh thu realtime'},
+  { keys:['sales','ctv','cộng tác viên','giới thiệu người','hoa hồng','kiếm tiền','mã giới thiệu'], q:'CTV Sales kiếm tiền như thế nào?', a:'🎯 CTV Sales CRABOR:\n\n💰 +2.000đ mỗi đơn hoàn thành của người bạn giới thiệu\n🔗 Mã giới thiệu riêng: CR + 3 ký tự + 4 số SĐT\n💳 Rút tiền tối thiểu 50.000đ\n📲 Chia sẻ qua Zalo, Facebook, SMS\n\n📱 Đăng ký tại /sales'},
+  { keys:['dịch vụ','các dịch vụ','module','giặt là','giúp việc','china shop','xe công nghệ'], q:'CRABOR có những dịch vụ gì?', a:'📦 Lộ trình dịch vụ CRABOR:\n\n🍜 Giao đồ ăn — T7/2025 ✅\n👕 Giặt là tận nơi — Q1/2026\n🧹 Giúp việc nhà — Q2/2026\n🚗 Xe công nghệ — Q3/2026\n🛍️ China Shop — Q4/2026'},
+  { keys:['thanh toán','momo','zalopay','cod','tiền mặt','phương thức'], q:'Thanh toán bằng gì?', a:'💳 Phương thức thanh toán:\n\n💵 COD — Tiền mặt khi nhận\n📱 MoMo\n📱 ZaloPay\n🏦 Chuyển khoản ngân hàng\n\nAn toàn, nhanh chóng, minh bạch!'},
+  { keys:['theo dõi','tracking','shipper đang ở đâu','bản đồ','xem đơn'], q:'Theo dõi đơn hàng?', a:'📍 Theo dõi đơn realtime:\n\n✅ Nút "🗺️ Theo dõi" xuất hiện khi shipper nhận đơn\n✅ Xem vị trí shipper trên bản đồ Goong\n✅ Ảnh xác nhận khi giao xong\n✅ Thông báo từng bước qua app\n💬 Chat trực tiếp với shipper trong đơn'},
+  { keys:['đánh giá','review','rating','5 sao','nhận xét'], q:'Đánh giá shipper/đối tác?', a:'⭐ Hệ thống đánh giá:\n\nSau mỗi đơn giao thành công, bạn có thể:\n• Chấm 1-5 sao cho Shipper\n• Chấm 1-5 sao cho Đối tác/Nhà hàng\n• Để lại nhận xét\n\nĐánh giá giúp nâng cao chất lượng dịch vụ CRABOR 🙏'},
+  { keys:['liên hệ','hotline','email','hỗ trợ','chăm sóc','contact','sos'], q:'Liên hệ hỗ trợ CRABOR?', a:'📞 Liên hệ CRABOR:\n\n📧 Email: support@crabor.vn\n🌐 Website: crabor-shipper-register.onrender.com\n🚨 Nút SOS trong app (hỗ trợ khẩn cấp)\n⏰ Hỗ trợ 24/7 qua chatbot này\n\nChúng tôi sẽ phản hồi trong vòng 30 phút!'},
+  { keys:['bảo mật','privacy','dữ liệu','thông tin cá nhân','bảo vệ'], q:'Chính sách bảo mật?', a:'🔒 Chính sách bảo mật CRABOR:\n\n✅ Dữ liệu được mã hóa và bảo vệ\n✅ Không bán thông tin cho bên thứ 3\n✅ OTP hết hạn sau 5 phút, không lưu trữ\n✅ Ảnh giấy tờ chỉ dùng để xác minh danh tính\n✅ Tuân thủ Luật An ninh mạng và BVDLCN Việt Nam\n\n📋 Dữ liệu của bạn là của bạn — CRABOR cam kết bảo vệ.'},
+  { keys:['điều khoản','terms','quy định','thoả thuận','pháp lý','luật'], q:'Điều khoản sử dụng?', a:'📜 Điều khoản CRABOR:\n\n👤 Người dùng:\n• Thông tin phải trung thực, chính xác\n• Không dùng app vào mục đích bất hợp pháp\n• Chịu trách nhiệm về tài khoản của mình\n\n🛵 Shipper:\n• Có bằng lái hợp lệ, tuân thủ luật giao thông\n• Không tự ý hủy đơn không lý do\n\n🤝 Đối tác:\n• Đảm bảo chất lượng sản phẩm/dịch vụ\n• Xử lý đơn đúng thời gian cam kết\n\n⚖️ CRABOR có quyền tạm khóa tài khoản vi phạm.'},
+  { keys:['hoàn tiền','hoàn trả','refund','hủy đơn','không nhận được','đồ ăn sai'], q:'Chính sách hoàn tiền?', a:'💰 Chính sách hoàn tiền:\n\n✅ Hủy trước khi shipper nhận: Hoàn 100%\n✅ Đồ ăn/dịch vụ không đúng mô tả: Hoàn 100%\n✅ Shipper không giao được: Hoàn 100%\n⚠️ Hủy sau khi shipper nhận đơn: Phí hủy 15.000đ\n\n📧 Gửi email support@crabor.vn để được hỗ trợ trong 24h'},
+  { keys:['điểm','loyalty','tích điểm','phần thưởng','ưu đãi','voucher','giảm giá','hạng'], q:'Điểm tích lũy hoạt động thế nào?', a:'⭐ Hệ thống điểm CRABOR:\n\n💰 Tích 1 điểm / 10.000đ chi tiêu\n🎁 Đổi điểm: 50 điểm = 10.000đ voucher\n\n🏆 4 hạng thành viên:\n• 🥉 Thành viên: 0 điểm\n• 🥈 Bạc: 100 điểm\n• 🥇 Vàng: 500 điểm → freeship 2 đơn/tháng\n• 💎 VIP: 2.000 điểm → freeship không giới hạn'},
+  { keys:['địa bàn','khu vực','hà nội','quận','hoạt động ở đâu','phạm vi'], q:'CRABOR hoạt động ở đâu?', a:'📍 Địa bàn hoạt động:\n\nHiện tại: Hà Nội (nội thành)\n\n🚀 Ra mắt: Tháng 7/2025\n📈 Mở rộng dần theo số lượng đối tác\n🎯 Mục tiêu: Super app số 1 Hà Nội cho thế hệ trẻ'},
+  { keys:['hạng shipper','đồng','bạc','vàng','kim cương','tier'], q:'Hạng Shipper là gì?', a:'🏆 Hạng Shipper CRABOR:\n\n🥉 Đồng: Mới bắt đầu\n🥈 Bạc: 50+ đơn & ⭐4.5 → Ưu tiên đơn cao\n🥇 Vàng: 200+ đơn & ⭐4.7 → Phí thấp hơn 5%\n💎 Kim Cương: 500+ đơn & ⭐4.9 → 0% phí dịch vụ + bonus x1.5\n\nCàng giao nhiều, hạng càng cao, thu nhập càng tốt! 🚀'},
+];
+
+const _QUICK = {
+  customer: ['CRABOR là gì?','Theo dõi đơn?','Điểm tích lũy?','Hoàn tiền?'],
+  shipper:  ['Đăng ký Shipper?','Thu nhập bao nhiêu?','Hạng Shipper?','Liên hệ?'],
+  partner:  ['Đăng ký đối tác?','Hoa hồng bao nhiêu?','Điều khoản?','Liên hệ?'],
+  sales:    ['CTV kiếm tiền?','Mã giới thiệu?','Hoàn tiền?','Liên hệ?'],
+  register: ['Đăng ký Shipper?','Đăng ký đối tác?','Phí bao nhiêu?','Liên hệ?'],
+  admin:    ['CRABOR là gì?','Ai sáng lập?','Điều khoản?','Liên hệ?'],
+  default:  ['CRABOR là gì?','Ai là người sáng lập?','Dịch vụ gì?','Liên hệ?'],
+};
+const _welcomes = {
+  customer: '👋 Xin chào! Tôi có thể giúp gì cho bạn hôm nay?',
+  shipper:  '🛵 Xin chào Shipper! Cần hỗ trợ gì không?',
+  partner:  '🤝 Xin chào Đối tác! Tôi có thể giúp gì cho bạn?',
+  sales:    '🎯 Xin chào CTV! Hỏi tôi về chương trình Sales nhé!',
+  register: '🦀 Chào mừng đến CRABOR! Bạn muốn đăng ký vai trò nào?',
+  admin:    '👋 Xin chào Admin! Cần hỗ trợ gì không?',
+  default:  '🦀 Xin chào! Hỏi tôi bất cứ điều gì về CRABOR nhé!',
+};
+
+const _page = (()=>{
+  const p = location.pathname;
+  if(p.includes('register')) return 'register';
+  if(p.includes('partner'))  return 'partner';
+  if(p.includes('sales'))    return 'sales';
+  if(p.includes('shipper'))  return 'shipper';
+  if(p.includes('admin'))    return 'admin';
+  return 'customer';
+})();
+
+function findAnswer(input) {
+  const q = input.toLowerCase();
+  for (const item of FAQ) {
+    if (item.keys.some(k => q.includes(k))) return item;
+  }
+  const words = q.split(/\s+/).filter(w => w.length > 2);
+  let best = null, bestScore = 0;
+  for (const item of FAQ) {
+    const score = item.keys.reduce((s,k) => s + (words.some(w => k.includes(w) || w.includes(k.split(' ')[0])) ? 1 : 0), 0);
+    if (score > bestScore) { bestScore = score; best = item; }
+  }
+  return bestScore > 0 ? best : null;
+}
+
+let _open = false;
+
+function _getMsgs() { return document.getElementById('crabotMsgs'); }
+function _getInput() { return document.getElementById('crabotInput'); }
+
+function _appendMsg(role, text) {
+  const el = _getMsgs(); if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'cmsg ' + role;
+  if (role === 'bot') {
+    div.innerHTML = '<span class="cmsg-icon">🦀</span><div class="cmsg-bubble">'
+      + text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>') + '</div>';
+  } else {
+    div.textContent = text;
+  }
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function _setChips(chips) {
+  const el = document.getElementById('crabotChips'); if (!el) return;
+  el.innerHTML = (chips||[]).map(q =>
+    '<button class="cb-chip" onclick="window._crabotAsk(this.textContent)">' + q + '</button>'
+  ).join('');
+}
+
+window.toggleCrabot = function() {
+  _open = !_open;
+  const win = document.getElementById('crabotWindow');
+  if (win) win.classList.toggle('open', _open);
+  const badge = document.getElementById('crabotBadge');
+  if (badge) badge.style.display = 'none';
+  if (_open) _getInput()?.focus();
+};
+
+window._crabotAsk = function(q) {
+  const inp = _getInput(); if (inp) inp.value = q;
+  window.crabotSend();
+};
+
+window.crabotSend = function() {
+  const inp = _getInput();
+  const text = (inp?.value || '').trim();
+  if (!text) return;
+  inp.value = '';
+  _setChips([]);
+  _appendMsg('user', text);
+  setTimeout(() => {
+    const match = findAnswer(text);
+    if (match) {
+      _appendMsg('bot', match.a);
+      _setChips(FAQ.filter(f => f !== match).slice(0,3).map(f => f.q));
+    } else {
+      _appendMsg('bot', '🤔 Tôi chưa có câu trả lời cho câu hỏi này.\n\nBạn thử:\n• Gửi email support@crabor.vn\n• Dùng nút 🚨 SOS trong app\n• Hỏi lại với từ khóa khác nhé!');
+      _setChips(_QUICK[_page] || _QUICK.default);
+    }
+  }, 350);
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    _appendMsg('bot', _welcomes[_page] || _welcomes.default);
+    _setChips(_QUICK[_page] || _QUICK.default);
+  }, 600);
+});
+})();
+</script>
+
+</body>
+</html>
