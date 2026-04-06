@@ -11,6 +11,19 @@ const path       = require("path");
 const crypto     = require("crypto");
 const axios      = require("axios");
 const nodemailer = require("nodemailer");
+const cocoEngine = require("./coco-engine");
+const { CocoKnowledge, CocoMemory, CocoLearnLog, CocoTools, cocoRespond, processLearnQueue, seedCocoKnowledge } = cocoEngine;
+const cocoOps   = require("./coco-ops");
+const cocoBrain = require("./coco-brain");
+const { cocoThink, CocoReasoning, checkBrainStatus, printBrainSetupGuide } = cocoBrain;
+const novaAgent = require("./nova-agent");
+const { SLAMonitor, RevenueIntel, DispatchIntel, InventoryIntel,
+        SystemHealth, OnboardingFlow,
+        NovaSLA, NovaMetric, NovaDecision,
+        NOVA_SYSTEM_PROMPT, startNovaCrons } = novaAgent;
+const { DispatchAI, PricingAI, FraudAI, GrowthAI, LearningEngine, AutoApproveAI,
+        CocoPattern, CocoDecision, CocoNotif, CocoCampaign,
+        dispatchPendingNotifications, startOpsCrons } = cocoOps;
 
 // App & Socket bootstrap ──
 const app    = express();
@@ -69,6 +82,9 @@ console.log("[DB] Connecting to MongoDB...");
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(async () => {
     console.log("[OK] MongoDB Atlas connected — DB: crabor");
+    // Coco AI: seed knowledge + start ops crons
+    seedCocoKnowledge().catch(e => console.log("[Coco] Seed:", e.message));
+    setTimeout(() => startOpsCrons(io), 3000); // delay 3s để DB ổn định
     // Auto-seed admin nếu chưa có
     try {
       const existingAdmin = await Admin.findOne({ username: "admin" });
@@ -101,6 +117,9 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
+
+// Track requests for Nova SystemHealth
+app.use((req,res,next)=>{ res.on("finish",()=>SystemHealth.recordRequest(res.statusCode>=500)); next(); });
 
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
@@ -2714,7 +2733,9 @@ async function buildUserContext(userId) {
 }
 
 // POST /api/claude/personalized — AI với full user context
-app.post("/api/claude/personalized", async (req, res) => {
+// DEPRECATED: /api/claude/personalized → redirect to Coco
+app.post("/api/claude/personalized", async (req, res) => { req.body.text = req.body.messages?.slice(-1)[0]?.content||""; return res.redirect(307,"/api/coco/chat"); }); //old:
+app.post("/api/claude/personalized_old", async (req, res) => {
   try {
     const CLAUDE_KEY = process.env.ANTHROPIC_API_KEY || "";
     if (!CLAUDE_KEY) return res.status(500).json({ success:false, message:"Chưa cấu hình API key" });
@@ -2772,56 +2793,15 @@ CÁCH TRẢ LỜI:
 
 // ── AI HOTLINE (Tổng đài AI) ──────────────────────────────────
 // POST /api/support/hotline-ai — chat với tổng đài AI
+// POST /api/support/hotline-ai — redirect to Coco engine (no Anthropic)
 app.post("/api/support/hotline-ai", async (req, res) => {
-  try {
-    const CLAUDE_KEY = process.env.ANTHROPIC_API_KEY || "";
-    if (!CLAUDE_KEY) return res.status(500).json({ success:false, message:"Tổng đài AI tạm thời gián đoạn" });
-
-    const { messages } = req.body;
-    const ctx = await buildUserContext(req.session.userId);
-
-    const systemPrompt = `Bạn là nhân viên tổng đài CRABOR — tên là "Coco", giọng thân thiện như người thật.
-
-${ctx ? `KHÁCH ĐANG GỌI:
-- Tên: ${ctx.name} | SĐT: ${ctx.phone}
-- Ví: ${ctx.walletBal.toLocaleString('vi-VN')}đ | Điểm: ${ctx.loyaltyPts}đ
-${ctx.unpaidInvoices?.length ? `- Có hóa đơn trả sau chưa thanh toán` : ''}
-${ctx.recentOrders?.length ? `- Đơn gần nhất: ${ctx.recentOrders[0]?.status}` : ''}` : 'Khách chưa đăng nhập'}
-
-PHONG CÁCH:
-- Xưng "Coco" hoặc "em", gọi khách là "${ctx?.name||'anh/chị'}"
-- Giống nhân viên tổng đài thật: lịch sự, rõ ràng, chuyên nghiệp
-- Mỗi tin < 120 từ
-- Mở đầu: "Dạ, CRABOR xin nghe. Em là Coco, rất vui được hỗ trợ anh/chị ạ!"
-- Kết thúc cuộc gọi: "Cảm ơn anh/chị đã liên hệ CRABOR! Chúc anh/chị một ngày tốt lành ạ 🦀"
-
-XỬ LÝ TÌNH HUỐNG:
-- Hỏi đơn hàng → dùng dữ liệu thật bên trên
-- Khiếu nại → xin lỗi + tạo ticket hỗ trợ
-- Không biết → "Em sẽ nhờ bộ phận kỹ thuật kiểm tra và phản hồi trong 30 phút ạ"
-- Hỏi phí/chính sách → trả lời đúng chính sách CRABOR`;
-
-    const r = await axios.post("https://api.anthropic.com/v1/messages", {
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 400,
-      system: systemPrompt,
-      messages,
-    }, {
-      headers: {
-        "x-api-key": CLAUDE_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      timeout: 12000,
-    });
-    res.json({ success:true, content: r.data.content });
-  } catch(err) {
-    res.status(500).json({ success:false, message:"Tổng đài AI tạm thời gián đoạn. Vui lòng thử lại." });
-  }
+  // Redirect to Coco engine
+  req.body.sessionId = req.body.sessionId || ('hotline_' + (req.session.userId||'anon') + '_' + Date.now());
+  req.url = '/api/coco/hotline';
+  return app._router.handle(Object.assign(req, { url:'/api/coco/hotline' }), res, ()=>{});
 });
 
-// ── AI EMAIL SUPPORT ──────────────────────────────────────────
-// POST /api/support/email — user gửi email → AI auto reply
+
 app.post("/api/support/email", async (req, res) => {
   try {
     const { subject, message, replyTo } = req.body;
@@ -2897,6 +2877,538 @@ Nội dung: ${message}` }],
     console.error("[AI Email Support]", err.message);
     res.status(500).json({ success:false, message:err.message });
   }
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  COCO AI ENGINE ENDPOINTS
+//  Không dùng Anthropic API — tất cả chạy nội bộ
+// ══════════════════════════════════════════════════════════════
+
+// POST /api/coco/chat — chat với Coco
+app.post("/api/coco/chat", async (req, res) => {
+  try {
+    const { text, sessionId = "anon_"+Date.now() } = req.body;
+    if (!text?.trim()) return res.status(400).json({ success:false });
+
+    // Lấy user context
+    let userCtx = {};
+    if (req.session.userId) {
+      const user = await User.findById(req.session.userId)
+        .select('fullName phone totalSpent loyaltyPts walletBalance');
+      if (user) userCtx = {
+        name:       user.fullName || 'bạn',
+        walletBal:  user.walletBalance||0,
+        loyaltyPts: user.loyaltyPts||0,
+        totalSpent: user.totalSpent||0,
+        phone:      user.phone,
+      };
+    }
+
+    // Get/create session memory
+    let memory = await CocoMemory.findOne({ sessionId });
+    if (!memory) memory = await CocoMemory.create({ sessionId, userId: req.session.userId||null });
+
+    // Coco responds — dùng brain nếu có, fallback về rule-based
+    let response;
+    const brainResult = await cocoThink(
+      [{ role:'user', content:text }],
+      { userContext: userCtx, task:'chat', maxTokens:500 }
+    );
+    if (brainResult.canReason && brainResult.text) {
+      response = { text: brainResult.text, intent: 'ai_reasoning', confidence: 0.95, backend: brainResult.backend };
+    } else {
+      response = await cocoRespond({ text, sessionId, userId: req.session.userId, userCtx });
+    }
+
+    // Save to memory
+    memory.messages.push({ role:'user', text, intent: response.intent });
+    memory.messages.push({ role:'coco', text: response.text, intent: response.intent });
+    memory.turnCount++;
+    memory.lastActive = new Date();
+    if (memory.messages.length > 40) memory.messages = memory.messages.slice(-40);
+    await memory.save();
+
+    res.json({
+      success: true,
+      text: response.text,
+      intent: response.intent,
+      confidence: response.confidence,
+    });
+  } catch(err) {
+    console.error("[Coco Chat]", err.message);
+    res.status(500).json({ success:false, message:"Coco tạm thời gián đoạn" });
+  }
+});
+
+// POST /api/coco/hotline — Tổng đài AI Coco (multi-turn với memory)
+app.post("/api/coco/hotline", async (req, res) => {
+  try {
+    const { text, sessionId } = req.body;
+    if (!text?.trim()) return res.status(400).json({ success:false });
+
+    let userCtx = {};
+    if (req.session.userId) {
+      const user = await User.findById(req.session.userId).select('fullName phone totalSpent loyaltyPts walletBalance');
+      if (user) userCtx = { name:user.fullName||'anh/chị', walletBal:user.walletBalance||0, loyaltyPts:user.loyaltyPts||0, phone:user.phone };
+    }
+
+    // Coco hotline — full reasoning mode nếu có
+    let response;
+    const hotlineBrain = await cocoThink(
+      [{ role:'user', content:text }],
+      { userContext:userCtx, task:'chat', temperature:0.7,
+        systemPrompt: `Bạn là Coco, nhân viên tổng đài AI của CRABOR. Xưng "Coco" hoặc "em". Lịch sự, chuyên nghiệp, giải quyết vấn đề cụ thể. Tối đa 120 từ mỗi câu.${userCtx.name ? ' Khách hàng tên: '+userCtx.name+'.' : ''}${userCtx.walletBal !== undefined ? ' Số dư ví: '+userCtx.walletBal.toLocaleString('vi-VN')+'đ.' : ''}` }
+    );
+    if (hotlineBrain.canReason && hotlineBrain.text) {
+      response = { text: hotlineBrain.text, intent: 'hotline_ai' };
+    } else {
+      response = await cocoRespond({ text, sessionId, userId:req.session.userId, userCtx });
+    }
+
+    // Thêm tông giọng tổng đài
+    let finalText = response.text;
+    if (response.intent === 'unknown') {
+      finalText = `Em đã ghi nhận yêu cầu của ${userCtx.name||'anh/chị'} ạ. Đội kỹ thuật sẽ phản hồi trong 30 phút. Anh/chị có cần hỗ trợ thêm gì không ạ?`;
+    }
+
+    res.json({ success:true, text:finalText, intent:response.intent });
+  } catch(err) {
+    res.status(500).json({ success:false, message:"Tổng đài Coco tạm thời gián đoạn ạ" });
+  }
+});
+
+// POST /api/coco/learn/url — Coco học từ URL
+app.post("/api/coco/learn/url", adminAuth, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ success:false });
+    // Queue URL for learning
+    const log = await CocoLearnLog.create({ type:'web', source:url, content:'', status:'pending' });
+    // Process immediately
+    const fetched = await CocoTools.webFetch(url);
+    if (!fetched.success) return res.status(400).json({ success:false, message:"Không tải được: "+fetched.error });
+
+    const extracted = CocoTools.extractKnowledge(fetched.content, 'web:'+url);
+    const ids = [];
+    for (const fact of extracted.slice(0, 15)) {
+      const r = await CocoTools.learnFact({ ...fact, category:'web' });
+      ids.push(r.id);
+    }
+    await CocoLearnLog.findByIdAndUpdate(log._id, { status:'processed', content:fetched.content.substring(0,500), knowledgeIds:ids });
+    res.json({ success:true, url, title:fetched.title, extracted:extracted.length, saved:ids.length });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// POST /api/coco/learn/document — Coco học từ văn bản/tài liệu
+app.post("/api/coco/learn/document", adminAuth, async (req, res) => {
+  try {
+    const { content, title, category='document' } = req.body;
+    if (!content) return res.status(400).json({ success:false });
+    const extracted = CocoTools.extractKnowledge(content, 'doc:'+title);
+    const ids = [];
+    for (const fact of extracted.slice(0,20)) {
+      const r = await CocoTools.learnFact({ ...fact, category });
+      ids.push(r.id);
+    }
+    const log = await CocoLearnLog.create({ type:'document', source:title||'unknown', content:content.substring(0,500), extracted, knowledgeIds:ids, status:'processed' });
+    res.json({ success:true, extracted:extracted.length, saved:ids.length });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// POST /api/coco/learn/fact — Thêm knowledge thủ công
+app.post("/api/coco/learn/fact", adminAuth, async (req, res) => {
+  try {
+    const { intent, keywords, answer, category='faq', confidence=1.0 } = req.body;
+    if (!intent||!answer) return res.status(400).json({ success:false, message:'Cần intent + answer' });
+    const kws = Array.isArray(keywords) ? keywords : (keywords||'').split(',').map(k=>k.trim().toLowerCase());
+    const r = await CocoTools.learnFact({ intent, keywords:kws, answer, category, confidence, source:'manual' });
+    res.json({ success:true, ...r });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// POST /api/coco/feedback — User đánh giá câu trả lời
+app.post("/api/coco/feedback", async (req, res) => {
+  try {
+    const { knowledgeId, helpful } = req.body;
+    if (!knowledgeId) return res.status(400).json({ success:false });
+    await CocoKnowledge.findByIdAndUpdate(knowledgeId, {
+      $inc: helpful ? { helpful:1 } : { notHelpful:1 }
+    });
+    // Nếu nhiều feedback xấu → giảm confidence
+    const k = await CocoKnowledge.findById(knowledgeId);
+    if (k && k.notHelpful > k.helpful + 3) {
+      await CocoKnowledge.findByIdAndUpdate(knowledgeId, { $inc:{ confidence:-0.1 }, $min:{ confidence:0.1 } });
+    }
+    res.json({ success:true });
+  } catch(err) { res.status(500).json({ success:false }); }
+});
+
+// GET /api/coco/knowledge — xem toàn bộ knowledge (admin)
+app.get("/api/coco/knowledge", adminAuth, async (req, res) => {
+  try {
+    const { category, search, page=1 } = req.query;
+    const filter = { active:true };
+    if (category) filter.category = category;
+    if (search) filter.$text = { $search: search };
+    const total = await CocoKnowledge.countDocuments(filter);
+    const docs  = await CocoKnowledge.find(filter).sort({ useCount:-1, confidence:-1 }).skip((page-1)*20).limit(20);
+    res.json({ success:true, total, page:Number(page), data:docs });
+  } catch(err) { res.status(500).json({ success:false }); }
+});
+
+// GET /api/coco/stats — thống kê brain
+app.get("/api/coco/stats", adminAuth, async (req, res) => {
+  try {
+    const [total, byCategory, topUsed, unanswered, learnLogs] = await Promise.all([
+      CocoKnowledge.countDocuments({ active:true }),
+      CocoKnowledge.aggregate([{ $group:{ _id:'$category', count:{$sum:1} } }]),
+      CocoKnowledge.find({ active:true }).sort({ useCount:-1 }).limit(5).select('intent answer useCount'),
+      CocoLearnLog.countDocuments({ status:'pending' }),
+      CocoLearnLog.countDocuments({ type:'web', status:'processed' }),
+    ]);
+    const memories = await CocoMemory.countDocuments();
+    const totalTurns = await CocoMemory.aggregate([{ $group:{ _id:null, total:{$sum:'$turnCount'} } }]);
+    res.json({ success:true, brain:{ total, byCategory, topUsed }, sessions:{ memories, turns:totalTurns[0]?.total||0 }, pending:{ unanswered, learnLogs } });
+  } catch(err) { res.status(500).json({ success:false }); }
+});
+
+// DELETE /api/coco/knowledge/:id — xóa knowledge
+app.delete("/api/coco/knowledge/:id", adminAuth, async (req, res) => {
+  try {
+    await CocoKnowledge.findByIdAndUpdate(req.params.id, { active:false });
+    res.json({ success:true });
+  } catch(err) { res.status(500).json({ success:false }); }
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  COCO OPS ENDPOINTS — Admin & System
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/coco/ops/stats — brain ops stats
+app.get("/api/coco/ops/stats", adminAuth, async (req,res) => {
+  try {
+    const [patterns, decisions, notifs, campaigns] = await Promise.all([
+      CocoPattern.countDocuments(),
+      CocoDecision.countDocuments({ createdAt:{ $gt: new Date(Date.now()-24*3600*1000) } }),
+      CocoNotif.countDocuments({ status:'pending' }),
+      CocoCampaign.countDocuments({ status:'active' }),
+    ]);
+    const insights = await LearningEngine.analyzePatterns();
+    const marginData = await PricingAI.analyzeMargin(7);
+    res.json({ success:true, patterns, decisions24h:decisions, pendingNotifs:notifs, activeCampaigns:campaigns, insights, marginData });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// GET /api/coco/ops/pricing — giá ship theo giờ hiện tại
+app.get("/api/coco/ops/pricing", async (req,res) => {
+  try {
+    const { distance=3, total=0 } = req.query;
+    const result = await PricingAI.calcShipFee({ distanceKm:Number(distance), orderTotal:Number(total) });
+    res.json({ success:true, ...result });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// POST /api/coco/ops/dispatch — chọn shipper cho đơn
+app.post("/api/coco/ops/dispatch", adminAuth, async (req,res) => {
+  try {
+    const { orderId } = req.body;
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ success:false });
+    const availableShippers = await Shipper.find({ isOnline:true, status:'approved' }).select('_id fullName rating tier currentDistrict todayOrders');
+    const best = await DispatchAI.selectShipper(order, availableShippers);
+    res.json({ success:true, selectedShipper:best, candidates:availableShippers.length });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/coco/ops/fraud/check — kiểm tra đơn hàng
+app.post("/api/coco/ops/fraud/check", async (req,res) => {
+  try {
+    if (!req.session.userId) return res.status(401).json({ success:false });
+    const { orderId } = req.body;
+    const order = await Order.findById(orderId);
+    const user  = await User.findById(req.session.userId).select('createdAt totalSpent');
+    if (!order || !user) return res.status(404).json({ success:false });
+    const result = await FraudAI.analyzeOrder(order, user);
+    res.json({ success:true, ...result });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// POST /api/coco/ops/voucher/check — kiểm tra abuse voucher
+app.post("/api/coco/ops/voucher/check", async (req,res) => {
+  try {
+    if (!req.session.userId) return res.status(401).json({ success:false });
+    const { code } = req.body;
+    const result = await FraudAI.checkVoucherAbuse(req.session.userId, code);
+    res.json({ success:true, ...result });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// GET /api/coco/ops/growth/recommend — gợi ý cho user
+app.get("/api/coco/ops/growth/recommend", async (req,res) => {
+  try {
+    if (!req.session.userId) return res.status(401).json({ success:false });
+    const recs = await GrowthAI.recommendFood(req.session.userId);
+    res.json({ success:true, ...recs });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// POST /api/coco/ops/campaign/plan — Coco lên kế hoạch voucher
+app.post("/api/coco/ops/campaign/plan", adminAuth, async (req,res) => {
+  try {
+    const { budget = 5000000 } = req.body;
+    const plan = await GrowthAI.planVoucherCampaign(Number(budget));
+    res.json({ success:true, ...plan });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/coco/ops/campaign/activate — kích hoạt campaign Coco đề xuất
+app.post("/api/coco/ops/campaign/activate", adminAuth, async (req,res) => {
+  try {
+    const campaigns = req.body.campaigns || [];
+    const created = [];
+    for (const c of campaigns) {
+      const campaign = await CocoCampaign.create({ ...c, status:'active' });
+      // Tạo vouchers thật theo config
+      const batchSize = Math.floor(c.budget / (c.voucherConfig?.value||20000));
+      for (let i=0; i<Math.min(batchSize,100); i++) {
+        const code = 'COCO'+Date.now().toString(36).toUpperCase()+i;
+        await Voucher.create({
+          code, type:c.voucherConfig.type, value:c.voucherConfig.value,
+          minOrder: c.voucherConfig.minOrder||0,
+          maxDiscount: c.voucherConfig.maxDiscount,
+          usageLimit:1, expiresAt:c.endAt, active:true,
+          description:`[Coco Campaign] ${c.name}`,
+        });
+      }
+      created.push(campaign._id);
+    }
+    res.json({ success:true, created:created.length });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/coco/ops/notify/broadcast — Coco broadcast tới tất cả users
+app.post("/api/coco/ops/notify/broadcast", adminAuth, async (req,res) => {
+  try {
+    const { title, body, targetType='broadcast', segment } = req.body;
+    const notif = await CocoNotif.create({
+      targetType: targetType==='broadcast'?'broadcast':'user',
+      title, body, scheduledAt:new Date(), source:'admin_via_coco',
+    });
+    // Emit ngay
+    req.io.emit('cocoNotification', { title, body, data:{ type:'broadcast' } });
+    res.json({ success:true, notifId:notif._id, message:'Đã gửi thông báo tới tất cả user online' });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// GET /api/coco/ops/approve/queue — xem hàng chờ duyệt
+app.get("/api/coco/ops/approve/queue", adminAuth, async (req,res) => {
+  try {
+    const [partners, shippers] = await Promise.all([
+      FoodPartner.find({ status:'pending' }).limit(20).select('bizName phone createdAt'),
+      Shipper.find({ status:{$in:['pending','pending_review']} }).limit(20).select('fullName phone feePaid createdAt'),
+    ]);
+    res.json({ success:true, partners, shippers, total:partners.length+shippers.length });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// POST /api/coco/ops/approve/run — chạy batch approve ngay
+app.post("/api/coco/ops/approve/run", adminAuth, async (req,res) => {
+  try {
+    const result = await AutoApproveAI.batchReview(req.io);
+    res.json({ success:true, ...result });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/coco/ops/feedback/decision — feedback cho decision AI
+app.post("/api/coco/ops/feedback/decision", adminAuth, async (req,res) => {
+  try {
+    const { decisionId, feedback } = req.body;
+    await LearningEngine.feedbackDecision(decisionId, feedback);
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  COCO BRAIN ENDPOINTS
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/coco/brain/status — kiểm tra brain backend
+app.get("/api/coco/brain/status", adminAuth, async (req,res) => {
+  try {
+    const status = await checkBrainStatus();
+    res.json({ success:true, ...status });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/coco/brain/reason — gọi reasoning engine trực tiếp (admin/dev)
+app.post("/api/coco/brain/reason", adminAuth, async (req,res) => {
+  try {
+    const { messages, task, systemPrompt, temperature, maxTokens } = req.body;
+    if (!messages?.length) return res.status(400).json({ success:false });
+    const result = await cocoThink(messages, { task, systemPrompt, temperature, maxTokens });
+    res.json({ success:true, ...result });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/coco/brain/analyze-complaint — phân tích khiếu nại
+app.post("/api/coco/brain/analyze-complaint", async (req,res) => {
+  try {
+    const { complaint } = req.body;
+    if (!complaint) return res.status(400).json({ success:false });
+    let userCtx = {};
+    if (req.session.userId) {
+      const user = await User.findById(req.session.userId).select('fullName totalSpent loyaltyPts walletBalance');
+      if (user) userCtx = { name:user.fullName, totalSpent:user.totalSpent||0, walletBal:user.walletBalance||0 };
+    }
+    const result = await CocoReasoning.handleComplaint(complaint, [], userCtx);
+    res.json({ success:true, analysis: result.text || "Đã ghi nhận khiếu nại, sẽ xử lý trong 30 phút.", backend: result.backend });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/coco/brain/document — Coco đọc và học từ tài liệu dài (với reasoning)
+app.post("/api/coco/brain/document", adminAuth, async (req,res) => {
+  try {
+    const { content, title } = req.body;
+    if (!content) return res.status(400).json({ success:false });
+    // Dùng reasoning để tóm tắt thay vì chỉ extract keywords
+    const summary = await CocoReasoning.summarizeDocument(content);
+    // Lưu summary vào knowledge base
+    if (summary.text) {
+      const { CocoTools } = require('./coco-engine');
+      const facts = summary.text.split('\n').filter(l=>l.trim().startsWith('-')||l.trim().startsWith('•'));
+      for (const fact of facts.slice(0,10)) {
+        const clean = fact.replace(/^[-•]\s*/,'').trim();
+        if (clean.length > 20) {
+          await CocoTools.learnFact({ intent:'general', keywords:clean.toLowerCase().split(' ').filter(w=>w.length>3).slice(0,6), answer:clean, category:'document', source:'ai_summary:'+title, confidence:0.8 });
+        }
+      }
+    }
+    res.json({ success:true, summary:summary.text, backend:summary.backend });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/coco/brain/campaign-plan — AI lên kế hoạch campaign thông minh
+app.post("/api/coco/brain/campaign-plan", adminAuth, async (req,res) => {
+  try {
+    const { budget=5000000 } = req.body;
+    const { PricingAI, GrowthAI } = cocoOps;
+    const [metrics, segments] = await Promise.all([
+      PricingAI.analyzeMargin(7),
+      GrowthAI.segmentUsers(),
+    ]);
+    // Kết hợp: rule-based plan + AI reasoning
+    const rulePlan = await GrowthAI.planVoucherCampaign(Number(budget));
+    const aiReason = await CocoReasoning.planCampaign(metrics, Number(budget), segments.stats);
+    res.json({ success:true, rulePlan, aiInsight: aiReason.text || null, backend: aiReason.backend });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  NOVA OPERATIONS ENDPOINTS
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/nova/health — system health report
+app.get("/api/nova/health", adminAuth, async (req,res) => {
+  try {
+    const report = await SystemHealth.fullReport();
+    res.json({ success:true, ...report });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// GET /api/nova/revenue — revenue intelligence
+app.get("/api/nova/revenue", adminAuth, async (req,res) => {
+  try {
+    const days = Number(req.query.days) || 7;
+    const summary = await RevenueIntel.summary(days);
+    const anomalies = await RevenueIntel.detectAnomalies();
+    res.json({ success:true, summary, anomalies });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// GET /api/nova/metrics — metrics snapshot lịch sử
+app.get("/api/nova/metrics", adminAuth, async (req,res) => {
+  try {
+    const metrics = await NovaMetric.find({ type:'hourly' }).sort({createdAt:-1}).limit(24);
+    res.json({ success:true, data:metrics });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// GET /api/nova/sla — SLA status
+app.get("/api/nova/sla", adminAuth, async (req,res) => {
+  try {
+    const now = new Date();
+    const [active, breached, ok] = await Promise.all([
+      NovaSLA.countDocuments({ completedAt:{$exists:false}, breached:false }),
+      NovaSLA.countDocuments({ breached:true, completedAt:{$exists:false} }),
+      NovaSLA.countDocuments({ completedAt:{$exists:true}, breached:false, createdAt:{$gt:new Date(Date.now()-86400000)} }),
+    ]);
+    const atRisk = await NovaSLA.find({
+      expectedAt: { $lt: new Date(Date.now() + 10*60000), $gt: now },
+      completedAt: { $exists:false },
+      breached: false,
+    }).limit(10).select('orderId module expectedAt');
+    res.json({ success:true, active, breached, completedToday:ok, atRisk });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// POST /api/nova/dispatch/run — trigger manual auto-dispatch
+app.post("/api/nova/dispatch/run", adminAuth, async (req,res) => {
+  try {
+    const assigned = await DispatchIntel.runAutoDispatch(req.io);
+    res.json({ success:true, assigned, message:`Nova đã gán ${assigned} đơn cho shipper` });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// GET /api/nova/partner/:id/status — check partner load + ETA
+app.get("/api/nova/partner/:id/status", async (req,res) => {
+  try {
+    const status = await InventoryIntel.checkPartnerStatus(req.params.id);
+    res.json({ success:true, ...status });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// GET /api/nova/onboarding/:type/:id — xem tiến độ onboarding
+app.get("/api/nova/onboarding/:type/:id", async (req,res) => {
+  try {
+    const step = await OnboardingFlow.getNextStep(req.params.id, req.params.type);
+    res.json({ success:true, ...step });
+  } catch(e) { res.status(500).json({ success:false }); }
+});
+
+// POST /api/nova/chat — Nova chat với admin (business insights)
+app.post("/api/nova/chat", adminAuth, async (req,res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ success:false });
+    // Get business context for Nova
+    const [revenue, health, sla] = await Promise.all([
+      RevenueIntel.summary(7),
+      SystemHealth.getSnapshot(),
+      NovaSLA.countDocuments({ breached:true, completedAt:{$exists:false} }),
+    ]);
+    const context = `Revenue 7 ngày: ${revenue.totalRevenue?.toLocaleString('vi-VN')}đ (${revenue.totalOrders} đơn). Health: ${health.status}. SLA breach đang xử lý: ${sla}.`;
+    const result = await cocoThink(
+      [{ role:'user', content:text }],
+      {
+        task: 'dispatch',
+        systemPrompt: NOVA_SYSTEM_PROMPT + '\n\nDỮ LIỆU HIỆN TẠI:\n' + context,
+        maxTokens: 500,
+      }
+    );
+    res.json({ success:true, text: result.text || "Nova đang ở mode rule-based. Set COCO_BRAIN=groq để bật AI.", backend: result.backend });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// GET /api/nova/decisions — lịch sử quyết định của Nova
+app.get("/api/nova/decisions", adminAuth, async (req,res) => {
+  try {
+    const decisions = await NovaDecision.find().sort({createdAt:-1}).limit(50);
+    res.json({ success:true, data:decisions });
+  } catch(e) { res.status(500).json({ success:false }); }
 });
 
 
