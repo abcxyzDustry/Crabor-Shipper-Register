@@ -10,7 +10,9 @@ const MongoStore = require("connect-mongo");
 const path       = require("path");
 const crypto     = require("crypto");
 const axios      = require("axios");
-const nodemailer = require("nodemailer");
+const nodemailer  = require("nodemailer");
+const { OAuth2Client } = require("google-auth-library");
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const cocoEngine = require("./coco-engine");
 const { CocoKnowledge, CocoMemory, CocoLearnLog, CocoTools, cocoRespond, processLearnQueue, seedCocoKnowledge } = cocoEngine;
 const cocoOps   = require("./coco-ops");
@@ -24,6 +26,16 @@ const { SLAMonitor, RevenueIntel, DispatchIntel, InventoryIntel,
 const { DispatchAI, PricingAI, FraudAI, GrowthAI, LearningEngine, AutoApproveAI,
         CocoPattern, CocoDecision, CocoNotif, CocoCampaign,
         dispatchPendingNotifications, startOpsCrons } = cocoOps;
+
+// ==========================================
+//  APP VERSIONS CONFIG (cho update OTA)
+// ==========================================
+const APP_VERSIONS = {
+  customer: '1.0.0',
+  shipper:  '1.0.0',
+  partner:  '1.0.0',
+  releaseNote: 'Phiên bản đầu tiên của CRABOR App! 🦀',
+};
 
 // App & Socket bootstrap ──
 const app    = express();
@@ -221,8 +233,14 @@ const userSchema = new mongoose.Schema({
   totalSpent:      { type: Number, default: 0, min: 0 },
   loyaltyPts:      { type: Number, default: 0, min: 0 },
   walletBalance:   { type: Number, default: 0, min: 0 },
+  googleId:        { type: String, unique: true, sparse: true },
+  avatar:          { type: String },
+  authMethod:      { type: String, enum: ["otp","google","form"], default: "otp" },
+  password:        { type: String },            // bcrypt hash — form auth
+  emailVerified:   { type: Boolean, default: false },
   walletEarned:    { type: Number, default: 0, min: 0 },   // tổng tiền đã nhận vào ví
   fcmToken:        String,
+  platform:        String,
   profileComplete: { type: Boolean, default: false },
   dob:             { type: String, trim: true },
   gender:          { type: String, enum: ["male","female","other"] },
@@ -384,6 +402,8 @@ const shipperSchema = new mongoose.Schema({
   walletBalance: { type: Number, default: 0, min: 0 },
   walletEarned:  { type: Number, default: 0, min: 0 },
   approvedAt:  Date,
+  fcmToken:        String,
+  platform:        String,
 }, { timestamps: true });
 
 shipperSchema.index({ phone: 1 });
@@ -424,6 +444,8 @@ const partnerBase = {
   status:       { type: String, enum: ["pending","reviewing","approved","rejected","active","suspended"], default: "pending" },
   adminNotes:   { type: String, trim: true },
   approvedAt:   Date,
+  fcmToken:     String,
+  platform:     String,
 };
 
 // ── GIẶT LÀ ──────────────────────────────
@@ -532,6 +554,8 @@ const foodPartnerSchema = new mongoose.Schema({
   walletBalance: { type: Number, default: 0, min: 0 },
   walletEarned:  { type: Number, default: 0, min: 0 },
   approvedAt:  Date,
+  fcmToken:     String,
+  platform:     String,
 }, { timestamps: true });
 
 foodPartnerSchema.index({ phone: 1 });
@@ -574,6 +598,8 @@ const rideDriverSchema = new mongoose.Schema({
   adminNotes:   { type: String, trim: true },
   approvedAt:   Date,
   documents:    { cccdFront: String, cccdBack: String, selfie: String, licenseImg: String, vehicleImg: String },
+  fcmToken:     String,
+  platform:     String,
 }, { timestamps: true });
 
 rideDriverSchema.index({ phone: 1 });
@@ -1326,7 +1352,7 @@ app.get("/api/register/lookup", async (req, res) => {
   }
 });
 
-// Health check
+// Health check + Version info
 app.get("/api/health", async (req, res) => {
   try {
     const dbState = ["disconnected","connected","connecting","disconnecting"][mongoose.connection.readyState] || "unknown";
@@ -1340,20 +1366,137 @@ app.get("/api/health", async (req, res) => {
       RideDriver.estimatedDocumentCount(),
       Order.estimatedDocumentCount(),
     ]);
-    res.json({ status: "ok", db: dbState,
+    res.json({ 
+      status: "ok", 
+      db: dbState,
       counts: { users, shippers, partners: gl+gv+cs+fp+rx, orders },
-      uptime: Math.floor(process.uptime()) + "s" });
-  } catch(e) { res.status(500).json({ status: "error", message: e.message }); }
+      uptime: Math.floor(process.uptime()) + "s",
+      // Version fields cho từng app (OTA update)
+      version:         APP_VERSIONS.customer,
+      customerVersion: APP_VERSIONS.customer,
+      shipperVersion:  APP_VERSIONS.shipper,
+      partnerVersion:  APP_VERSIONS.partner,
+      releaseNote:     APP_VERSIONS.releaseNote,
+    });
+  } catch(e) { 
+    res.status(500).json({ status: "error", message: e.message }); 
+  }
 });
 
-// ══════════════════════════════════════════════════════
+// ==========================================
+//  DOWNLOAD APK ROUTES (OTA Update)
+// ==========================================
+
+// GET /download/:app — redirect đến APK download
+app.get('/download/:app', (req, res) => {
+  const urls = {
+    'customer-app.apk': process.env.CUSTOMER_APK_URL || '/downloads/crabor-customer.apk',
+    'shipper-app.apk':  process.env.SHIPPER_APK_URL  || '/downloads/crabor-shipper.apk',
+    'partner-app.apk':  process.env.PARTNER_APK_URL  || '/downloads/crabor-partner.apk',
+  };
+  const url = urls[req.params.app];
+  if (!url) return res.status(404).json({ error: 'App not found' });
+  res.redirect(url);
+});
+
+// Alias đẹp hơn cho từng app
+app.get('/download/customer', (req, res) => res.redirect('/download/customer-app.apk'));
+app.get('/download/shipper',  (req, res) => res.redirect('/download/shipper-app.apk'));
+app.get('/download/partner',  (req, res) => res.redirect('/download/partner-app.apk'));
+
+// GET /api/version — lấy version info cho tất cả app
+app.get('/api/version', (req, res) => {
+  res.json({
+    success: true,
+    customer: APP_VERSIONS.customer,
+    shipper: APP_VERSIONS.shipper,
+    partner: APP_VERSIONS.partner,
+    releaseNote: APP_VERSIONS.releaseNote,
+    lastUpdated: new Date().toISOString(),
+  });
+});
+
+// ==========================================
+//  PUSH TOKEN ROUTES (FCM)
+// ==========================================
+
+// Helper middleware cho push token
+const requireAuth = async (req, res, next) => {
+  if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+  const user = await User.findById(req.session.userId);
+  if (!user) return res.status(401).json({ success: false });
+  req.user = user;
+  next();
+};
+
+const requireShipperAuth = async (req, res, next) => {
+  const phone = req.session.userPhone;
+  if (!phone) return res.status(401).json({ success: false });
+  const shipper = await Shipper.findOne({ phone });
+  if (!shipper) return res.status(401).json({ success: false });
+  req.shipper = shipper;
+  next();
+};
+
+const requirePartnerAuth = async (req, res, next) => {
+  const phone = req.session.userPhone;
+  if (!phone) return res.status(401).json({ success: false });
+  for (const Model of [FoodPartner, GiatLa, GiupViec, ChinaShop]) {
+    const partner = await Model.findOne({ phone });
+    if (partner) {
+      req.partner = partner;
+      req.partnerModel = Model;
+      return next();
+    }
+  }
+  return res.status(401).json({ success: false, message: "Không tìm thấy đối tác" });
+};
+
+// POST /api/users/push-token — customer
+app.post('/api/users/push-token', requireAuth, async (req, res) => {
+  try {
+    const { token, platform = 'android' } = req.body;
+    if (!token) return res.status(400).json({ success: false, message: "Thiếu token" });
+    await User.findByIdAndUpdate(req.user._id, { fcmToken: token, platform });
+    res.json({ success: true, message: "Đã lưu token push" });
+  } catch (e) { 
+    res.status(500).json({ success: false, message: e.message }); 
+  }
+});
+
+// POST /api/shipper/push-token — shipper
+app.post('/api/shipper/push-token', requireShipperAuth, async (req, res) => {
+  try {
+    const { token, platform = 'android' } = req.body;
+    if (!token) return res.status(400).json({ success: false, message: "Thiếu token" });
+    await Shipper.findByIdAndUpdate(req.shipper._id, { fcmToken: token, platform });
+    res.json({ success: true, message: "Đã lưu token push" });
+  } catch (e) { 
+    res.status(500).json({ success: false, message: e.message }); 
+  }
+});
+
+// POST /api/partner/push-token — partner
+app.post('/api/partner/push-token', requirePartnerAuth, async (req, res) => {
+  try {
+    const { token, platform = 'android' } = req.body;
+    if (!token) return res.status(400).json({ success: false, message: "Thiếu token" });
+    const Model = req.partnerModel;
+    await Model.findByIdAndUpdate(req.partner._id, { fcmToken: token, platform });
+    res.json({ success: true, message: "Đã lưu token push" });
+  } catch (e) { 
+    res.status(500).json({ success: false, message: e.message }); 
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
 //  AUTO-APPROVE BOT
 //  - Partner (giat_la, giup_viec, china_shop, food_partner):
 //    tự động duyệt sau 1 giờ kể từ khi tạo hồ sơ
 //  - Shipper + RideDriver:
 //    tự động duyệt nếu đã thanh toán phí (feeStatus="paid")
 //    giữ nguyên pending nếu chưa thanh toán
-// ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 async function runAutoApproveBot() {
   const now = new Date();
   const oneHourAgo = new Date(now - 60 * 60 * 1000);
@@ -2711,7 +2854,7 @@ async function buildUserContext(userId) {
     const [user, orders, wallet, bnplElig, loan] = await Promise.all([
       User.findById(userId).select('fullName phone email totalSpent loyaltyPts walletBalance'),
       // 3 đơn gần nhất
-      mongoose.model('Order') ? mongoose.model('Order').find({customerId:userId}).sort({createdAt:-1}).limit(3).select('orderId status totalAmount createdAt') : Promise.resolve([]),
+      mongoose.model('Order') ? mongoose.model('Order').find({customerId:userId}).sort({createdAt:-1}).limit(3).select('orderId status total createdAt') : Promise.resolve([]),
       WalletTx.find({ownerId:userId}).sort({createdAt:-1}).limit(5),
       BNPLInvoice.find({userId, status:{$in:['issued','overdue','installment']}}).limit(3),
       Loan.findOne({userId, status:{$in:['approved','active','pending']}}).select('amount status totalRepay paidAmount'),
@@ -2755,7 +2898,7 @@ ${ctx ? `THÔNG TIN TÀI KHOẢN NGƯỜI DÙNG:
 - Điểm loyalty: ${ctx.loyaltyPts} điểm
 - Số dư ví: ${ctx.walletBal.toLocaleString('vi-VN')}đ
 - Hạn mức Ví Trả Sau: ${ctx.bnplLimit.toLocaleString('vi-VN')}đ
-${ctx.recentOrders?.length ? `- Đơn gần nhất: ${ctx.recentOrders.map(o=>`#${o.orderId||o._id} (${o.status} - ${(o.totalAmount||0).toLocaleString('vi-VN')}đ)`).join(', ')}` : ''}
+${ctx.recentOrders?.length ? `- Đơn gần nhất: ${ctx.recentOrders.map(o=>`#${o.orderId||o._id} (${o.status} - ${(o.total||0).toLocaleString('vi-VN')}đ)`).join(', ')}` : ''}
 ${ctx.unpaidInvoices?.length ? `- ⚠️ Có ${ctx.unpaidInvoices.length} hóa đơn Ví Trả Sau chưa thanh toán` : ''}
 ${ctx.activeLoan ? `- Đang có khoản vay ${ctx.activeLoan.amount.toLocaleString('vi-VN')}đ (${ctx.activeLoan.status})` : ''}` : 'Người dùng chưa đăng nhập — chỉ tư vấn chung.'}
 
@@ -3412,6 +3555,197 @@ app.get("/api/nova/decisions", adminAuth, async (req,res) => {
 });
 
 
+// ══════════════════════════════════════════════════════════════
+//  AUTH MỚI — Google OAuth + Form (thay thế OTP SMS)
+// ══════════════════════════════════════════════════════════════
+
+// POST /api/auth/google — xác thực Google ID token từ client
+app.post("/api/auth/google", async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ success:false, message:"Thiếu idToken" });
+
+    // Verify token với Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    // Tìm hoặc tạo user
+    let user = await User.findOne({ $or: [{ googleId }, { email: email.toLowerCase() }] });
+    if (!user) {
+      user = await User.create({
+        googleId,
+        email:        email.toLowerCase(),
+        fullName:     name,
+        avatar:       picture,
+        authMethod:   "google",
+        emailVerified: true,
+        phone:        "google_" + googleId.slice(-8),
+        status:       "active",
+      });
+    } else if (!user.googleId) {
+      // Merge existing account với Google
+      await User.findByIdAndUpdate(user._id, { googleId, avatar: picture, emailVerified: true, authMethod: "google" });
+    }
+
+    req.session.userId    = user._id;
+    req.session.userPhone = user.phone;
+    await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
+
+    res.json({
+      success: true,
+      user: {
+        _id:      user._id,
+        fullName: user.fullName || name,
+        email:    user.email,
+        avatar:   user.avatar || picture,
+        loyaltyPts: user.loyaltyPts || 0,
+        walletBalance: user.walletBalance || 0,
+        isNew:    !user.totalSpent,
+      },
+    });
+  } catch(err) {
+    console.error("[Google Auth]", err.message);
+    res.status(401).json({ success:false, message:"Xác thực Google thất bại. Thử lại nhé!" });
+  }
+});
+
+// POST /api/auth/register-form — đăng ký bằng form thường (email + password)
+app.post("/api/auth/register-form", async (req, res) => {
+  try {
+    const { fullName, email, password, phone } = req.body;
+    if (!fullName || !email || !password)
+      return res.status(400).json({ success:false, message:"Nhập đủ họ tên, email và mật khẩu" });
+    if (password.length < 6)
+      return res.status(400).json({ success:false, message:"Mật khẩu tối thiểu 6 ký tự" });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return res.status(400).json({ success:false, message:"Email không hợp lệ" });
+
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing)
+      return res.status(400).json({ success:false, message:"Email này đã được đăng ký" });
+
+    const bcrypt = require("bcryptjs");
+    const hash   = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      fullName,
+      email:      email.toLowerCase(),
+      phone:      phone || "form_" + Date.now().toString(36),
+      password:   hash,
+      authMethod: "form",
+      status:     "active",
+    });
+
+    req.session.userId    = user._id;
+    req.session.userPhone = user.phone;
+    await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
+
+    res.json({
+      success: true,
+      message: "Đăng ký thành công!",
+      user: { _id:user._id, fullName:user.fullName, email:user.email },
+    });
+  } catch(err) {
+    res.status(500).json({ success:false, message:err.message });
+  }
+});
+
+// POST /api/auth/login-form — đăng nhập bằng email + password
+app.post("/api/auth/login-form", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password)
+      return res.status(400).json({ success:false, message:"Nhập email và mật khẩu" });
+
+    const user = await User.findOne({ email: email.toLowerCase(), authMethod: { $in:["form","otp"] } });
+    if (!user || !user.password)
+      return res.status(400).json({ success:false, message:"Email chưa đăng ký hoặc đăng ký qua Google" });
+
+    const bcrypt  = require("bcryptjs");
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res.status(400).json({ success:false, message:"Mật khẩu không đúng" });
+
+    req.session.userId    = user._id;
+    req.session.userPhone = user.phone;
+    await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
+
+    res.json({
+      success: true,
+      user: {
+        _id:        user._id,
+        fullName:   user.fullName,
+        email:      user.email,
+        loyaltyPts: user.loyaltyPts || 0,
+        walletBalance: user.walletBalance || 0,
+      },
+    });
+  } catch(err) {
+    res.status(500).json({ success:false, message:err.message });
+  }
+});
+
+// POST /api/auth/forgot-password — gửi email reset
+app.post("/api/auth/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email?.toLowerCase() });
+    // Luôn trả 200 để không lộ email tồn tại
+    if (!user || !createEmailTransporter()) {
+      return res.json({ success:true, message:"Nếu email tồn tại, link đặt lại đã được gửi" });
+    }
+    const token   = require("crypto").randomBytes(32).toString("hex");
+    const expiry  = Date.now() + 3600000; // 1h
+    await User.findByIdAndUpdate(user._id, { resetToken:token, resetExpiry:expiry });
+
+    const resetUrl = (process.env.BASE_URL || "https://crabor-shipper-register.onrender.com")
+      + "/reset-password?token=" + token;
+
+    const transporter = createEmailTransporter();
+    await transporter.sendMail({
+      from: '"CRABOR 🦀" <' + process.env.EMAIL_USER + '>',
+      to:   email,
+      subject: "[CRABOR] Đặt lại mật khẩu",
+      html: '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto">'
+        + '<div style="background:#E8504A;padding:20px;border-radius:16px 16px 0 0;text-align:center">'
+        + '<div style="font-size:2rem">🦀</div><div style="color:#fff;font-weight:900">CRABOR</div></div>'
+        + '<div style="padding:20px;background:#f9f9f9">'
+        + '<p>Nhấn link bên dưới để đặt lại mật khẩu (hết hạn sau 1 giờ):</p>'
+        + '<a href="' + resetUrl + '" style="display:block;background:#E8504A;color:#fff;padding:14px;border-radius:12px;text-align:center;text-decoration:none;font-weight:900;margin:16px 0">Đặt lại mật khẩu</a>'
+        + '<p style="color:#888;font-size:.8rem">Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>'
+        + '</div></div>',
+    });
+    res.json({ success:true, message:"Link đặt lại mật khẩu đã gửi về email" });
+  } catch(err) {
+    res.status(500).json({ success:false, message:err.message });
+  }
+});
+
+// POST /api/auth/reset-password
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword || newPassword.length < 6)
+      return res.status(400).json({ success:false, message:"Mật khẩu tối thiểu 6 ký tự" });
+
+    const user = await User.findOne({ resetToken:token, resetExpiry:{ $gt: Date.now() } });
+    if (!user)
+      return res.status(400).json({ success:false, message:"Link hết hạn hoặc không hợp lệ" });
+
+    const bcrypt = require("bcryptjs");
+    const hash   = await bcrypt.hash(newPassword, 10);
+    await User.findByIdAndUpdate(user._id, { password:hash, resetToken:null, resetExpiry:null });
+    res.json({ success:true, message:"Đặt lại mật khẩu thành công! Đăng nhập lại nhé." });
+  } catch(err) {
+    res.status(500).json({ success:false, message:err.message });
+  }
+});
+
+
 // Landing (root) — Màn hình chọn vai trò
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
@@ -3856,7 +4190,7 @@ app.get("/api/map/directions", async (req, res) => {
     const { origin, destination, vehicle = "motorbike" } = req.query;
     if (!origin || !destination)
       return res.status(400).json({ success: false, message: "Thiếu origin hoặc destination" });
-    const key = GOONG_API_KEY || process.env.GOONG_API_KEY;
+    const key = process.env.GOONG_API_KEY;
     if (!key) return res.status(500).json({ success: false, message: "Chưa cấu hình GOONG_API_KEY" });
     const url = `https://rsapi.goong.io/Direction?origin=${origin}&destination=${destination}&vehicle=${vehicle}&api_key=${key}`;
     const r = await axios.get(url, { timeout: 10000 });
@@ -3871,7 +4205,7 @@ app.get("/api/map/geocode", async (req, res) => {
   try {
     const { address } = req.query;
     if (!address) return res.status(400).json({ success: false });
-    const key = GOONG_API_KEY || process.env.GOONG_API_KEY;
+    const key = process.env.GOONG_API_KEY;
     const url = `https://rsapi.goong.io/geocode?address=${encodeURIComponent(address)}&api_key=${key}`;
     const r = await axios.get(url, { timeout: 8000 });
     res.json(r.data);
@@ -3885,7 +4219,7 @@ app.get("/api/map/places", async (req, res) => {
   try {
     const { input, location } = req.query;
     if (!input) return res.status(400).json({ success: false });
-    const key = GOONG_API_KEY || process.env.GOONG_API_KEY;
+    const key = process.env.GOONG_API_KEY;
     let url = `https://rsapi.goong.io/Place/AutoComplete?input=${encodeURIComponent(input)}&api_key=${key}`;
     if (location) url += `&location=${location}`;
     const r = await axios.get(url, { timeout: 8000 });
@@ -4500,6 +4834,42 @@ async function setupDefaultAdmin() {
   }
 }
 
+// GET /api/admin/customers — Danh sách khách hàng
+app.get("/api/admin/customers", adminAuth, async (req, res) => {
+  try {
+    const { q, page = 1, limit = 50 } = req.query;
+    const filter = {};
+    if (q) filter.$or = [
+      { phone: { $regex: q, $options: "i" } },
+      { fullName: { $regex: q, $options: "i" } },
+      { email: { $regex: q, $options: "i" } },
+    ];
+    const total = await User.countDocuments(filter);
+    const users = await User.find(filter)
+      .select("-__v")
+      .sort({ createdAt: -1 })
+      .skip((page-1)*limit).limit(Number(limit));
+    res.json({ success: true, customers: users, total });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PATCH /api/admin/customers/:id/status — Khóa/mở khóa tài khoản
+app.patch("/api/admin/customers/:id/status", adminAuth, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { status: req.body.status },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ success: false, message: "Không tìm thấy user" });
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ==========================================
 //  16. START SERVER
 // ==========================================
@@ -4551,40 +4921,3 @@ server.listen(PORT, async () => {
 });
 
 module.exports = { app, server, io };
-
-
-// GET /api/admin/customers — Danh sách khách hàng
-app.get("/api/admin/customers", adminAuth, async (req, res) => {
-  try {
-    const { q, page = 1, limit = 50 } = req.query;
-    const filter = {};
-    if (q) filter.$or = [
-      { phone: { $regex: q, $options: "i" } },
-      { fullName: { $regex: q, $options: "i" } },
-      { email: { $regex: q, $options: "i" } },
-    ];
-    const total = await User.countDocuments(filter);
-    const users = await User.find(filter)
-      .select("-__v")
-      .sort({ createdAt: -1 })
-      .skip((page-1)*limit).limit(Number(limit));
-    res.json({ success: true, customers: users, total });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// PATCH /api/admin/customers/:id/status — Khóa/mở khóa tài khoản
-app.patch("/api/admin/customers/:id/status", adminAuth, async (req, res) => {
-  try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
-      { new: true }
-    );
-    if (!user) return res.status(404).json({ success: false, message: "Không tìm thấy user" });
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
