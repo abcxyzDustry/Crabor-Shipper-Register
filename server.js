@@ -12,6 +12,9 @@ const crypto     = require("crypto");
 const axios      = require("axios");
 const nodemailer  = require("nodemailer");
 const { OAuth2Client } = require("google-auth-library");
+const cron = require("node-cron");
+const { Expo } = require("expo-server-sdk");
+const expo = new Expo();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const cocoEngine = require("./coco-engine");
 const { CocoKnowledge, CocoMemory, CocoLearnLog, CocoTools, cocoRespond, processLearnQueue, seedCocoKnowledge } = cocoEngine;
@@ -86,6 +89,7 @@ mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true 
     console.log("[OK] MongoDB Atlas connected — DB: crabor");
     // Coco AI: seed knowledge + start ops crons
     seedCocoKnowledge().catch(e => console.log("[Coco] Seed:", e.message));
+    startCronJobs();
     setTimeout(() => startOpsCrons(io), 3000); // delay 3s để DB ổn định
     // Auto-seed admin nếu chưa có
     try {
@@ -230,6 +234,9 @@ const userSchema = new mongoose.Schema({
   emailVerified:   { type: Boolean, default: false },
   walletEarned:    { type: Number, default: 0, min: 0 },   // tổng tiền đã nhận vào ví
   fcmToken:        String,
+  pushToken:       { type: String, default: null },
+  pushPlatform:    { type: String, default: null },  // 'ios' | 'android'
+  pushUpdatedAt:   { type: Date,   default: null },
   profileComplete: { type: Boolean, default: false },
   dob:             { type: String, trim: true },
   gender:          { type: String, enum: ["male","female","other"] },
@@ -391,8 +398,6 @@ const shipperSchema = new mongoose.Schema({
   walletBalance: { type: Number, default: 0, min: 0 },
   walletEarned:  { type: Number, default: 0, min: 0 },
   approvedAt:  Date,
-  fcmToken:    { type: String, default: null },   // push notification token (mobile app)
-  fcmPlatform: { type: String, enum: ['ios','android',null], default: null },
 }, { timestamps: true });
 
 shipperSchema.index({ phone: 1 });
@@ -541,8 +546,6 @@ const foodPartnerSchema = new mongoose.Schema({
   walletBalance: { type: Number, default: 0, min: 0 },
   walletEarned:  { type: Number, default: 0, min: 0 },
   approvedAt:  Date,
-  fcmToken:    { type: String, default: null },   // push notification token (mobile app)
-  fcmPlatform: { type: String, enum: ['ios','android',null], default: null },
 }, { timestamps: true });
 
 foodPartnerSchema.index({ phone: 1 });
@@ -855,6 +858,114 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 // Gửi OTP qua SpeedSMS
+
+// ══════════════════════════════════════════════════════════════
+//  SURGE PRICING & PUSH NOTIFICATION HELPERS
+//  (tích hợp từ cron.js + push_route.js)
+// ══════════════════════════════════════════════════════════════
+
+const SURGE_PERIODS = [
+  { startH: 11, endH: 12, label: 'trưa' },
+  { startH: 19, endH: 20, label: 'tối'  },
+];
+const SURGE_MULTIPLIER = 1.5;
+
+function getSurgeMultiplier() {
+  const h = new Date().getHours();
+  const isSurge = SURGE_PERIODS.some(p => h >= p.startH && h < p.endH);
+  return { multiplier: isSurge ? SURGE_MULTIPLIER : 1.0, isSurge };
+}
+
+function calcDeliveryFee(baseFee) {
+  const { multiplier } = getSurgeMultiplier();
+  return Math.round(baseFee * multiplier);
+}
+
+async function getAllPushTokens() {
+  const users = await User.find({ pushToken: { $ne: null } }, { pushToken: 1 });
+  return users.map(u => u.pushToken).filter(t => t && Expo.isExpoPushToken(t));
+}
+
+async function sendPushToUsers(tokens, title, body, data = {}) {
+  const valid = tokens.filter(t => Expo.isExpoPushToken(t));
+  if (!valid.length) return 0;
+  const messages = valid.map(to => ({ to, title, body, data, sound: 'default', badge: 1 }));
+  const chunks = expo.chunkPushNotifications(messages);
+  let sent = 0;
+  for (const chunk of chunks) {
+    try {
+      const res = await expo.sendPushNotificationsAsync(chunk);
+      sent += chunk.length;
+    } catch(e) { console.error('[Push]', e.message); }
+  }
+  console.log('[Push] Sent ' + sent + '/' + valid.length + ': "' + title + '"');
+  return sent;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CRON JOBS — Surge notifications + Promos (Asia/Ho_Chi_Minh)
+// ══════════════════════════════════════════════════════════════
+
+function startCronJobs() {
+  // 10:45 — Cảnh báo trước giờ cao điểm trưa 15 phút
+  cron.schedule("45 10 * * 1-7", async () => {
+    try {
+      const tokens = await getAllPushTokens();
+      await sendPushToUsers(tokens, "⚡ Sắp vào giờ cao điểm!", "Đặt đồ ăn ngay trước 11h để được phí ship bình thường nhé! 🍜", { type: "surge_warning", screen: "Food" });
+    } catch(e) { console.error("[Cron] 10:45", e.message); }
+  }, { timezone: "Asia/Ho_Chi_Minh" });
+
+  // 11:00 — Giờ cao điểm trưa bắt đầu
+  cron.schedule("0 11 * * 1-7", async () => {
+    try {
+      const tokens = await getAllPushTokens();
+      await sendPushToUsers(tokens, "🔥 Giờ cao điểm trưa!", "Phí ship tăng 50% từ 11h-12h. Đặt ngay kẻo lỡ! 🍜", { type: "surge_start", screen: "Food" });
+    } catch(e) { console.error("[Cron] 11:00", e.message); }
+  }, { timezone: "Asia/Ho_Chi_Minh" });
+
+  // 18:45 — Cảnh báo trước giờ cao điểm tối
+  cron.schedule("45 18 * * 1-7", async () => {
+    try {
+      const tokens = await getAllPushTokens();
+      await sendPushToUsers(tokens, "⚡ Sắp vào giờ cao điểm tối!", "Đặt bữa tối trước 19h để tiết kiệm phí ship! 🌙", { type: "surge_warning", screen: "Food" });
+    } catch(e) { console.error("[Cron] 18:45", e.message); }
+  }, { timezone: "Asia/Ho_Chi_Minh" });
+
+  // 19:00 — Giờ cao điểm tối bắt đầu
+  cron.schedule("0 19 * * 1-7", async () => {
+    try {
+      const tokens = await getAllPushTokens();
+      await sendPushToUsers(tokens, "🌙 Giờ cao điểm tối bắt đầu!", "Phí ship tăng 50% từ 19h-20h. Đặt ngay! 🍜", { type: "surge_start", screen: "Food" });
+    } catch(e) { console.error("[Cron] 19:00", e.message); }
+  }, { timezone: "Asia/Ho_Chi_Minh" });
+
+  // 20:00 — Hết giờ cao điểm
+  cron.schedule("0 20 * * 1-7", async () => {
+    try {
+      const tokens = await getAllPushTokens();
+      await sendPushToUsers(tokens, "✅ Hết giờ cao điểm!", "Phí ship đã về bình thường. Đặt đồ ăn tối ngay! 🍽️", { type: "surge_end", screen: "Food" });
+    } catch(e) { console.error("[Cron] 20:00", e.message); }
+  }, { timezone: "Asia/Ho_Chi_Minh" });
+
+  // 09:00 Thứ 2 — Promo đầu tuần
+  cron.schedule("0 9 * * 1", async () => {
+    try {
+      const tokens = await getAllPushTokens();
+      await sendPushToUsers(tokens, "🎉 Khuyến mãi đầu tuần!", "Giảm 20% phí ship cho đơn từ 50k! Đặt ngay 🦀", { type: "weekly_promo", screen: "Food" });
+    } catch(e) { console.error("[Cron] Monday promo", e.message); }
+  }, { timezone: "Asia/Ho_Chi_Minh" });
+
+  console.log("[Cron] 6 jobs registered ✓ (Asia/Ho_Chi_Minh)");
+}
+
+
+
+async function sendPushToUser(userId, title, body, data = {}) {
+  const user = await User.findById(userId).select('pushToken');
+  if (!user?.pushToken || !Expo.isExpoPushToken(user.pushToken)) return 0;
+  return sendPushToUsers([user.pushToken], title, body, data);
+}
+
 
 // ══════════════════════════════════════════════════════════════
 //  EMAIL OTP — Phương án 2 (fallback khi SMS chưa dùng được)
@@ -1338,14 +1449,6 @@ app.get("/api/register/lookup", async (req, res) => {
 });
 
 // Health check
-// ── Version config — tăng khi release build APK mới ──────────
-const APP_VERSIONS = {
-  customer:    '1.0.0',
-  shipper:     '1.0.0',
-  partner:     '1.0.0',
-  releaseNote: 'Phiên bản đầu tiên của CRABOR App! 🦀',
-};
-
 app.get("/api/health", async (req, res) => {
   try {
     const dbState = ["disconnected","connected","connecting","disconnecting"][mongoose.connection.readyState] || "unknown";
@@ -1359,31 +1462,10 @@ app.get("/api/health", async (req, res) => {
       RideDriver.estimatedDocumentCount(),
       Order.estimatedDocumentCount(),
     ]);
-    res.json({
-      status: "ok", db: dbState,
+    res.json({ status: "ok", db: dbState,
       counts: { users, shippers, partners: gl+gv+cs+fp+rx, orders },
-      uptime: Math.floor(process.uptime()) + "s",
-      // ── App versions cho mobile update checker ──
-      version:         APP_VERSIONS.customer,
-      customerVersion: APP_VERSIONS.customer,
-      shipperVersion:  APP_VERSIONS.shipper,
-      partnerVersion:  APP_VERSIONS.partner,
-      releaseNote:     APP_VERSIONS.releaseNote,
-    });
+      uptime: Math.floor(process.uptime()) + "s" });
   } catch(e) { res.status(500).json({ status: "error", message: e.message }); }
-});
-
-// ── APK download redirect ─────────────────────────────────────
-// Đặt APK vào thư mục public/downloads/ hoặc set env vars
-app.get("/download/:appName", (req, res) => {
-  const urls = {
-    "customer-app.apk": process.env.CUSTOMER_APK_URL || null,
-    "shipper-app.apk":  process.env.SHIPPER_APK_URL  || null,
-    "partner-app.apk":  process.env.PARTNER_APK_URL  || null,
-  };
-  const url = urls[req.params.appName];
-  if (!url) return res.status(404).json({ error: "APK chưa được cấu hình. Set env CUSTOMER_APK_URL / SHIPPER_APK_URL / PARTNER_APK_URL" });
-  res.redirect(url);
 });
 
 // ══════════════════════════════════════════════════════
@@ -3456,222 +3538,57 @@ app.get("/api/nova/decisions", adminAuth, async (req,res) => {
 //  AUTH MỚI — Google OAuth + Form (thay thế OTP SMS)
 // ══════════════════════════════════════════════════════════════
 
-// POST /api/auth/google
-// Hỗ trợ 2 cách:
-//   { idToken }     — web (google-auth-library verify)
-//   { accessToken } — mobile React Native (Google Sign-In SDK)
+// POST /api/auth/google — xác thực Google ID token từ client
 app.post("/api/auth/google", async (req, res) => {
   try {
-    const { idToken, accessToken } = req.body;
-    if (!idToken && !accessToken)
-      return res.status(400).json({ success:false, message:"Thiếu idToken hoặc accessToken" });
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ success:false, message:"Thiếu idToken" });
 
-    let googleId, email, name, picture;
+    // Verify token với Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
 
-    if (idToken) {
-      // ── Web flow: verify ID token bằng google-auth-library ──
-      const ticket = await googleClient.verifyIdToken({
-        idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
-      const payload = ticket.getPayload();
-      ({ sub: googleId, email, name, picture } = payload);
-    } else {
-      // ── Mobile flow: verify access token qua Google userinfo ──
-      const gRes = await fetch(
-        `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`
-      );
-      if (!gRes.ok)
-        return res.status(401).json({ success:false, message:"Access token Google không hợp lệ" });
-      const gData = await gRes.json();
-      if (!gData.sub)
-        return res.status(401).json({ success:false, message:"Không lấy được thông tin Google" });
-      ({ sub: googleId, email, name, picture } = gData);
-    }
-
-    // ── Tìm hoặc tạo user ─────────────────────────────────────
+    // Tìm hoặc tạo user
     let user = await User.findOne({ $or: [{ googleId }, { email: email.toLowerCase() }] });
-    const isNewUser = !user;
-
-    if (isNewUser) {
+    if (!user) {
       user = await User.create({
         googleId,
-        email:         email.toLowerCase(),
-        fullName:      name,
-        avatar:        picture,
-        authMethod:    "google",
+        email:        email.toLowerCase(),
+        fullName:     name,
+        avatar:       picture,
+        authMethod:   "google",
         emailVerified: true,
-        phone:         "google_" + googleId.slice(-8),
-        status:        "active",
+        phone:        "google_" + googleId.slice(-8),
+        status:       "active",
       });
     } else if (!user.googleId) {
-      await User.findByIdAndUpdate(user._id, {
-        googleId, avatar: picture, emailVerified: true, authMethod: "google",
-      });
+      // Merge existing account với Google
+      await User.findByIdAndUpdate(user._id, { googleId, avatar: picture, emailVerified: true, authMethod: "google" });
     }
 
-    // ── Tạo session ───────────────────────────────────────────
     req.session.userId    = user._id;
     req.session.userPhone = user.phone;
-    await new Promise((resolve, reject) =>
-      req.session.save(e => e ? reject(e) : resolve())
-    );
+    await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
 
-    // ── Lấy cookie string trả về cho mobile app ───────────────
-    const setCookieHeader = res.getHeader("Set-Cookie");
-    const cookieStr = Array.isArray(setCookieHeader)
-      ? setCookieHeader[0]?.split(";")[0]
-      : (setCookieHeader || "").split(";")[0];
-
-    // needProfile = true nếu là user Google chưa có SĐT thật
-    const needProfile = !user.phone || user.phone.startsWith("google_");
-
-    return res.json({
+    res.json({
       success: true,
-      needProfile,
-      isNewUser,
-      cookie: cookieStr,   // mobile lưu vào AsyncStorage
       user: {
-        _id:          user._id,
-        fullName:     user.fullName || name,
-        email:        user.email,
-        phone:        user.phone || null,
-        avatar:       user.avatar || picture || null,
-        loyaltyPts:   user.loyaltyPts   || 0,
+        _id:      user._id,
+        fullName: user.fullName || name,
+        email:    user.email,
+        avatar:   user.avatar || picture,
+        loyaltyPts: user.loyaltyPts || 0,
         walletBalance: user.walletBalance || 0,
-        isNew:        isNewUser,
+        isNew:    !user.totalSpent,
       },
     });
-
   } catch(err) {
     console.error("[Google Auth]", err.message);
     res.status(401).json({ success:false, message:"Xác thực Google thất bại. Thử lại nhé!" });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════
-//  PUSH TOKEN — Lưu FCM token từ mobile app
-// ══════════════════════════════════════════════════════════════
-
-// POST /api/users/push-token — customer app
-app.post("/api/users/push-token", async (req, res) => {
-  try {
-    if (!req.session.userId) return res.status(401).json({ ok: false });
-    const { token, platform } = req.body;
-    if (!token) return res.status(400).json({ ok: false, message: "Thiếu token" });
-    await User.findByIdAndUpdate(req.session.userId, {
-      fcmToken: token,
-      fcmPlatform: platform || null,
-    });
-    res.json({ ok: true });
-  } catch(e) { res.status(500).json({ ok: false, message: e.message }); }
-});
-
-// POST /api/shipper/push-token — shipper app
-app.post("/api/shipper/push-token", async (req, res) => {
-  try {
-    if (!req.session.userId) return res.status(401).json({ ok: false });
-    const { token, platform } = req.body;
-    if (!token) return res.status(400).json({ ok: false, message: "Thiếu token" });
-    await Shipper.findByIdAndUpdate(req.session.userId, {
-      fcmToken: token,
-      fcmPlatform: platform || null,
-    });
-    res.json({ ok: true });
-  } catch(e) { res.status(500).json({ ok: false, message: e.message }); }
-});
-
-// POST /api/partner/push-token — partner app
-app.post("/api/partner/push-token", async (req, res) => {
-  try {
-    if (!req.session.partnerId && !req.session.userId)
-      return res.status(401).json({ ok: false });
-    const { token, platform } = req.body;
-    if (!token) return res.status(400).json({ ok: false, message: "Thiếu token" });
-    const partnerId = req.session.partnerId || req.session.userId;
-    // Thử update trên tất cả partner models (food, laundry, etc)
-    const updateData = { fcmToken: token, fcmPlatform: platform || null };
-    await Promise.allSettled([
-      FoodPartner.findByIdAndUpdate(partnerId, updateData),
-      GiatLa.findByIdAndUpdate(partnerId, updateData),
-      GiupViec.findByIdAndUpdate(partnerId, updateData),
-      ChinaShop.findByIdAndUpdate(partnerId, updateData),
-    ]);
-    res.json({ ok: true });
-  } catch(e) { res.status(500).json({ ok: false, message: e.message }); }
-});
-
-// ══════════════════════════════════════════════════════════════
-//  GOOGLE AUTH — SHIPPER (mobile app shipper đăng nhập Google)
-// ══════════════════════════════════════════════════════════════
-app.post("/api/auth/google/shipper", async (req, res) => {
-  try {
-    const { accessToken } = req.body;
-    if (!accessToken) return res.status(400).json({ success:false, message:"Thiếu accessToken" });
-
-    const gRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`);
-    if (!gRes.ok) return res.status(401).json({ success:false, message:"Token không hợp lệ" });
-    const { sub: googleId, email } = await gRes.json();
-
-    const shipper = await Shipper.findOne({ $or: [{ googleId }, { email: email?.toLowerCase() }] });
-    if (!shipper) return res.status(404).json({ success:false, message:"Không tìm thấy tài khoản shipper với email này. Vui lòng đăng ký trước." });
-
-    if (!shipper.googleId) {
-      await Shipper.findByIdAndUpdate(shipper._id, { googleId });
-    }
-
-    req.session.userId = shipper._id;
-    await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
-
-    const setCookieHeader = res.getHeader("Set-Cookie");
-    const cookieStr = Array.isArray(setCookieHeader)
-      ? setCookieHeader[0]?.split(";")[0]
-      : (setCookieHeader || "").split(";")[0];
-
-    res.json({ success:true, cookie: cookieStr, shipper: { _id: shipper._id, fullName: shipper.fullName, status: shipper.status } });
-  } catch(e) {
-    console.error("[Google Auth Shipper]", e.message);
-    res.status(500).json({ success:false, message:"Lỗi xác thực Google" });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════
-//  GOOGLE AUTH — PARTNER (mobile app partner đăng nhập Google)
-// ══════════════════════════════════════════════════════════════
-app.post("/api/auth/google/partner", async (req, res) => {
-  try {
-    const { accessToken } = req.body;
-    if (!accessToken) return res.status(400).json({ success:false, message:"Thiếu accessToken" });
-
-    const gRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`);
-    if (!gRes.ok) return res.status(401).json({ success:false, message:"Token không hợp lệ" });
-    const { sub: googleId, email } = await gRes.json();
-
-    if (!email) return res.status(400).json({ success:false, message:"Không lấy được email từ Google" });
-
-    // Tìm partner trên tất cả models
-    const emailQuery = { $or: [{ googleId }, { email: email.toLowerCase() }] };
-    const [fp, gl, gv, cs] = await Promise.all([
-      FoodPartner.findOne(emailQuery),
-      GiatLa.findOne(emailQuery),
-      GiupViec.findOne(emailQuery),
-      ChinaShop.findOne(emailQuery),
-    ]);
-    const partner = fp || gl || gv || cs;
-    if (!partner) return res.status(404).json({ success:false, message:"Không tìm thấy tài khoản đối tác với email này." });
-
-    req.session.partnerId = partner._id;
-    await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
-
-    const setCookieHeader = res.getHeader("Set-Cookie");
-    const cookieStr = Array.isArray(setCookieHeader)
-      ? setCookieHeader[0]?.split(";")[0]
-      : (setCookieHeader || "").split(";")[0];
-
-    res.json({ success:true, cookie: cookieStr, partner: { _id: partner._id, bizName: partner.bizName || partner.fullName, status: partner.status } });
-  } catch(e) {
-    console.error("[Google Auth Partner]", e.message);
-    res.status(500).json({ success:false, message:"Lỗi xác thực Google" });
   }
 });
 
@@ -3805,6 +3722,70 @@ app.post("/api/auth/reset-password", async (req, res) => {
   } catch(err) {
     res.status(500).json({ success:false, message:err.message });
   }
+});
+
+
+// ── PUSH TOKEN ENDPOINTS (từ push_route.js) ──────────────────
+
+// POST /api/users/push-token — lưu Expo push token
+app.post("/api/users/push-token", async (req, res) => {
+  try {
+    if (!req.session?.userId)
+      return res.json({ success: false, reason: "not_logged_in" });
+    const { token, platform } = req.body;
+    if (!token) return res.status(400).json({ message: "Thiếu token" });
+    await User.findByIdAndUpdate(req.session.userId, {
+      pushToken:      token,
+      pushPlatform:   platform || "unknown",
+      pushUpdatedAt:  new Date(),
+      fcmToken:       token, // backwards compat
+    });
+    res.json({ success: true });
+  } catch(e) {
+    console.error("[Push/Register]", e);
+    res.status(500).json({ message: "Lỗi lưu push token" });
+  }
+});
+
+// DELETE /api/users/push-token — xóa token khi logout
+app.delete("/api/users/push-token", async (req, res) => {
+  try {
+    if (!req.session?.userId) return res.json({ success: false });
+    await User.findByIdAndUpdate(req.session.userId, {
+      pushToken: null, pushPlatform: null, fcmToken: null,
+    });
+    res.json({ success: true });
+  } catch(e) {
+    console.error("[Push/Unregister]", e);
+    res.status(500).json({ message: "Lỗi xóa push token" });
+  }
+});
+
+// GET /api/surge — surge info cho app (Coco/Nova dùng)
+app.get("/api/surge", (req, res) => {
+  const { multiplier, isSurge } = getSurgeMultiplier();
+  const h = new Date().getHours();
+  const period = SURGE_PERIODS.find(p => h >= p.startH && h < p.endH);
+  res.json({
+    success: true,
+    isSurge,
+    multiplier,
+    message: isSurge ? `⚡ Giờ cao điểm \${period?.label||''} — phí ship tăng 50%` : null,
+    nextSurge: SURGE_PERIODS.find(p => h < p.startH)?.startH || null,
+  });
+});
+
+// POST /api/admin/notify — admin gửi thông báo thủ công
+app.post("/api/admin/notify", adminAuth, async (req, res) => {
+  try {
+    const { title, body, target = "all", data = {} } = req.body;
+    if (!title || !body) return res.status(400).json({ success:false, message:"Thiếu title/body" });
+    const tokens = await getAllPushTokens();
+    const sent = await sendPushToUsers(tokens, title, body, { type:"admin_broadcast", ...data });
+    // Emit socket broadcast
+    req.io.emit("cocoNotification", { title, body, data });
+    res.json({ success:true, sent, total: tokens.length });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
 });
 
 
