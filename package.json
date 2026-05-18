@@ -16,14 +16,16 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "google-auth-library": "^9.11.0",
     "mongoose": "^8.4.1",
     "socket.io": "^4.7.5",
     "nodemailer": "^6.9.14",
     "cheerio": "^1.0.0",
     "natural": "^6.12.0",
     "node-schedule": "^2.1.1",
-    "fuse.js": "^7.0.0"
+    "fuse.js": "^7.0.0",
+    "google-auth-library": "^9.0.0",
+    "node-cron": "^3.0.3",
+    "expo-server-sdk": "^3.13.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
