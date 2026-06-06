@@ -7309,6 +7309,14 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// ══════════════════════════════════════════════════════════════
+//  COCO AI v2 — Nâng cấp /api/coco/chat thành Groq-powered
+//  Thêm /api/nova/chat, /api/coco/conversations, /api/coco/history
+//  Chỉ cần thêm COCO_BRAIN=groq + GROQ_API_KEY vào .env để bật
+// ══════════════════════════════════════════════════════════════
+require('./server-coco-patch')(app, io);
+
 server.listen(PORT, async () => {
   const env = process.env.NODE_ENV || "development";
   console.log(`
