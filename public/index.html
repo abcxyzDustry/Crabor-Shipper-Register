@@ -996,29 +996,12 @@ footer{
           <div class="dl-store">Google Play</div>
         </div>
       </div>
-      <div class="dl-btn" onclick="window.location.href='/customer'">
-        <div class="dl-btn-icon">🌐</div>
-        <div class="dl-btn-text">
-          <div class="dl-small">Dùng ngay</div>
-          <div class="dl-store">Web App</div>
-        </div>
-      </div>
     </div>
     <p class="dl-note reveal">⚡ Hoàn toàn miễn phí · Không cần thẻ tín dụng · Đăng ký trong 30 giây</p>
   </div>
 </section>
 
 <!-- ═══ FOOTER ═══ -->
-<!-- Theme selector -->
-<div class="settings-theme-row">
-  <div class="settings-theme-label">🎨 Giao diện</div>
-  <div class="settings-theme-opts">
-    <button class="sth-btn" data-theme="dark"        onclick="themeSet('dark')">🌙 Dark</button>
-    <button class="sth-btn" data-theme="light"       onclick="themeSet('light')">☀️ Light</button>
-    <button class="sth-btn" data-theme="glass-dark"  onclick="themeSet('glass-dark')">🫧 Glass Dark</button>
-    <button class="sth-btn" data-theme="glass-light" onclick="themeSet('glass-light')">🪟 Glass Light</button>
-  </div>
-</div>
 <footer>
   <div class="footer-inner">
     <div class="footer-brand">
@@ -1266,196 +1249,6 @@ heroObserver.observe(heroSection);
 </script>
 
 <!-- ══════════════════════════════════════
-     CRABOR THEME SWITCHER
-══════════════════════════════════════ -->
-<style>
-/* ── Theme variables injected on <html> ── */
-html.theme-light {
-  --th-bg:       #f4f1eb;
-  --th-bg2:      #ffffff;
-  --th-bg3:      #ede9e0;
-  --th-card:     #ffffff;
-  --th-border:   rgba(0,0,0,.1);
-  --th-text:     #1a1a1a;
-  --th-muted:    #777;
-  --th-surface:  rgba(255,255,255,.9);
-  --th-coral:    #E8504A;
-  filter: none;
-}
-html.theme-dark {
-  --th-bg:       #0f0f18;
-  --th-bg2:      #1a1a28;
-  --th-bg3:      #20202e;
-  --th-card:     #1a1a28;
-  --th-border:   rgba(255,255,255,.08);
-  --th-text:     #F5F0DC;
-  --th-muted:    rgba(245,240,220,.45);
-  --th-surface:  rgba(26,26,40,.9);
-  --th-coral:    #E8504A;
-  filter: none;
-}
-html.theme-glass-dark {
-  --th-bg:       #0a0a12;
-  --th-bg2:      rgba(255,255,255,.04);
-  --th-bg3:      rgba(255,255,255,.02);
-  --th-card:     rgba(255,255,255,.06);
-  --th-border:   rgba(255,255,255,.12);
-  --th-text:     #F5F0DC;
-  --th-muted:    rgba(245,240,220,.5);
-  --th-surface:  rgba(255,255,255,.08);
-  --th-coral:    #E8504A;
-}
-html.theme-glass-light {
-  --th-bg:       #dce4f0;
-  --th-bg2:      rgba(255,255,255,.35);
-  --th-bg3:      rgba(255,255,255,.2);
-  --th-card:     rgba(255,255,255,.45);
-  --th-border:   rgba(255,255,255,.6);
-  --th-text:     #1a1a2e;
-  --th-muted:    rgba(30,30,60,.5);
-  --th-surface:  rgba(255,255,255,.55);
-  --th-coral:    #c93d37;
-}
-
-/* Glass effect — applies when glass theme active */
-html.theme-glass-dark body,
-html.theme-glass-light body {
-  background-attachment: fixed;
-}
-html.theme-glass-dark body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(232,80,74,.18) 0%, transparent 65%),
-    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(100,149,237,.15) 0%, transparent 65%),
-    radial-gradient(ellipse 40% 60% at 60% 30%, rgba(240,180,41,.1) 0%, transparent 65%),
-    #0a0a12;
-}
-html.theme-glass-light body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(232,80,74,.2) 0%, transparent 65%),
-    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(100,149,237,.18) 0%, transparent 65%),
-    radial-gradient(ellipse 40% 60% at 60% 30%, rgba(240,180,41,.15) 0%, transparent 65%),
-    #dce4f0;
-}
-
-/* Glass card style */
-html.theme-glass-dark .panel,
-html.theme-glass-dark .card,
-html.theme-glass-dark .stat-card,
-html.theme-glass-dark .active-order,
-html.theme-glass-dark .hist-card,
-html.theme-glass-dark .wallet-card,
-html.theme-glass-dark .share-card,
-html.theme-glass-dark .ref-panel,
-html.theme-glass-dark .auth-card,
-html.theme-glass-dark .earn-stat-card,
-html.theme-glass-dark .prof-section {
-  background: rgba(255,255,255,.06) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255,255,255,.12) !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.1) !important;
-}
-html.theme-glass-light .panel,
-html.theme-glass-light .card,
-html.theme-glass-light .stat-card,
-html.theme-glass-light .active-order,
-html.theme-glass-light .hist-card,
-html.theme-glass-light .wallet-card,
-html.theme-glass-light .share-card,
-html.theme-glass-light .ref-panel,
-html.theme-glass-light .auth-card,
-html.theme-glass-light .earn-stat-card,
-html.theme-glass-light .prof-section {
-  background: rgba(255,255,255,.45) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255,255,255,.65) !important;
-  box-shadow: 0 8px 32px rgba(31,38,135,.1), inset 0 1px 0 rgba(255,255,255,.8) !important;
-}
-
-/* Light mode — override dark backgrounds */
-html.theme-light body {
-  background: #f4f1eb !important;
-  color: #1a1a1a !important;
-}
-html.theme-light .sidebar      { background: #fff !important; border-color: #eee !important; }
-html.theme-light .panel        { background: #fff !important; border-color: #eee !important; color: #1a1a1a !important; }
-html.theme-light .card         { background: #fff !important; }
-html.theme-light .auth-card    { background: #fff !important; }
-html.theme-light .topbar       { background: linear-gradient(135deg,#E8504A,#c93d37) !important; }
-html.theme-light .nav-item     { color: #555 !important; }
-html.theme-light .nav-item.active { color: #E8504A !important; background: rgba(232,80,74,.08) !important; }
-html.theme-light .stat-card    { background: #fff !important; border-color: #eee !important; }
-html.theme-light .reg-table tbody tr:hover { background: #fafafa !important; }
-html.theme-light .modal-body, html.theme-light #overlay .inner { background: #fff !important; }
-html.theme-light input, html.theme-light select { background: #f9f9f9 !important; color: #1a1a1a !important; border-color: #ddd !important; }
-html.theme-light .bottom-nav   { background: #fff !important; border-color: #eee !important; }
-html.theme-light .bn-item      { color: #aaa !important; }
-html.theme-light .bn-item.active { color: #E8504A !important; }
-
-
-
-/* ── Switcher panel ── */
-
-
-html.theme-light .theme-panel-divider { background: rgba(0,0,0,.07); }
-</style>
-
-
-
-<script>
-(function(){
-  const ICONS = { dark:'🌙', light:'☀️', 'glass-dark':'🫧', 'glass-light':'🪟' };
-  const THEMES = ['dark','light','glass-dark','glass-light'];
-  let _panelOpen = false;
-
-  function themeApply(t) {
-    const html = document.documentElement;
-    THEMES.forEach(th => html.classList.remove('theme-' + th));
-    html.classList.add('theme-' + t);
-    document.getElementById('themeIcon').textContent = ICONS[t] || '🌙';
-    document.querySelectorAll('.theme-opt').forEach(el => {
-      el.classList.toggle('active', el.dataset.theme === t);
-    });
-    localStorage.setItem('crabor_theme', t);
-  }
-
-  window.themeSet = function(t) {
-    themeApply(t);
-    // Update active state on inline buttons
-    document.querySelectorAll('.sth-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.theme === t);
-    });
-    // Close panel if open
-    if (typeof _panelOpen !== 'undefined') _panelOpen = false;
-    const panel = document.getElementById('themeSwitcherPanel');
-    if (panel) panel.classList.remove('open');
-  };
-
-  window.themeTogglePanel = function() {
-    // Panel removed - theme now in settings
-  };
-
-  // Close panel on outside click
-  document.addEventListener('click', function(e) {
-    if(_panelOpen && !e.target.closest('#themeSwitcherPanel')) {
-      _panelOpen = false;
-      document.getElementById('themeSwitcherPanel').classList.remove('open');
-    }
-  });
-
-  // Init from localStorage
-  const saved = localStorage.getItem('crabor_theme') || 'dark';
-  themeApply(saved);
-})();
-</script>
-
-
-<!-- ════════════════════════════════════
      CRABOR CHATBOT WIDGET
 ════════════════════════════════════ -->
 <style>
@@ -1487,21 +1280,6 @@ html.theme-light .theme-panel-divider { background: rgba(0,0,0,.07); }
 .cb-input:focus{border-color:#E8504A}
 .cb-send{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#E8504A,#c93d37);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
 .cb-send:disabled{opacity:.5;cursor:not-allowed}
-
-/* ── Inline theme selector in settings ── */
-.settings-theme-row { margin: 14px 0; }
-.settings-theme-label { font-size:.75rem; font-weight:900; text-transform:uppercase; letter-spacing:.8px; color:var(--muted,#888); margin-bottom:8px; }
-.settings-theme-opts { display:flex; gap:8px; flex-wrap:wrap; }
-.sth-btn {
-  padding:7px 14px; border-radius:50px;
-  border:1.5px solid rgba(232,80,74,.25);
-  background:rgba(232,80,74,.06);
-  color:var(--cream,#333); font-size:.78rem; font-weight:800;
-  cursor:pointer; font-family:inherit; transition:.15s; white-space:nowrap;
-}
-.sth-btn:hover { background:rgba(232,80,74,.18); border-color:#E8504A; }
-.sth-btn.active { background:#E8504A; color:#fff; border-color:#E8504A; }
-html.theme-light .sth-btn { color:#333; }
 </style>
 
 <button class="crabot-fab" id="crabotFab" onclick="toggleCrabot()">🦀<div class="cb-badge" id="crabotBadge"></div></button>
@@ -1664,7 +1442,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 })();
 </script>
-
 
   <!-- Coco AI Widget v2 (Groq-powered) -->
   <script src="/coco-widget.js"></script>
