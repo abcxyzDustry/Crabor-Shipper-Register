@@ -86,7 +86,7 @@ VỀ CRABOR:
 - Founder: Kiều Thanh Hải — sinh viên năm 2 Logistics, Đại học Đại Nam, Hà Nội
 - 20 tuổi, tự học code từ 0, một mình xây toàn bộ hệ thống
 - Dịch vụ: Giao đồ ăn 🍜 | Giặt là 👕 | Giúp việc 🧹 | China Shop 🛍️ | Xe công nghệ 🚗
-- Ra mắt: Tháng 7/2025 tại Hà Nội
+- Ra mắt: Tháng 7/2026 tại Hà Nội
 - Ví Trả Sau: dùng tháng này trả ngày 15 tháng sau (trễ +30k, trả góp +10%)
 - Vay nhanh: 1M-50M, lãi 1.5%/tháng, cần giao dịch từ 2M để mở
 - Shipper: Early Bird 500k (hoàn sau 1000 đơn), Standard 700k
