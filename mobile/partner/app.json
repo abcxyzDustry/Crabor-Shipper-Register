@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "CRABOR Partner",
+    "slug": "crabor-partner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E8504A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.crabor.partner",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "CRABOR cần vị trí để shipper tìm đến cửa hàng của bạn.",
+        "NSLocationAlwaysUsageDescription": "CRABOR cần vị trí để chia sẻ cho shipper khi nhận đơn."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#E8504A"
+      },
+      "package": "com.crabor.partner",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#E8504A"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "CRABOR cần vị trí để shipper tìm đến cửa hàng.",
+          "locationWhenInUsePermission": "CRABOR cần vị trí để shipper tìm đến cửa hàng."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1a4e2ec1-5a6d-4257-ab47-bf01d99b8201"
+      }
+    },
+    "owner": "haikieu"
+  }
+}
