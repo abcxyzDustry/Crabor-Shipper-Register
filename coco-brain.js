@@ -2,22 +2,22 @@
  * COCO BRAIN v2 — Não thật của Coco (CRABOR AI Agent)
  *
  * Kiến trúc:
- *   - Groq API (Llama 3.3 70B) = suy luận chính, miễn phí 14k req/day
+ *   - OpenRouter API (Llama 3.3 70B Instruct FREE) = suy luận chính, miễn phí
  *   - Conversation Manager     = MongoDB lưu lịch sử chat theo session
  *   - Context Injector         = ghép dữ liệu thật của user vào prompt
  *   - Tool Router              = kết nối Coco với CocoOps (dispatch, fraud, pricing...)
  *   - API Endpoints            = /api/coco/chat, /api/coco/admin, /api/nova/chat
- *   - Fallback Chain           = Groq → Ollama → rule-based engine
+ *   - Fallback Chain           = OpenRouter → Ollama → rule-based engine
  *
  * Compatible với server.js hiện tại — drop-in replacement cho coco-brain.js cũ.
  *
  * Env vars cần có:
- *   GROQ_API_KEY      = gsk_xxx (bắt buộc để suy luận thật)
- *   COCO_BRAIN        = groq | ollama | rule (default: rule)
- *   GROQ_MODEL        = llama-3.3-70b-versatile (default)
- *   OLLAMA_URL        = http://vps:11434 (nếu dùng ollama)
- *   OLLAMA_MODEL      = llama3.1:8b
- *   ANTHROPIC_API_KEY = fallback cuối cùng
+ *   OPENROUTER_API_KEY = sk-or-v1-xxx (bắt buộc để suy luận thật)
+ *   COCO_BRAIN         = openrouter | ollama | rule (default: rule)
+ *   OPENROUTER_MODEL   = meta-llama/llama-3.3-70b-instruct:free (default)
+ *   OLLAMA_URL         = http://vps:11434 (nếu dùng ollama)
+ *   OLLAMA_MODEL       = llama3.1:8b
+ *   ANTHROPIC_API_KEY  = fallback cuối cùng
  */
 
 'use strict';
@@ -125,17 +125,18 @@ FORMAT: số liệu → nhận xét → khuyến nghị → hành động cụ t
 // ══════════════════════════════════════════════════════════════
 
 /**
- * Gọi Groq API
- * FREE: llama-3.3-70b-versatile, 14,400 req/day, 6000 tok/min
+ * Gọi OpenRouter API (OpenAI-compatible)
+ * FREE: meta-llama/llama-3.3-70b-instruct:free
+ * Docs: https://openrouter.ai/docs
  */
-async function callGroq(messages, systemPrompt, opts = {}) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error('GROQ_API_KEY chưa được cấu hình');
+async function callOpenRouter(messages, systemPrompt, opts = {}) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY chưa được cấu hình');
 
-  const model = opts.model || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const model = opts.model || process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
 
   const response = await axios.post(
-    'https://api.groq.com/openai/v1/chat/completions',
+    'https://openrouter.ai/api/v1/chat/completions',
     {
       model,
       messages: [
@@ -144,14 +145,15 @@ async function callGroq(messages, systemPrompt, opts = {}) {
       ],
       max_tokens:  opts.maxTokens  || 800,
       temperature: opts.temperature || 0.7,
-      stream: false,
     },
     {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type':  'application/json',
+        'Authorization':  `Bearer ${apiKey}`,
+        'Content-Type':   'application/json',
+        'HTTP-Referer':   'https://crabor.vn',   // hiện trên OpenRouter leaderboard
+        'X-Title':        'CRABOR Coco AI',
       },
-      timeout: 20000,
+      timeout: 30000,
     }
   );
 
@@ -160,8 +162,16 @@ async function callGroq(messages, systemPrompt, opts = {}) {
     text:    choice?.message?.content || '',
     model,
     tokens:  response.data.usage?.completion_tokens || 0,
-    backend: 'groq',
+    backend: 'openrouter',
   };
+}
+
+/**
+ * @deprecated Groq đã được thay bằng OpenRouter — giữ lại để backward-compat
+ */
+async function callGroq(messages, systemPrompt, opts = {}) {
+  console.warn('[Coco Brain] callGroq() deprecated → dùng callOpenRouter()');
+  return callOpenRouter(messages, systemPrompt, opts);
 }
 
 /**
@@ -409,8 +419,9 @@ async function cocoThink(messages, opts = {}) {
 
   // Try primary backend
   try {
-    if (backend === 'groq') {
-      result = await callGroq(messages, systemPrompt, opts);
+    if (backend === 'openrouter' || backend === 'groq') {
+      // 'groq' alias → openrouter (backward compat)
+      result = await callOpenRouter(messages, systemPrompt, opts);
     } else if (backend === 'ollama') {
       result = await callOllama(messages, systemPrompt, opts);
     } else if (backend === 'claude') {
@@ -420,8 +431,8 @@ async function cocoThink(messages, opts = {}) {
     lastError = err;
     console.error(`[Coco Brain] ${backend} error:`, err.message);
 
-    // Auto-fallback: groq/ollama → claude → rule
-    if (backend === 'groq' || backend === 'ollama') {
+    // Auto-fallback: openrouter/ollama → claude → rule
+    if (backend === 'openrouter' || backend === 'groq' || backend === 'ollama') {
       console.log('[Coco Brain] Fallback → Claude...');
       try {
         result = await callClaude(messages, systemPrompt, opts);
@@ -583,10 +594,10 @@ ${content.substring(0, 4000)}
 function mountCocoRoutes(app, io) {
 
   const AVAILABLE_MODELS = [
-    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', contextWindow: 128000, provider: 'groq' },
-    { id: 'llama-3.1-8b-instant',    name: 'Llama 3.1 8B Instant',    contextWindow: 128000, provider: 'groq' },
-    { id: 'mixtral-8x7b-32768',      name: 'Mixtral 8x7B',            contextWindow: 32768,  provider: 'groq' },
-    { id: 'gemma2-9b-it',            name: 'Gemma 2 9B',              contextWindow: 8192,   provider: 'groq' },
+    { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B Instruct (Free)', contextWindow: 65536,  provider: 'openrouter', free: true },
+    { id: 'meta-llama/llama-3.1-8b-instruct:free',  name: 'Llama 3.1 8B Instruct (Free)',  contextWindow: 131072, provider: 'openrouter', free: true },
+    { id: 'mistralai/mistral-7b-instruct:free',      name: 'Mistral 7B Instruct (Free)',    contextWindow: 32768,  provider: 'openrouter', free: true },
+    { id: 'google/gemma-3-4b-it:free',               name: 'Gemma 3 4B IT (Free)',          contextWindow: 8192,   provider: 'openrouter', free: true },
   ];
 
   // ─── Health ──────────────────────────────────────────────────
@@ -872,15 +883,15 @@ async function checkBrainStatus() {
   const backend = process.env.COCO_BRAIN || 'rule';
   const status = {
     backend,
-    canReason:  false,
-    model:      null,
-    latencyMs:  null,
-    groqKeySet: !!process.env.GROQ_API_KEY,
-    ollamaUrl:  process.env.OLLAMA_URL || null,
+    canReason:        false,
+    model:            null,
+    latencyMs:        null,
+    openrouterKeySet: !!process.env.OPENROUTER_API_KEY,
+    ollamaUrl:        process.env.OLLAMA_URL || null,
   };
 
   if (backend === 'rule') {
-    status.note = 'Phase 1: Rule-based engine. Set COCO_BRAIN=groq để bật suy luận thật.';
+    status.note = 'Phase 1: Rule-based engine. Set COCO_BRAIN=openrouter để bật suy luận thật.';
     return status;
   }
 
@@ -908,25 +919,26 @@ async function checkBrainStatus() {
 
 function printBrainSetupGuide() {
   const backend = process.env.COCO_BRAIN || 'rule';
-  const groqKey = process.env.GROQ_API_KEY;
 
   console.log('\n╔══════════════════════════════════════════╗');
   console.log('║   🧠  COCO BRAIN v2 STATUS                ║');
   console.log('╠══════════════════════════════════════════╣');
   console.log(`║  Backend : ${(backend + '                    ').slice(0,26)}║`);
 
+  const orKey = process.env.OPENROUTER_API_KEY;
+
   if (backend === 'rule') {
     console.log('║  Mode    : Phase 1 (rule-based)          ║');
     console.log('║                                          ║');
-    console.log('║  Để bật Groq (MIỄN PHÍ):               ║');
-    console.log('║    1. Đăng ký console.groq.com          ║');
-    console.log('║    2. Set COCO_BRAIN=groq               ║');
-    console.log('║    3. Set GROQ_API_KEY=gsk_xxx          ║');
-  } else if (backend === 'groq') {
-    console.log(`║  Key     : ${groqKey ? '✅ Configured              ' : '❌ MISSING! Set GROQ_API_KEY'}║`);
-    console.log('║  Model   : llama-3.3-70b-versatile       ║');
+    console.log('║  Để bật OpenRouter (MIỄN PHÍ):          ║');
+    console.log('║    1. Đăng ký openrouter.ai             ║');
+    console.log('║    2. Set COCO_BRAIN=openrouter          ║');
+    console.log('║    3. Set OPENROUTER_API_KEY=sk-or-xxx  ║');
+  } else if (backend === 'openrouter' || backend === 'groq') {
+    console.log(`║  Key     : ${orKey ? '✅ Configured              ' : '❌ MISSING! Set OPENROUTER_API_KEY'}║`);
+    console.log('║  Model   : llama-3.3-70b-instruct:free   ║');
     console.log('║  Mode    : Phase 2 — Real Reasoning ✅   ║');
-    console.log('║  Limit   : 14,400 req/day (FREE)         ║');
+    console.log('║  Limit   : FREE (rate limited per key)   ║');
   } else if (backend === 'ollama') {
     const url = process.env.OLLAMA_URL || 'http://localhost:11434';
     console.log(`║  URL     : ${url.slice(0,26)}     ║`);
@@ -956,7 +968,8 @@ module.exports = {
   CocoChat,
 
   // Backend adapters
-  callGroq,
+  callOpenRouter,
+  callGroq,      // deprecated alias → callOpenRouter
   callOllama,
   callClaude,
 };
