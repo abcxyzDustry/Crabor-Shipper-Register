@@ -2198,6 +2198,8 @@ app.post("/api/orders/:id/delivery-photo", async (req, res) => {
     req.io.to("admin").emit("orderUpdated", { orderId: order.orderId, status: "delivered" });
     // processReferralReward
     if (order.customerId) await processReferralReward(order.customerId, "user", req.io).catch(()=>{});
+    // Earn loyalty points
+    if (order.customerId && order.finalTotal) await earnLoyaltyPoints(order.customerId, order.finalTotal).catch(()=>{});
     res.json({ success: true, message: "Đã xác nhận giao thành công!" });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
@@ -2209,7 +2211,30 @@ app.get("/api/vouchers/validate", async (req, res) => {
   try {
     const { code, total, userId, module: mod } = req.query;
     if (!code) return res.status(400).json({ success: false });
-    const v = await Voucher.findOne({ code: code.toUpperCase().trim(), active: true });
+    const codeUpper = code.toUpperCase().trim();
+    
+    // Special handling for NEW user welcome code
+    if (codeUpper === 'NEW' && userId) {
+      const user = await User.findById(userId);
+      if (user && (!user.totalOrders || user.totalOrders === 0)) {
+        const orderTotal = Number(total) || 0;
+        const discount = Math.min(Math.round(orderTotal * 50 / 100), 50000); // 50% off, max 50k
+        return res.json({ 
+          success: true, 
+          discount, 
+          description: `Giảm 50% đơn đầu tiên (tối đa 50.000đ)`,
+          code: 'NEW',
+          type: 'percent',
+          value: 50,
+          maxDiscount: 50000,
+          isWelcomeCode: true
+        });
+      } else {
+        return res.status(400).json({ success: false, message: "Mã NEW chỉ dành cho khách hàng mới (chưa từng đặt hàng)" });
+      }
+    }
+    
+    const v = await Voucher.findOne({ code: codeUpper, active: true });
     if (!v) return res.status(404).json({ success: false, message: "Mã không tồn tại hoặc đã hết hạn" });
     if (new Date() > v.expiresAt) return res.status(400).json({ success: false, message: "Mã đã hết hạn" });
     if (v.usedCount >= v.usageLimit) return res.status(400).json({ success: false, message: "Mã đã dùng hết lượt" });
@@ -2725,6 +2750,18 @@ app.post("/api/support", async (req, res) => {
       req.io.to("admin").emit("SOS_ALERT", { ticketId: ticket._id, phone, orderId, message });
     }
     res.json({ success:true, ticketId: ticket._id, message:"Đã gửi yêu cầu hỗ trợ. Chúng tôi sẽ phản hồi trong 30 phút." });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// GET /api/support/my — Customer lấy lịch sử ticket hỗ trợ của mình
+app.get("/api/support/my", async (req, res) => {
+  try {
+    if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const tickets = await SupportTicket.find({ userId: req.session.userId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .select("-__v");
+    res.json({ success: true, data: tickets });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -7189,6 +7226,8 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
         orderId: order.orderId, status: "delivered",
         message: "Đồ đã được trả! Cảm ơn bạn đã dùng CRABOR Giặt là 👕",
       });
+      // Earn loyalty points
+      if (order.customerId && order.finalTotal) await earnLoyaltyPoints(order.customerId, order.finalTotal).catch(()=>{});
     }
 
     await order.save();
@@ -9053,6 +9092,9 @@ app.patch("/api/orders/:id/status", async (req, res) => {
         shipperEarn, partnerEarn,
         paymentMethod: order.paymentMethod,
       });
+      
+      // Earn loyalty points
+      if (order.customerId && order.finalTotal) await earnLoyaltyPoints(order.customerId, order.finalTotal).catch(()=>{});
     }
 
     await order.save();
@@ -9219,6 +9261,9 @@ app.post("/api/ride/:orderId/complete", async (req, res) => {
       message: "Chuyến đi hoàn thành! Cảm ơn bạn đã dùng CRABOR 🦀",
     });
     req.io.to("admin").emit("wallet_pending_approval", { orderId: order.orderId, shipperEarn, paymentMethod: order.paymentMethod });
+
+    // Earn loyalty points
+    if (order.customerId && order.finalTotal) await earnLoyaltyPoints(order.customerId, order.finalTotal).catch(()=>{});
 
     res.json({ success: true, message: "Hoàn thành chuyến!" });
   } catch (err) {
