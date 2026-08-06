@@ -6772,6 +6772,72 @@ app.post("/api/orders/:orderId/delivery-qr", async (req, res) => {
   }
 });
 
+// POST /api/orders/:orderId/customer-qr — Customer lấy QR SePay để thanh toán đơn của mình
+app.post("/api/orders/:orderId/customer-qr", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.userId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await Order.findOne({ orderId: req.params.orderId, customerId: req.session.userId });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+    if (order.paymentStatus === "paid")
+      return res.status(400).json({ success: false, message: "Đơn đã thanh toán rồi" });
+
+    const amount   = order.finalTotal || order.total || 0;
+    const sePayRef = "CRORD" + order.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase();
+    await Order.findByIdAndUpdate(order._id, { sePayRef });
+
+    const qrUrl = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${amount}&des=${encodeURIComponent(sePayRef)}`;
+
+    res.json({
+      success: true,
+      qrUrl,
+      sePayRef,
+      amount,
+      bankName:    "VIB",
+      accountNo:   "068394585",
+      accountName: "KIEU THANH HAI",
+      message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/orders/:orderId/customer-confirm-payment — Customer tự xác nhận đã chuyển khoản
+app.post("/api/orders/:orderId/customer-confirm-payment", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.userId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await Order.findOne({ orderId: req.params.orderId, customerId: req.session.userId });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+    if (order.paymentStatus === "paid")
+      return res.status(400).json({ success: false, message: "Đơn đã thanh toán rồi" });
+
+    order.paymentStatus = "pending_review";
+    order.paymentConfirmedAt = new Date();
+    order.paymentNote = req.body.note || "Khách tự xác nhận đã chuyển khoản";
+    order.statusHistory.push({ status: "payment_pending_review", by: "customer" });
+    await order.save();
+
+    // Thông báo admin kiểm tra
+    req.io.to("admin").emit("wallet_pending_approval", {
+      orderId: order.orderId,
+      type: "customer_manual_confirm",
+      message: `Đơn ${order.orderId} — Khách tự xác nhận đã chuyển khoản. Kiểm tra giúp.`,
+    });
+    if (order.shipperId) {
+      req.io.to(`shipper_${order.shipperId}`).emit("payment_confirmed", {
+        orderId: order.orderId, status: "pending_review",
+        message: "Khách đã chuyển khoản và chờ admin xác nhận.",
+      });
+    }
+
+    res.json({ success: true, message: "Đã ghi nhận. Admin sẽ xác nhận sớm." });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // POST /api/orders/:orderId/confirm-payment — Shipper xác nhận thủ công
 app.post("/api/orders/:orderId/confirm-payment", async (req, res) => {
   try {
@@ -7301,6 +7367,73 @@ app.post("/api/laundry/orders/:id/delivery-qr", async (req, res) => {
       accountName: "KIEU THANH HAI",
       message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
     });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/laundry/orders/:id/customer-qr — Customer lấy QR SePay thanh toán đơn giặt của mình
+app.post("/api/laundry/orders/:id/customer-qr", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.userId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await LaundryOrder.findOne({
+      $and: [
+        { $or: [{ orderId: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] },
+        { customerId: req.session.userId },
+      ]
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn giặt" });
+    if (order.paymentStatus === "paid")
+      return res.status(400).json({ success: false, message: "Đơn đã thanh toán rồi" });
+
+    const amount   = order.finalTotal || order.estimatedTotal || 0;
+    const sePayRef = "CRLAU" + order.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase();
+    await LaundryOrder.findByIdAndUpdate(order._id, { sePayRef });
+
+    const qrUrl = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${amount}&des=${encodeURIComponent(sePayRef)}`;
+
+    res.json({
+      success: true,
+      qrUrl,
+      sePayRef,
+      amount,
+      bankName:    "VIB",
+      accountNo:   "068394585",
+      accountName: "KIEU THANH HAI",
+      message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/laundry/orders/:id/customer-confirm-payment — Khách tự xác nhận đã chuyển khoản
+app.post("/api/laundry/orders/:id/customer-confirm-payment", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.userId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await LaundryOrder.findOne({
+      $and: [
+        { $or: [{ orderId: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] },
+        { customerId: req.session.userId },
+      ]
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn giặt" });
+    if (order.paymentStatus === "paid")
+      return res.status(400).json({ success: false, message: "Đơn đã thanh toán rồi" });
+
+    order.paymentStatus = "pending_review";
+    order.paymentConfirmedAt = new Date();
+    order.paymentNote = req.body.note || "Khách tự xác nhận đã chuyển khoản";
+    order.statusHistory.push({ status: "payment_pending_review", by: "customer" });
+    await order.save();
+
+    req.io.to("admin").emit("wallet_pending_approval", {
+      orderId: order.orderId,
+      type: "customer_manual_confirm",
+      message: `Đơn giặt ${order.orderId} — Khách tự xác nhận đã chuyển khoản. Kiểm tra giúp.`,
+    });
+
+    res.json({ success: true, message: "Đã ghi nhận. Admin sẽ xác nhận sớm." });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
