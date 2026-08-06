@@ -5537,10 +5537,18 @@ app.get("/api/orders", async (req, res) => {
     if (customerId) filter.customerId = customerId;
 
     const [data, total] = await Promise.all([
-      Order.find(filter).sort({ createdAt: -1 }).skip((page-1)*limit).limit(Number(limit)),
+      Order.find(filter).sort({ createdAt: -1 }).skip((page-1)*limit).limit(Number(limit)).lean(),
       Order.countDocuments(filter)
     ]);
-    res.json({ success: true, total, page: Number(page), data });
+    // Đảm bảo mọi order đều có field discount/finalTotal
+    const enriched = data.map(o => ({
+      ...o,
+      discount: o.discount || 0,
+      voucherCode: o.voucherCode || null,
+      voucherDiscount: o.voucherDiscount || 0,
+      finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
+    }));
+    res.json({ success: true, total, page: Number(page), data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -5573,7 +5581,15 @@ app.get("/api/orders/:id", async (req, res) => {
         }
       } catch(_) {}
     }
-    res.json({ success: true, order: { ...order, shipperInfo }, data: { ...order, shipperInfo } });
+    // Đảm bảo discount/finalTotal luôn có giá trị để frontend 3 app nhất quán
+    const enrichedOrder = {
+      ...order,
+      discount: order.discount || 0,
+      voucherCode: order.voucherCode || null,
+      voucherDiscount: order.voucherDiscount || 0,
+      finalTotal: order.finalTotal ?? Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0)),
+    };
+    res.json({ success: true, order: { ...enrichedOrder, shipperInfo }, data: { ...enrichedOrder, shipperInfo } });
   } catch(err) {
     console.error('[GET /api/orders/:id] Error:', err.message);
     res.status(500).json({ success: false, message: err.message });
@@ -5994,8 +6010,16 @@ app.get("/api/partner/orders", async (req, res) => {
   try {
     if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
     const orders = await Order.find({ partnerId: req.session.partnerId })
-      .sort({ createdAt: -1 }).limit(100);
-    res.json({ success: true, orders });
+      .sort({ createdAt: -1 }).limit(100).lean();
+    // Đảm bảo mọi order đều có field discount/finalTotal để partner app hiển thị nhất quán
+    const enriched = orders.map(o => ({
+      ...o,
+      discount: o.discount || 0,
+      voucherCode: o.voucherCode || null,
+      voucherDiscount: o.voucherDiscount || 0,
+      finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
+    }));
+    res.json({ success: true, orders: enriched });
   } catch(err) { res.status(500).json({ success:false, message: err.message }); }
 });
 
@@ -6059,8 +6083,13 @@ app.patch("/api/partner/orders/:id", async (req, res) => {
                 _id: order._id,
                 orderId: order.orderId,
                 items: order.items,
-                total: order.finalTotal || order.total,
+                total: order.total,
+                finalTotal: order.finalTotal,
+                discount: order.discount || 0,
+                voucherCode: order.voucherCode,
+                voucherDiscount: order.voucherDiscount || 0,
                 shipFee: order.shipFee || 0,
+                serviceFee: order.serviceFee || 0,
                 pickupAddress: order.partnerAddress || "Địa chỉ quán",
                 pickupLat, pickupLng,
                 deliveryAddress: order.address,
@@ -6149,7 +6178,8 @@ app.get("/api/partner/stats", async (req, res) => {
       const shipFee = o.shipFee || 0;
       const serviceFee = o.serviceFee || 0;
       const finalTotal = o.finalTotal || o.total || 0;
-      const partnerBase = Math.max(0, finalTotal - shipFee - serviceFee);
+      // FIX: Platform chịu discount → partnerBase = originalTotal (không trừ discount)
+      const partnerBase = Math.max(0, o.total || 0);
       const commissionPct = e?.commissionPct || 0;
       const platformFee = Math.round(partnerBase * commissionPct / 100);
       recentOrdersOut.push({
@@ -8498,17 +8528,21 @@ setInterval(async () => {
 const DEFAULT_COMMISSION = { food: 20, laundry: 18, cleaning: 15, china_shop: 12, ride: 10 };
 
 async function calcEarnings(order) {
-  const total      = order.finalTotal || order.total || 0;
+  const originalTotal = order.total      || 0;
+  const finalTotal    = order.finalTotal || (originalTotal + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
   const shipFee    = order.shipFee    || 0;
   const serviceFee = order.serviceFee || 0;
+  const discount   = order.discount    || 0;
   const module     = order.module     || 'food';
 
   // Platform fee 35% — shipper nhận 65% phí ship
   const PLATFORM_FEE_PCT = 35;
   const shipperEarn = Math.round(shipFee * (1 - PLATFORM_FEE_PCT / 100));
 
-  // Phần partner = total - shipFee - serviceFee (CRABOR giữ serviceFee)
-  const partnerBase = Math.max(0, total - shipFee - serviceFee);
+  // FIX: Platform chịu voucher discount → partner base = originalTotal (không trừ discount)
+  // Trước đây: partnerBase = finalTotal - shipFee - serviceFee = originalTotal - discount → partner mất tiền voucher
+  // Giờ: partnerBase = originalTotal → platform hấp thụ discount
+  const partnerBase = Math.max(0, originalTotal);
 
   // Lấy commission % từ DB theo partnerId + module, fallback về DEFAULT_COMMISSION
   let commissionPct = DEFAULT_COMMISSION[module] ?? 15;
@@ -8536,7 +8570,9 @@ async function calcEarnings(order) {
   const partnerEarn = Math.round(partnerBase * (1 - commissionPct / 100));
 
   // CRABOR giữ: serviceFee + commission trên partnerBase
-  const craborEarn = total - shipperEarn - partnerEarn;
+  // Platform hấp thụ discount: craborEarn = finalTotal - shipperEarn - partnerEarn
+  // (finalTotal đã trừ discount, nhưng partnerEarn vẫn dựa trên originalTotal)
+  const craborEarn = finalTotal - shipperEarn - partnerEarn;
 
   return { shipperEarn, partnerEarn, craborEarn, commissionPct, serviceFee };
 }
@@ -8706,8 +8742,13 @@ async function dispatchOrderToNearbyShippers(order, io) {
         _id: order._id,
         orderId: order.orderId,
         items: order.items,
-        total: order.finalTotal || order.total,
+        total: order.total,
+        finalTotal: order.finalTotal,
+        discount: order.discount || 0,
+        voucherCode: order.voucherCode,
+        voucherDiscount: order.voucherDiscount || 0,
         shipFee: order.shipFee,
+        serviceFee: order.serviceFee || 0,
         pickupAddress: order.partnerAddress || "Địa chỉ quán",
         pickupLat,
         pickupLng,
@@ -9030,6 +9071,8 @@ app.patch("/api/orders/:id/status", async (req, res) => {
       // Thông báo partner
       req.io.to(`partner_${order.partnerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "shipper_accepted",
+        total: order.total, finalTotal: order.finalTotal,
+        discount: order.discount || 0, voucherCode: order.voucherCode,
       });
     }
 
@@ -9041,6 +9084,8 @@ app.patch("/api/orders/:id/status", async (req, res) => {
       });
       req.io.to(`partner_${order.partnerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "picked_up",
+        total: order.total, finalTotal: order.finalTotal,
+        discount: order.discount || 0, voucherCode: order.voucherCode,
       });
     }
 
@@ -9514,7 +9559,15 @@ app.get("/api/shipper/active-orders", async (req, res) => {
       items: [{ name: `${o.packageName}`, qty: 1, price: o.finalTotal || o.estimatedTotal || 0 }],
       deadline: o.deadline,
     }));
-    res.json({ success: true, orders: [...mappedLaundry, ...foodOrders] });
+    // Enrich food orders với discount/finalTotal để shipper app hiển thị đúng
+    const enrichedFood = foodOrders.map(o => ({
+      ...o,
+      discount: o.discount || 0,
+      voucherCode: o.voucherCode || null,
+      voucherDiscount: o.voucherDiscount || 0,
+      finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
+    }));
+    res.json({ success: true, orders: [...mappedLaundry, ...enrichedFood] });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
