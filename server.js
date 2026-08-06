@@ -4940,10 +4940,11 @@ app.post("/api/partner/check-account", async (req, res) => {
     const { phone, email } = req.body;
     const query = phone ? { phone: normalizePhone(phone) } : { email: email?.toLowerCase().trim() };
     const models = [
-      { model: mongoose.models.GiatLa,      module: "giat_la" },
-      { model: mongoose.models.GiupViec,    module: "giup_viec" },
-      { model: mongoose.models.ChinaShop,   module: "china_shop" },
-      { model: mongoose.models.FoodPartner, module: "food_partner" },
+      { model: GiatLa,      module: "giat_la" },
+      { model: GiupViec,    module: "giup_viec" },
+      { model: ChinaShop,   module: "china_shop" },
+      { model: FoodPartner, module: "food_partner" },
+      { model: RideDriver,  module: "ride_driver" },
     ].filter(m => m.model);
     for (const { model, module } of models) {
       const p = await model.findOne(query).select("_id password status rejectReason");
@@ -4971,10 +4972,11 @@ app.post("/api/partner/set-password", async (req, res) => {
     }
     const query = phone ? { phone: normalizePhone(phone) } : { email: email?.toLowerCase().trim() };
     const models = [
-      { model: mongoose.models.GiatLa,      key: "giat_la" },
-      { model: mongoose.models.GiupViec,    key: "giup_viec" },
-      { model: mongoose.models.ChinaShop,   key: "china_shop" },
-      { model: mongoose.models.FoodPartner, key: "food_partner" },
+      { model: GiatLa,      key: "giat_la" },
+      { model: GiupViec,    key: "giup_viec" },
+      { model: ChinaShop,   key: "china_shop" },
+      { model: FoodPartner, key: "food_partner" },
+      { model: RideDriver,  key: "ride_driver" },
     ].filter(m => m.model);
     const bcrypt = require("bcryptjs");
     let foundPartner = null, foundModule = null;
@@ -5027,6 +5029,9 @@ app.post("/api/partner/login", async (req, res) => {
         if (!p.password) return res.status(400).json({ success: false, message: "Tài khoản chưa có mật khẩu. Vui lòng đặt mật khẩu." });
         const ok = await bcrypt.compare(password, p.password);
         if (!ok) return res.status(401).json({ success: false, message: "Mật khẩu không đúng" });
+        if (p.status === 'rejected') {
+          return res.status(403).json({ success: false, status: 'rejected', message: "Tài khoản bị từ chối" });
+        }
         req.session.userPhone = p.phone;
         req.session.partnerId = p._id;
         req.session.partnerModule = module;
@@ -6688,10 +6693,12 @@ app.post("/api/laundry/order", async (req, res) => {
     req.io.to(`partner_${providerId}`).emit("new_laundry_order", {
       order: {
         _id: order._id, orderId: order.orderId,
-        customerName: order.customerName, pickupAddress: order.pickupAddress,
+        customerName: order.customerName, customerPhone: order.customerPhone,
+        pickupAddress: order.pickupAddress,
         packageName: order.packageName, turnaround: order.turnaround,
         estimatedKg: order.estimatedKg, estimatedTotal: order.estimatedTotal,
-        deadline: order.deadline, note: order.note,
+        finalTotal: order.finalTotal, shipFee: order.shipFee, discount: order.discount,
+        deadline: order.deadline, note: order.note, paymentMethod: order.paymentMethod,
       }
     });
 
@@ -6713,7 +6720,15 @@ app.get("/api/laundry/orders/:id", async (req, res) => {
   try {
     const order = await LaundryOrder.findOne({ $or: [{ orderId: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] });
     if (!order) return res.status(404).json({ success: false });
-    res.json({ success: true, order });
+    const plain = order.toObject();
+    plain.module = "laundry";
+    // Gắn shipperInfo để customer app hiện bubble/map theo dõi
+    const activeShipperId = plain.shipperReturnId || plain.shipperId;
+    if (activeShipperId) {
+      const sh = await Shipper.findById(activeShipperId).select("fullName phone vehiclePlate location avatar").lean();
+      if (sh) plain.shipperInfo = sh;
+    }
+    res.json({ success: true, order: plain });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -6730,6 +6745,17 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
     });
     if (!order) return res.status(404).json({ success: false });
 
+    // ── Shipper nhận đơn: gán shipperId / shipperReturnId ──
+    if (isShipper) {
+      if (status === "shipper_picking" && !order.shipperId) {
+        order.shipperId = req.session.shipperId;
+        order.pickupTime = new Date();
+      }
+      if (status === "shipper_returning" && !order.shipperReturnId) {
+        order.shipperReturnId = req.session.shipperId;
+      }
+    }
+
     order.status = status;
     order.statusHistory.push({ status, by: isPartner?"partner":isShipper?"shipper":"customer", time: new Date() });
 
@@ -6744,9 +6770,15 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
     }
 
     if (status === "partner_accepted") {
-      // Partner nhận đơn → tìm shipper gần nhất đến địa chỉ khách
+      // Partner nhận đơn → tìm shipper gần nhất đến địa chỉ khách (5km, mở rộng dần)
       if (order.pickupLat && order.pickupLng) {
-        const nearby = await findNearbyShippers(order.pickupLat, order.pickupLng, 8, 5);
+        // Lấy toạ độ cửa hàng để shipper biết điểm trả sau khi lấy đồ
+        let partnerLat = null, partnerLng = null;
+        if (order.partnerId) {
+          const g = await GiatLa.findById(order.partnerId).select("lastLat lastLng").catch(() => null);
+          if (g?.lastLat) { partnerLat = g.lastLat; partnerLng = g.lastLng; }
+        }
+        const nearby = await findLaundryShippers(order.pickupLat, order.pickupLng, 5);
         if (nearby.length) {
           const pickupPayload = {
             type: "laundry_pickup_request",
@@ -6754,11 +6786,14 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
             pickupAddress: order.pickupAddress,
             pickupLat: order.pickupLat, pickupLng: order.pickupLng,
             partnerAddress: `${order.partnerName}`,
-            partnerLat: null, partnerLng: null,
+            partnerLat, partnerLng,
             customerName: order.customerName,
             customerPhone: order.customerPhone || "",
             packageName: order.packageName,
+            estimatedTotal: order.estimatedTotal || 0,
+            finalTotal: order.finalTotal || order.estimatedTotal || 0,
             shipFee: order.shipFee,
+            module: "laundry",
             timeout: 30,
           };
           for (const s of nearby) req.io.to(`shipper_${s._id}`).emit("order_request", pickupPayload);
@@ -6770,9 +6805,33 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
       });
     }
 
+    if (status === "shipper_picking") {
+      // Shipper đã nhận → thông báo cho customer (bubble + map) và partner
+      req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "shipper_picking",
+        shipperId: order.shipperId,
+        message: "Shipper đang đến lấy đồ của bạn!",
+      });
+      req.io.to(`partner_${order.partnerId}`).emit("laundry_shipper_picking", {
+        orderId: order.orderId, shipperId: order.shipperId,
+        message: "Shipper đang đến lấy đồ tại khách",
+      });
+    }
+
+    if (status === "picked_up_by_shipper") {
+      req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "picked_up_by_shipper",
+        message: "Shipper đã lấy đồ, đang mang đến cửa hàng giặt!",
+      });
+      req.io.to(`partner_${order.partnerId}`).emit("laundry_shipper_picked", {
+        orderId: order.orderId, message: "Shipper đang mang đồ đến cửa hàng",
+      });
+    }
+
     if (status === "at_partner") {
       // Shipper đã đưa đồ đến partner → partner bắt đầu countdown
       order.countdownStarted = new Date();
+      order.shipperReturnId = order.shipperReturnId || order.shipperId;
       req.io.to(`partner_${order.partnerId}`).emit("laundry_order_arrived", {
         orderId: order.orderId, packageName: order.packageName,
         turnaround: order.turnaround, deadline: order.deadline,
@@ -6798,24 +6857,49 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
         order.finalTotal = Math.round(finalKg * order.pricePerKg + order.shipFee - order.discount);
         order.estimatedKg = finalKg;
       }
-      // Tìm shipper đến lấy ở partner
-      const nearby = await findNearbyShippers(
-        order.pickupLat || 21.0285, order.pickupLng || 105.8542, 8, 5
-      );
+      // Ưu tiên shipper đã lấy đồ (đang chờ) trả; không có thì tìm shipper khác
       const returnPayload = {
         type: "laundry_return_request",
         orderId: order.orderId,
         pickupAddress: `${order.partnerName} — Lấy đồ đã giặt`,
         deliveryAddress: order.pickupAddress,
+        deliveryLat: order.pickupLat, deliveryLng: order.pickupLng,
         customerName: order.customerName,
+        customerPhone: order.customerPhone || "",
         packageName: order.packageName,
+        finalTotal: order.finalTotal || order.estimatedTotal || 0,
         shipFee: Math.round(order.shipFee / 2), // shipper về nhận 1 chiều
+        module: "laundry",
         timeout: 30,
       };
-      for (const s of nearby) req.io.to(`shipper_${s._id}`).emit("order_request", returnPayload);
+      if (order.shipperReturnId) {
+        // Ưu tiên shipper đã lấy đồ; nếu họ offline → tìm shipper gần khác
+        const assigned = await Shipper.findById(order.shipperReturnId).select("online isAccepting status").lean().catch(() => null);
+        const available = assigned && assigned.online && assigned.isAccepting && ["approved", "active"].includes(assigned.status);
+        if (available) {
+          req.io.to(`shipper_${order.shipperReturnId}`).emit("order_request", returnPayload);
+        } else {
+          const nearby = await findLaundryShippers(
+            order.pickupLat || 21.0285, order.pickupLng || 105.8542, 5
+          );
+          for (const s of nearby) req.io.to(`shipper_${s._id}`).emit("order_request", returnPayload);
+        }
+      } else {
+        const nearby = await findLaundryShippers(
+          order.pickupLat || 21.0285, order.pickupLng || 105.8542, 5
+        );
+        for (const s of nearby) req.io.to(`shipper_${s._id}`).emit("order_request", returnPayload);
+      }
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "ready_return",
         message: "Đồ đã sạch! Đang tìm shipper trả đồ về cho bạn...",
+      });
+    }
+
+    if (status === "shipper_returning") {
+      req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "shipper_returning",
+        message: "Shipper đang mang đồ sạch về cho bạn!",
       });
     }
 
@@ -6823,6 +6907,7 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
       order.deliveredAt = new Date();
       order.paymentStatus = order.paymentMethod === "cash" ? "paid" : order.paymentStatus;
       // Tính phân chia: đọc commission từ DB (mặc định 18%), tính serviceFee
+      order.module = "laundry";
       const { shipperEarn, partnerEarn } = await calcEarnings(order);
       if (order.shipperId)  await addToWalletQueue(order.orderId, order.shipperId,  "shipper",  shipperEarn, order.paymentMethod, `Giặt là ${order.orderId}`);
       if (order.partnerId)  await addToWalletQueue(order.orderId, order.partnerId,  "partner",  partnerEarn, order.paymentMethod, `Giặt là ${order.orderId}`);
@@ -6875,6 +6960,64 @@ app.patch("/api/laundry/orders/:id/cancel", async (req, res) => {
   }
 });
 
+
+// POST /api/laundry/orders/:id/delivery-qr — Shipper lấy QR thu tiền đơn giặt
+app.post("/api/laundry/orders/:id/delivery-qr", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await LaundryOrder.findOne({
+      $or: [{ orderId: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }]
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn giặt" });
+
+    const amount   = order.finalTotal || order.estimatedTotal || 0;
+    const sePayRef = "CRLAU" + order.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase();
+    await LaundryOrder.findByIdAndUpdate(order._id, { sePayRef });
+
+    const qrUrl = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${amount}&des=${encodeURIComponent(sePayRef)}`;
+
+    res.json({
+      success: true,
+      qrUrl,
+      sePayRef,
+      amount,
+      bankName:    "VIB",
+      accountNo:   "068394585",
+      accountName: "KIEU THANH HAI",
+      message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/laundry/orders/:id/confirm-payment — Shipper xác nhận đã thu tiền
+app.post("/api/laundry/orders/:id/confirm-payment", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await LaundryOrder.findOne({
+      $or: [{ orderId: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }]
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn giặt" });
+    if (order.paymentStatus === "paid")
+      return res.status(400).json({ success: false, message: "Đơn đã thanh toán rồi" });
+
+    order.paymentStatus = "pending_review";
+    order.paymentConfirmedAt = new Date();
+    order.paymentNote = req.body.note || "Shipper xác nhận";
+    order.statusHistory.push({ status: "payment_pending_review", by: "shipper" });
+    await order.save();
+
+    // Tính tiền và đưa vào wallet queue
+    const { shipperEarn, partnerEarn } = await calcEarnings({ ...order.toObject(), module: "laundry" });
+    if (order.shipperId)  await addToWalletQueue(order.orderId, order.shipperId,  "shipper", shipperEarn, order.paymentMethod, `Giặt là ${order.orderId}`);
+    if (order.partnerId)  await addToWalletQueue(order.orderId, order.partnerId,  "partner", partnerEarn, order.paymentMethod, `Giặt là ${order.orderId}`);
+
+    res.json({ success: true, message: "Đã ghi nhận thanh toán, chờ admin duyệt" });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
 
 // ── Helper: resolve GiatLa partner từ session ─────────────
 // Ưu tiên partnerId; nếu không khớp GiatLa thì fallback theo phone
@@ -8111,9 +8254,11 @@ async function calcEarnings(order) {
   return { shipperEarn, partnerEarn, craborEarn, commissionPct, serviceFee };
 }
 
-// ── Helper: thêm vào wallet pending queue ─────────────────────
+// ── Helper: thêm vào wallet pending queue (tránh trùng) ──────
 async function addToWalletQueue(orderId, recipientId, recipientType, amount, paymentMethod, note) {
   if (amount <= 0) return;
+  const exists = await WalletQueue.findOne({ orderId, recipientId, recipientType, amount, status: { $in: ["pending", "approved"] } }).lean().catch(() => null);
+  if (exists) return;
   await WalletQueue.create({ orderId, recipientId, recipientType, amount, paymentMethod, note });
 }
 
@@ -8127,6 +8272,18 @@ io.use((socket, next) => {
   socket.data.rooms = [];
   next();
 });
+
+// ── Helper: tìm shipper cho đơn giặt — 5km rồi mở rộng dần ──
+async function findLaundryShippers(lat, lng, baseRadiusKm = 5, limit = 5) {
+  const radii = [baseRadiusKm, Math.round(baseRadiusKm * 2), Math.round(baseRadiusKm * 3), Math.round(baseRadiusKm * 5)];
+  let best = [];
+  for (const r of radii) {
+    const found = await findNearbyShippers(lat, lng, r, limit);
+    if (found.length) { best = found; break; }
+    best = found.length ? found : best;
+  }
+  return best;
+}
 
 // ── Helper: find nearby shippers ─────────────────────────────
 async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5) {
@@ -9006,17 +9163,42 @@ app.post("/api/shipper/location", async (req, res) => {
   }
 });
 
-// GET /api/shipper/active-orders — Đơn đang active của shipper
+// GET /api/shipper/active-orders — Đơn đang active của shipper (food + laundry)
 app.get("/api/shipper/active-orders", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
-    await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
-    const orders = await Order.find({
-      shipperId: req.session.shipperId,
-      status: { $in: ["shipper_accepted", "picking_up", "picked_up", "delivering"] }
-    }).sort({ createdAt: -1 });
-    res.json({ success: true, orders });
+    const shipperId = req.session.shipperId;
+    const [foodOrders, laundryOrders] = await Promise.all([
+      Order.find({
+        shipperId,
+        status: { $in: ["shipper_accepted", "picking_up", "picked_up", "delivering"] }
+      }).sort({ createdAt: -1 }).lean(),
+      LaundryOrder.find({
+        shipperId,
+        status: { $in: ["shipper_picking", "picked_up_by_shipper", "at_partner", "washing", "countdown", "ready_return", "shipper_returning"] }
+      }).sort({ createdAt: -1 }).lean(),
+    ]);
+    const mappedLaundry = laundryOrders.map(o => ({
+      ...o,
+      module: "laundry",
+      orderId: o.orderId,
+      customerName: o.customerName,
+      customerPhone: o.customerPhone,
+      partnerName: o.partnerName,
+      address: o.pickupAddress,
+      addressLat: o.pickupLat, addressLng: o.pickupLng,
+      deliveryAddress: o.pickupAddress,
+      deliveryLat: o.pickupLat, deliveryLng: o.pickupLng,
+      partnerAddress: o.partnerName,
+      finalTotal: o.finalTotal || o.estimatedTotal || 0,
+      total: o.finalTotal || o.estimatedTotal || 0,
+      shipFee: o.shipFee,
+      packageName: o.packageName,
+      items: [{ name: `${o.packageName}`, qty: 1, price: o.finalTotal || o.estimatedTotal || 0 }],
+      deadline: o.deadline,
+    }));
+    res.json({ success: true, orders: [...mappedLaundry, ...foodOrders] });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -9132,7 +9314,7 @@ app.get("/api/admin/wallet-queue/stats", async (req, res) => {
       User.aggregate([{ $group: { _id: null, total: { $sum: "$walletBalance" } } }]),
       Promise.all([
         mongoose.models.FoodPartner?.aggregate([{ $group: { _id: null, total: { $sum: "$walletBalance" } } }]) || [],
-        mongoose.models.GiatLa?.aggregate([{ $group: { _id: null, total: { $sum: "$walletBalance" } } }]) || [],
+        mongoose.models.GiatLaPartner?.aggregate([{ $group: { _id: null, total: { $sum: "$walletBalance" } } }]) || [],
         mongoose.models.GiupViec?.aggregate([{ $group: { _id: null, total: { $sum: "$walletBalance" } } }]) || [],
         mongoose.models.ChinaShop?.aggregate([{ $group: { _id: null, total: { $sum: "$walletBalance" } } }]) || [],
       ]),
