@@ -2126,7 +2126,7 @@ app.get("/api/orders/my", async (req, res) => {
       .limit(50)
       .lean();
     
-    // Thêm tên nhà hàng cho mỗi đơn
+    // Thêm tên nhà hàng + enrich discount fields cho mỗi đơn
     const enrichedOrders = await Promise.all(orders.map(async (order) => {
       if (order.partnerId) {
         const partner = await FoodPartner.findById(order.partnerId).select('bizName');
@@ -2134,6 +2134,11 @@ app.get("/api/orders/my", async (req, res) => {
           order.partnerName = partner.bizName;
         }
       }
+      // FIX: Đảm bảo discount/finalTotal luôn có giá trị để customer app hiển thị nhất quán
+      order.discount      = order.discount || 0;
+      order.voucherCode   = order.voucherCode || null;
+      order.voucherDiscount = order.voucherDiscount || 0;
+      order.finalTotal    = order.finalTotal ?? Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
       return order;
     }));
     
@@ -5429,8 +5434,16 @@ app.patch("/api/users/profile", async (req, res) => {
 app.get("/api/users/:id/orders", async (req, res) => {
   try {
     const orders = await Order.find({ customerId: req.params.id })
-      .sort({ createdAt: -1 }).limit(50).select("-__v");
-    res.json({ success: true, data: orders });
+      .sort({ createdAt: -1 }).limit(50).select("-__v").lean();
+    // FIX: Enrich discount fields để frontend hiển thị đúng giá sau voucher
+    const enriched = orders.map(o => ({
+      ...o,
+      discount: o.discount || 0,
+      voucherCode: o.voucherCode || null,
+      voucherDiscount: o.voucherDiscount || 0,
+      finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
+    }));
+    res.json({ success: true, data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -8987,7 +9000,14 @@ app.post("/api/order", async (req, res) => {
     
     req.io.to("admin").emit("newOrderNotification", { orderId: order.orderId, module: order.module, total: order.finalTotal });
 
-    res.status(201).json({ success: true, order, orderId: order.orderId });
+    // FIX: Enrich discount fields trong response để customer app nhận đủ thông tin
+    const orderRes = order.toObject ? order.toObject() : order;
+    orderRes.discount = orderRes.discount || 0;
+    orderRes.voucherCode = orderRes.voucherCode || null;
+    orderRes.voucherDiscount = orderRes.voucherDiscount || 0;
+    orderRes.finalTotal = orderRes.finalTotal ?? Math.max(0, (orderRes.total||0) + (orderRes.shipFee||0) + (orderRes.serviceFee||0) - (orderRes.discount||0));
+
+    res.status(201).json({ success: true, order: orderRes, orderId: order.orderId });
   } catch (err) {
     console.error('[Create Order] Error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -9127,12 +9147,19 @@ app.patch("/api/orders/:id/status", async (req, res) => {
 
     await order.save();
 
+    // FIX: Enrich discount fields trước khi gửi cho các app
+    const orderObj = order.toObject();
+    orderObj.discount = orderObj.discount || 0;
+    orderObj.voucherCode = orderObj.voucherCode || null;
+    orderObj.voucherDiscount = orderObj.voucherDiscount || 0;
+    orderObj.finalTotal = orderObj.finalTotal ?? Math.max(0, (orderObj.total||0) + (orderObj.shipFee||0) + (orderObj.serviceFee||0) - (orderObj.discount||0));
+
     // Broadcast cho tất cả room đang track đơn này
     req.io.to(`order_${order.orderId}`).emit("orderStatusChanged", {
-      orderId: order.orderId, status, order,
+      orderId: order.orderId, status, order: orderObj,
     });
 
-    res.json({ success: true, order });
+    res.json({ success: true, order: orderObj });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
