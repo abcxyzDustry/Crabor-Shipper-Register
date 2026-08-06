@@ -179,13 +179,19 @@ async function searchKnowledge(query, intent = null) {
     if (ranked[0].score > 0.2) return ranked[0].doc;
   }
 
-  // 3. Full-text search fallback
-  const byText = await CocoKnowledge.find(
-    { $text: { $search: query }, active: true },
-    { score: { $meta: 'textScore' } }
-  ).sort({ score: { $meta: 'textScore' } }).limit(3);
+  // 3. Full-text search fallback (an toàn: nếu chưa có text index thì fallback regex)
+  try {
+    const byText = await CocoKnowledge.find(
+      { $text: { $search: query }, active: true },
+      { score: { $meta: 'textScore' } }
+    ).sort({ score: { $meta: 'textScore' } }).limit(3);
+    if (byText[0]) return byText[0];
+  } catch (_) { /* text index chưa sẵn sàng → fallback regex bên dưới */ }
 
-  return byText[0] || null;
+  const regex = new RegExp(tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'i');
+  const byRegex = await CocoKnowledge.find({ answer: regex, active: true })
+    .sort({ confidence: -1 }).limit(3);
+  return byRegex[0] || null;
 }
 
 // Fill template với variables

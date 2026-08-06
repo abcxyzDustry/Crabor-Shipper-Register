@@ -291,7 +291,97 @@ async function buildShipperContext(shipperId) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  3. BUILD ADMIN / NOVA CONTEXT — business intelligence
+//  3. BUILD PARTNER CONTEXT — dữ liệu realtime của đối tác
+// ══════════════════════════════════════════════════════════════
+async function buildPartnerContext(partnerId) {
+  if (!partnerId) return {};
+  const ctx = { userType: 'partner' };
+
+  try {
+    // Partner models — tìm đúng model chứa đối tác
+    const partnerModels = [
+      M('FoodPartner'), M('GiatLa'), M('GiupViec'), M('ChinaShop'), M('RideDriver'),
+    ].filter(Boolean);
+
+    for (const model of partnerModels) {
+      const p = await model.findById(partnerId)
+        .select('bizName fullName phone walletBalance totalSales totalOrders rating feePercent commission isAccepting status');
+      if (p) {
+        ctx.partnerId    = partnerId.toString();
+        ctx.name         = p.bizName || p.fullName || 'đối tác';
+        ctx.phone        = p.phone;
+        ctx.walletBal    = p.walletBalance || 0;
+        ctx.totalSales   = p.totalSales || 0;
+        ctx.totalOrders  = p.totalOrders || 0;
+        ctx.rating       = p.rating || 0;
+        ctx.feePercent   = p.feePercent || p.commission || 0;
+        ctx.isAccepting  = p.isAccepting !== false;
+        ctx.status       = p.status;
+        break;
+      }
+    }
+
+    // Đơn hàng gần nhất của partner
+    const Order = M('Order');
+    if (Order) {
+      const orders = await Order.find({ partnerId })
+        .sort({ createdAt: -1 }).limit(5)
+        .select('orderId module status finalTotal total serviceFee shipFee discount items createdAt deliveredAt cancelReason paymentMethod paymentStatus');
+
+      ctx.recentOrders = orders.map(o => ({
+        orderId:      o.orderId,
+        module:       MODULE_VI[o.module] || o.module,
+        status:       statusVi(o.status),
+        statusRaw:    o.status,
+        total:        vnd(o.finalTotal || o.total),
+        serviceFee:   vnd(o.serviceFee),
+        shipFee:      vnd(o.shipFee),
+        discount:     vnd(o.discount),
+        items:        o.items?.map(i => `${i.name} x${i.qty}`).join(', ') || '',
+        time:         timeAgo(o.createdAt),
+        createdAt:    o.createdAt,
+        deliveredAt:  o.deliveredAt,
+        cancelReason: o.cancelReason || null,
+        paymentMethod: o.paymentMethod,
+        paymentStatus: o.paymentStatus,
+      }));
+
+      const activeStatuses = ['pending','confirmed','preparing','partner_accepted','ready','shipper_accepted','picking_up','at_partner','picked_up','delivering'];
+      ctx.activeOrders = ctx.recentOrders.filter(o => activeStatuses.includes(o.statusRaw));
+
+      // Doanh thu hôm nay
+      const today = new Date(); today.setHours(0,0,0,0);
+      const todayAgg = await Order.aggregate([
+        { $match: { partnerId, createdAt: { $gte: today }, status: { $ne: 'cancelled' } } },
+        { $group: { _id: null, revenue: { $sum: '$finalTotal' }, count: { $sum: 1 } } },
+      ]);
+      ctx.todayRevenue = todayAgg[0]?.revenue || 0;
+      ctx.todayOrdersReal = todayAgg[0]?.count || 0;
+    }
+
+    // Giao dịch ví
+    const WalletTx = M('WalletTx');
+    if (WalletTx) {
+      const txs = await WalletTx.find({ ownerId: partnerId, ownerType: 'partner' })
+        .sort({ createdAt: -1 }).limit(5)
+        .select('type amount note createdAt');
+      ctx.recentWalletTx = txs.map(tx => ({
+        type:   tx.type,
+        amount: vnd(tx.amount),
+        note:   tx.note || '',
+        time:   timeAgo(tx.createdAt),
+      }));
+    }
+
+  } catch(err) {
+    console.error('[CocoDb] buildPartnerContext error:', err.message);
+  }
+
+  return ctx;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  4. BUILD ADMIN / NOVA CONTEXT — business intelligence
 // ══════════════════════════════════════════════════════════════
 async function buildAdminContext() {
   const ctx = {};
@@ -518,6 +608,42 @@ function buildContextString(ctx) {
     }
   }
 
+  // Partner context
+  if (ctx.userType === 'partner') {
+    lines.push(`\n[ĐỐI TÁC INFO]`);
+    lines.push(`• Tên: ${ctx.name}`);
+    if (ctx.phone)         lines.push(`• SĐT: ${ctx.phone}`);
+    if (ctx.walletBal !== undefined) lines.push(`• Ví đối tác: ${vnd(ctx.walletBal)}`);
+    if (ctx.feePercent)    lines.push(`• Phí nền tảng: ${ctx.feePercent}%`);
+    if (ctx.rating)        lines.push(`• Đánh giá: ${ctx.rating}⭐`);
+    if (ctx.totalOrders)   lines.push(`• Tổng đơn: ${ctx.totalOrders}`);
+    if (ctx.totalSales)    lines.push(`• Tổng doanh thu: ${vnd(ctx.totalSales)}`);
+    if (ctx.todayRevenue !== undefined) lines.push(`• Doanh thu hôm nay: ${vnd(ctx.todayRevenue)} (${ctx.todayOrdersReal || 0} đơn)`);
+    if (ctx.isAccepting === false) lines.push(`• ⚠️ Đang tạm dừng nhận đơn`);
+
+    if (ctx.activeOrders?.length) {
+      lines.push(`\n[ĐƠN ĐANG XỬ LÝ]`);
+      ctx.activeOrders.forEach(o =>
+        lines.push(`• ${o.orderId}: ${o.module} — ${o.status} — ${o.total} (${o.time})`)
+      );
+    }
+    if (ctx.recentOrders?.length) {
+      lines.push(`\n[LỊCH SỬ ĐƠN GẦN NHẤT]`);
+      ctx.recentOrders.slice(0,3).forEach(o => {
+        let line = `• ${o.orderId}: ${o.module} — ${o.status} — ${o.total} (${o.time})`;
+        if (o.items)        line += `\n  Sản phẩm: ${o.items}`;
+        if (o.cancelReason) line += `\n  Lý do huỷ: ${o.cancelReason}`;
+        lines.push(line);
+      });
+    }
+    if (ctx.recentWalletTx?.length) {
+      lines.push(`\n[GIAO DỊCH VÍ GẦN ĐÂY]`);
+      ctx.recentWalletTx.forEach(tx =>
+        lines.push(`• ${tx.type === 'credit' ? '➕' : '➖'} ${tx.amount} — ${tx.note} (${tx.time})`)
+      );
+    }
+  }
+
   // Admin context
   if (ctx.orders) {
     lines.push(`\n[NOVA ADMIN METRICS]`);
@@ -586,8 +712,7 @@ function detectDbIntent(text) {
 // ══════════════════════════════════════════════════════════════
 //  8. SMART QUERY — auto query đúng data theo intent
 // ══════════════════════════════════════════════════════════════
-async function smartQuery(text, userId) {
-  const { intent, orderId } = detectDbIntent(text);
+async function smartQuery(text, userId) {  const { intent, orderId } = detectDbIntent(text);
   const Order = M('Order');
   let extra = '';
 
@@ -655,15 +780,88 @@ async function smartQuery(text, userId) {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  8B. SMART QUERY PARTNER — truy vấn data riêng cho đối tác
+// ══════════════════════════════════════════════════════════════
+async function smartQueryPartner(text, partnerId) {
+  if (!partnerId) return { intent: 'general', extra: '' };
+  const t = text.toLowerCase();
+  const Order = M('Order');
+  let extra = '';
+
+  try {
+    // Tra đơn cụ thể của partner
+    const orderIdMatch = text.match(/ORD-[A-Z0-9-]+/i);
+    if (orderIdMatch) {
+      const o = await Order.findOne({ orderId: orderIdMatch[0].toUpperCase(), partnerId })
+        .select('orderId module status finalTotal total serviceFee shipFee discount items address customerName createdAt deliveredAt cancelReason paymentMethod paymentStatus');
+      if (o) {
+        extra = `\n[CHI TIẾT ĐƠN ${o.orderId}]\n`;
+        extra += `• Dịch vụ: ${MODULE_VI[o.module] || o.module}\n`;
+        extra += `• Khách: ${o.customerName || ''}\n`;
+        extra += `• Trạng thái: ${statusVi(o.status)}\n`;
+        extra += `• Sản phẩm:\n${o.items?.map(i => `  - ${i.name} x${i.qty} (${vnd(i.price)})`).join('\n') || '  (trống)'}\n`;
+        extra += `• Tạm tính: ${vnd(o.total)}\n`;
+        extra += `• Phí dịch vụ: ${vnd(o.serviceFee)}\n`;
+        extra += `• Phí ship: ${vnd(o.shipFee)}\n`;
+        extra += `• Giảm giá: ${vnd(o.discount)}\n`;
+        extra += `• Tổng cộng: ${vnd(o.finalTotal || o.total)}\n`;
+        extra += `• Thanh toán: ${o.paymentMethod || '?'} — ${o.paymentStatus === 'paid' ? '✅ Đã thanh toán' : '⏳ Chưa thanh toán'}\n`;
+        if (o.cancelReason) extra += `• Lý do huỷ: ${o.cancelReason}\n`;
+        extra += `• Đặt lúc: ${o.createdAt ? new Date(o.createdAt).toLocaleString('vi-VN') : '?'}`;
+      } else {
+        extra = `\n[Không tìm thấy đơn ${orderIdMatch[0].toUpperCase()} của đối tác này]`;
+      }
+      return { intent: 'lookup_order', extra };
+    }
+
+    // Đơn đang xử lý
+    if (/đơn.*đang|đang.*giao|đơn.*nào|đơn.*mới/.test(t)) {
+      const activeStatuses = ['pending','confirmed','preparing','partner_accepted','ready','shipper_accepted','picking_up','at_partner','picked_up','delivering'];
+      const actives = await Order.find({ partnerId, status: { $in: activeStatuses } })
+        .sort({ createdAt: -1 }).limit(5)
+        .select('orderId module status address finalTotal createdAt');
+      if (actives.length) {
+        extra = `\n[ĐƠN ĐANG XỬ LÝ — ${actives.length} đơn]\n`;
+        actives.forEach(o => {
+          extra += `• ${o.orderId}: ${MODULE_VI[o.module]||o.module} — ${statusVi(o.status)} — ${vnd(o.finalTotal)} — ${timeAgo(o.createdAt)}\n`;
+        });
+      } else {
+        extra = '\n[Không có đơn nào đang xử lý]';
+      }
+      return { intent: 'active_orders', extra };
+    }
+
+    // Doanh thu hôm nay
+    if (/doanh thu.*hôm nay|hôm nay.*doanh thu|thu nhập|kiếm.*bao nhiêu|doanh số/.test(t)) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const agg = await Order.aggregate([
+        { $match: { partnerId, createdAt: { $gte: today }, status: { $ne: 'cancelled' } } },
+        { $group: { _id: null, revenue: { $sum: '$finalTotal' }, count: { $sum: 1 } } },
+      ]);
+      const rev = agg[0]?.revenue || 0;
+      const cnt = agg[0]?.count || 0;
+      extra = `\n[DOANH THU HÔM NAY]\n• Số đơn: ${cnt}\n• Tổng doanh thu: ${vnd(rev)}`;
+      return { intent: 'revenue', extra };
+    }
+  } catch(err) {
+    console.error('[CocoDb] smartQueryPartner error:', err.message);
+  }
+
+  return { intent: 'general', extra };
+}
+
+// ══════════════════════════════════════════════════════════════
 //  EXPORTS
 // ══════════════════════════════════════════════════════════════
 module.exports = {
   buildUserContext,
   buildShipperContext,
+  buildPartnerContext,
   buildAdminContext,
   buildContextString,
   queryOrder,
   searchOrders,
   smartQuery,
+  smartQueryPartner,
   detectDbIntent,
 };

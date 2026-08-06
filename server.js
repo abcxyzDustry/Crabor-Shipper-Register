@@ -56,7 +56,7 @@ function buildSignedSessionCookie(sessionId) {
 
 // ── Helper: load session từ MongoDB bằng X-Session-ID (dùng khi cookie signature fail) ──
 async function loadSessionFromHeader(req, res) {
-  if (req.session?.shipperId || req.session?.userId || req.session?.adminId) return; // đã có session
+  if (req.session?.shipperId || req.session?.userId || req.session?.adminId || req.session?.partnerId) return; // đã có session
   const xSid = req.headers['x-session-id'];
   if (!xSid || xSid.length < 10) return;
   try {
@@ -68,6 +68,7 @@ async function loadSessionFromHeader(req, res) {
     if (sess.shipperId) { req.session.shipperId = sess.shipperId; req.session.userPhone = sess.userPhone; req.session.role = 'shipper'; }
     else if (sess.userId) { req.session.userId = sess.userId; req.session.role = sess.role; }
     else if (sess.adminId) { req.session.adminId = sess.adminId; req.session.role = 'admin'; }
+    else if (sess.partnerId) { req.session.partnerId = sess.partnerId; req.session.userPhone = sess.userPhone; req.session.partnerModule = sess.partnerModule; req.session.role = 'partner'; }
     console.log('[SessionFallback] Loaded from X-Session-ID:', xSid.substring(0,8) + '... role:', req.session.role);
     // Quan trọng: ghi đè session data vào đúng session doc của X-Session-ID
     // Sau đó tell client dùng đúng session này (thay vì tạo session mới mỗi request)
@@ -2912,8 +2913,8 @@ app.post("/api/auth/verify-otp-email/partner", async (req, res) => {
     // Tìm partner theo email
     let found = null, module = null;
     for (const [Model, mod] of [
-      [FoodPartner,'food_partner'],[GiatLa,'giat_la'],[GiupViec,'giup_viec'],
-      [ChinaShop,'china_shop'],
+      [GiatLa,'giat_la'],[GiupViec,'giup_viec'],
+      [ChinaShop,'china_shop'],[FoodPartner,'food_partner'],
     ]) {
       const p = await Model.findOne({ email: email.toLowerCase(), status: { $ne: "rejected" } });
       if (p) { found = p; module = mod; break; }
@@ -3646,55 +3647,81 @@ Nội dung: ${message}` }],
 //  Không dùng Anthropic API — tất cả chạy nội bộ
 // ══════════════════════════════════════════════════════════════
 
-// POST /api/coco/chat — chat với Coco
+// POST /api/coco/chat — chat với Coco (role-aware + đọc DB realtime)
 app.post("/api/coco/chat", async (req, res) => {
   try {
-    const { text, sessionId = "anon_"+Date.now() } = req.body;
-    if (!text?.trim()) return res.status(400).json({ success:false });
+    const { text, message, sessionId } = req.body || {};
+    const userInput = (message || text || '').trim();
+    if (!userInput) return res.status(400).json({ success:false, message:"Thiếu nội dung tin nhắn" });
 
-    // Lấy user context
-    let userCtx = {};
-    if (req.session.userId) {
-      const user = await User.findById(req.session.userId)
-        .select('fullName phone totalSpent loyaltyPts walletBalance');
-      if (user) userCtx = {
-        name:       user.fullName || 'bạn',
-        walletBal:  user.walletBalance||0,
-        loyaltyPts: user.loyaltyPts||0,
-        totalSpent: user.totalSpent||0,
-        phone:      user.phone,
+    // ── ROLE-AWARE DB CONTEXT (user / partner / shipper realtime) ──
+    const CocoDb = require('./coco-db');
+    let ctx = {}, smartExtra = '', role = 'customer';
+
+    if (req.session?.partnerId) {
+      role = 'partner';
+      ctx = await CocoDb.buildPartnerContext(req.session.partnerId).catch(() => ({}));
+      const q = await CocoDb.smartQueryPartner(userInput, req.session.partnerId).catch(() => ({ extra: '' }));
+      smartExtra = q.extra || '';
+    } else if (req.session?.shipperId) {
+      role = 'shipper';
+      ctx = await CocoDb.buildShipperContext(req.session.shipperId).catch(() => ({}));
+    } else if (req.session?.userId) {
+      role = 'customer';
+      ctx = await CocoDb.buildUserContext(req.session.userId).catch(() => ({}));
+      const q = await CocoDb.smartQuery(userInput, req.session.userId).catch(() => ({ extra: '' }));
+      smartExtra = q.extra || '';
+    }
+
+    const sid = sessionId || `coco_${(req.session?.userId || req.session?.partnerId || req.session?.shipperId || 'anon').toString().slice(0,8)}_${Date.now()}`;
+
+    // ── AI BRAIN — dùng DB context làm prompt ──
+    let response = null;
+    try {
+      const dbContextStr = CocoDb.buildContextString(ctx);
+      const enriched = {
+        ...ctx,
+        _dbContext: dbContextStr + (smartExtra ? '\n\n[KẾT QUẢ TRA CỨU]\n' + smartExtra : ''),
       };
+      const brainResult = await cocoThink(
+        [{ role:'user', content: userInput }],
+        { userContext: enriched, task:'chat', maxTokens:500 }
+      );
+      if (brainResult.canReason && brainResult.text) {
+        response = { text: brainResult.text, intent:'ai_reasoning', confidence:0.95, backend: brainResult.backend };
+      }
+    } catch(e) { console.error("[Coco Chat] Brain error:", e.message); }
+
+    // ── FALLBACK rule engine (không bao giờ để 500) ──
+    if (!response) {
+      try {
+        response = await cocoRespond({ text: userInput, sessionId: sid, userId: req.session.userId || null, userCtx: ctx });
+      } catch(e2) {
+        console.error("[Coco Chat] Engine error:", e2.message);
+        response = { text:"Em chưa có đủ thông tin để trả lời ngay, anh/chị thử hỏi lại hoặc gọi hotline để được hỗ trợ nhanh hơn nhé 🙏", intent:'fallback', confidence:0 };
+      }
     }
 
-    // Get/create session memory
-    let memory = await CocoMemory.findOne({ sessionId });
-    if (!memory) memory = await CocoMemory.create({ sessionId, userId: req.session.userId||null });
-
-    // Coco responds — dùng brain nếu có, fallback về rule-based
-    let response;
-    const brainResult = await cocoThink(
-      [{ role:'user', content:text }],
-      { userContext: userCtx, task:'chat', maxTokens:500 }
-    );
-    if (brainResult.canReason && brainResult.text) {
-      response = { text: brainResult.text, intent: 'ai_reasoning', confidence: 0.95, backend: brainResult.backend };
-    } else {
-      response = await cocoRespond({ text, sessionId, userId: req.session.userId, userCtx });
-    }
-
-    // Save to memory
-    memory.messages.push({ role:'user', text, intent: response.intent });
-    memory.messages.push({ role:'coco', text: response.text, intent: response.intent });
-    memory.turnCount++;
-    memory.lastActive = new Date();
-    if (memory.messages.length > 40) memory.messages = memory.messages.slice(-40);
-    await memory.save();
+    // ── Lưu memory (an toàn, không bao giờ block response) ──
+    try {
+      let memory = await CocoMemory.findOne({ sessionId: sid });
+      if (!memory) memory = await CocoMemory.create({ sessionId: sid, userId: req.session.userId || null });
+      memory.messages.push({ role:'user', text: userInput, intent: response.intent });
+      memory.messages.push({ role:'coco', text: response.text, intent: response.intent });
+      memory.turnCount++;
+      memory.lastActive = new Date();
+      if (memory.messages.length > 40) memory.messages = memory.messages.slice(-40);
+      await memory.save();
+    } catch(_) {}
 
     res.json({
       success: true,
       text: response.text,
+      message: response.text,
       intent: response.intent,
-      confidence: response.confidence,
+      confidence: response.confidence || 0.7,
+      sessionId: sid,
+      backend: response.backend || 'rule',
     });
   } catch(err) {
     console.error("[Coco Chat]", err.message);
@@ -3702,30 +3729,38 @@ app.post("/api/coco/chat", async (req, res) => {
   }
 });
 
-// POST /api/coco/hotline — Tổng đài AI Coco (multi-turn với memory)
+// POST /api/coco/hotline — Tổng đài AI Coco (multi-turn, DB context)
 app.post("/api/coco/hotline", async (req, res) => {
   try {
-    const { message, text: textField, sessionId } = req.body;
+    const { message, text: textField, sessionId } = req.body || {};
     const text = (textField || message || '').trim();
     if (!text) return res.status(400).json({ success:false });
 
+    const CocoDb = require('./coco-db');
     let userCtx = {};
-    if (req.session.userId) {
-      const user = await User.findById(req.session.userId).select('fullName phone totalSpent loyaltyPts walletBalance');
-      if (user) userCtx = { name:user.fullName||'anh/chị', walletBal:user.walletBalance||0, loyaltyPts:user.loyaltyPts||0, phone:user.phone };
-    }
+    if (req.session?.userId)      userCtx = await CocoDb.buildUserContext(req.session.userId).catch(() => ({}));
+    else if (req.session?.partnerId) userCtx = await CocoDb.buildPartnerContext(req.session.partnerId).catch(() => ({}));
+    else if (req.session?.shipperId) userCtx = await CocoDb.buildShipperContext(req.session.shipperId).catch(() => ({}));
 
     // Coco hotline — full reasoning mode nếu có
     let response;
-    const hotlineBrain = await cocoThink(
-      [{ role:'user', content:text }],
-      { userContext:userCtx, task:'chat', temperature:0.7,
-        systemPrompt: `Bạn là Coco, nhân viên tổng đài AI của CRABOR. Xưng "Coco" hoặc "em". Lịch sự, chuyên nghiệp, giải quyết vấn đề cụ thể. Tối đa 120 từ mỗi câu.${userCtx.name ? ' Khách hàng tên: '+userCtx.name+'.' : ''}${userCtx.walletBal !== undefined ? ' Số dư ví: '+userCtx.walletBal.toLocaleString('vi-VN')+'đ.' : ''}` }
-    );
-    if (hotlineBrain.canReason && hotlineBrain.text) {
-      response = { text: hotlineBrain.text, intent: 'hotline_ai' };
-    } else {
-      response = await cocoRespond({ text, sessionId, userId:req.session.userId, userCtx });
+    try {
+      const hotlineBrain = await cocoThink(
+        [{ role:'user', content:text }],
+        { userContext: userCtx, task:'chat', temperature:0.7,
+          systemPrompt: `Bạn là Coco, nhân viên tổng đài AI của CRABOR. Xưng "Coco" hoặc "em". Lịch sự, chuyên nghiệp, giải quyết vấn đề cụ thể. Tối đa 120 từ mỗi câu.${userCtx.name ? ' Khách hàng tên: '+userCtx.name+'.' : ''}${userCtx.walletBal !== undefined ? ' Số dư ví: '+Number(userCtx.walletBal||0).toLocaleString('vi-VN')+'đ.' : ''}` }
+      );
+      if (hotlineBrain.canReason && hotlineBrain.text) {
+        response = { text: hotlineBrain.text, intent: 'hotline_ai' };
+      }
+    } catch(_) {}
+
+    if (!response) {
+      try {
+        response = await cocoRespond({ text, sessionId, userId:req.session.userId || req.session.partnerId || req.session.shipperId, userCtx });
+      } catch(e2) {
+        response = { text:`Em đã ghi nhận yêu cầu của ${userCtx.name||'anh/chị'} ạ. Đội kỹ thuật sẽ phản hồi trong 30 phút. Anh/chị có cần hỗ trợ thêm gì không ạ?`, intent: 'unknown' };
+      }
     }
 
     // Thêm tông giọng tổng đài
@@ -4905,10 +4940,10 @@ app.post("/api/partner/check-account", async (req, res) => {
     const { phone, email } = req.body;
     const query = phone ? { phone: normalizePhone(phone) } : { email: email?.toLowerCase().trim() };
     const models = [
-      { model: mongoose.models.FoodPartner, module: "food_partner" },
       { model: mongoose.models.GiatLa,      module: "giat_la" },
       { model: mongoose.models.GiupViec,    module: "giup_viec" },
       { model: mongoose.models.ChinaShop,   module: "china_shop" },
+      { model: mongoose.models.FoodPartner, module: "food_partner" },
     ].filter(m => m.model);
     for (const { model, module } of models) {
       const p = await model.findOne(query).select("_id password status rejectReason");
@@ -4936,10 +4971,10 @@ app.post("/api/partner/set-password", async (req, res) => {
     }
     const query = phone ? { phone: normalizePhone(phone) } : { email: email?.toLowerCase().trim() };
     const models = [
-      { model: mongoose.models.FoodPartner, key: "food_partner" },
       { model: mongoose.models.GiatLa,      key: "giat_la" },
       { model: mongoose.models.GiupViec,    key: "giup_viec" },
       { model: mongoose.models.ChinaShop,   key: "china_shop" },
+      { model: mongoose.models.FoodPartner, key: "food_partner" },
     ].filter(m => m.model);
     const bcrypt = require("bcryptjs");
     let foundPartner = null, foundModule = null;
@@ -5308,6 +5343,7 @@ app.patch("/api/orders/:id/cancel", async (req, res) => {
       req.io.to(`shipper_${order.shipperId}`).emit("order_cancelled", {
         orderId: order.orderId,
         message: "Khách hàng đã hủy đơn hàng",
+        cancelReason: order.cancelReason || null,
       });
     }
     // Notify partner
@@ -5315,6 +5351,7 @@ app.patch("/api/orders/:id/cancel", async (req, res) => {
       req.io.to(`partner_${order.partnerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "cancelled",
         message: `Khách hủy: ${reason}`,
+        cancelReason: order.cancelReason || reason || null,
       });
     }
 
@@ -5781,12 +5818,15 @@ app.patch("/api/partner/orders/:id", async (req, res) => {
       order.cancelledAt = new Date();
       order.statusHistory.push({ status: "cancelled", by: "partner", time: new Date() });
       if (note) order.partnerNote = note;
+      if (note) order.cancelReason = note;
+      else if (!order.cancelReason) order.cancelReason = "Quán đã từ chối đơn hàng";
 
       // Thông báo customer
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId || order._id,
         status: "cancelled",
-        message: "Rất tiếc, quán đã từ chối đơn hàng của bạn.",
+        message: note ? `Rất tiếc, quán đã từ chối đơn hàng của bạn. Lý do: ${note}` : "Rất tiếc, quán đã từ chối đơn hàng của bạn.",
+        cancelReason: order.cancelReason,
       });
 
       await order.save();
@@ -5806,16 +5846,50 @@ app.get("/api/partner/stats", async (req, res) => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const [todayOrders, monthOrders, allOrders] = await Promise.all([
+    const [todayOrders, monthOrders, allOrders, recentOrders] = await Promise.all([
       Order.find({ partnerId:pid, createdAt:{$gte:todayStart}, status:"delivered" }),
       Order.find({ partnerId:pid, createdAt:{$gte:monthStart}, status:"delivered" }),
       Order.find({ partnerId:pid, status:"delivered" }).limit(500),
+      Order.find({ partnerId:pid }).sort({ createdAt:-1 }).limit(30),
     ]);
     const cancelled = await Order.countDocuments({ partnerId:pid, status:"cancelled" });
-    const todayRevenue = todayOrders.reduce((s,o)=>s+(o.partnerRevenue||o.total*0.8||0),0);
-    const monthRevenue = monthOrders.reduce((s,o)=>s+(o.partnerRevenue||o.total*0.8||0),0);
+
+    const sumEarnings = async (orders) => {
+      let s = 0;
+      for (const o of orders) { try { s += (await calcEarnings(o)).partnerEarn; } catch(e) { s += 0; } }
+      return s;
+    };
+    const todayRevenue = await sumEarnings(todayOrders);
+    const monthRevenue = await sumEarnings(monthOrders);
     const avgOrderValue = allOrders.length ? allOrders.reduce((s,o)=>s+(o.total||0),0)/allOrders.length : 0;
-    res.json({ success:true, todayRevenue, monthRevenue, todayOrders:todayOrders.length, cancelledOrders:cancelled, avgOrderValue, avgRating:"5.0" });
+
+    // Lịch sử đơn kèm chi tiết phí — KHÔNG hiển thị phí ship
+    const recentOrdersOut = [];
+    for (const o of recentOrders) {
+      const e = await calcEarnings(o).catch(() => null);
+      const shipFee = o.shipFee || 0;
+      const serviceFee = o.serviceFee || 0;
+      const finalTotal = o.finalTotal || o.total || 0;
+      const partnerBase = Math.max(0, finalTotal - shipFee - serviceFee);
+      const commissionPct = e?.commissionPct || 0;
+      const platformFee = Math.round(partnerBase * commissionPct / 100);
+      recentOrdersOut.push({
+        _id: o._id, orderId: o.orderId, module: o.module, status: o.status,
+        createdAt: o.createdAt, deliveredAt: o.deliveredAt,
+        total: o.total || 0, discount: o.discount || 0, finalTotal,
+        items: o.items || [], customerName: o.customerName,
+        partnerEarn: e?.partnerEarn || Math.round(partnerBase * (1 - commissionPct/100)),
+        platformFee,
+        commissionPct,
+      });
+    }
+
+    res.json({
+      success:true, todayRevenue, monthRevenue,
+      todayOrders:todayOrders.length, cancelledOrders:cancelled,
+      avgOrderValue, avgRating:"5.0",
+      recentOrders: recentOrdersOut,
+    });
   } catch(err) { res.status(500).json({ success:false, message: err.message }); }
 });
 
@@ -6501,6 +6575,7 @@ const laundryOrderSchema = new mongoose.Schema({
     default: "pending",
   },
   statusHistory: [{ status: String, by: String, time: { type: Date, default: Date.now } }],
+  cancelReason:  String,
   sePayRef:      String,
   note:          String,
 }, { timestamps: true });
@@ -6658,6 +6733,16 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
     order.status = status;
     order.statusHistory.push({ status, by: isPartner?"partner":isShipper?"shipper":"customer", time: new Date() });
 
+    if (status === "cancelled") {
+      if (note) order.cancelReason = note;
+      else if (!order.cancelReason) order.cancelReason = "Cửa hàng đã từ chối đơn hàng";
+      req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "cancelled",
+        message: order.cancelReason,
+        cancelReason: order.cancelReason,
+      });
+    }
+
     if (status === "partner_accepted") {
       // Partner nhận đơn → tìm shipper gần nhất đến địa chỉ khách
       if (order.pickupLat && order.pickupLng) {
@@ -6791,12 +6876,24 @@ app.patch("/api/laundry/orders/:id/cancel", async (req, res) => {
 });
 
 
+// ── Helper: resolve GiatLa partner từ session ─────────────
+// Ưu tiên partnerId; nếu không khớp GiatLa thì fallback theo phone
+// (trường hợp session.partnerId trỏ sang model khác như FoodPartner).
+async function findLaundryPartner(req) {
+  let p = null;
+  if (req.session?.partnerId) p = await GiatLa.findById(req.session.partnerId).catch(() => null);
+  if (!p && req.session?.userPhone) p = await GiatLa.findOne({ phone: normalizePhone(req.session.userPhone) });
+  return p;
+}
+
 // GET /api/laundry/partner/orders — Partner xem đơn giặt của mình
 app.get("/api/laundry/partner/orders", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success: false });
+    await loadSessionFromHeader(req, res);
+    const partner = await findLaundryPartner(req);
+    if (!partner) return res.status(401).json({ success: false });
     const { status } = req.query;
-    const filter = { partnerId: req.session.partnerId };
+    const filter = { partnerId: partner._id };
     if (status) filter.status = status;
     const orders = await LaundryOrder.find(filter).sort({ createdAt: -1 }).limit(50);
     res.json({ success: true, orders });
@@ -6807,16 +6904,17 @@ app.get("/api/laundry/partner/orders", async (req, res) => {
 app.patch("/api/laundry/partner/packages", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
-    if (!req.session.partnerId) return res.status(401).json({ success: false, message: "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại." });
     const { packages } = req.body;
     if (!Array.isArray(packages)) return res.status(400).json({ success: false, message: "packages phải là array" });
     // Đảm bảo partnerId đúng với GiatLa (không phải FoodPartner)
-    const updated = await GiatLa.findByIdAndUpdate(req.session.partnerId, { packages }, { new: true, runValidators: false });
-    if (!updated) {
-      // Thử tìm lại qua FoodPartner và các model khác
+    let partner = await findLaundryPartner(req);
+    if (!partner) {
+      // Thử tìm lại qua các model khác để báo lỗi rõ hơn
       return res.status(404).json({ success: false, message: "Không tìm thấy tài khoản giặt là. Bạn có đang dùng đúng tài khoản?" });
     }
-    console.log("[PATCH /laundry/partner/packages] Updated", packages.length, "packages for partner", req.session.partnerId);
+    partner.packages = packages;
+    const updated = await partner.save();
+    console.log("[PATCH /laundry/partner/packages] Updated", packages.length, "packages for partner", partner._id);
     res.json({ success: true, packages: updated.packages });
   } catch (err) {
     console.error("[PATCH /laundry/partner/packages]", err.message);
@@ -6827,9 +6925,12 @@ app.patch("/api/laundry/partner/packages", async (req, res) => {
 // PATCH /api/laundry/partner/accepting — Partner bật/tắt nhận đơn
 app.patch("/api/laundry/partner/accepting", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success: false });
+    await loadSessionFromHeader(req, res);
+    const partner = await findLaundryPartner(req);
+    if (!partner) return res.status(401).json({ success: false });
     const { accepting } = req.body;
-    await GiatLa.findByIdAndUpdate(req.session.partnerId, { isAccepting: accepting });
+    partner.isAccepting = accepting;
+    await partner.save();
     res.json({ success: true, isAccepting: accepting });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -6837,8 +6938,8 @@ app.patch("/api/laundry/partner/accepting", async (req, res) => {
 // GET /api/laundry/partner/me — Partner xem thông tin của mình
 app.get("/api/laundry/partner/me", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success: false });
-    const p = await GiatLa.findById(req.session.partnerId);
+    await loadSessionFromHeader(req, res);
+    const p = await findLaundryPartner(req);
     res.json({ success: true, partner: p });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -8422,6 +8523,7 @@ app.patch("/api/orders/:id/status", async (req, res) => {
         req.io.to(`shipper_${order.shipperId}`).emit("order_cancelled", {
           orderId: order.orderId,
           message: "Khách hàng đã hủy đơn hàng",
+          cancelReason: order.cancelReason || null,
         });
       }
       req.io.to(`partner_${order.partnerId}`).emit("order_status_update", {
