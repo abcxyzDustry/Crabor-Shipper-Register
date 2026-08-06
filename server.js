@@ -5531,22 +5531,27 @@ app.patch("/api/products/:id", adminAuth, async (req, res) => {
 // POST /api/orders — Tạo đơn mới
 app.post("/api/orders", async (req, res) => {
   try {
-    const { module = "food", items, address, district, paymentMethod, note, customerId, addressLat, addressLng, partnerLat, partnerLng, partnerName, partnerAddress } = req.body;
+    const { module = "food", items, address, district, paymentMethod, note, customerId, addressLat, addressLng, partnerLat, partnerLng, partnerName, partnerAddress, voucherCode, voucherDiscount, shipFee: clientShipFee } = req.body;
 
     const uid = customerId || req.session.userId;
     if (!uid) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
 
-    // Tính tổng
-    const total = (items || []).reduce((s, i) => s + i.price * i.qty, 0);
-    const shipFee = total >= 150000 ? 0 : 15000;
-    const serviceFee = Math.round(total * 0.02);
+    // Tính tổng từ items
+    const itemTotal = (items || []).reduce((s, i) => s + i.price * i.qty, 0);
+    const shipFee = clientShipFee !== undefined ? clientShipFee : (itemTotal >= 150000 ? 0 : 15000);
+    const serviceFee = Math.round(itemTotal * 0.02);
+    const discount = Math.max(0, Number(voucherDiscount) || 0);
+    const finalTotal = itemTotal + shipFee + serviceFee - discount;
 
     const order = await Order.create({
       module, customerId: uid, items, address, district,
       addressLat: addressLat || null, addressLng: addressLng || null,
       partnerLat: partnerLat || null, partnerLng: partnerLng || null,
       partnerName: partnerName || null, partnerAddress: partnerAddress || null,
-      total, shipFee, serviceFee,
+      total: itemTotal, shipFee, serviceFee,
+      voucherCode: voucherCode || null,
+      voucherDiscount: discount,
+      finalTotal,
       paymentMethod: paymentMethod || "cash",
       note,
       statusHistory: [{ status: "pending", time: new Date(), by: "system" }]
@@ -7869,6 +7874,24 @@ app.post("/api/payment/payos/webhook", async (req, res) => {
           orderId: order.orderId, shipperEarn, partnerEarn, paymentMethod: "payos",
         });
         console.log(`[PayOS Webhook] Order ${order.orderId} PAID — ${amount?.toLocaleString("vi-VN")}đ`);
+      }
+
+      // ── Wallet top-up qua PayOS (CRTOPUP + userId trong description) ──
+      if (status === "PAID" || status === "00") {
+        const rawDesc = (webhookData.data?.description || webhookData.description || "").toString();
+        const topupMatch = rawDesc.match(/CRTOPUP([A-Z0-9]+)/);
+        if (topupMatch && amount > 0) {
+          const user = await User.findOne({ _id: { $regex: topupMatch[1], $options: "i" } }).catch(() => null);
+          if (user) {
+            const dup = await WalletTx.findOne({ ownerId: user._id, type: 'credit', ref: rawDesc }).catch(() => null);
+            if (!dup) {
+              await walletCredit(user._id, "user", amount, rawDesc, "Nạp ví CRABOR (PayOS)");
+              const newBal = (await User.findById(user._id).select('walletBalance').lean())?.walletBalance;
+              global._io?.to(`customer_${user._id}`).emit("walletCredited", { amount, newBalance: newBal });
+              console.log(`[PayOS Webhook] Wallet topup ${user._id} +${amount?.toLocaleString("vi-VN")}đ`);
+            }
+          }
+        }
       }
     }
     res.json({ success: true });
@@ -11061,29 +11084,84 @@ app.post("/api/users/search-history", async (req, res) => {
 });
 
 
-// POST /api/wallet/topup/prepare — Tạo lệnh nạp ví (qua PayOS/SePay)
+// POST /api/wallet/topup/prepare — Tạo lệnh nạp ví (SePay QR hoặc PayOS link)
 app.post("/api/wallet/topup/prepare", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
-    const { amount } = req.body;
+    const { amount, method } = req.body;
     const amt = Number(amount);
     if (!amt || amt < 10000)  return res.status(400).json({ success: false, message: "Số tiền tối thiểu 10.000đ" });
     if (amt > 50000000)       return res.status(400).json({ success: false, message: "Số tiền tối đa 50.000.000đ" });
 
-    // Tạo mã tham chiếu CRTOPUP + 8 chars userId
+    // Mã tham chiếu CRTOPUP + 8 ký tự cuối userId (SePay webhook match theo cái này)
     const uid = req.session.userId.toString().slice(-8).toUpperCase();
+    const sePayRef = "CRTOPUP" + uid;
     const orderCode = Date.now();
-    const description = `CRTOPUP${uid}`;
+
+    // ── SePay QR ──
+    if (method !== 'payos') {
+      const qrUrl = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${amt}&des=${encodeURIComponent(sePayRef)}`;
+      return res.json({
+        success: true,
+        method: 'sepay',
+        orderCode,
+        amount: amt,
+        description: sePayRef,
+        sePayRef,
+        accountNo:   '068394585',
+        accountName: 'KIEU THANH HAI',
+        bankName:    'VIB',
+        qrUrl,
+      });
+    }
+
+    // ── PayOS link ──
+    if (!payOS) {
+      // PayOS chưa khởi tạo → fallback QR SePay
+      const qrUrl = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${amt}&des=${encodeURIComponent(sePayRef)}`;
+      return res.json({
+        success: true,
+        method: 'payos_fallback',
+        orderCode,
+        amount: amt,
+        description: sePayRef,
+        sePayRef,
+        accountNo:   '068394585',
+        accountName: 'KIEU THANH HAI',
+        bankName:    'VIB',
+        qrUrl,
+      });
+    }
+
+    const paymentData = {
+      orderCode,
+      amount: Math.round(amt),
+      description: sePayRef, // CRTOPUP + 8 chars, PayOS giới hạn 25 ký tự
+      returnUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/success?orderId=topup`,
+      cancelUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/cancel?orderId=topup`,
+      items: [{ name: "Nap vi CRABOR", quantity: 1, price: Math.round(amt) }],
+    };
+    let link;
+    if (typeof payOS.paymentRequests?.create === 'function') {
+      link = await payOS.paymentRequests.create(paymentData);
+    } else if (typeof payOS.createPaymentLink === 'function') {
+      link = await payOS.createPaymentLink(paymentData);
+    } else {
+      throw new Error('PayOS SDK không hợp lệ - không tìm thấy createPaymentLink hoặc paymentRequests.create');
+    }
+    const linkData = link?.data && typeof link.data === 'object' && !Array.isArray(link.data)
+      ? link.data
+      : link;
 
     res.json({
       success: true,
-      orderCode,
+      method: 'payos',
+      orderCode: linkData?.orderCode ?? orderCode,
+      checkoutUrl: linkData?.checkoutUrl,
+      qrCode: linkData?.qrCode,
       amount: amt,
-      description,
-      accountNo:   process.env.SEPAY_ACCOUNT || '',
-      accountName: process.env.SEPAY_ACCOUNT_NAME || 'KIEU THANH HAI',
-      bankName:    process.env.SEPAY_BANK || 'MB Bank',
-      qrUrl: `https://img.vietqr.io/image/${process.env.SEPAY_BANK_CODE || 'MB'}-${process.env.SEPAY_ACCOUNT || ''}-print.png?amount=${amt}&addInfo=${description}`,
+      description: sePayRef,
+      sePayRef,
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -11092,10 +11170,41 @@ app.post("/api/wallet/topup/prepare", async (req, res) => {
 app.post("/api/wallet/topup/check", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
-    const { orderCode } = req.body;
-    if (!orderCode) return res.status(400).json({ success: false, message: "Thiếu orderCode" });
+    const { orderCode, method } = req.body;
 
-    // Kiểm tra trong lịch sử giao dịch ví
+    // ── PayOS: query PayOS trực tiếp, tự credit nếu webhook chưa kịp ──
+    if (method === 'payos' && orderCode) {
+      let paid = false;
+      let paidAmount = 0;
+      if (payOS) {
+        try {
+          let info;
+          if (typeof payOS.getPaymentLinkInformation === 'function') {
+            info = await payOS.getPaymentLinkInformation(orderCode);
+          } else {
+            info = await payOS.paymentRequests?.getById?.({ id: orderCode });
+          }
+          const d = info?.data && typeof info.data === 'object' && !Array.isArray(info.data) ? info.data : info;
+          if (d?.status === 'PAID' || d?.status === '00') {
+            paid = true;
+            paidAmount = d.amountPaid || d.amount || 0;
+          }
+        } catch (e) { console.warn('[TopupCheck] PayOS query failed:', e.message); }
+      }
+      if (paid && paidAmount > 0) {
+        const ref = "CRTOPUP" + req.session.userId.toString().slice(-8).toUpperCase();
+        const dup = await WalletTx.findOne({ ownerId: req.session.userId, type: 'credit', ref }).catch(() => null);
+        if (!dup) {
+          await walletCredit(req.session.userId, "user", paidAmount, ref, "Nạp ví CRABOR (PayOS)");
+          const newBal = (await User.findById(req.session.userId).select('walletBalance').lean())?.walletBalance;
+          req.io?.to(`customer_${req.session.userId}`).emit("walletCredited", { amount: paidAmount, newBalance: newBal });
+          console.log(`[TopupCheck] PayOS wallet topup ${req.session.userId} +${paidAmount}đ (webhook bù)`);
+        }
+      }
+      return res.json({ success: true, status: paid ? 'paid' : 'pending', amount: paidAmount });
+    }
+
+    // ── SePay: kiểm tra trong lịch sử giao dịch ví ──
     const tx = await WalletTx.findOne({
       ownerId: req.session.userId,
       type: 'credit',
