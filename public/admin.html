@@ -468,6 +468,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <span class="ico">💰</span> Duyệt ví
         <span class="nav-badge" id="walletBadge" style="display:none;background:#FFD84D;color:#000"></span>
       </div>
+      <div class="nav-item" onclick="showPage('featured')">
+        <span class="ico">✨</span> Quán nổi bật
+        <span class="nav-badge" id="featuredBadge" style="display:none;background:#FFD84D;color:#000">0</span>
+      </div>
       <div class="nav-item" onclick="showPage('settings')">
         <span class="ico">⚙️</span> Cài đặt
       </div>
@@ -1302,6 +1306,64 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           </table>
         </div>
         <div class="pager" id="wqPager"></div>
+      </div>
+    </section>
+
+    <!-- ── FEATURED RESTAURANTS PAGE ── -->
+    <section id="pgFeatured" class="page-section">
+      <div class="page-header">
+        <div class="page-title">✨ Quán nổi bật — Phê duyệt</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="filter-select" id="ftrStatus" onchange="loadFeatured()">
+            <option value="all">Tất cả</option>
+            <option value="pending">⏳ Chờ duyệt</option>
+            <option value="approved">✅ Đã duyệt</option>
+            <option value="rejected">❌ Từ chối</option>
+          </select>
+          <button class="filter-btn" onclick="loadFeatured()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+        <div class="panel" style="text-align:center;padding:18px">
+          <div style="font-size:.72rem;color:#aaa;font-weight:800;margin-bottom:6px">⏳ CHỜ DUYỆT</div>
+          <div style="font-size:1.6rem;font-weight:900;color:#FFD84D" id="ftrStPending">—</div>
+          <div style="font-size:.72rem;color:#aaa;margin-top:4px" id="ftrStPendingAmt">—</div>
+        </div>
+        <div class="panel" style="text-align:center;padding:18px">
+          <div style="font-size:.72rem;color:#aaa;font-weight:800;margin-bottom:6px">✅ ĐÃ DUYỆT</div>
+          <div style="font-size:1.6rem;font-weight:900;color:#3aaa5c" id="ftrStApproved">—</div>
+          <div style="font-size:.72rem;color:#aaa;margin-top:4px" id="ftrStApprovedAmt">—</div>
+        </div>
+        <div class="panel" style="text-align:center;padding:18px">
+          <div style="font-size:.72rem;color:#aaa;font-weight:800;margin-bottom:6px">🎫 DOANH THU</div>
+          <div style="font-size:1.6rem;font-weight:900;color:#6495ed" id="ftrStRevenue">—</div>
+          <div style="font-size:.72rem;color:#aaa;margin-top:4px">Tổng các gói đã duyệt</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>Mã yêu cầu</th>
+                <th>Quán</th>
+                <th>Banner</th>
+                <th>Gói</th>
+                <th>Số tiền</th>
+                <th>P.thức</th>
+                <th>Thanh toán</th>
+                <th>Ngày tạo</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="ftrTbody">
+              <tr><td colspan="10" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -2195,6 +2257,59 @@ async function rejectWallet(id) { const reason = prompt('Lý do từ chối (b�
 async function approveAllPending() { if (!confirm('Duyệt TẤT CẢ các mục đang chờ? Hành động này không thể hoàn tác.')) return; try { const r = await apiFetch('/api/admin/wallet-queue/approve-all', 'POST'); if (r.success) { showNotif('✅ Đã duyệt tất cả', `${r.approved} mục — ${fmtMoney(r.totalAmount)}`, 'green'); loadWalletQueue(); loadStats(); } else showNotif('❌ Lỗi', r.message); } catch(e) { showNotif('❌ Lỗi', e.message); } }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//   FEATURED RESTAURANTS
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadFeatured() {
+  const tbody = document.getElementById('ftrTbody');
+  const status = document.getElementById('ftrStatus')?.value || 'all';
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
+  try {
+    const r = await apiFetch('/api/admin/featured-requests?status=' + status);
+    if (!r.success) throw new Error(r.message || 'Lỗi tải');
+    const list = r.data || [];
+    const pending = list.filter(x => x.status === 'pending');
+    const approved = list.filter(x => x.status === 'approved');
+    setText('ftrStPending', pending.length);
+    setText('ftrStPendingAmt', fmtMoney(pending.reduce((s,x)=>s+(x.amount||0),0)));
+    setText('ftrStApproved', approved.length);
+    setText('ftrStApprovedAmt', fmtMoney(approved.reduce((s,x)=>s+(x.amount||0),0)));
+    setText('ftrStRevenue', fmtMoney(list.filter(x=>x.status==='approved').reduce((s,x)=>s+(x.amount||0),0)));
+    const badge = document.getElementById('featuredBadge');
+    if (badge) { badge.style.display = pending.length ? '' : 'none'; badge.textContent = pending.length; }
+    if (!list.length) { tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted)">${status==='pending' ? '✅ Không có yêu cầu nào chờ duyệt' : 'Không có dữ liệu'}</td></tr>`; return; }
+    tbody.innerHTML = list.map(x => {
+      const payBadge = x.paymentStatus === 'paid' ? '<span class="badge b-approved">✅ Đã nhận tiền</span>' : x.paymentStatus === 'pending_review' ? '<span class="badge b-pending">⏳ Chờ xác nhận</span>' : '<span class="badge b-rejected">❌ Chưa TT</span>';
+      const statusBadge = x.status === 'pending' ? '<span class="badge b-pending">⏳ Chờ duyệt</span>' : x.status === 'approved' ? '<span class="badge b-approved">✅ Đã duyệt</span>' : '<span class="badge b-rejected">❌ Từ chối</span>';
+      const bannerHtml = x.bannerImage ? `<img src="${x.bannerImage}" style="width:80px;height:44px;border-radius:8px;object-fit:cover" />` : '<span style="color:#aaa">—</span>';
+      return `<tr>
+        <td><span style="font-family:var(--font-mono);font-size:.75rem;color:var(--coral)">${x.requestId||'—'}</span></td>
+        <td style="font-size:.82rem;font-weight:700">${x.partnerName||'—'}</td>
+        <td>${bannerHtml}</td>
+        <td>⏰ ${x.hours||0} giờ</td>
+        <td><strong style="color:#FFD84D">${fmtMoney(x.amount)}</strong></td>
+        <td style="font-size:.78rem">${x.paymentMethod||'—'}</td>
+        <td>${payBadge}</td>
+        <td style="font-size:.75rem;color:#aaa">${fmtDate(x.createdAt)}</td>
+        <td>${statusBadge}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap">
+          ${x.status === 'pending' ? `<button class="act-btn approve" onclick="approveFeatured('${x._id}')" style="font-size:.72rem;padding:4px 10px">✅ Duyệt</button><button class="act-btn reject" onclick="rejectFeatured('${x._id}')" style="font-size:.72rem;padding:4px 10px">❌ Từ chối</button>` : `<span style="font-size:.72rem;color:#aaa">${x.adminNote||'—'}</span>`}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="10" style="color:var(--coral);text-align:center;padding:16px">❌ ${e.message}</td></tr>`; }
+}
+async function approveFeatured(id) {
+  const r = await apiFetch(`/api/admin/featured-requests/${id}/approve`, 'POST');
+  if (r.success) { showNotif('✅ Đã kích hoạt', r.message || 'Quán đang nổi bật', 'green'); loadFeatured(); loadStats(); }
+  else showNotif('❌ Lỗi', r.message || 'Không duyệt được');
+}
+async function rejectFeatured(id) {
+  const note = prompt('Lý do từ chối:'); if (note === null) return;
+  try { const r = await apiFetch(`/api/admin/featured-requests/${id}/reject`, 'POST', { note }); if (r.success) { showNotif('❌ Đã từ chối', 'Yêu cầu đã bị từ chối', 'coral'); loadFeatured(); } else showNotif('❌ Lỗi', r.message); } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //   CUSTOMERS
 // ─────────────────────────────────────────────────────────────────────────────
 let customerList = [];
@@ -2446,7 +2561,7 @@ async function deleteBannerAdmin(id) { if (!confirm('Xóa banner này?')) return
 // ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', settings:'pgSettings' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', settings:'pgSettings' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -2459,6 +2574,7 @@ function showPage(key, ev) {
   if (key === 'sales') loadSales();
   if (key === 'vouchers') loadVouchers();
   if (key === 'wallet') loadWalletQueue();
+  if (key === 'featured') loadFeatured();
   if (key === 'analytics') loadAdvAnalytics();
   if (key === 'support') loadSupportTickets();
   if (key === 'leaderboard') loadLeaderboard();

@@ -803,6 +803,13 @@ const foodPartnerSchema = new mongoose.Schema({
   isAccepting: { type: Boolean, default: true },
   lastLat:     Number,
   lastLng:     Number,
+  // ── Spotlight "quán nổi bật" ──
+  featured:         { type: Boolean, default: false },
+  featuredUntil:    { type: Date },
+  featuredBanner:   String,
+  featuredHours:    Number,
+  featuredPackage:  String,
+  featuredAt:       Date,
 }, { timestamps: true });
 
 foodPartnerSchema.index({ phone: 1 });
@@ -815,6 +822,32 @@ foodPartnerSchema.pre("save", function(next) {
   next();
 });
 const FoodPartner = mongoose.model("FoodPartner", foodPartnerSchema, "food_partners");
+
+// ── FEATURED REQUEST — yêu cầu làm "quán nổi bật" ───────────
+const featuredRequestSchema = new mongoose.Schema({
+  requestId:      { type: String, unique: true, sparse: true },
+  partnerId:      { type: mongoose.Schema.Types.ObjectId, ref: "FoodPartner" },
+  partnerName:    String,
+  bannerImage:    String,   // base64 hoặc URL banner
+  hours:          { type: Number, min: 1, max: 24, default: 4 },
+  amount:         { type: Number, default: 0 }, // hours * 50.000
+  paymentMethod:  { type: String, enum: ["sepay","payos","wallet"], default: "sepay" },
+  paymentStatus:  { type: String, enum: ["unpaid","paid","pending_review"], default: "unpaid" },
+  status:         { type: String, enum: ["pending","approved","rejected"], default: "pending" },
+  sePayRef:       String,
+  payosOrderCode: String,
+  payosCheckoutUrl: String,
+  adminNote:      String,
+  approvedAt:     Date,
+  rejectedAt:     Date,
+  paidAt:         Date,
+}, { timestamps: true });
+
+featuredRequestSchema.pre("save", function(next) {
+  if (!this.requestId) this.requestId = "CRFTR-" + Date.now().toString(36).toUpperCase();
+  next();
+});
+const FeaturedRequest = mongoose.model("FeaturedRequest", featuredRequestSchema, "featured_requests");
 
 // ── RIDE DRIVER ───────────────────────────
 const rideDriverSchema = new mongoose.Schema({
@@ -2724,8 +2757,230 @@ app.get("/api/food-partners/featured", async (req, res) => {
     const featured = await FoodPartner.find({
       featured: true, featuredUntil: { $gt: now },
       status: { $in:["approved","active"] }
-    }).limit(6).select("bizName emoji district categories rating coverImage");
-    res.json({ success:true, data:featured });
+    }).limit(6).select("_id bizName address district categories rating coverImage avatar featuredBanner");
+    const data = featured.map(p => ({
+      _id: p._id,
+      name: p.bizName,
+      bizName: p.bizName,
+      logo: p.avatar || p.featuredBanner || p.coverImage,
+      coverImage: p.featuredBanner || p.coverImage,
+      address: p.address,
+      district: p.district,
+      categories: p.categories,
+      rating: p.rating,
+      deliveryTime: "25",
+    }));
+    res.json({ success:true, data });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// ══════════════════════════════════════════════
+//  FEATURED RESTAURANT — partner mua gói nổi bật
+// ══════════════════════════════════════════════
+const FEATURED_PRICE_PER_HOUR = 50000;
+const FEATURED_PACKAGES = [
+  { hours: 4,  label: "4 giờ",  price: 4  * FEATURED_PRICE_PER_HOUR },
+  { hours: 8,  label: "8 giờ",  price: 8  * FEATURED_PRICE_PER_HOUR },
+  { hours: 12, label: "12 giờ", price: 12 * FEATURED_PRICE_PER_HOUR },
+  { hours: 24, label: "24 giờ", price: 24 * FEATURED_PRICE_PER_HOUR },
+];
+
+// POST /api/partner/featured/request — partner tạo yêu cầu nổi bật
+app.post("/api/partner/featured/request", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const partner = await FoodPartner.findById(req.session.partnerId);
+    if (!partner) return res.status(404).json({ success:false, message:"Không tìm thấy quán" });
+    if (partner.status !== "approved") return res.status(403).json({ success:false, message:"Quán chưa được duyệt" });
+
+    const { hours, paymentMethod, bannerImage } = req.body || {};
+    const pkg = FEATURED_PACKAGES.find(p => p.hours === Number(hours));
+    if (!pkg) return res.status(400).json({ success:false, message:"Gói giờ không hợp lệ (4/8/12/24)" });
+    if (!["sepay","payos","wallet"].includes(paymentMethod))
+      return res.status(400).json({ success:false, message:"Phương thức thanh toán không hợp lệ" });
+    if (!bannerImage || bannerImage.length < 50)
+      return res.status(400).json({ success:false, message:"Cần tải ảnh banner" });
+
+    // Đang có gói nổi bật chưa hết hạn? chặn tạo mới
+    if (partner.featured && partner.featuredUntil && new Date(partner.featuredUntil) > new Date())
+      return res.status(400).json({ success:false, message:"Quán đang trong thời gian nổi bật" });
+
+    const request = await FeaturedRequest.create({
+      partnerId: partner._id,
+      partnerName: partner.bizName || partner.fullName || "Quán",
+      bannerImage,
+      hours: pkg.hours,
+      amount: pkg.price,
+      paymentMethod,
+    });
+
+    let payExtra = {};
+    // Ví CRABOR: trừ ngay
+    if (paymentMethod === "wallet") {
+      try {
+        await walletDebit(partner._id, 'partner', pkg.price, 'debit', request.requestId,
+          `Mua gói nổi bật ${pkg.hours} giờ (${pkg.label})`);
+        request.paymentStatus = "paid";
+        request.paidAt = new Date();
+        await request.save();
+        payExtra.walletPaid = true;
+      } catch (e) {
+        await FeaturedRequest.deleteOne({ _id: request._id });
+        return res.status(400).json({ success:false, message: e.message || "Ví không đủ số dư" });
+      }
+    }
+
+    // SePay: tạo QR
+    if (paymentMethod === "sepay") {
+      const sePayRef = "CRFTR" + request.requestId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase();
+      request.sePayRef = sePayRef;
+      await request.save();
+      payExtra = {
+        qrUrl: `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${pkg.price}&des=${encodeURIComponent(sePayRef)}`,
+        sePayRef,
+        bankName: "VIB",
+        accountNo: "068394585",
+        accountName: "KIEU THANH HAI",
+      };
+    }
+
+    // PayOS: tạo link thanh toán
+    if (paymentMethod === "payos") {
+      try {
+        const orderCode = parseInt(Date.now().toString().slice(-9));
+        const description = "CRABOR NOI BAT " + pkg.hours + "h";
+        if (payOS) {
+          const paymentData = {
+            orderCode,
+            amount: pkg.price,
+            description,
+            items: [{ name: `Gói nổi bật ${pkg.hours} giờ`, quantity: 1, price: pkg.price }],
+          };
+          let link;
+          if (typeof payOS.paymentRequests?.create === 'function') link = await payOS.paymentRequests.create(paymentData);
+          else if (typeof payOS.createPaymentLink === 'function') link = await payOS.createPaymentLink(paymentData);
+          const linkData = link?.data && typeof link.data === 'object' ? link.data : link;
+          request.payosOrderCode = String(linkData?.orderCode ?? orderCode);
+          request.payosCheckoutUrl = linkData?.checkoutUrl;
+          await request.save();
+          payExtra = { checkoutUrl: linkData?.checkoutUrl, orderCode: request.payosOrderCode, payosPaid: false };
+        } else {
+          request.payosOrderCode = String(orderCode);
+          await request.save();
+          const qrUrl = `https://img.vietqr.io/image/VIB-068394585-print.png?amount=${pkg.price}&addInfo=${encodeURIComponent(description)}`;
+          payExtra = { qrUrl, orderCode: String(orderCode), payosFallback: true };
+        }
+      } catch (e) {
+        console.warn("[Featured PayOS] fallback:", e.message);
+        request.payosOrderCode = String(parseInt(Date.now().toString().slice(-9)));
+        await request.save();
+        payExtra = { payosError: e.message };
+      }
+    }
+
+    req.io?.to("admin").emit("featured_request_created", { requestId: request.requestId, partnerName: request.partnerName, amount: request.amount });
+
+    res.json({
+      success: true,
+      request: { _id: request._id, requestId: request.requestId, hours: request.hours, amount: request.amount,
+        paymentMethod, paymentStatus: request.paymentStatus, status: request.status,
+        bannerImage: request.bannerImage, sePayRef: request.sePayRef, payosCheckoutUrl: request.payosCheckoutUrl },
+      ...payExtra,
+    });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// POST /api/partner/featured/request/:id/confirm-payment — xác nhận đã chuyển khoản
+app.post("/api/partner/featured/request/:id/confirm-payment", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const request = await FeaturedRequest.findOne({ _id: req.params.id, partnerId: req.session.partnerId });
+    if (!request) return res.status(404).json({ success:false, message:"Không tìm thấy yêu cầu" });
+    if (request.paymentStatus === "paid")
+      return res.json({ success:true, request });
+    request.paymentStatus = "pending_review";
+    request.paidAt = new Date();
+    await request.save();
+    req.io?.to("admin").emit("featured_request_paid", { requestId: request.requestId, partnerName: request.partnerName });
+    res.json({ success:true, request });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// GET /api/partner/featured/status — trạng thái nổi bật của quán + lịch sử
+app.get("/api/partner/featured/status", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const partner = await FoodPartner.findById(req.session.partnerId).select("featured featuredUntil featuredBanner featuredHours featuredPackage featuredAt");
+    const requests = await FeaturedRequest.find({ partnerId: req.session.partnerId }).sort({ createdAt: -1 }).limit(20);
+    res.json({
+      success: true,
+      featured: {
+        active: !!(partner?.featured && partner?.featuredUntil && new Date(partner.featuredUntil) > new Date()),
+        featuredUntil: partner?.featuredUntil,
+        banner: partner?.featuredBanner,
+        hours: partner?.featuredHours,
+        package: partner?.featuredPackage,
+        featuredAt: partner?.featuredAt,
+      },
+      requests,
+    });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// GET /api/admin/featured-requests — danh sách yêu cầu cho admin
+app.get("/api/admin/featured-requests", adminAuth, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const q = {};
+    if (status && status !== "all") q.status = status;
+    const requests = await FeaturedRequest.find(q).sort({ createdAt: -1 }).limit(100);
+    res.json({ success:true, data: requests });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// POST /api/admin/featured-requests/:id/approve — duyệt → kích hoạt featured
+app.post("/api/admin/featured-requests/:id/approve", adminAuth, async (req, res) => {
+  try {
+    const request = await FeaturedRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ success:false, message:"Không tìm thấy yêu cầu" });
+    if (request.status !== "pending")
+      return res.status(400).json({ success:false, message:"Yêu cầu đã được xử lý" });
+
+    const until = new Date(Date.now() + request.hours * 3600e3);
+    await FoodPartner.findByIdAndUpdate(request.partnerId, {
+      featured: true,
+      featuredUntil: until,
+      featuredBanner: request.bannerImage,
+      featuredHours: request.hours,
+      featuredPackage: `Nổi bật ${request.hours} giờ`,
+      featuredAt: new Date(),
+    });
+    request.status = "approved";
+    request.approvedAt = new Date();
+    request.paymentStatus = request.paymentStatus === "unpaid" ? "pending_review" : request.paymentStatus;
+    await request.save();
+
+    req.io?.to(`partner_${request.partnerId}`).emit("featured_approved", { until, hours: request.hours });
+    res.json({ success:true, message:`Đã kích hoạt nổi bật ${request.hours} giờ`, until });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// POST /api/admin/featured-requests/:id/reject — từ chối
+app.post("/api/admin/featured-requests/:id/reject", adminAuth, async (req, res) => {
+  try {
+    const request = await FeaturedRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ success:false, message:"Không tìm thấy yêu cầu" });
+    if (request.status !== "pending")
+      return res.status(400).json({ success:false, message:"Yêu cầu đã được xử lý" });
+    request.status = "rejected";
+    request.rejectedAt = new Date();
+    request.adminNote = req.body?.note || "Bị từ chối bởi admin";
+    await request.save();
+    req.io?.to(`partner_${request.partnerId}`).emit("featured_rejected", { note: request.adminNote });
+    res.json({ success:true, message:"Đã từ chối yêu cầu" });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -3418,6 +3673,25 @@ app.post("/api/webhook/sepay", async (req, res) => {
         });
 
         console.log(`[SEPAY] Order payment confirmed: ${order.orderId} — ${amount.toLocaleString("vi-VN")}đ`);
+        handled = true;
+      }
+    }
+
+    // ── 7. Featured request (CRFTR) — quán nổi bật ───────────
+    const ftrMatch = rawRef.match(/CRFTR([A-Z0-9]{6,10})/);
+    if (ftrMatch && !handled) {
+      const suffix = ftrMatch[1];
+      const ftr = await FeaturedRequest.findOne({
+        sePayRef: { $regex: suffix, $options: "i" },
+        paymentStatus: { $in: ["unpaid", "pending_review"] },
+      });
+      if (ftr && amount >= (ftr.amount - 1000)) {
+        ftr.paymentStatus = "paid";
+        ftr.paidAt = new Date();
+        await ftr.save();
+        req.io?.to("admin").emit("featured_request_paid", { requestId: ftr.requestId, partnerName: ftr.partnerName });
+        req.io?.to(`partner_${ftr.partnerId}`).emit("featured_paid", { requestId: ftr.requestId });
+        console.log(`[SEPAY] Featured request confirmed: ${ftr.requestId} — ${amount.toLocaleString("vi-VN")}đ`);
         handled = true;
       }
     }
@@ -6771,33 +7045,33 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
 
     if (status === "partner_accepted") {
       // Partner nhận đơn → tìm shipper gần nhất đến địa chỉ khách (5km, mở rộng dần)
-      if (order.pickupLat && order.pickupLng) {
-        // Lấy toạ độ cửa hàng để shipper biết điểm trả sau khi lấy đồ
-        let partnerLat = null, partnerLng = null;
-        if (order.partnerId) {
-          const g = await GiatLa.findById(order.partnerId).select("lastLat lastLng").catch(() => null);
-          if (g?.lastLat) { partnerLat = g.lastLat; partnerLng = g.lastLng; }
-        }
-        const nearby = await findLaundryShippers(order.pickupLat, order.pickupLng, 5);
-        if (nearby.length) {
-          const pickupPayload = {
-            type: "laundry_pickup_request",
-            orderId: order.orderId,
-            pickupAddress: order.pickupAddress,
-            pickupLat: order.pickupLat, pickupLng: order.pickupLng,
-            partnerAddress: `${order.partnerName}`,
-            partnerLat, partnerLng,
-            customerName: order.customerName,
-            customerPhone: order.customerPhone || "",
-            packageName: order.packageName,
-            estimatedTotal: order.estimatedTotal || 0,
-            finalTotal: order.finalTotal || order.estimatedTotal || 0,
-            shipFee: order.shipFee,
-            module: "laundry",
-            timeout: 30,
-          };
-          for (const s of nearby) req.io.to(`shipper_${s._id}`).emit("order_request", pickupPayload);
-        }
+      const dispatchLat = order.pickupLat || 21.0285;   // Hà Nội fallback nếu chưa có GPS
+      const dispatchLng = order.pickupLng || 105.8542;
+      // Lấy toạ độ cửa hàng để shipper biết điểm trả sau khi lấy đồ
+      let partnerLat = null, partnerLng = null;
+      if (order.partnerId) {
+        const g = await GiatLa.findById(order.partnerId).select("lastLat lastLng").catch(() => null);
+        if (g?.lastLat) { partnerLat = g.lastLat; partnerLng = g.lastLng; }
+      }
+      const nearby = await findLaundryShippers(dispatchLat, dispatchLng, 5);
+      if (nearby.length) {
+        const pickupPayload = {
+          type: "laundry_pickup_request",
+          orderId: order.orderId,
+          pickupAddress: order.pickupAddress,
+          pickupLat: dispatchLat, pickupLng: dispatchLng,
+          partnerAddress: `${order.partnerName}`,
+          partnerLat, partnerLng,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone || "",
+          packageName: order.packageName,
+          estimatedTotal: order.estimatedTotal || 0,
+          finalTotal: order.finalTotal || order.estimatedTotal || 0,
+          shipFee: order.shipFee,
+          module: "laundry",
+          timeout: 30,
+        };
+        for (const s of nearby) req.io.to(`shipper_${s._id}`).emit("order_request", pickupPayload);
       }
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "partner_accepted",
@@ -7383,6 +7657,19 @@ app.post("/api/payment/payos/webhook", async (req, res) => {
       // Tìm order theo payosOrderCode
       const Order = require("mongoose").models.Order;
       const order = Order ? await Order.findOne({ payosOrderCode: String(orderCode) }) : null;
+
+      // Featured request (quán nổi bật) cũng có thể khớp orderCode
+      let ftr = null;
+      try { ftr = await FeaturedRequest.findOne({ payosOrderCode: String(orderCode), paymentStatus: { $in: ["unpaid","pending_review"] } }); } catch(_) {}
+
+      if (ftr) {
+        ftr.paymentStatus = "paid";
+        ftr.paidAt = new Date();
+        await ftr.save();
+        global._io?.to("admin").emit("featured_request_paid", { requestId: ftr.requestId, partnerName: ftr.partnerName });
+        global._io?.to(`partner_${ftr.partnerId}`).emit("featured_paid", { requestId: ftr.requestId });
+        console.log(`[PayOS Webhook] Featured request ${ftr.requestId} PAID — ${amount?.toLocaleString("vi-VN")}đ`);
+      }
 
       if (order && order.paymentStatus !== "paid") {
         order.paymentStatus = "paid";
@@ -8343,8 +8630,12 @@ async function dispatchToShippers(order, io) {
         _id: order._id,
         orderId: order.orderId,
         items: order.items,
-        total: order.finalTotal || order.total,
+        total: order.total,
+        finalTotal: order.finalTotal,
+        discount: order.discount || 0,
+        voucherCode: order.voucherCode,
         shipFee: order.shipFee,
+        serviceFee: order.serviceFee,
         pickupAddress: order.partnerAddress || "Địa chỉ quán",
         pickupLat, pickupLng,
         deliveryAddress: order.address,
