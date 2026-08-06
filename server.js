@@ -7019,7 +7019,12 @@ app.post("/api/laundry/order", async (req, res) => {
       }
     });
 
-    res.status(201).json({ success: true, order, orderId: order.orderId });
+    // FIX: Enrich discount fields trong response
+    const laundryCreatedRes = order.toObject ? order.toObject() : order;
+    laundryCreatedRes.discount = laundryCreatedRes.discount || 0;
+    laundryCreatedRes.voucherCode = laundryCreatedRes.voucherCode || null;
+    laundryCreatedRes.finalTotal = laundryCreatedRes.finalTotal ?? Math.max(0, (laundryCreatedRes.estimatedTotal||0) + (laundryCreatedRes.shipFee||0) - (laundryCreatedRes.discount||0));
+    res.status(201).json({ success: true, order: laundryCreatedRes, orderId: order.orderId });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -7027,8 +7032,15 @@ app.post("/api/laundry/order", async (req, res) => {
 app.get("/api/laundry/orders/my", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false });
-    const orders = await LaundryOrder.find({ customerId: req.session.userId }).sort({ createdAt: -1 }).limit(30);
-    res.json({ success: true, orders });
+    const orders = await LaundryOrder.find({ customerId: req.session.userId }).sort({ createdAt: -1 }).limit(30).lean();
+    // FIX: Enrich discount fields để customer app hiển thị đúng giá sau voucher
+    const enriched = orders.map(o => ({
+      ...o,
+      discount: o.discount || 0,
+      voucherCode: o.voucherCode || null,
+      finalTotal: o.finalTotal ?? Math.max(0, (o.estimatedTotal||0) + (o.shipFee||0) - (o.discount||0)),
+    }));
+    res.json({ success: true, orders: enriched });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -7039,6 +7051,10 @@ app.get("/api/laundry/orders/:id", async (req, res) => {
     if (!order) return res.status(404).json({ success: false });
     const plain = order.toObject();
     plain.module = "laundry";
+    // FIX: Enrich discount fields
+    plain.discount = plain.discount || 0;
+    plain.voucherCode = plain.voucherCode || null;
+    plain.finalTotal = plain.finalTotal ?? Math.max(0, (plain.estimatedTotal||0) + (plain.shipFee||0) - (plain.discount||0));
     // Gắn shipperInfo để customer app hiện bubble/map theo dõi
     const activeShipperId = plain.shipperReturnId || plain.shipperId;
     if (activeShipperId) {
@@ -7110,6 +7126,8 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
           packageName: order.packageName,
           estimatedTotal: order.estimatedTotal || 0,
           finalTotal: order.finalTotal || order.estimatedTotal || 0,
+          discount: order.discount || 0,
+          voucherCode: order.voucherCode || null,
           shipFee: order.shipFee,
           module: "laundry",
           timeout: 30,
@@ -7185,6 +7203,8 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
         customerPhone: order.customerPhone || "",
         packageName: order.packageName,
         finalTotal: order.finalTotal || order.estimatedTotal || 0,
+        discount: order.discount || 0,
+        voucherCode: order.voucherCode || null,
         shipFee: Math.round(order.shipFee / 2), // shipper về nhận 1 chiều
         module: "laundry",
         timeout: 30,
@@ -7235,7 +7255,12 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
     }
 
     await order.save();
-    res.json({ success: true, order });
+    // FIX: Enrich discount fields trong response
+    const laundryRes = order.toObject ? order.toObject() : order;
+    laundryRes.discount = laundryRes.discount || 0;
+    laundryRes.voucherCode = laundryRes.voucherCode || null;
+    laundryRes.finalTotal = laundryRes.finalTotal ?? Math.max(0, (laundryRes.estimatedTotal||0) + (laundryRes.shipFee||0) - (laundryRes.discount||0));
+    res.json({ success: true, order: laundryRes });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -7355,8 +7380,15 @@ app.get("/api/laundry/partner/orders", async (req, res) => {
     const { status } = req.query;
     const filter = { partnerId: partner._id };
     if (status) filter.status = status;
-    const orders = await LaundryOrder.find(filter).sort({ createdAt: -1 }).limit(50);
-    res.json({ success: true, orders });
+    const orders = await LaundryOrder.find(filter).sort({ createdAt: -1 }).limit(50).lean();
+    // FIX: Enrich discount fields
+    const enriched = orders.map(o => ({
+      ...o,
+      discount: o.discount || 0,
+      voucherCode: o.voucherCode || null,
+      finalTotal: o.finalTotal ?? Math.max(0, (o.estimatedTotal||0) + (o.shipFee||0) - (o.discount||0)),
+    }));
+    res.json({ success: true, orders: enriched });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -9355,7 +9387,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       .sort({ deliveredAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select("orderId module items address partnerAddress finalTotal total shipFee status deliveredAt createdAt ratingShipper ratingComment")
+      .select("orderId module items address partnerAddress finalTotal total shipFee serviceFee discount voucherCode voucherDiscount status deliveredAt createdAt ratingShipper ratingComment")
       .lean(),
       Order.countDocuments({ 
         shipperId: req.session.shipperId, 
@@ -9367,8 +9399,12 @@ app.get("/api/shipper/order-history", async (req, res) => {
       orderId: o.orderId,
       module: o.module || 'food',
       status: o.status,
-      total: o.finalTotal || o.total || 0,
+      total: o.total || 0,
+      finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
+      discount: o.discount || 0,
+      voucherCode: o.voucherCode || null,
       shipFee: o.shipFee || 0,
+      serviceFee: o.serviceFee || 0,
       address: o.address,
       partnerAddress: o.partnerAddress,
       items: (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', '),
