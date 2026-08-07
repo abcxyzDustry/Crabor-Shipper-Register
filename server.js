@@ -8290,7 +8290,10 @@ app.get("/api/payment/payos/:orderCode", async (req, res) => {
     } else {
       info = await payOS.paymentRequests?.getById?.({ id: req.params.orderCode });
     }
-    res.json({ success: true, payment: info });
+    // PayOS SDK bọc response trong { data: {...} } — unwrap để app có thể đọc status trực tiếp
+    const raw = info?.data && typeof info.data === 'object' && !Array.isArray(info.data) ? info.data : info;
+    const statusPay = raw?.status || info?.status;
+    res.json({ success: true, payment: { ...raw, status: statusPay }, status: statusPay, paid: statusPay === "PAID" || statusPay === "00" });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -11002,6 +11005,35 @@ app.patch("/api/admin/customers/:id/status", adminAuth, async (req, res) => {
     );
     if (!user) return res.status(404).json({ success: false, message: "Không tìm thấy user" });
     res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/admin/clear-balance — Xoá số dư ví về 0 (khách/shipper/đối tác/sales)
+app.post("/api/admin/clear-balance", adminAuth, async (req, res) => {
+  try {
+    const { type, id, module } = req.body || {};
+    if (!id) return res.status(400).json({ success: false, message: "Thiếu id" });
+    let Model = null, ownerType = null, label = "";
+    if (type === "user")       { Model = User; ownerType = "user"; label = "khách hàng"; }
+    else if (type === "shipper") { Model = Shipper; ownerType = "shipper"; label = "shipper"; }
+    else if (type === "sales") { Model = Sales; ownerType = "sales"; label = "sales"; }
+    else if (type === "partner") { Model = module ? getPartnerModel(module) : FoodPartner; ownerType = "partner"; label = "đối tác"; }
+    if (!Model) return res.status(400).json({ success: false, message: "Loại tài khoản không hợp lệ" });
+
+    const doc = await Model.findById(id);
+    if (!doc) return res.status(404).json({ success: false, message: "Không tìm thấy " + label });
+    const oldBal = doc.walletBalance || 0;
+    if (oldBal > 0) {
+      doc.walletBalance = 0;
+      await doc.save();
+      await WalletTx.create({
+        ownerId: doc._id, ownerType, type: "debit", amount: oldBal,
+        balance: 0, ref: "ADMIN_CLEAR", note: "Admin xoá số dư ví",
+      });
+    }
+    res.json({ success: true, cleared: oldBal, message: `Đã xoá ${oldBal.toLocaleString("vi-VN")}đ khỏi ví` });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

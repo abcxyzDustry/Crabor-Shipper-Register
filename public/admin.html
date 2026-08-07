@@ -1909,6 +1909,7 @@ async function loadTable(type, page) {
         <td><div style="display:flex;gap:6px;"><button class="act-btn" onclick="viewRecord('${s._id}','shipper')">Xem</button>
         ${s.status==='pending'?`<button class="act-btn approve" onclick="quickStatus('${s._id}','shipper','approved')">✓ Duyệt</button>
         <button class="act-btn reject" onclick="quickStatus('${s._id}','shipper','rejected')">✗ Từ chối</button>`:''}
+        ${(s.walletBalance||0)>0?`<button class="act-btn" onclick="clearBalance('shipper','${s._id}')" title="Số dư: ${fmtMoney(s.walletBalance)}">💱 Xoá ${fmtMoney(s.walletBalance)}</button>`:''}
         </div></td>
       </tr>`).join('') || emptyRow(9);
       renderPager('shipperPager', r.total, p, 20, n => loadTable('shipper', n));
@@ -1955,6 +1956,7 @@ async function loadTable(type, page) {
           <td><div style="display:flex;gap:6px;"><button class="act-btn" onclick="viewRecord('${p._id}','${typeKey}')">Xem</button>
           ${p.status==='pending'?`<button class="act-btn approve" onclick="quickStatus('${p._id}','${typeKey}','approved')">✓ Duyệt</button>
           <button class="act-btn reject" onclick="quickStatus('${p._id}','${typeKey}','rejected')">✗ Từ chối</button>`:''}
+          ${(p.walletBalance||0)>0?`<button class="act-btn" onclick="clearBalance('partner','${p._id}','${typeKey}')" title="Số dư: ${fmtMoney(p.walletBalance)}">💱 Xoá ${fmtMoney(p.walletBalance)}</button>`:''}
           </div></td>
         </tr>`;
       }).join('') || emptyRow(9);
@@ -2175,7 +2177,7 @@ async function loadSales() {
       const countBadge = document.getElementById('salesCountBadge'); if (countBadge) countBadge.textContent = r.total || 0;
     }
     if (!r.data.length) { if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Chưa có Sales nào</td></tr>'; return; }
-    if(tbody) tbody.innerHTML = r.data.map(a => `<tr><td><div style="font-weight:900;color:var(--cream)">${a.fullName}</div><div style="font-size:.73rem;color:var(--muted);font-family:var(--font-mono)">${a.phone}</div></td><td><span style="background:rgba(232,80,74,.15);color:var(--coral);border-radius:6px;padding:3px 10px;font-family:var(--font-mono);font-weight:900;font-size:.85rem;letter-spacing:1px">${a.refCode}</span></td><td><div style="font-weight:900">${a.referralTotal || 0}</div><div style="font-size:.72rem;color:var(--muted)">${a.referralEarned || 0} hoàn thành</div></td><td style="font-weight:900;color:var(--green)">${a.referralEarned || 0}</td><td style="font-weight:900;color:var(--yellow);font-family:var(--font-mono)">${(a.walletBalance||0).toLocaleString('vi-VN')}</td><td style="font-family:var(--font-mono);font-size:.82rem">${(a.totalEarned||0).toLocaleString('vi-VN')}</td><td><span class="status-pill ${a.status === 'active' ? 'approved' : 'rejected'}">${a.status === 'active' ? '🟢 Hoạt động' : '🔴 Khóa'}</span></td><td style="display:flex;gap:4px;flex-wrap:wrap"><button class="act-btn" onclick="viewSalesRefs('${a._id}','${a.fullName}','${a.refCode}')" style="font-size:.72rem;padding:4px 10px">📋 Refs</button><button class="act-btn ${a.status==='active'?'reject':''}" onclick="toggleSalesStatus('${a._id}','${a.status}')" style="font-size:.72rem;padding:4px 10px">${a.status==='active'?'🔒 Khóa':'🔓 Mở'}</button><button class="act-btn reject" onclick="deleteSales('${a._id}','${a.fullName}')" style="font-size:.72rem;padding:4px 8px">🗑️</button></td></tr>`).join('');
+    if(tbody) tbody.innerHTML = r.data.map(a => `<tr><td><div style="font-weight:900;color:var(--cream)">${a.fullName}</div><div style="font-size:.73rem;color:var(--muted);font-family:var(--font-mono)">${a.phone}</div></td><td><span style="background:rgba(232,80,74,.15);color:var(--coral);border-radius:6px;padding:3px 10px;font-family:var(--font-mono);font-weight:900;font-size:.85rem;letter-spacing:1px">${a.refCode}</span></td><td><div style="font-weight:900">${a.referralTotal || 0}</div><div style="font-size:.72rem;color:var(--muted)">${a.referralEarned || 0} hoàn thành</div></td><td style="font-weight:900;color:var(--green)">${a.referralEarned || 0}</td><td style="font-weight:900;color:var(--yellow);font-family:var(--font-mono)">${(a.walletBalance||0).toLocaleString('vi-VN')}</td><td style="font-family:var(--font-mono);font-size:.82rem">${(a.totalEarned||0).toLocaleString('vi-VN')}</td><td><span class="status-pill ${a.status === 'active' ? 'approved' : 'rejected'}">${a.status === 'active' ? '🟢 Hoạt động' : '🔴 Khóa'}</span></td><td style="display:flex;gap:4px;flex-wrap:wrap"><button class="act-btn" onclick="viewSalesRefs('${a._id}','${a.fullName}','${a.refCode}')" style="font-size:.72rem;padding:4px 10px">📋 Refs</button><button class="act-btn ${a.status==='active'?'reject':''}" onclick="toggleSalesStatus('${a._id}','${a.status}')" style="font-size:.72rem;padding:4px 10px">${a.status==='active'?'🔒 Khóa':'🔓 Mở'}</button>${(a.walletBalance||0)>0?`<button class="act-btn" onclick="clearBalance('sales','${a._id}')" style="font-size:.72rem;padding:4px 10px" title="Số dư: ${fmtMoney(a.walletBalance)}">💱 Xoá</button>`:''}<button class="act-btn reject" onclick="deleteSales('${a._id}','${a.fullName}')" style="font-size:.72rem;padding:4px 8px">🗑️</button></td></tr>`).join('');
   } catch(e) { if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:var(--coral);text-align:center;padding:20px">❌ ' + e.message + '</td></tr>'; }
 }
 
@@ -2322,7 +2324,7 @@ async function loadCustomers() {
     const r = await apiFetch(url);
     if (!r.success) return;
     customerList = r.customers || [];
-    if(document.getElementById('userTbody')) document.getElementById('userTbody').innerHTML = customerList.map(u => `<tr><td style="font-weight:900;color:var(--coral)">${u.phone}</td><td>${u.fullName || '<em style="color:#888">Chưa đặt tên</em>'}</td><td style="color:#aaa;font-size:.8rem">${u.email || '—'}</td><td>${u.district || '—'}</td><td style="text-align:center;font-weight:900">${u.totalOrders||0}</td><td style="font-weight:700">${fmtMoney(u.totalSpent||0)}</td><td style="color:#aaa;font-size:.78rem">${fmtDate(u.createdAt)}</td><td><span class="status-pill ${u.status==='active'?'status-ap':'status-rj'}">${u.status==='active'?'Hoạt động':'Bị khóa'}</span></td><td style="display:flex;gap:4px;flex-wrap:wrap"><button onclick="toggleCustStatus('${u._id}','${u.status}')" class="act-btn" style="font-size:.72rem;padding:4px 10px">${u.status==='active'?'🔒 Khóa':'🔓 Mở'}</button><button onclick="deleteCust('${u._id}','${u.phone}')" class="act-btn reject" style="font-size:.72rem;padding:4px 10px">🗑️</button></td></tr>`).join('') || emptyRow(9);
+    if(document.getElementById('userTbody')) document.getElementById('userTbody').innerHTML = customerList.map(u => `<tr><td style="font-weight:900;color:var(--coral)">${u.phone}</td><td>${u.fullName || '<em style="color:#888">Chưa đặt tên</em>'}</td><td style="color:#aaa;font-size:.8rem">${u.email || '—'}</td><td>${u.district || '—'}</td><td style="text-align:center;font-weight:900">${u.totalOrders||0}</td><td style="font-weight:700">${fmtMoney(u.totalSpent||0)}</td><td style="color:#aaa;font-size:.78rem">${fmtDate(u.createdAt)}</td><td><span class="status-pill ${u.status==='active'?'status-ap':'status-rj'}">${u.status==='active'?'Hoạt động':'Bị khóa'}</span></td><td style="display:flex;gap:4px;flex-wrap:wrap"><button onclick="toggleCustStatus('${u._id}','${u.status}')" class="act-btn" style="font-size:.72rem;padding:4px 10px">${u.status==='active'?'🔒 Khóa':'🔓 Mở'}</button>${(u.walletBalance||0)>0?`<button onclick="clearBalance('user','${u._id}')" class="act-btn" style="font-size:.72rem;padding:4px 10px" title="Số dư: ${fmtMoney(u.walletBalance)}">💱 Xoá ${fmtMoney(u.walletBalance)}</button>`:''}<button onclick="deleteCust('${u._id}','${u.phone}')" class="act-btn reject" style="font-size:.72rem;padding:4px 10px">🗑️</button></td></tr>`).join('') || emptyRow(9);
     if (document.getElementById('custTotal')) setText('custTotal', r.total || customerList.length);
     if (document.getElementById('custToday')) { const today = new Date(); today.setHours(0,0,0,0); const todayCount = customerList.filter(u => new Date(u.createdAt) >= today).length; setText('custToday', todayCount); }
     const withOrders = customerList.filter(u => (u.totalOrders||0) > 0).length;
@@ -2332,6 +2334,17 @@ async function loadCustomers() {
 function searchCustomers() { clearTimeout(window._custTimer); window._custTimer = setTimeout(loadCustomers, 400); }
 async function toggleCustStatus(id, cur) { const ns = cur === 'active' ? 'banned' : 'active'; if (!confirm('Bạn có chắc muốn ' + (ns==='banned'?'khóa':'mở khóa') + ' tài khoản này?')) return; try { const r = await apiFetch('/api/admin/customers/' + id + '/status', 'PATCH', { status: ns }); if (r.success) { showNotif(ns==='banned'?'🔒 Đã khóa':'🔓 Đã mở khóa','Tài khoản đã cập nhật'); loadCustomers(); } } catch(e) {} }
 async function deleteCust(id, phone) { if (!confirm(`⚠️ XÓA tài khoản khách hàng ${phone}?\n\nToàn bộ dữ liệu sẽ bị xóa vĩnh viễn!\nNhấn OK để xác nhận.`)) return; try { const r = await apiFetch('/api/admin/customers/' + id, 'DELETE'); if (r.success) { showNotif('🗑️ Đã xóa', 'Tài khoản khách hàng đã bị xóa', 'coral'); loadCustomers(); loadStats(); } else showNotif('❌ Lỗi', r.message || 'Không xóa được', 'coral'); } catch(e) {} }
+
+// Xoá số dư ví về 0 cho khách / shipper / đối tác / sales
+async function clearBalance(type, id, module) {
+  const typeLabel = { user:'khách hàng', shipper:'shipper', partner:'đối tác', sales:'sales' };
+  if (!confirm(`⚠️ XOÁ SỐ DƯ ví của ${typeLabel[type]||type} này về 0?\n\nHành động này không thể hoàn tác!\nNhấn OK để xác nhận.`)) return;
+  try {
+    const r = await apiFetch('/api/admin/clear-balance', 'POST', { type, id, module });
+    if (r.success) { showNotif('💱 Đã xoá số dư', r.message || `Đã xoá ${fmtMoney(r.cleared)}`, 'green'); }
+    else showNotif('❌ Lỗi', r.message || 'Không xoá được', 'coral');
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //   FINANCE

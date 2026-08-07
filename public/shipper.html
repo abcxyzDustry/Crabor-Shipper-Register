@@ -538,7 +538,7 @@ async function loadWallet(apiPath, containerId) {
       <div class="wh-title">Lịch sử giao dịch</div>
       ${txs.length===0 ? '<div style="color:#888;font-size:.82rem;text-align:center;padding:20px">Chưa có giao dịch nào</div>'
         : txs.map(tx=>{
-          const isC = ['credit','loan_receive'].includes(tx.type);
+          const isC = ['credit','refund','loan_receive'].includes(tx.type);
           return '<div class="wh-item"><div class="wh-icon '+(isC?'credit':'debit')+'">'+(isC?'📥':'📤')+'</div><div class="wh-info"><div class="wh-note">'+(tx.note||tx.type)+'</div><div class="wh-date">'+new Date(tx.createdAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+'</div></div><div class="wh-amount '+(isC?'credit':'debit')+'">'+(isC?'+':'-')+tx.amount.toLocaleString('vi-VN')+'đ</div></div>';
         }).join('')
       }
