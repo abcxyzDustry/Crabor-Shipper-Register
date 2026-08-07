@@ -27,6 +27,8 @@ const SEPAY_CONFIG = {
   accountName: process.env.SEPAY_ACCOUNT_NAME || 'KIEU THANH HAI',
   apiToken:    process.env.SEPAY_API_TOKEN    || '',
   webhookUrl:  process.env.SEPAY_WEBHOOK_URL  || '/api/webhook/sepay',
+  // Secret để verify chữ ký webhook (nếu cấu hình HMAC-SHA256 trên my.sepay.vn)
+  webhookSecret: process.env.SEPAY_WEBHOOK_SECRET || '',
 };
 
 // Helper: tạo QR SePay (qr.sepay.vn)
@@ -231,7 +233,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type','Authorization','Cookie','X-Session-ID'],
   exposedHeaders: ['Set-Cookie'],
 }));
-app.use(express.json({ limit: '15mb' }));
+// ── Capture raw body để verify chữ ký webhook SePay HMAC ──
+app.use(express.json({
+  limit: '15mb',
+  verify: (req, res, buf) => { req.rawBody = buf.toString('utf8'); },
+}));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // ── Middleware: mobile client gửi X-Session-ID header → inject vào cookie ──
@@ -3798,8 +3804,48 @@ async function processSePayPayment(payload, ioRef) {
 }
 
 // POST /api/webhook/sepay — SePay gọi về khi có GD vào TK
+// Xác thực: HMAC-SHA256 (SEPAY_WEBHOOK_SECRET) hoặc API Key (SEPAY_WEBHOOK_API_KEY).
+// Nếu cả hai đều trống → không xác thực (chỉ nên dùng khi test).
+function verifySePayWebhook(req) {
+  const secret = SEPAY_CONFIG.webhookSecret;
+  if (secret) {
+    const sigHeader = req.headers['x-sepay-signature'] || '';
+    const tsHeader  = req.headers['x-sepay-timestamp'] || '';
+    if (!sigHeader || !tsHeader) return { ok: false, reason: 'Missing signature headers' };
+    // Chống replay: lệch quá 5 phút
+    if (Math.abs(Math.floor(Date.now() / 1000) - Number(tsHeader)) > 300) {
+      return { ok: false, reason: 'Request expired' };
+    }
+    const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(`${tsHeader}.${req.rawBody || ''}`).digest('hex');
+    const provided = String(sigHeader).trim().toLowerCase();
+    const a = Buffer.from(expected.toLowerCase());
+    const b = Buffer.from(provided);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return { ok: false, reason: 'Invalid signature' };
+    }
+    return { ok: true };
+  }
+  const apiKey = process.env.SEPAY_WEBHOOK_API_KEY;
+  if (apiKey) {
+    const auth = req.headers['authorization'] || '';
+    const provided = auth.startsWith('Apikey ') ? auth.slice(7) : '';
+    const a = Buffer.from(apiKey);
+    const b = Buffer.from(provided);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return { ok: false, reason: 'Invalid API Key' };
+    }
+    return { ok: true };
+  }
+  return { ok: true }; // Không cấu hình → không xác thực
+}
+
 app.post("/api/webhook/sepay", async (req, res) => {
   try {
+    const v = verifySePayWebhook(req);
+    if (!v.ok) {
+      console.warn('[SEPAY Webhook] Rejected:', v.reason);
+      return res.status(401).json({ success: false, message: v.reason });
+    }
     await processSePayPayment(req.body, req.io);
     res.json({ success: true }); // Always 200 — SePay retries on non-200
   } catch(err) {
