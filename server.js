@@ -1107,6 +1107,20 @@ function getPartnerModel(mod) {
   return slug[mod] || null;
 }
 
+// Resolve FoodPartner theo session — hỗ trợ 1 tài khoản đăng ký nhiều module (giặt là + đồ ăn cùng phone)
+// Ưu tiên tìm theo phone để luôn lấy đúng quán đồ ăn, không phụ thuộc session.partnerId (chỉ trỏ 1 module)
+async function getSessionFoodPartner(req) {
+  if (req.session?.userPhone) {
+    const fp = await FoodPartner.findOne({ phone: normalizePhone(req.session.userPhone) }).catch(() => null);
+    if (fp) return fp;
+  }
+  if (req.session?.partnerModule === 'food_partner' && req.session?.partnerId) {
+    const fp = await FoodPartner.findById(req.session.partnerId).catch(() => null);
+    if (fp) return fp;
+  }
+  return null;
+}
+
 function slugify(fe) {
   const MAP = {
     // short codes từ backend cũ
@@ -2381,7 +2395,9 @@ app.get("/api/shipper/tier", async (req, res) => {
 // GET /api/partner/revenue-chart — Biểu đồ doanh thu 7 ngày
 app.get("/api/partner/revenue-chart", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success: false });
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success: false });
+    const pid = partner._id;
     const days = [];
     const labels = [];
     const now = new Date();
@@ -2389,7 +2405,7 @@ app.get("/api/partner/revenue-chart", async (req, res) => {
       const d = new Date(now); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
       const end = new Date(d); end.setHours(23,59,59,999);
       const agg = await Order.aggregate([
-        { $match: { partnerId: req.session.partnerId, status:"delivered", deliveredAt:{$gte:d,$lte:end} }},
+        { $match: { partnerId: pid, status:"delivered", deliveredAt:{$gte:d,$lte:end} }},
         { $group: { _id:null, total:{$sum:"$finalTotal"}, count:{$sum:1} }}
       ]);
       days.push({ revenue: agg[0]?.total||0, orders: agg[0]?.count||0 });
@@ -2496,30 +2512,17 @@ app.get("/api/flash-deals", async (req, res) => {
 // PATCH /api/partner/accepting — Partner bật/tắt nhận đơn
 app.patch("/api/partner/accepting", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
     const isAccepting = req.body.isAccepting ?? req.body.accepting;
-    let mod = req.session.partnerModule;
-    // Auto-detect module nếu session không có
-    if (!mod) {
-      const pModels = [
-        { model: FoodPartner, key: "food_partner" },
-        { model: GiatLa,      key: "giat_la" },
-        { model: GiupViec,    key: "giup_viec" },
-        { model: ChinaShop,   key: "china_shop" },
-      ];
-      for (const { model, key } of pModels) {
-        const found = await model.findById(req.session.partnerId);
-        if (found) { mod = key; req.session.partnerModule = key; break; }
-      }
-    }
+    const mod = "food_partner";
     const Model = getPartnerModel(mod);
-    if (!Model) return res.status(400).json({ success: false, message: "Không xác định loại partner. Đăng xuất và đăng nhập lại." });
-    await Model.findByIdAndUpdate(req.session.partnerId, { isAccepting: !!isAccepting });
+    await Model.findByIdAndUpdate(partner._id, { isAccepting: !!isAccepting });
     req.io.to("admin").emit("partnerStatusChanged", {
-      partnerId: req.session.partnerId, isAccepting, module: mod
+      partnerId: partner._id, isAccepting, module: mod
     });
     // Notify shipper broadcast room
-    if (!!isAccepting) req.io.to("shipper_broadcast").emit("partner_online", { partnerId: req.session.partnerId });
+    if (!!isAccepting) req.io.to("shipper_broadcast").emit("partner_online", { partnerId: partner._id });
     res.json({ success: true, isAccepting: !!isAccepting });
   } catch(err) {
     console.error('[PATCH /api/partner/accepting] Error:', err);
@@ -2794,8 +2797,8 @@ const FEATURED_PACKAGES = [
 app.post("/api/partner/featured/request", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
-    const partner = await FoodPartner.findById(req.session.partnerId);
+    if (!req.session.partnerId && !req.session.userPhone) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const partner = await getSessionFoodPartner(req);
     if (!partner) return res.status(404).json({ success:false, message:"Không tìm thấy quán" });
     if (partner.status !== "approved") return res.status(403).json({ success:false, message:"Quán chưa được duyệt" });
 
@@ -2900,8 +2903,10 @@ app.post("/api/partner/featured/request", async (req, res) => {
 app.post("/api/partner/featured/request/:id/confirm-payment", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
-    const request = await FeaturedRequest.findOne({ _id: req.params.id, partnerId: req.session.partnerId });
+    if (!req.session.partnerId && !req.session.userPhone) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(404).json({ success:false, message:"Không tìm thấy quán" });
+    const request = await FeaturedRequest.findOne({ _id: req.params.id, partnerId: partner._id });
     if (!request) return res.status(404).json({ success:false, message:"Không tìm thấy yêu cầu" });
     if (request.paymentStatus === "paid")
       return res.json({ success:true, request });
@@ -2917,9 +2922,10 @@ app.post("/api/partner/featured/request/:id/confirm-payment", async (req, res) =
 app.get("/api/partner/featured/status", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
-    const partner = await FoodPartner.findById(req.session.partnerId).select("featured featuredUntil featuredBanner featuredHours featuredPackage featuredAt");
-    const requests = await FeaturedRequest.find({ partnerId: req.session.partnerId }).sort({ createdAt: -1 }).limit(20);
+    if (!req.session.partnerId && !req.session.userPhone) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const partner = await getSessionFoodPartner(req);
+    const pid = partner?._id || req.session.partnerId;
+    const requests = await FeaturedRequest.find({ partnerId: pid }).sort({ createdAt: -1 }).limit(20);
     res.json({
       success: true,
       featured: {
@@ -5079,18 +5085,23 @@ app.post("/api/shipper/session", async (req, res) => {
 // GET /api/partner/me — Partner tìm profile theo session phone
 app.get("/api/partner/me", async (req, res) => {
   try {
+    await loadSessionFromHeader(req, res);
     const phone = req.session.userPhone;
     if (!phone) return res.status(401).json({ success: false, message: "Chưa xác thực" });
-    const models = [
-      { model: GiatLa, module: "giat_la", name: "Giặt Là" },
-      { model: GiupViec, module: "giup_viec", name: "Giúp Việc" },
-      { model: ChinaShop, module: "china_shop", name: "China Shop" },
-      { model: FoodPartner, module: "food_partner", name: "Nhà hàng" },
-    ];
-    for (const { model, module, name } of models) {
-      const p = await model.findOne({ phone });
-      if (p) {
-        const pObj = p.toObject ? p.toObject() : p;
+    // FIX: Tài khoản có thể đăng ký nhiều module (giặt là + đồ ăn cùng phone) → ưu tiên FoodPartner
+    const foodPartner = await getSessionFoodPartner(req);
+    const models = foodPartner
+      ? [{ model: FoodPartner, module: "food_partner", name: "Nhà hàng", p: foodPartner }]
+      : [
+          { model: GiatLa, module: "giat_la", name: "Giặt Là" },
+          { model: GiupViec, module: "giup_viec", name: "Giúp Việc" },
+          { model: ChinaShop, module: "china_shop", name: "China Shop" },
+          { model: FoodPartner, module: "food_partner", name: "Nhà hàng" },
+        ];
+    for (const { model, module, name, p } of models) {
+      const found = p || await model.findOne({ phone });
+      if (found) {
+        const pObj = found.toObject ? found.toObject() : found;
         if (pObj.documents) {
           Object.keys(pObj.documents).forEach(k => {
             const v = pObj.documents[k];
@@ -5394,6 +5405,11 @@ app.get("/api/auth/me", async (req, res) => {
     return res.json({ success: true, role: "shipper", shipper });
   }
   if (req.session.role === "partner" && req.session.partnerId) {
+    // FIX: tài khoản nhiều module — ưu tiên FoodPartner theo phone
+    const foodPartner = await getSessionFoodPartner(req);
+    if (foodPartner) {
+      return res.json({ success: true, role: "partner", partner: foodPartner, module: "food_partner" });
+    }
     const model = getPartnerModel(req.session.partnerModule);
     if (model) {
       const partner = await model.findById(req.session.partnerId);
@@ -5972,8 +5988,9 @@ app.post("/api/shipper/register", async (req, res) => {
 // GET /api/partner/menu
 app.get("/api/partner/menu", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
-    const products = await Product.find({ partnerId: req.session.partnerId }).sort({ createdAt: -1 });
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const products = await Product.find({ partnerId: partner._id }).sort({ createdAt: -1 });
     res.json({ success: true, items: products });
   } catch(err) { res.status(500).json({ success:false, message: err.message }); }
 });
@@ -5981,11 +5998,12 @@ app.get("/api/partner/menu", async (req, res) => {
 // POST /api/partner/menu — thêm món
 app.post("/api/partner/menu", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
     const { name, price, category, description, available, image } = req.body;
     if (!name || !price) return res.status(400).json({ success:false, message:"Thiếu tên hoặc giá" });
     const item = await Product.create({
-      partnerId: req.session.partnerId,
+      partnerId: partner._id,
       name: name.trim(), price: Number(price),
       category: category?.trim() || "Khác",
       description: description?.trim() || "",
@@ -5999,9 +6017,10 @@ app.post("/api/partner/menu", async (req, res) => {
 // PATCH /api/partner/menu/:id — sửa món
 app.patch("/api/partner/menu/:id", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
     const item = await Product.findOneAndUpdate(
-      { _id: req.params.id, partnerId: req.session.partnerId },
+      { _id: req.params.id, partnerId: partner._id },
       req.body, { new: true }
     );
     if (!item) return res.status(404).json({ success:false, message:"Không tìm thấy món" });
@@ -6012,8 +6031,9 @@ app.patch("/api/partner/menu/:id", async (req, res) => {
 // DELETE /api/partner/menu/:id — xóa món
 app.delete("/api/partner/menu/:id", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
-    await Product.findOneAndDelete({ _id: req.params.id, partnerId: req.session.partnerId });
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    await Product.findOneAndDelete({ _id: req.params.id, partnerId: partner._id });
     res.json({ success: true });
   } catch(err) { res.status(500).json({ success:false, message: err.message }); }
 });
@@ -6021,8 +6041,9 @@ app.delete("/api/partner/menu/:id", async (req, res) => {
 // GET /api/partner/orders — lấy đơn hàng của partner
 app.get("/api/partner/orders", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
-    const orders = await Order.find({ partnerId: req.session.partnerId })
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const orders = await Order.find({ partnerId: partner._id })
       .sort({ createdAt: -1 }).limit(100).lean();
     // Đảm bảo mọi order đều có field discount/finalTotal để partner app hiển thị nhất quán
     const enriched = orders.map(o => ({
@@ -6041,8 +6062,10 @@ app.get("/api/partner/orders", async (req, res) => {
 // Partner app gọi { action: 'accept' | 'reject' }
 app.patch("/api/partner/orders/:id", async (req, res) => {
   try {
-    if (!req.session.partnerId)
+    const partner = await getSessionFoodPartner(req);
+    if (!partner)
       return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const partnerId = partner._id;
 
     const { action, note } = req.body;
     if (!action || !["accept", "reject"].includes(action))
@@ -6058,7 +6081,7 @@ app.patch("/api/partner/orders/:id", async (req, res) => {
     if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
 
     // Chỉ cho phép partner sở hữu đơn này
-    if (order.partnerId && order.partnerId.toString() !== req.session.partnerId.toString())
+    if (order.partnerId && order.partnerId.toString() !== partnerId.toString())
       return res.status(403).json({ success: false, message: "Bạn không có quyền thao tác đơn này" });
 
     if (action === "accept") {
@@ -6162,8 +6185,9 @@ app.patch("/api/partner/orders/:id", async (req, res) => {
 // GET /api/partner/stats
 app.get("/api/partner/stats", async (req, res) => {
   try {
-    if (!req.session.partnerId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
-    const pid = req.session.partnerId;
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const pid = partner._id;
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -6645,9 +6669,14 @@ app.get("/api/partner/wallet", async (req, res) => {
   try {
     if (!req.session.partnerId && !req.session.userPhone)
       return res.status(401).json({ success: false });
-    // Dùng partnerId hoặc userPhone để lấy wallet
+    // FIX: Ưu tiên FoodPartner (tài khoản nhiều module) — Featured debit vào wallet FoodPartner
+    const foodPartner = await getSessionFoodPartner(req);
     const wallet = await (async () => {
-      // Thử wallet từ partner document
+      if (foodPartner) {
+        const p = await FoodPartner.findById(foodPartner._id).select("walletBalance walletHistory");
+        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [] };
+      }
+      // Dùng partnerId hoặc userPhone để lấy wallet
       const models = [
         require("mongoose").models.GiatLa,
         require("mongoose").models.GiupViec,
@@ -10327,19 +10356,26 @@ app.post("/api/coco/partner", async (req, res) => {
     // Lấy thông tin partner
     let partner = null;
     let module = null;
-    const models = [
-      { model: mongoose.models.FoodPartner, key: "food_partner" },
-      { model: mongoose.models.GiatLa,      key: "giat_la" },
-      { model: mongoose.models.GiupViec,    key: "giup_viec" },
-      { model: mongoose.models.ChinaShop,   key: "china_shop" },
-    ].filter(m => m.model);
-    
-    for (const { model, key } of models) {
-      const p = await model.findById(req.session.partnerId);
-      if (p) {
-        partner = p;
-        module = key;
-        break;
+    // FIX: tài khoản nhiều module — ưu tiên FoodPartner theo phone
+    const foodPartner = await getSessionFoodPartner(req);
+    if (foodPartner) {
+      partner = foodPartner;
+      module = "food_partner";
+    } else {
+      const models = [
+        { model: mongoose.models.FoodPartner, key: "food_partner" },
+        { model: mongoose.models.GiatLa,      key: "giat_la" },
+        { model: mongoose.models.GiupViec,    key: "giup_viec" },
+        { model: mongoose.models.ChinaShop,   key: "china_shop" },
+      ].filter(m => m.model);
+      
+      for (const { model, key } of models) {
+        const p = await model.findById(req.session.partnerId);
+        if (p) {
+          partner = p;
+          module = key;
+          break;
+        }
       }
     }
     
