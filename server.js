@@ -3577,7 +3577,7 @@ app.patch("/api/admin/loan/:id", adminAuth, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 
 // ── Hàm xử lý chính — dùng cho cả webhook và polling ─────────
-async function processSePayPayment(payload, ioRef) {
+async function processSePayPayment(payload, ioRef, force = false) {
   const ioInstance = ioRef || (global._io) || io;
   // SePay gửi: { id, gateway, transactionDate, accountNumber,
   //              code, content, transferType, transferAmount,
@@ -3595,14 +3595,23 @@ async function processSePayPayment(payload, ioRef) {
   if (txId) {
     const existed = await SePayTx.findOne({ txId }).catch(() => null);
     if (existed) {
-      console.log(`[SEPAY] Duplicate tx ${txId} (${rawRef}) — skipped`);
-      return { handled: true, duplicate: true };
-    }
-    try {
-      await SePayTx.create({ txId, ref: rawRef, amount, rawContent: content || '', handled: false });
-    } catch (e) {
-      if (e?.code === 11000) { console.log(`[SEPAY] Duplicate tx ${txId} — skipped`); return { handled: true, duplicate: true }; }
-      console.error('[SEPAY] Lưu log tx lỗi:', e.message);
+      // force=true (polling retry): chỉ bỏ qua khi đã handled thành công
+      if (!force) {
+        console.log(`[SEPAY] Duplicate tx ${txId} (${rawRef}) — skipped`);
+        return { handled: true, duplicate: true };
+      }
+      if (existed.handled && existed.note === 'matched') {
+        console.log(`[SEPAY] Tx ${txId} (${rawRef}) — already handled, skipped`);
+        return { handled: true, duplicate: true };
+      }
+      // Chưa matched trước đó → tiếp tục xử lý lại
+    } else {
+      try {
+        await SePayTx.create({ txId, ref: rawRef, amount, rawContent: content || '', handled: false });
+      } catch (e) {
+        if (e?.code === 11000) { console.log(`[SEPAY] Duplicate tx ${txId} — skipped`); return { handled: true, duplicate: true }; }
+        console.error('[SEPAY] Lưu log tx lỗi:', e.message);
+      }
     }
   }
 
@@ -3657,8 +3666,11 @@ async function processSePayPayment(payload, ioRef) {
   const topupMatch = rawRef.match(/CRTOPUP([A-Z0-9]+)/);
   if (topupMatch && !handled) {
     const uid = topupMatch[1];
-    // Try to match userId (last 8 chars)
-    const user = await User.findOne({ _id: { $regex: uid, $options:'i' } }).catch(()=>null);
+    // _id là ObjectId (binary) — không regex được trực tiếp.
+    // So sánh qua $toString hex để khớp 8 ký tự cuối.
+    const user = await User.findOne({
+      $expr: { $regexMatch: { input: { $toString: "$_id" }, regex: new RegExp(uid + "$", "i") } },
+    }).catch(() => null);
     if (user && amount >= 10000) {
       await walletCredit(user._id, 'user', amount, rawRef, 'Nạp ví CRABOR');
       ioInstance?.to(`customer_${user._id}`).emit('walletCredited', { amount, newBalance: (await User.findById(user._id).select('walletBalance').lean())?.walletBalance });
@@ -3670,13 +3682,16 @@ async function processSePayPayment(payload, ioRef) {
   const loanMatch = rawRef.match(/CRLOAN([A-Z0-9]+)/);
   if (loanMatch && !handled) {
     const suffix = loanMatch[1];
-    const loan = await Loan.findOne({ _id: { $regex: suffix, $options:'i' }, status:{$in:['approved','active']} });
+    const loan = await Loan.findOne({
+      $expr: { $regexMatch: { input: { $toString: "$_id" }, regex: new RegExp(suffix + "$", "i") } },
+      status: { $in: ['approved', 'active'] },
+    });
     if (loan && amount > 0) {
       const remaining = loan.totalRepay - loan.paidAmount - amount;
       const newStatus = remaining <= 0 ? 'repaid' : 'active';
-      await Loan.findByIdAndUpdate(loan._id, { $inc:{paidAmount:amount}, status:newStatus });
-      if (newStatus==='repaid') {
-        ioInstance?.to(loan.userId.toString()).emit('loanRepaid', { loanId:loan._id });
+      await Loan.findByIdAndUpdate(loan._id, { $inc: { paidAmount: amount }, status: newStatus });
+      if (newStatus === 'repaid') {
+        ioInstance?.to(loan.userId.toString()).emit('loanRepaid', { loanId: loan._id });
       }
       handled = true;
     }
@@ -3868,9 +3883,9 @@ async function pollSePayTransactions() {
     if (!Array.isArray(list) || !list.length) return;
     for (const tx of list) {
       if (tx.transfer_type !== 'in') continue;
-      // Bỏ qua giao dịch đã xử lý (SePayTx txId trùng)
+      // Giao dịch đã matched thành công → bỏ qua. Chưa matched → retry (force=true)
       const existing = await SePayTx.findOne({ txId: String(tx.id) }).catch(() => null);
-      if (existing) continue;
+      if (existing && existing.handled && existing.note === 'matched') continue;
       await processSePayPayment({
         id: tx.id,
         content: tx.transaction_content,
@@ -3878,7 +3893,7 @@ async function pollSePayTransactions() {
         transferType: tx.transfer_type,
         referenceCode: tx.reference_number,
         transactionDate: tx.transaction_date,
-      }, null);
+      }, null, existing ? true : false);
     }
     console.log(`[SEPAY] Polled ${list.length} transactions`);
   } catch (err) {
@@ -11428,10 +11443,14 @@ app.post("/api/wallet/topup/check", async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
 
     // Tìm giao dịch CRTOPUP mới nhất của user (không cần orderCode — SePay chỉ match nội dung CK)
+    // Lưu ý: webhook lưu mã CRTOPUP vào field "ref", note là 'Nạp ví CRABOR'
     const tx = await WalletTx.findOne({
       ownerId: req.session.userId,
       type: 'credit',
-      note: { $regex: 'CRTOPUP', $options: 'i' },
+      $or: [
+        { ref: { $regex: 'CRTOPUP', $options: 'i' } },
+        { note: { $regex: 'CRTOPUP', $options: 'i' } },
+      ],
     }).sort({ createdAt: -1 });
 
     if (tx) {
