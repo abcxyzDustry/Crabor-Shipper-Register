@@ -3701,39 +3701,72 @@ async function processSePayPayment(payload, ioRef, force = false) {
   const orderMatch = rawRef.match(/CRORD([A-Z0-9]{6,10})/);
   if (orderMatch && !handled) {
     const suffix = orderMatch[1];
-    const order = await Order.findOne({
-      sePayRef: { $regex: suffix, $options: "i" },
+    // Match theo sePayRef (nếu QR được tạo từ server) HOẶC theo orderId
+    // (nếu shipper app fallback tạo QR client-side, sePayRef chưa được lưu DB).
+    // orderId dạng "ORD-XXX-XXXX" → sau khi bỏ dấu "-" khớp đuôi với suffix.
+    const orderIdPat = new RegExp(suffix.split("").join("-?") + "$", "i");
+    let order = await Order.findOne({
       paymentStatus: { $in: ["unpaid", "pending_review"] },
+      $or: [
+        { sePayRef: { $regex: suffix, $options: "i" } },
+        { orderId: { $regex: orderIdPat } },
+      ],
     });
+    // Fallback cuối: quét đuôi orderId không quan trọng dấu gạch
+    if (!order) {
+      const all = await Order.find({ paymentStatus: { $in: ["unpaid", "pending_review"] } })
+        .select("orderId paymentStatus")
+        .lean()
+        .catch(() => []);
+      order = all.find(o => o.orderId && o.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase() === suffix) || null;
+      if (order) order = await Order.findById(order._id);
+    }
     if (order && amount >= (order.finalTotal || order.total) - 1000) {
       order.paymentStatus = "paid";
       order.paidAt = new Date();
+      order.sePayRef = order.sePayRef || rawRef;
       order.statusHistory.push({ status: "payment_confirmed_sepay", by: "system" });
       await order.save();
 
       // Tính tiền shipper + partner
       const { shipperEarn, partnerEarn } = await calcEarnings(order);
 
-      // Xoá wallet queue cũ (nếu đã add lúc confirm thủ công) và tạo lại với status pending
+      // SePay xác nhận thành công → AUTO DUYỆT, cộng tiền thẳng vào ví (không cần admin)
+      // Xoá wallet queue pending cũ (nếu shipper/partner đã confirm thủ công trước đó)
       await WalletQueue.deleteMany({ orderId: order.orderId, status: "pending" });
 
-      if (order.shipperId) {
-        await WalletQueue.create({
-          orderId: order.orderId, recipientId: order.shipperId,
-          recipientType: "shipper", amount: shipperEarn,
-          paymentMethod: "bank_transfer",
-          note: `Đơn ${order.orderId} — SePay confirmed`,
-          status: "pending",
-        });
+      // Chống cộng đúp: nếu queue đã được auto-approve trước đó (30 phút) thì không cộng lại
+      if (order.shipperId && shipperEarn > 0) {
+        const already = await WalletQueue.findOne({
+          orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
+          amount: shipperEarn, status: "approved",
+        }).lean().catch(() => null);
+        if (!already) {
+          await creditWalletDirect(order.shipperId, "shipper", shipperEarn);
+          await WalletQueue.create({
+            orderId: order.orderId, recipientId: order.shipperId,
+            recipientType: "shipper", amount: shipperEarn,
+            paymentMethod: "bank_transfer",
+            note: `Đơn ${order.orderId} — SePay auto duyệt`,
+            status: "approved", approvedBy: "sepay_auto", approvedAt: new Date(),
+          });
+        }
       }
-      if (order.partnerId) {
-        await WalletQueue.create({
-          orderId: order.orderId, recipientId: order.partnerId,
-          recipientType: "partner", amount: partnerEarn,
-          paymentMethod: "bank_transfer",
-          note: `Đơn ${order.orderId} — SePay confirmed`,
-          status: "pending",
-        });
+      if (order.partnerId && partnerEarn > 0) {
+        const already = await WalletQueue.findOne({
+          orderId: order.orderId, recipientId: order.partnerId, recipientType: "partner",
+          amount: partnerEarn, status: "approved",
+        }).lean().catch(() => null);
+        if (!already) {
+          await creditWalletDirect(order.partnerId, "partner", partnerEarn);
+          await WalletQueue.create({
+            orderId: order.orderId, recipientId: order.partnerId,
+            recipientType: "partner", amount: partnerEarn,
+            paymentMethod: "bank_transfer",
+            note: `Đơn ${order.orderId} — SePay auto duyệt`,
+            status: "approved", approvedBy: "sepay_auto", approvedAt: new Date(),
+          });
+        }
       }
 
       // Notify shipper qua socket
@@ -3764,19 +3797,65 @@ async function processSePayPayment(payload, ioRef, force = false) {
   const lauMatch = rawRef.match(/CRLAU([A-Z0-9]{6,10})/);
   if (lauMatch && !handled) {
     const suffix = lauMatch[1];
-    const lau = await LaundryOrder.findOne({
-      sePayRef: { $regex: suffix, $options: "i" },
+    const lauIdPat = new RegExp(suffix.split("").join("-?") + "$", "i");
+    let lau = await LaundryOrder.findOne({
       paymentStatus: { $in: ["unpaid", "pending_review"] },
+      $or: [
+        { sePayRef: { $regex: suffix, $options: "i" } },
+        { orderId: { $regex: lauIdPat } },
+      ],
     });
+    if (!lau) {
+      const lauAll = await LaundryOrder.find({ paymentStatus: { $in: ["unpaid", "pending_review"] } })
+        .select("orderId paymentStatus")
+        .lean()
+        .catch(() => []);
+      lau = lauAll.find(o => o.orderId && o.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase() === suffix) || null;
+      if (lau) lau = await LaundryOrder.findById(lau._id);
+    }
     if (lau && amount >= (lau.finalTotal || lau.estimatedTotal || 0) - 1000) {
       lau.paymentStatus = "paid";
       lau.paidAt = new Date();
+      lau.sePayRef = lau.sePayRef || rawRef;
       lau.statusHistory.push({ status: "payment_confirmed_sepay", by: "system" });
       await lau.save();
 
       const { shipperEarn, partnerEarn } = await calcEarnings({ ...lau.toObject(), module: "laundry" });
-      if (lau.shipperId)  await addToWalletQueue(lau.orderId, lau.shipperId, "shipper", shipperEarn, "bank_transfer", `Giặt là ${lau.orderId} — SePay`);
-      if (lau.partnerId)  await addToWalletQueue(lau.orderId, lau.partnerId, "partner", partnerEarn, "bank_transfer", `Giặt là ${lau.orderId} — SePay`);
+
+      // AUTO DUYỆT: cộng thẳng vào ví khi SePay xác nhận
+      await WalletQueue.deleteMany({ orderId: lau.orderId, status: "pending" });
+      if (lau.shipperId && shipperEarn > 0) {
+        const already = await WalletQueue.findOne({
+          orderId: lau.orderId, recipientId: lau.shipperId, recipientType: "shipper",
+          amount: shipperEarn, status: "approved",
+        }).lean().catch(() => null);
+        if (!already) {
+          await creditWalletDirect(lau.shipperId, "shipper", shipperEarn);
+          await WalletQueue.create({
+            orderId: lau.orderId, recipientId: lau.shipperId,
+            recipientType: "shipper", amount: shipperEarn,
+            paymentMethod: "bank_transfer",
+            note: `Giặt là ${lau.orderId} — SePay auto duyệt`,
+            status: "approved", approvedBy: "sepay_auto", approvedAt: new Date(),
+          });
+        }
+      }
+      if (lau.partnerId && partnerEarn > 0) {
+        const already = await WalletQueue.findOne({
+          orderId: lau.orderId, recipientId: lau.partnerId, recipientType: "partner",
+          amount: partnerEarn, status: "approved",
+        }).lean().catch(() => null);
+        if (!already) {
+          await creditWalletDirect(lau.partnerId, "partner", partnerEarn);
+          await WalletQueue.create({
+            orderId: lau.orderId, recipientId: lau.partnerId,
+            recipientType: "partner", amount: partnerEarn,
+            paymentMethod: "bank_transfer",
+            note: `Giặt là ${lau.orderId} — SePay auto duyệt`,
+            status: "approved", approvedBy: "sepay_auto", approvedAt: new Date(),
+          });
+        }
+      }
 
       if (lau.customerId) {
         ioInstance.to(`customer_${lau.customerId}`).emit("order_status_update", {
@@ -6840,11 +6919,11 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
       const { shipperEarn } = await calcEarnings(order);
       const WalletQueue = mongoose.models.WalletQueue;
       if (WalletQueue) {
-        await WalletQueue.create({
-          orderId: order.orderId, recipientId: shipperId, recipientType: "shipper",
-          amount: shipperEarn, note: `Dọn nhà ${order.orderId}`, status: "pending",
-          releaseAt: new Date(Date.now() + 30 * 60 * 1000),
-        });
+        await addToWalletQueue(
+          order.orderId, shipperId, "shipper", shipperEarn, order.paymentMethod,
+          `Dọn nhà ${order.orderId}`,
+          new Date(Date.now() + 30 * 60 * 1000)
+        );
       }
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "completed",
@@ -7087,29 +7166,20 @@ async function handleConfirmPayment(req, res) {
     const releaseAt = new Date(Date.now() + 30 * 60 * 1000); // 30 phút
 
     // Lưu wallet queue với timestamp để cron job hoặc admin duyệt
+    // Dùng addToWalletQueue để chống trùng với queue đã tạo lúc delivered
     if (order.shipperId) {
-      await WalletQueue.create({
-        orderId:       order.orderId,
-        recipientId:   order.shipperId,
-        recipientType: "shipper",
-        amount:        shipperEarn,
-        paymentMethod: order.paymentMethod,
-        note:          `Đơn ${order.orderId} — phí ship (xác nhận thủ công)`,
-        status:        "pending",
-        releaseAt,
-      });
+      await addToWalletQueue(
+        order.orderId, order.shipperId, "shipper", shipperEarn, order.paymentMethod,
+        `Đơn ${order.orderId} — phí ship (xác nhận thủ công)`,
+        releaseAt
+      );
     }
     if (order.partnerId) {
-      await WalletQueue.create({
-        orderId:       order.orderId,
-        recipientId:   order.partnerId,
-        recipientType: "partner",
-        amount:        partnerEarn,
-        paymentMethod: order.paymentMethod,
-        note:          `Đơn ${order.orderId} — tiền hàng (xác nhận thủ công)`,
-        status:        "pending",
-        releaseAt,
-      });
+      await addToWalletQueue(
+        order.orderId, order.partnerId, "partner", partnerEarn, order.paymentMethod,
+        `Đơn ${order.orderId} — tiền hàng (xác nhận thủ công)`,
+        releaseAt
+      );
     }
 
     // Thông báo admin
@@ -9003,11 +9073,30 @@ async function calcEarnings(order) {
 }
 
 // ── Helper: thêm vào wallet pending queue (tránh trùng) ──────
-async function addToWalletQueue(orderId, recipientId, recipientType, amount, paymentMethod, note) {
+async function addToWalletQueue(orderId, recipientId, recipientType, amount, paymentMethod, note, releaseAt = null) {
   if (amount <= 0) return;
   const exists = await WalletQueue.findOne({ orderId, recipientId, recipientType, amount, status: { $in: ["pending", "approved"] } }).lean().catch(() => null);
   if (exists) return;
-  await WalletQueue.create({ orderId, recipientId, recipientType, amount, paymentMethod, note });
+  await WalletQueue.create({ orderId, recipientId, recipientType, amount, paymentMethod, note, releaseAt });
+}
+
+// ── Helper: cộng tiền trực tiếp vào ví (auto-duyệt) ─────────
+async function creditWalletDirect(recipientId, recipientType, amount) {
+  if (!recipientId || amount <= 0) return;
+  if (recipientType === "shipper") {
+    const upd = await Shipper.findByIdAndUpdate(recipientId, { $inc: { walletBalance: amount, totalEarnings: amount } });
+    if (upd) return upd;
+    return null;
+  }
+  const pModels = [
+    mongoose.models.FoodPartner, mongoose.models.GiatLa,
+    mongoose.models.GiupViec,   mongoose.models.ChinaShop,
+  ].filter(Boolean);
+  for (const m of pModels) {
+    const upd = await m.findByIdAndUpdate(recipientId, { $inc: { walletBalance: amount, totalSales: amount } });
+    if (upd) return upd;
+  }
+  return null;
 }
 
 // ══════════════════════════════════════════════════════════════
