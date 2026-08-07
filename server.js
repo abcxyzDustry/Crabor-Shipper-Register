@@ -997,6 +997,46 @@ const walletTxSchema = new mongoose.Schema({
 walletTxSchema.index({ ownerId: 1, createdAt: -1 });
 const WalletTx = mongoose.model('WalletTx', walletTxSchema);
 
+// ── NOTIFICATION (chuông thông báo) ───────────────────────────
+const notificationSchema = new mongoose.Schema({
+  ownerType: { type: String, enum: ['user','shipper','partner','sales'], required: true },
+  ownerId:   { type: mongoose.Schema.Types.ObjectId, required: true },
+  type:      { type: String, enum: ['featured','new_order','income','withdraw','topup','product','cash_due','support','system'], default: 'system' },
+  title:     { type: String, required: true, trim: true },
+  body:      { type: String, trim: true, maxlength: 500 },
+  ref:       { type: String, trim: true },               // orderId, productId...
+  refModule: { type: String, trim: true },               // food|laundry|ride|cleaning|china...
+  read:      { type: Boolean, default: false },
+}, { timestamps: true });
+notificationSchema.index({ ownerId: 1, read: 1, createdAt: -1 });
+const Notification = mongoose.model('Notification', notificationSchema);
+
+// Helper: tạo notification + emit socket realtime
+async function notifyUser(ownerType, ownerId, { type = 'system', title, body = '', ref = '', refModule = '' }) {
+  try {
+    const n = await Notification.create({ ownerType, ownerId, type, title, body, ref, refModule });
+    const room = ownerType === 'user' ? `customer_${ownerId}` : `${ownerType}_${ownerId}`;
+    const io = global._io;
+    if (io) io.to(room).emit('new_notification', { _id: n._id, type, title, body, ref, refModule, read: false, createdAt: n.createdAt });
+    return n;
+  } catch (e) { console.error('[Notify] error:', e.message); return null; }
+}
+
+// ── WITHDRAW REQUEST (rút tiền về ngân hàng) ──────────────────
+const withdrawRequestSchema = new mongoose.Schema({
+  ownerId:     { type: mongoose.Schema.Types.ObjectId, required: true },
+  ownerType:   { type: String, enum: ['user','shipper','partner'], required: true },
+  amount:      { type: Number, required: true, min: 0 },
+  bankName:    { type: String, trim: true, required: true },
+  accountNo:   { type: String, trim: true, required: true },
+  accountName: { type: String, trim: true, required: true },
+  status:      { type: String, enum: ['pending','approved','rejected'], default: 'pending' },
+  adminNote:   { type: String, trim: true },
+  processedAt: Date,
+}, { timestamps: true });
+withdrawRequestSchema.index({ status: 1, createdAt: -1 });
+const WithdrawRequest = mongoose.model('WithdrawRequest', withdrawRequestSchema);
+
 // ── SEPAY TRANSACTION LOG (chống trùng webhook / idempotent) ──
 const sePayTxSchema = new mongoose.Schema({
   txId:       { type: String, unique: true, required: true },   // SePay transaction id — chống trùng
@@ -2774,6 +2814,21 @@ app.post("/api/support", async (req, res) => {
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
+// GET /api/support/my — Customer/Shipper/Partner lấy danh sách ticket của mình
+app.get("/api/support/my", async (req, res) => {
+  try {
+    const { role, phone } = req.query;
+    const filter = {};
+    if (req.session.userId) filter.userId = req.session.userId;
+    else if (req.session.shipperId) filter.userId = req.session.shipperId;
+    else if (req.session.partnerId) filter.userId = req.session.partnerId;
+    else if (role && phone) { filter.role = role; filter.phone = phone; }
+    else return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const tickets = await SupportTicket.find(filter).sort({ createdAt:-1 }).limit(100);
+    res.json({ success:true, data:tickets, total:tickets.length });
+  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
 // GET /api/admin/support — Admin list tickets
 app.get("/api/admin/support", adminAuth, async (req, res) => {
   try {
@@ -3014,6 +3069,11 @@ app.post("/api/admin/featured-requests/:id/approve", adminAuth, async (req, res)
     await request.save();
 
     req.io?.to(`partner_${request.partnerId}`).emit("featured_approved", { until, hours: request.hours });
+    await notifyUser('partner', request.partnerId, {
+      type: 'featured', title: '✨ Quán của bạn đã nổi bật!',
+      body: `Đã kích hoạt "Nổi bật ${request.hours} giờ" — quán của bạn sẽ xuất hiện ở vị trí nổi bật`,
+      refModule: 'featured',
+    });
     res.json({ success:true, message:`Đã kích hoạt nổi bật ${request.hours} giờ`, until });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
@@ -3030,6 +3090,11 @@ app.post("/api/admin/featured-requests/:id/reject", adminAuth, async (req, res) 
     request.adminNote = req.body?.note || "Bị từ chối bởi admin";
     await request.save();
     req.io?.to(`partner_${request.partnerId}`).emit("featured_rejected", { note: request.adminNote });
+    await notifyUser('partner', request.partnerId, {
+      type: 'featured', title: '❌ Yêu cầu nổi bật bị từ chối',
+      body: request.adminNote || 'Yêu cầu nổi bật của bạn bị từ chối',
+      refModule: 'featured',
+    });
     res.json({ success:true, message:"Đã từ chối yêu cầu" });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
@@ -3281,6 +3346,39 @@ function getWalletOwner(req) {
   return null;
 }
 
+// GET /api/notifications/my — Danh sách thông báo của owner (shipper/partner/user)
+app.get("/api/notifications/my", async (req, res) => {
+  try {
+    const owner = getWalletOwner(req);
+    if (!owner) return res.status(401).json({ success: false });
+    const notifs = await Notification.find({ ownerId: owner.id }).sort({ createdAt: -1 }).limit(100).lean();
+    const unread = notifs.filter(n => !n.read).length;
+    res.json({ success: true, notifications: notifs, unread });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/notifications/read — Đánh dấu đã đọc (1 hoặc tất cả)
+app.post("/api/notifications/read", async (req, res) => {
+  try {
+    const owner = getWalletOwner(req);
+    if (!owner) return res.status(401).json({ success: false });
+    const { id } = req.body || {};
+    if (id) await Notification.updateOne({ _id: id, ownerId: owner.id }, { $set: { read: true } });
+    else await Notification.updateMany({ ownerId: owner.id, read: false }, { $set: { read: true } });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// GET /api/notifications/unread-count — Số thông báo chưa đọc (cho badge chuông)
+app.get("/api/notifications/unread-count", async (req, res) => {
+  try {
+    const owner = getWalletOwner(req);
+    if (!owner) return res.json({ success: true, count: 0 });
+    const count = await Notification.countDocuments({ ownerId: owner.id, read: false });
+    res.json({ success: true, count });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // GET /api/wallet — số dư + lịch sử
 app.get("/api/wallet", async (req, res) => {
   try {
@@ -3348,6 +3446,11 @@ app.post("/api/wallet/withdraw", async (req, res) => {
     if (amt > 50000000)        return res.status(400).json({ success:false, message:'Số tiền rút tối đa 50.000.000đ' });
     if (!bankName || !accountNo || !accountName) return res.status(400).json({ success:false, message:'Thiếu thông tin ngân hàng' });
     const newBal = await walletDebit(owner.id, owner.type, amt, 'withdraw', null, `Rút tiền → ${bankName} ${accountNo}`);
+    // Persist yêu cầu rút tiền để admin duyệt
+    await WithdrawRequest.create({
+      ownerId: owner.id, ownerType: owner.type, amount: amt,
+      bankName, accountNo, accountName, status: 'pending',
+    });
     // Notify admin
     req.io.to('admin').emit('withdrawRequest', { ownerId: owner.id, ownerType: owner.type, amount: amt, bankName, accountNo, accountName });
     res.json({ success:true, newBalance: newBal, message:`Yêu cầu rút ${amt.toLocaleString('vi-VN')}đ đã ghi nhận. Xử lý trong 1–3 ngày làm việc.` });
@@ -3674,6 +3777,11 @@ async function processSePayPayment(payload, ioRef, force = false) {
     if (user && amount >= 10000) {
       await walletCredit(user._id, 'user', amount, rawRef, 'Nạp ví CRABOR');
       ioInstance?.to(`customer_${user._id}`).emit('walletCredited', { amount, newBalance: (await User.findById(user._id).select('walletBalance').lean())?.walletBalance });
+      await notifyUser('user', user._id, {
+        type: 'topup', title: '💵 Nạp ví thành công!',
+        body: `${amount.toLocaleString('vi-VN')}đ đã được nạp vào ví CRABOR của bạn`,
+        ref: rawRef, refModule: 'topup',
+      });
       handled = true;
     }
   }
@@ -6338,6 +6446,11 @@ app.post("/api/partner/menu", async (req, res) => {
       available: available !== false,
       image: image || "",
     });
+    await notifyUser('partner', partner._id, {
+      type: 'product', title: '🍽️ Món mới đã thêm',
+      body: `"${item.name}" giá ${Number(price).toLocaleString('vi-VN')}đ đã có trên menu`,
+      ref: String(item._id), refModule: 'food',
+    });
     res.json({ success: true, item });
   } catch(err) { res.status(500).json({ success:false, message: err.message }); }
 });
@@ -6469,6 +6582,11 @@ app.patch("/api/partner/orders/:id", async (req, res) => {
             };
             for (const shipper of nearbyShippers) {
               req.io.to(`shipper_${shipper._id}`).emit("order_request", payload);
+              await notifyUser('shipper', shipper._id, {
+                type: 'new_order', title: '🚚 Đơn hàng mới!',
+                body: `Đơn #${(payload.order?.orderId || order.orderId || '').slice(-6)} cần giao`,
+                ref: String(order._id), refModule: 'food',
+              });
               console.log(`[PartnerConfirm] Dispatched order ${order.orderId} to shipper ${shipper._id}`);
             }
             await Order.findByIdAndUpdate(order._id, {
@@ -7388,6 +7506,8 @@ const laundryOrderSchema = new mongoose.Schema({
   cancelReason:  String,
   sePayRef:      String,
   note:          String,
+  dispatchedTo:  [mongoose.Schema.Types.ObjectId], // shipper đã được dispatch
+  dispatchedAt:  Date,                            // lần dispatch gần nhất
 }, { timestamps: true });
 
 laundryOrderSchema.pre("save", function(next) {
@@ -7510,6 +7630,11 @@ app.post("/api/laundry/order", async (req, res) => {
     }
 
     // Thông báo partner
+    await notifyUser('partner', providerId, {
+      type: 'new_order', title: '🧺 Đơn giặt là mới!',
+      body: `Đơn ${order.orderId} — ${(order.finalTotal||0).toLocaleString('vi-VN')}đ. Khách: ${order.customerName}`,
+      ref: order.orderId, refModule: 'laundry',
+    });
     req.io.to(`partner_${providerId}`).emit("new_laundry_order", {
       order: {
         _id: order._id, orderId: order.orderId,
@@ -7642,6 +7767,9 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
           timeout: 30,
         };
         for (const s of nearby) req.io.to(`shipper_${s._id}`).emit("order_request", pickupPayload);
+        order.dispatchedTo = nearby.map(s => s._id);
+        order.dispatchedAt = new Date();
+        await order.save().catch(() => {});
       }
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "partner_accepted",
@@ -9337,6 +9465,11 @@ async function autoCreditOrderEarnings(order, shipperEarn, partnerEarn, method, 
         note: `${baseNote} — phí ship`,
         status: "approved", approvedBy: "auto_credit", approvedAt: new Date(),
       });
+      await notifyUser('shipper', order.shipperId, {
+        type: 'income', title: '💰 Thu nhập mới!',
+        body: `Đơn ${order.orderId} — bạn nhận ${shipperEarn.toLocaleString('vi-VN')}đ (phí ship)`,
+        ref: order.orderId, refModule: order.module || 'food',
+      });
     }
   }
   if (order.partnerId && partnerEarn > 0) {
@@ -9373,7 +9506,7 @@ async function findLaundryShippers(lat, lng, baseRadiusKm = 5, limit = 5) {
   const radii = [baseRadiusKm, Math.round(baseRadiusKm * 2), Math.round(baseRadiusKm * 3), Math.round(baseRadiusKm * 5)];
   let best = [];
   for (const r of radii) {
-    const found = await findNearbyShippers(lat, lng, r, limit);
+    const found = await findNearbyShippers(lat, lng, r, limit, true);
     if (found.length) { best = found; break; }
     best = found.length ? found : best;
   }
@@ -9381,13 +9514,15 @@ async function findLaundryShippers(lat, lng, baseRadiusKm = 5, limit = 5) {
 }
 
 // ── Helper: find nearby shippers ─────────────────────────────
-async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5) {
-  // Lấy shipper online + isAccepting, có hoặc không có location
-  const shippers = await Shipper.find({
+// requireLaundry=true → chỉ lấy shipper có preferences.acceptLaundry === true
+async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5, requireLaundry = false) {
+  const query = {
     status: { $in: ["approved", "active"] },
     online: true,
     isAccepting: true,
-  }).select("_id phone fullName location pushToken walletBalance rating totalOrders");
+  };
+  if (requireLaundry) query["preferences.acceptLaundry"] = true;
+  const shippers = await Shipper.find(query).select("_id phone fullName location pushToken walletBalance rating totalOrders");
 
   // Loại shipper đang bị chặn vì nợ tiền mặt quá hạn
   const blockedIds = await getCashBlockedShipperIds(shippers.map(s => s._id));
@@ -9461,6 +9596,11 @@ async function dispatchToShippers(order, io) {
     // Gửi đến từng shipper qua socket room
     for (const s of nearby) {
       io.to(`shipper_${s._id}`).emit("order_request", payload);
+      await notifyUser('shipper', s._id, {
+        type: 'new_order', title: '🚚 Đơn hàng mới!',
+        body: `Đơn #${order.orderId?.slice(-6)} cần giao`,
+        ref: String(order._id), refModule: order.module || 'food',
+      });
     }
 
     // Lưu danh sách shipper đã được gửi vào order để tracking
@@ -9542,6 +9682,11 @@ async function dispatchOrderToNearbyShippers(order, io) {
 
     for (const shipper of nearbyShippers) {
       io.to(`shipper_${shipper._id}`).emit("order_request", payload);
+      await notifyUser('shipper', shipper._id, {
+        type: 'new_order', title: '🚚 Đơn hàng mới!',
+        body: `Đơn #${order.orderId?.slice(-6)} cần giao`,
+        ref: String(order._id), refModule: order.module || 'food',
+      });
       console.log('[Dispatch] Sent to shipper:', shipper._id, 'distance:', shipper.distKm, 'km');
     }
 
@@ -9700,6 +9845,11 @@ app.post("/api/order", async (req, res) => {
     // undefined lúc gửi realtime cho partner app. Chuyển xuống sau save()
     // và bổ sung voucherCode/discount để partner app hiển thị đúng, đủ.
     if (order.module === "food" && order.partnerId) {
+      await notifyUser('partner', order.partnerId, {
+        type: 'new_order', title: '📦 Đơn hàng mới!',
+        body: `Đơn ${order.orderId} — ${(order.finalTotal||order.total||0).toLocaleString('vi-VN')}đ. Khách: ${order.customerName}`,
+        ref: order.orderId, refModule: 'food',
+      });
       req.io.to(`partner_${order.partnerId}`).emit("new_order", {
         order: {
           _id: order._id,
@@ -10082,6 +10232,11 @@ app.post("/api/ride/book", async (req, res) => {
 
     for (const s of nearby) {
       req.io.to(`shipper_${s._id}`).emit("ride_request", ridePayload);
+      await notifyUser('shipper', s._id, {
+        type: 'new_order', title: '🚗 Yêu cầu đặt xe mới!',
+        body: `${rideOrder.customerName || 'Khách hàng'} — ${(rideOrder.fee || 0).toLocaleString('vi-VN')}đ`,
+        ref: String(rideOrder._id), refModule: 'ride',
+      });
     }
 
     // Lưu danh sách shipper đã gửi
@@ -10713,6 +10868,13 @@ async function releaseSettlementEarnings(settlement) {
       message: `Đối soát tiền mặt xong — thu nhập đã vào ví!`,
     });
   }
+  if (settlement.shipperId && settlement.shipperEarn > 0) {
+    await notifyUser('shipper', settlement.shipperId, {
+      type: 'income', title: '💰 Đối soát tiền mặt xong!',
+      body: `Đơn ${settlement.orderId} — ${settlement.shipperEarn.toLocaleString('vi-VN')}đ đã vào ví`,
+      ref: settlement.orderId, refModule: settlement.orderModule || 'food',
+    });
+  }
   return settlement;
 }
 
@@ -11040,6 +11202,89 @@ app.post("/api/admin/clear-balance", adminAuth, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// GET /api/admin/withdraws — Danh sách yêu cầu rút tiền về ngân hàng
+app.get("/api/admin/withdraws", adminAuth, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = status && status !== "all" ? { status } : {};
+    const reqs = await WithdrawRequest.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+    // Gắn tên chủ ví
+    const owners = {};
+    const idsByType = { user: [], shipper: [], partner: [] };
+    for (const r of reqs) (idsByType[r.ownerType] || idsByType.user).push(r.ownerId);
+    const nameMap = {};
+    const fill = async (Model, arr) => {
+      if (!arr.length) return;
+      const docs = await Model.find({ _id: { $in: arr } }).select("fullName phone walletBalance").lean();
+      for (const d of docs) nameMap[String(d._id)] = { name: d.fullName, phone: d.phone, balance: d.walletBalance || 0 };
+    };
+    await fill(User, idsByType.user);
+    await fill(Shipper, idsByType.shipper);
+    await fill(FoodPartner, idsByType.partner);
+    const data = reqs.map(r => ({
+      ...r,
+      ownerName: nameMap[String(r.ownerId)]?.name || nameMap[String(r.ownerId)]?.phone || "N/A",
+      ownerPhone: nameMap[String(r.ownerId)]?.phone || "",
+      ownerBalance: nameMap[String(r.ownerId)]?.balance ?? null,
+    }));
+    res.json({ success: true, data });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// PATCH /api/admin/withdraws/:id — Duyệt / từ chối yêu cầu rút tiền
+app.patch("/api/admin/withdraws/:id", adminAuth, async (req, res) => {
+  try {
+    const { status, adminNote } = req.body;
+    if (!["approved", "rejected"].includes(status))
+      return res.status(400).json({ success: false, message: "Trạng thái không hợp lệ" });
+    const wr = await WithdrawRequest.findById(req.params.id);
+    if (!wr) return res.status(404).json({ success: false, message: "Không tìm thấy yêu cầu" });
+    if (wr.status !== "pending")
+      return res.status(400).json({ success: false, message: `Yêu cầu đã ${wr.status === "approved" ? "được duyệt" : "bị từ chối"} trước đó` });
+
+    const Model = wr.ownerType === "user" ? User : wr.ownerType === "shipper" ? Shipper : FoodPartner;
+    const ownerLabel = wr.ownerType === "user" ? "Khách hàng" : wr.ownerType === "shipper" ? "Shipper" : "Đối tác";
+
+    if (status === "rejected") {
+      // Tiền đã trừ khi tạo yêu cầu → hoàn lại ví khi từ chối
+      await walletCredit(wr.ownerId, wr.ownerType, wr.amount, "WITHDRAW_REJECT", `Hoàn lại tiền rút bị từ chối`);
+    }
+
+    wr.status = status;
+    wr.adminNote = adminNote || "";
+    wr.processedAt = new Date();
+    await wr.save();
+
+    if (status === "approved") {
+      const p = await Model.findById(wr.ownerId).catch(() => null);
+      const room = wr.ownerType === "user" ? `customer_${wr.ownerId}` : `${wr.ownerType}_${wr.ownerId}`;
+      req.io.to(room).emit("withdraw_status", {
+        status: "approved", amount: wr.amount,
+        message: `Yêu cầu rút ${wr.amount.toLocaleString("vi-VN")}đ đã được duyệt và chuyển đến ${wr.bankName}`,
+      });
+      await notifyUser(wr.ownerType, wr.ownerId, {
+        type: 'withdraw', title: '💸 Rút tiền thành công!',
+        body: `${wr.amount.toLocaleString("vi-VN")}đ đã được chuyển đến ${wr.bankName} ${wr.accountNo}`,
+        ref: String(wr._id), refModule: 'withdraw',
+      });
+    } else if (status === "rejected") {
+      const room = wr.ownerType === "user" ? `customer_${wr.ownerId}` : `${wr.ownerType}_${wr.ownerId}`;
+      req.io.to(room).emit("withdraw_status", {
+        status: "rejected", amount: wr.amount,
+        message: `Yêu cầu rút ${wr.amount.toLocaleString("vi-VN")}đ bị từ chối. Tiền đã hoàn về ví. ${adminNote ? "Lý do: " + adminNote : ""}`,
+      });
+      await notifyUser(wr.ownerType, wr.ownerId, {
+        type: 'withdraw', title: '❌ Yêu cầu rút tiền bị từ chối',
+        body: `${wr.amount.toLocaleString("vi-VN")}đ đã hoàn về ví. ${adminNote ? "Lý do: " + adminNote : ""}`,
+        ref: String(wr._id), refModule: 'withdraw',
+      });
+    }
+
+    res.json({ success: true, data: wr });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 server.listen(PORT, async () => {
   const env = process.env.NODE_ENV || "development";
   console.log(`
@@ -11070,6 +11315,8 @@ server.listen(PORT, async () => {
 setInterval(async () => {
   try {
     const retryThreshold = new Date(Date.now() - 35000); // 35s
+
+    // ── Food / Ride orders ──
     const pendingOrders = await Order.find({
       status: { $in: ["pending", "confirmed"] }, // confirmed = partner đã xác nhận
       shipperId: { $exists: false },             // chưa có shipper
@@ -11079,13 +11326,26 @@ setInterval(async () => {
         { dispatchedAt: { $lt: retryThreshold } } // dispatch lần trước đã > 35s, dispatch lại
       ]
     }).limit(10);
-    
-    if (pendingOrders.length === 0) return;
-    
+
+    // ── Laundry orders (partner đã xác nhận, chưa có shipper lấy đồ) ──
+    let pendingLaundry = [];
+    if (mongoose.models.LaundryOrder) {
+      pendingLaundry = await mongoose.models.LaundryOrder.find({
+        status: "partner_accepted",
+        shipperId: { $exists: false },
+        $or: [
+          { dispatchedAt: { $exists: false } },
+          { dispatchedAt: { $lt: retryThreshold } }
+        ]
+      }).limit(10).lean();
+    }
+
+    if (pendingOrders.length === 0 && pendingLaundry.length === 0) return;
+
     // Log tổng số socket đang kết nối để debug
     const totalSockets = global._io?.sockets?.sockets?.size || 0;
-    console.log(`[AutoDispatch] Found ${pendingOrders.length} orders | Total connected sockets: ${totalSockets}`);
-    
+    console.log(`[AutoDispatch] Found ${pendingOrders.length} orders + ${pendingLaundry.length} laundry | Total connected sockets: ${totalSockets}`);
+
     for (const order of pendingOrders) {
       // dispatchedAt check handled in query (retry after 35s)
       
@@ -11142,6 +11402,11 @@ setInterval(async () => {
           const roomSockets = global._io?.sockets?.adapter?.rooms?.get(room);
           const socketCount = roomSockets ? roomSockets.size : 0;
           global._io?.to(room).emit("order_request", payload);
+          await notifyUser('shipper', shipper._id, {
+            type: 'new_order', title: order.module === 'laundry' ? '👕 Đơn giặt là' : '🚚 Đơn hàng mới!',
+            body: `Đơn #${order.orderId?.slice(-6)}`,
+            ref: String(order._id), refModule: order.module || 'food',
+          });
           console.log(`[AutoDispatch] Emit order_request → room=[${room}] sockets=${socketCount} order=${order.orderId} dist=${shipper.distKm ?? 0}km`);
         }
         
@@ -11150,6 +11415,55 @@ setInterval(async () => {
         });
       } else {
         console.log(`[AutoDispatch] No nearby shipper for order ${order.orderId}`);
+      }
+    }
+
+    // ── Laundry: re-dispatch pickup request ──
+    for (const order of pendingLaundry) {
+      const dispatchLat = order.pickupLat || 21.0285;
+      const dispatchLng = order.pickupLng || 105.8542;
+      let partnerLat = null, partnerLng = null;
+      if (order.partnerId) {
+        const g = await GiatLa.findById(order.partnerId).select("lastLat lastLng").catch(() => null);
+        if (g?.lastLat) { partnerLat = g.lastLat; partnerLng = g.lastLng; }
+      }
+      const nearby = await findLaundryShippers(dispatchLat, dispatchLng, 5);
+      if (nearby.length > 0) {
+        const payload = {
+          type: "laundry_pickup_request",
+          orderId: order.orderId,
+          pickupAddress: order.pickupAddress,
+          pickupLat: dispatchLat, pickupLng: dispatchLng,
+          partnerAddress: `${order.partnerName}`,
+          partnerLat, partnerLng,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone || "",
+          packageName: order.packageName,
+          estimatedTotal: order.estimatedTotal || 0,
+          finalTotal: order.finalTotal || order.estimatedTotal || 0,
+          discount: order.discount || 0,
+          voucherCode: order.voucherCode || null,
+          shipFee: order.shipFee,
+          module: "laundry",
+          timeout: 30,
+        };
+        for (const s of nearby) {
+          const room = `shipper_${s._id}`;
+          const roomSockets = global._io?.sockets?.adapter?.rooms?.get(room);
+          const socketCount = roomSockets ? roomSockets.size : 0;
+          global._io?.to(room).emit("order_request", payload);
+          await notifyUser('shipper', s._id, {
+            type: 'new_order', title: '👕 Đơn giặt là mới!',
+            body: `Đơn #${order.orderId?.slice(-6)}`,
+            ref: String(order._id), refModule: 'laundry',
+          });
+          console.log(`[AutoDispatch] Laundry emit order_request → room=[${room}] sockets=${socketCount} order=${order.orderId} dist=${s.distKm ?? 0}km`);
+        }
+        await mongoose.models.LaundryOrder.findByIdAndUpdate(order._id, {
+          $set: { dispatchedTo: nearby.map(s => s._id), dispatchedAt: new Date() }
+        });
+      } else {
+        console.log(`[AutoDispatch] No nearby shipper for laundry order ${order.orderId}`);
       }
     }
   } catch (error) {
@@ -12136,8 +12450,17 @@ app.post("/api/partner/wallet/withdraw", async (req, res) => {
   if (!bankName || !accountNo || !accountName) return res.status(400).json({ success: false, message: "Thiếu thông tin ngân hàng" });
   try {
     const newBal = await walletDebit(req.session.partnerId, 'partner', amt, 'withdraw', null, `Rút tiền → ${bankName} ${accountNo}`);
-    req.io.to('admin').emit('withdrawRequest', { ownerId: req.session.partnerId, ownerType: 'partner', amount: amt, bankName, accountNo, accountName });
-    res.json({ success: true, newBalance: newBal, message: `Yêu cầu rút ${amt.toLocaleString('vi-VN')}đ đã ghi nhận. Xử lý trong 1–3 ngày.` });
+    await WithdrawRequest.create({
+      ownerId: req.session.partnerId, ownerType: 'partner', amount: amt,
+      bankName, accountNo, accountName, status: 'pending',
+    });
+     req.io.to('admin').emit('withdrawRequest', { ownerId: req.session.partnerId, ownerType: 'partner', amount: amt, bankName, accountNo, accountName });
+     await notifyUser('partner', req.session.partnerId, {
+       type: 'withdraw', title: '💸 Yêu cầu rút tiền đã ghi nhận',
+       body: `${amt.toLocaleString('vi-VN')}đ → ${bankName} ${accountNo}. Xử lý trong 1–3 ngày.`,
+       ref: '', refModule: 'withdraw',
+     });
+     res.json({ success: true, newBalance: newBal, message: `Yêu cầu rút ${amt.toLocaleString('vi-VN')}đ đã ghi nhận. Xử lý trong 1–3 ngày.` });
   } catch (err) { res.status(400).json({ success: false, message: err.message }); }
 });
 

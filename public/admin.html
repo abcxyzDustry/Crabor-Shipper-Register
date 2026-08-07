@@ -447,6 +447,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
       <div class="nav-item" onclick="showPage('finance')">
         <span class="ico">💰</span> Tài chính
       </div>
+      <div class="nav-item" onclick="showPage('withdraws')">
+        <span class="ico">🏦</span> Rút tiền
+        <span class="nav-badge" id="withdrawBadge" style="display:none;background:#FFD84D;color:#000">0</span>
+      </div>
       <div class="nav-item" onclick="showPage('vouchers')">
         <span class="ico">🎟️</span> Vouchers
       </div>
@@ -1073,6 +1077,44 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           </table>
         </div>
         <div class="pager" id="txPager"></div>
+      </div>
+    </section>
+
+    <!-- ── RÚT TIỀN ── -->
+    <section id="pgWithdraws" class="page-section">
+      <div class="page-header">
+        <div class="page-title">Yêu cầu rút tiền <small>Ví CRABOR → Ngân hàng</small></div>
+        <div style="display:flex;gap:8px">
+          <select class="filter-select" id="wdFilter" onchange="loadWithdraws()">
+            <option value="pending">Chờ duyệt</option>
+            <option value="approved">Đã duyệt</option>
+            <option value="rejected">Đã từ chối</option>
+            <option value="all">Tất cả</option>
+          </select>
+          <button class="filter-btn" onclick="loadWithdraws()">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>Loại</th>
+                <th>Chủ ví</th>
+                <th>Số tiền</th>
+                <th>Ngân hàng</th>
+                <th>STK</th>
+                <th>Chủ TK</th>
+                <th>Trạng thái</th>
+                <th>Thời gian</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="wdTbody">
+              <tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted)">Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -2574,7 +2616,7 @@ async function deleteBannerAdmin(id) { if (!confirm('Xóa banner này?')) return
 // ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', settings:'pgSettings' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', settings:'pgSettings' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -2595,6 +2637,7 @@ function showPage(key, ev) {
   if (key === 'users') loadCustomers();
   if (key === 'dashboard') loadStats();
   if (key === 'finance') loadFinance();
+  if (key === 'withdraws') loadWithdraws();
   if (key === 'settings') { loadSettings(); }
 }
 function viewOrderDetail(orderId) { apiFetch('/api/admin/orders/' + orderId).then(function(data) { var o = data.order || data; var body = document.getElementById('modalBody'); var modal = document.getElementById('overlay'); if (!body || !modal) { alert('Chi tiet don: ' + orderId); return; } body.innerHTML = '<div style="line-height:2"><b>Ma don:</b> ' + (o._id || orderId) + '<br><b>Khach hang:</b> ' + (o.customerName || o.customer || '-') + '<br><b>SDT:</b> ' + (o.customerPhone || '-') + '<br><b>Dia chi:</b> ' + (o.deliveryAddress || '-') + '<br><b>Tong tien:</b> ' + fmtMoney(o.total || 0) + '<br><b>Trang thai:</b> ' + (o.status || '-') + '<br><b>Thoi gian:</b> ' + fmtDate(o.createdAt) + '</div>'; modal.classList.add('show'); }).catch(function(e) { showNotif('Loi', (e && e.message) || 'Khong tai duoc don', 'coral'); }); }
@@ -2603,7 +2646,66 @@ function viewOrderDetail(orderId) { apiFetch('/api/admin/orders/' + orderId).the
 function loadSettings() {
   try { var saved = JSON.parse(localStorage.getItem('crabor_settings') || '{}'); var defaults = { commFood:20, commLaundry:18, commClean:18, commShop:12, commShipper:0, delivBase:15000, delivKm:5000, minOrder:20000 }; var s = Object.assign({}, defaults, saved); var set = function(id, val) { var el = document.getElementById(id); if(el) el.value = val; }; set('comFood', s.commFood); set('comLaundry', s.commLaundry); set('comClean', s.commClean); set('comChina', s.commShop); set('comRide', s.commShipper); set('delBase', s.delivBase); set('delPerKm', s.delivKm); set('minOrder', s.minOrder); } catch(e) { console.warn('loadSettings:', e); }
 }
-async function saveAllSettings() {
+async function loadWithdraws() {
+  const tb = document.getElementById('wdTbody');
+  const status = (document.getElementById('wdFilter') || {}).value || 'pending';
+  try {
+    const r = await apiFetch('/api/admin/withdraws?status=' + encodeURIComponent(status));
+    if (!r.success) throw new Error(r.message || 'Lỗi tải yêu cầu rút tiền');
+    const list = r.data || [];
+    const badge = document.getElementById('withdrawBadge');
+    if (badge) {
+      const pendingCount = (await apiFetch('/api/admin/withdraws?status=pending')).data.length;
+      if (pendingCount > 0) { badge.style.display = 'inline-flex'; badge.textContent = pendingCount; }
+      else badge.style.display = 'none';
+    }
+    if (!list.length) { tb.innerHTML = emptyRow(9); return; }
+    const typeLabel = { user: '👤 Khách', shipper: '🛵 Shipper', partner: '🤝 Đối tác' };
+    const statusBadge = (s) => s === 'pending' ? '<span style="color:#FFD84D;font-weight:900">⏳ Chờ</span>'
+      : s === 'approved' ? '<span style="color:#3aaa5c;font-weight:900">✅ Đã duyệt</span>'
+      : '<span style="color:#E8504A;font-weight:900">❌ Từ chối</span>';
+    tb.innerHTML = list.map(w => `
+      <tr>
+        <td>${typeLabel[w.ownerType] || w.ownerType}</td>
+        <td>
+          <div style="font-weight:800">${w.ownerName}</div>
+          <div style="font-size:.72rem;color:var(--muted)">${w.ownerPhone || ''}</div>
+          ${w.ownerBalance !== null && w.ownerBalance !== undefined ? `<div style="font-size:.72rem;color:var(--muted)">Số dư: ${fmtMoney(w.ownerBalance)}</div>` : ''}
+        </td>
+        <td style="font-weight:900;color:#FFD84D">${fmtMoney(w.amount)}</td>
+        <td>${w.bankName}</td>
+        <td style="font-family:var(--font-mono)">${w.accountNo}</td>
+        <td>${w.accountName}</td>
+        <td>${statusBadge(w.status)}</td>
+        <td style="font-size:.78rem;color:var(--muted)">${fmtDate(w.createdAt)}</td>
+        <td>
+          ${w.status === 'pending' ? `
+            <button class="act-btn" style="background:rgba(58,170,92,.15);color:#3aaa5c;border:1px solid rgba(58,170,92,.3);padding:6px 10px;font-size:.72rem" onclick="approveWithdraw('${w._id}')">Duyệt</button>
+            <button class="act-btn" style="background:rgba(232,80,74,.15);color:#E8504A;border:1px solid rgba(232,80,74,.3);padding:6px 10px;font-size:.72rem" onclick="rejectWithdraw('${w._id}')">Từ chối</button>
+          ` : `<span style="color:var(--muted);font-size:.75rem">${w.adminNote || '—'}</span>`}
+        </td>
+      </tr>`).join('');
+  } catch (e) {
+    tb.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;color:#E8504A">${e.message || 'Lỗi'}</td></tr>`;
+  }
+}
+async function approveWithdraw(id) {
+  if (!confirm('Xác nhận DUYỆT yêu cầu rút tiền này? Tiền đã được chuyển đến ngân hàng của chủ ví.')) return;
+  try {
+    const r = await apiFetch('/api/admin/withdraws/' + id, 'PATCH', { status: 'approved' });
+    if (r.success) { showNotif('✅ Đã duyệt', 'Yêu cầu rút tiền đã được duyệt', 'green'); loadWithdraws(); }
+    else showNotif('Lỗi', r.message || 'Không duyệt được', 'coral');
+  } catch (e) { showNotif('Lỗi', e.message || 'Không duyệt được', 'coral'); }
+}
+async function rejectWithdraw(id) {
+  const note = prompt('Lý do từ chối (tiền sẽ được hoàn về ví):');
+  if (note === null) return;
+  try {
+    const r = await apiFetch('/api/admin/withdraws/' + id, 'PATCH', { status: 'rejected', adminNote: note || '' });
+    if (r.success) { showNotif('❌ Đã từ chối', 'Tiền đã hoàn về ví của chủ ví', 'coral'); loadWithdraws(); }
+    else showNotif('Lỗi', r.message || 'Không từ chối được', 'coral');
+  } catch (e) { showNotif('Lỗi', e.message || 'Không từ chối được', 'coral'); }
+}
   try { var g = function(id) { return document.getElementById(id); }; var payload = { commissionFood: parseFloat((g('comFood') && g('comFood').value) || 20), commissionLaundry: parseFloat((g('comLaundry') && g('comLaundry').value) || 18), commissionCleaning: parseFloat((g('comClean') && g('comClean').value) || 18), commissionShop: parseFloat((g('comChina') && g('comChina').value) || 12), commissionRide: parseFloat((g('comRide') && g('comRide').value) || 0), deliveryBaseFee: parseFloat((g('delBase') && g('delBase').value) || 15000), deliveryPerKm: parseFloat((g('delPerKm') && g('delPerKm').value) || 5000), minOrderAmount: parseFloat((g('minOrder') && g('minOrder').value) || 20000) }; localStorage.setItem('crabor_settings', JSON.stringify(payload)); showNotif('Đã lưu', 'Cài đặt đã được lưu thành công', 'green'); } catch(e) { showNotif('Lỗi', 'Không thể lưu cài đặt', 'coral'); }
 }
 function showSetTab(key, btn) {
