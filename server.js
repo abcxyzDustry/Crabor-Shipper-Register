@@ -18,12 +18,12 @@ const expo = new Expo();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ── SEPAY CONFIG (tập trung — thay toàn bộ hardcode ngân hàng) ──
-// Bank: KienLongBank · STK 0796438068 · KIEU THANH HAI
+// Bank: KienLongBank · STK 101499100004630283 (tài khoản xác thực tự động)
 // VietQR bank code KLB (KienLongBank). Cấu hình qua .env để dễ đổi.
 const SEPAY_CONFIG = {
   bankCode:    process.env.SEPAY_BANK_CODE    || 'KLB',
   bankName:    process.env.SEPAY_BANK_NAME    || 'KienLongBank',
-  accountNo:   process.env.SEPAY_ACCOUNT      || '0796438068',
+  accountNo:   process.env.SEPAY_ACCOUNT      || '101499100004630283',
   accountName: process.env.SEPAY_ACCOUNT_NAME || 'KIEU THANH HAI',
   apiToken:    process.env.SEPAY_API_TOKEN    || '',
   webhookUrl:  process.env.SEPAY_WEBHOOK_URL  || '/api/webhook/sepay',
@@ -11391,7 +11391,7 @@ app.post("/api/users/search-history", async (req, res) => {
 });
 
 
-// POST /api/wallet/topup/prepare — Tạo lệnh nạp ví (qua PayOS/SePay)
+// POST /api/wallet/topup/prepare — Tạo lệnh nạp ví (qua SePay)
 app.post("/api/wallet/topup/prepare", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
@@ -11404,28 +11404,30 @@ app.post("/api/wallet/topup/prepare", async (req, res) => {
     const uid = req.session.userId.toString().slice(-8).toUpperCase();
     const orderCode = Date.now();
     const description = `CRTOPUP${uid}`;
+    const sePayRef = description;
+    const qrUrl = sepayQrUrl(amt, sePayRef);
 
     res.json({
       success: true,
       orderCode,
       amount: amt,
       description,
-      accountNo:   process.env.SEPAY_ACCOUNT || '',
-      accountName: process.env.SEPAY_ACCOUNT_NAME || 'KIEU THANH HAI',
-      bankName:    process.env.SEPAY_BANK || 'MB Bank',
-      qrUrl: `https://img.vietqr.io/image/${process.env.SEPAY_BANK_CODE || 'MB'}-${process.env.SEPAY_ACCOUNT || ''}-print.png?amount=${amt}&addInfo=${description}`,
+      sePayRef,
+      accountNo:   SEPAY_CONFIG.accountNo,
+      accountName: SEPAY_CONFIG.accountName,
+      bankName:    SEPAY_CONFIG.bankName,
+      bankCode:    SEPAY_CONFIG.bankCode,
+      qrUrl,
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// POST /api/wallet/topup/check — Kiểm tra trạng thái nạp ví
+// POST /api/wallet/topup/check — Kiểm tra trạng thái nạp ví (không cần orderCode)
 app.post("/api/wallet/topup/check", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
-    const { orderCode } = req.body;
-    if (!orderCode) return res.status(400).json({ success: false, message: "Thiếu orderCode" });
 
-    // Kiểm tra trong lịch sử giao dịch ví
+    // Tìm giao dịch CRTOPUP mới nhất của user (không cần orderCode — SePay chỉ match nội dung CK)
     const tx = await WalletTx.findOne({
       ownerId: req.session.userId,
       type: 'credit',
