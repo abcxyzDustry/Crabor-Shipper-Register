@@ -3854,6 +3854,11 @@ function verifySePayWebhook(req) {
   return { ok: true }; // Không cấu hình → không xác thực
 }
 
+// GET /api/webhook/sepay — xác minh URL (SePay/trình duyệt kiểm tra)
+app.get("/api/webhook/sepay", (req, res) => {
+  res.json({ success: true, message: "SePay webhook endpoint. Gửi POST để nhận giao dịch." });
+});
+
 app.post("/api/webhook/sepay", async (req, res) => {
   try {
     const v = verifySePayWebhook(req);
