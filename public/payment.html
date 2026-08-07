@@ -471,13 +471,13 @@ body::before {
     <div class="bank-info">
       <div class="bank-row">
         <span class="bank-key">Ngân hàng</span>
-        <span class="bank-val">VIB</span>
+        <span class="bank-val">KienLongBank</span>
       </div>
       <div class="bank-row">
         <span class="bank-key">Số tài khoản</span>
         <div style="display:flex;align-items:center;gap:8px">
-          <span class="bank-val mono" id="bankAcc">068394585</span>
-          <button class="copy-btn" onclick="copyText('068394585','Đã sao chép số TK!')">Copy</button>
+          <span class="bank-val mono" id="bankAcc">0796438068</span>
+          <button class="copy-btn" onclick="copyText('0796438068','Đã sao chép số TK!')">Copy</button>
         </div>
       </div>
       <div class="bank-row">
@@ -654,7 +654,7 @@ function renderPayment() {
 }
 
 function buildQR(fee, desc) {
-  const url = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${fee}&des=${encodeURIComponent(desc)}`;
+  const url = `https://qr.sepay.vn/img?bank=KLB&acc=0796438068&template=compact&amount=${fee}&des=${encodeURIComponent(desc)}`;
   document.getElementById('qrImg').src = url;
 }
 

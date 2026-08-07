@@ -17,6 +17,27 @@ const { Expo } = require("expo-server-sdk");
 const expo = new Expo();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// ── SEPAY CONFIG (tập trung — thay toàn bộ hardcode ngân hàng) ──
+// Bank: KienLongBank · STK 0796438068 · KIEU THANH HAI
+// VietQR bank code KLB (KienLongBank). Cấu hình qua .env để dễ đổi.
+const SEPAY_CONFIG = {
+  bankCode:    process.env.SEPAY_BANK_CODE    || 'KLB',
+  bankName:    process.env.SEPAY_BANK_NAME    || 'KienLongBank',
+  accountNo:   process.env.SEPAY_ACCOUNT      || '0796438068',
+  accountName: process.env.SEPAY_ACCOUNT_NAME || 'KIEU THANH HAI',
+  apiToken:    process.env.SEPAY_API_TOKEN    || '',
+  webhookUrl:  process.env.SEPAY_WEBHOOK_URL  || '/api/webhook/sepay',
+};
+
+// Helper: tạo QR SePay (qr.sepay.vn)
+function sepayQrUrl(amount, des) {
+  return `https://qr.sepay.vn/img?bank=${SEPAY_CONFIG.bankCode}&acc=${SEPAY_CONFIG.accountNo}&template=compact&amount=${amount}&des=${encodeURIComponent(des)}`;
+}
+// Helper: tạo QR VietQR (img.vietqr.io) — fallback khi SePay QR không dùng được
+function vietQrUrl(amount, des) {
+  return `https://img.vietqr.io/image/${SEPAY_CONFIG.bankCode}-${SEPAY_CONFIG.accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(des)}&accountName=${encodeURIComponent(SEPAY_CONFIG.accountName)}`;
+}
+
 
 const cocoEngine = require("./coco-engine");
 const { CocoKnowledge, CocoMemory, CocoLearnLog, CocoTools, cocoRespond, processLearnQueue, seedCocoKnowledge } = cocoEngine;
@@ -969,6 +990,17 @@ const walletTxSchema = new mongoose.Schema({
 }, { timestamps: true });
 walletTxSchema.index({ ownerId: 1, createdAt: -1 });
 const WalletTx = mongoose.model('WalletTx', walletTxSchema);
+
+// ── SEPAY TRANSACTION LOG (chống trùng webhook / idempotent) ──
+const sePayTxSchema = new mongoose.Schema({
+  txId:       { type: String, unique: true, required: true },   // SePay transaction id — chống trùng
+  ref:        { type: String, trim: true },                     // mã ref CRTOPUP/CRORD/...
+  amount:     { type: Number, default: 0 },
+  rawContent: { type: String, trim: true },
+  handled:    { type: Boolean, default: false },
+  note:       { type: String, trim: true },
+}, { timestamps: true });
+const SePayTx = mongoose.model('SePayTx', sePayTxSchema);
 
 // ── LOAN (Vay nhanh) ──────────────────────────────────────
 const loanSchema = new mongoose.Schema({
@@ -2845,11 +2877,12 @@ app.post("/api/partner/featured/request", async (req, res) => {
       request.sePayRef = sePayRef;
       await request.save();
       payExtra = {
-        qrUrl: `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${pkg.price}&des=${encodeURIComponent(sePayRef)}`,
+        qrUrl: sepayQrUrl(pkg.price, sePayRef),
         sePayRef,
-        bankName: "VIB",
-        accountNo: "068394585",
-        accountName: "KIEU THANH HAI",
+        bankName: SEPAY_CONFIG.bankName,
+        bankCode: SEPAY_CONFIG.bankCode,
+        accountNo: SEPAY_CONFIG.accountNo,
+        accountName: SEPAY_CONFIG.accountName,
       };
     }
 
@@ -2876,7 +2909,7 @@ app.post("/api/partner/featured/request", async (req, res) => {
         } else {
           request.payosOrderCode = String(orderCode);
           await request.save();
-          const qrUrl = `https://img.vietqr.io/image/VIB-068394585-print.png?amount=${pkg.price}&addInfo=${encodeURIComponent(description)}`;
+          const qrUrl = vietQrUrl(pkg.price, description);
           payExtra = { qrUrl, orderCode: String(orderCode), payosFallback: true };
         }
       } catch (e) {
@@ -3343,7 +3376,7 @@ function getCreditLimit(totalSpent=0){if(totalSpent>=20000000)return 10000000;if
 //  VÍ TRẢ SAU — BNPL (chuẩn SPayLater + CRABOR rules)
 // Chu kỳ: dùng bao nhiêu tháng đó trả bấy nhiêu (trước ngày 15)
 // Trễ hạn: +30.000đ cố định | Trả góp: +10% phí chuyển đổi
-// Thanh toán: SePay QR (VIB 068394585)
+// Thanh toán: SePay QR (KienLongBank)
 // ══════════════════════════════════════════════════════════════
 
 // GET /api/bnpl/eligibility
@@ -3416,8 +3449,9 @@ app.post("/api/bnpl/invoice/:id/prepare-pay", async (req,res) => {
     await BNPLInvoice.findByIdAndUpdate(inv._id,{lateFee,finalAmount,sePayRef});
     res.json({
       success:true, finalAmount, lateFee, sePayRef,
-      qrUrl:`https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${finalAmount}&des=${encodeURIComponent(sePayRef)}`,
-      bankName:'VIB', accountNo:'068394585', accountName:'KIEU THANH HAI',
+      qrUrl: sepayQrUrl(finalAmount, sePayRef),
+      bankName: SEPAY_CONFIG.bankName, bankCode: SEPAY_CONFIG.bankCode,
+      accountNo: SEPAY_CONFIG.accountNo, accountName: SEPAY_CONFIG.accountName,
       message:`Chuyển khoản ${finalAmount.toLocaleString('vi-VN')}đ · Nội dung: ${sePayRef}`,
       note: late ? `⚠️ Quá hạn: +30.000đ phí trễ` : `✅ Thanh toán đúng hạn`,
     });
@@ -3530,192 +3564,305 @@ app.patch("/api/admin/loan/:id", adminAuth, async (req, res) => {
 
 
 // ══════════════════════════════════════════════════════════════
-//  SEPAY WEBHOOK — Auto-confirm mọi thanh toán
+//  SEPAY — Xử lý giao dịch vào TK (webhook + API polling)
 //  Setup: SePay dashboard → Webhook URL → POST /api/webhook/sepay
 //  Khi có tài khoản DN + payment 1 chạm: không cần admin confirm
+//  Idempotent: dùng SePayTx.txId unique chống cộng tiền 2 lần
 // ══════════════════════════════════════════════════════════════
+
+// ── Hàm xử lý chính — dùng cho cả webhook và polling ─────────
+async function processSePayPayment(payload, ioRef) {
+  const ioInstance = ioRef || (global._io) || io;
+  // SePay gửi: { id, gateway, transactionDate, accountNumber,
+  //              code, content, transferType, transferAmount,
+  //              accumulated, subAccount, referenceCode, description }
+  const { content, transferAmount, transferType, referenceCode, transactionDate, id } = payload;
+
+  // Chỉ xử lý tiền vào
+  if (transferType !== 'in') return { handled: true };
+
+  const amount    = Number(transferAmount);
+  const rawRef    = (content || referenceCode || '').toUpperCase().trim();
+
+  // Chống trùng: dùng SePay id (không đổi qua mọi retry/replay)
+  const txId = String(id ?? '');
+  if (txId) {
+    const existed = await SePayTx.findOne({ txId }).catch(() => null);
+    if (existed) {
+      console.log(`[SEPAY] Duplicate tx ${txId} (${rawRef}) — skipped`);
+      return { handled: true, duplicate: true };
+    }
+    try {
+      await SePayTx.create({ txId, ref: rawRef, amount, rawContent: content || '', handled: false });
+    } catch (e) {
+      if (e?.code === 11000) { console.log(`[SEPAY] Duplicate tx ${txId} — skipped`); return { handled: true, duplicate: true }; }
+      console.error('[SEPAY] Lưu log tx lỗi:', e.message);
+    }
+  }
+
+  console.log(`[SEPAY] Tx: ${rawRef} · ${amount.toLocaleString('vi-VN')}đ`);
+
+  let handled = false;
+
+  // ── 1. BNPL Invoice payment ──────────────────────────────
+  const bnplMatch = rawRef.match(/BNPL([A-Z0-9]{6,8})/);
+  if (bnplMatch) {
+    const suffix = bnplMatch[1];
+    const inv = await BNPLInvoice.findOne({ sePayRef: { $regex: suffix, $options:'i' }, status:{$in:['issued','overdue','installment']} });
+    if (inv && amount >= (inv.finalAmount - 1000)) { // tolerance 1k
+      await BNPLInvoice.findByIdAndUpdate(inv._id, { status:'paid', paidAt: new Date() });
+      await BNPLTx.updateMany({ invoiceId: inv._id }, { status:'paid' });
+      await User.findByIdAndUpdate(inv.userId, { $inc: { loyaltyPts: Math.floor(inv.totalAmount/10000) } });
+      ioInstance?.to('admin').emit('bnplPaid', { invoiceId:inv._id, amount:inv.finalAmount });
+      ioInstance?.to(inv.userId.toString()).emit('bnplConfirmed', { invoiceId:inv._id });
+      console.log(`[SEPAY] BNPL confirmed: ${inv._id}`);
+      handled = true;
+    }
+  }
+
+  // ── 2. Shipper registration fee ──────────────────────────
+  const shipMatch = rawRef.match(/CRSHIP([A-Z0-9]+)/);
+  if (shipMatch && !handled) {
+    const appId = shipMatch[1];
+    const app_ = await Shipper.findOne({ appId: { $regex: appId, $options:'i' }, status:'pending_payment' });
+    if (app_) {
+      await Shipper.findByIdAndUpdate(app_._id, { status:'pending_review', paidAt: new Date(), feePaid: amount });
+      ioInstance?.to('admin').emit('shipperFeePaid', { shipperId: app_._id });
+      console.log(`[SEPAY] Shipper fee confirmed: ${app_._id}`);
+      handled = true;
+    }
+  }
+
+  // ── 3. Partner registration fee ─────────────────────────
+  const partnerMatch = rawRef.match(/CRPART([A-Z0-9]+)/);
+  if (partnerMatch && !handled) {
+    const appId = partnerMatch[1];
+    for (const Model of [FoodPartner, GiatLa, GiupViec, ChinaShop]) {
+      const p = await Model.findOne({ appId: { $regex: appId, $options:'i' }, status:'pending_payment' });
+      if (p) {
+        await Model.findByIdAndUpdate(p._id, { status:'pending_review', paidAt:new Date(), feePaid:amount });
+        ioInstance?.to('admin').emit('partnerFeePaid', { partnerId:p._id });
+        handled = true; break;
+      }
+    }
+  }
+
+  // ── 4. Wallet top-up (CRTOPUP + userId) ─────────────────
+  const topupMatch = rawRef.match(/CRTOPUP([A-Z0-9]+)/);
+  if (topupMatch && !handled) {
+    const uid = topupMatch[1];
+    // Try to match userId (last 8 chars)
+    const user = await User.findOne({ _id: { $regex: uid, $options:'i' } }).catch(()=>null);
+    if (user && amount >= 10000) {
+      await walletCredit(user._id, 'user', amount, rawRef, 'Nạp ví CRABOR');
+      ioInstance?.to(`customer_${user._id}`).emit('walletCredited', { amount, newBalance: (await User.findById(user._id).select('walletBalance').lean())?.walletBalance });
+      handled = true;
+    }
+  }
+
+  // ── 5. Loan repayment ────────────────────────────────────
+  const loanMatch = rawRef.match(/CRLOAN([A-Z0-9]+)/);
+  if (loanMatch && !handled) {
+    const suffix = loanMatch[1];
+    const loan = await Loan.findOne({ _id: { $regex: suffix, $options:'i' }, status:{$in:['approved','active']} });
+    if (loan && amount > 0) {
+      const remaining = loan.totalRepay - loan.paidAmount - amount;
+      const newStatus = remaining <= 0 ? 'repaid' : 'active';
+      await Loan.findByIdAndUpdate(loan._id, { $inc:{paidAmount:amount}, status:newStatus });
+      if (newStatus==='repaid') {
+        ioInstance?.to(loan.userId.toString()).emit('loanRepaid', { loanId:loan._id });
+      }
+      handled = true;
+    }
+  }
+
+  // ── 6. Order delivery payment (CRORD) ───────────────────
+  const orderMatch = rawRef.match(/CRORD([A-Z0-9]{6,10})/);
+  if (orderMatch && !handled) {
+    const suffix = orderMatch[1];
+    const order = await Order.findOne({
+      sePayRef: { $regex: suffix, $options: "i" },
+      paymentStatus: { $in: ["unpaid", "pending_review"] },
+    });
+    if (order && amount >= (order.finalTotal || order.total) - 1000) {
+      order.paymentStatus = "paid";
+      order.paidAt = new Date();
+      order.statusHistory.push({ status: "payment_confirmed_sepay", by: "system" });
+      await order.save();
+
+      // Tính tiền shipper + partner
+      const { shipperEarn, partnerEarn } = await calcEarnings(order);
+
+      // Xoá wallet queue cũ (nếu đã add lúc confirm thủ công) và tạo lại với status pending
+      await WalletQueue.deleteMany({ orderId: order.orderId, status: "pending" });
+
+      if (order.shipperId) {
+        await WalletQueue.create({
+          orderId: order.orderId, recipientId: order.shipperId,
+          recipientType: "shipper", amount: shipperEarn,
+          paymentMethod: "bank_transfer",
+          note: `Đơn ${order.orderId} — SePay confirmed`,
+          status: "pending",
+        });
+      }
+      if (order.partnerId) {
+        await WalletQueue.create({
+          orderId: order.orderId, recipientId: order.partnerId,
+          recipientType: "partner", amount: partnerEarn,
+          paymentMethod: "bank_transfer",
+          note: `Đơn ${order.orderId} — SePay confirmed`,
+          status: "pending",
+        });
+      }
+
+      // Notify shipper qua socket
+      if (order.shipperId) {
+        ioInstance.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
+          orderId: order.orderId,
+          amount,
+          message: `Khách đã thanh toán ${amount.toLocaleString("vi-VN")}đ qua SePay!`,
+        });
+      }
+      // Notify customer
+      ioInstance.to(`customer_${order.customerId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "payment_confirmed",
+        message: "Thanh toán thành công! Cảm ơn bạn đã dùng CRABOR 🦀",
+      });
+      // Notify admin
+      ioInstance.to("admin").emit("wallet_pending_approval", {
+        orderId: order.orderId, shipperEarn, partnerEarn,
+        paymentMethod: "bank_transfer", source: "sepay_auto",
+      });
+
+      console.log(`[SEPAY] Order payment confirmed: ${order.orderId} — ${amount.toLocaleString("vi-VN")}đ`);
+      handled = true;
+    }
+  }
+
+  // ── 6b. Laundry delivery payment (CRLAU) ─────────────────
+  const lauMatch = rawRef.match(/CRLAU([A-Z0-9]{6,10})/);
+  if (lauMatch && !handled) {
+    const suffix = lauMatch[1];
+    const lau = await LaundryOrder.findOne({
+      sePayRef: { $regex: suffix, $options: "i" },
+      paymentStatus: { $in: ["unpaid", "pending_review"] },
+    });
+    if (lau && amount >= (lau.finalTotal || lau.estimatedTotal || 0) - 1000) {
+      lau.paymentStatus = "paid";
+      lau.paidAt = new Date();
+      lau.statusHistory.push({ status: "payment_confirmed_sepay", by: "system" });
+      await lau.save();
+
+      const { shipperEarn, partnerEarn } = await calcEarnings({ ...lau.toObject(), module: "laundry" });
+      if (lau.shipperId)  await addToWalletQueue(lau.orderId, lau.shipperId, "shipper", shipperEarn, "bank_transfer", `Giặt là ${lau.orderId} — SePay`);
+      if (lau.partnerId)  await addToWalletQueue(lau.orderId, lau.partnerId, "partner", partnerEarn, "bank_transfer", `Giặt là ${lau.orderId} — SePay`);
+
+      if (lau.customerId) {
+        ioInstance.to(`customer_${lau.customerId}`).emit("order_status_update", {
+          orderId: lau.orderId, status: "payment_confirmed",
+          message: "Thanh toán giặt là thành công! 🦀",
+        });
+      }
+      console.log(`[SEPAY] Laundry payment confirmed: ${lau.orderId} — ${amount.toLocaleString("vi-VN")}đ`);
+      handled = true;
+    }
+  }
+
+  // ── 7. Featured request (CRFTR) — quán nổi bật ───────────
+  const ftrMatch = rawRef.match(/CRFTR([A-Z0-9]{6,10})/);
+  if (ftrMatch && !handled) {
+    const suffix = ftrMatch[1];
+    const ftr = await FeaturedRequest.findOne({
+      sePayRef: { $regex: suffix, $options: "i" },
+      paymentStatus: { $in: ["unpaid", "pending_review"] },
+    });
+    if (ftr && amount >= (ftr.amount - 1000)) {
+      ftr.paymentStatus = "paid";
+      ftr.paidAt = new Date();
+      await ftr.save();
+      ioInstance?.to("admin").emit("featured_request_paid", { requestId: ftr.requestId, partnerName: ftr.partnerName });
+      ioInstance?.to(`partner_${ftr.partnerId}`).emit("featured_paid", { requestId: ftr.requestId });
+      console.log(`[SEPAY] Featured request confirmed: ${ftr.requestId} — ${amount.toLocaleString("vi-VN")}đ`);
+      handled = true;
+    }
+  }
+
+  // Đánh dấu đã xử lý
+  if (txId) await SePayTx.updateOne({ txId }, { handled: true, note: handled ? 'matched' : 'unmatched' }).catch(() => {});
+
+  if (!handled) {
+    console.log(`[SEPAY] Unmatched: ${rawRef} ${amount}đ — logged only`);
+  }
+
+  return { handled, txId };
+}
 
 // POST /api/webhook/sepay — SePay gọi về khi có GD vào TK
 app.post("/api/webhook/sepay", async (req, res) => {
   try {
-    // SePay gửi: { id, gateway, transactionDate, accountNumber,
-    //              code, content, transferType, transferAmount,
-    //              accumulated, subAccount, referenceCode, description }
-    const { content, transferAmount, transferType, referenceCode } = req.body;
-
-    // Chỉ xử lý tiền vào
-    if (transferType !== 'in') return res.json({ success: true });
-
-    const amount    = Number(transferAmount);
-    const rawRef    = (content || referenceCode || '').toUpperCase().trim();
-
-    console.log(`[SEPAY] Webhook: ${rawRef} · ${amount.toLocaleString('vi-VN')}đ`);
-
-    let handled = false;
-
-    // ── 1. BNPL Invoice payment ──────────────────────────────
-    const bnplMatch = rawRef.match(/BNPL([A-Z0-9]{6,8})/);
-    if (bnplMatch) {
-      const suffix = bnplMatch[1];
-      const inv = await BNPLInvoice.findOne({ sePayRef: { $regex: suffix, $options:'i' }, status:{$in:['issued','overdue','installment']} });
-      if (inv && amount >= (inv.finalAmount - 1000)) { // tolerance 1k
-        await BNPLInvoice.findByIdAndUpdate(inv._id, { status:'paid', paidAt: new Date() });
-        await BNPLTx.updateMany({ invoiceId: inv._id }, { status:'paid' });
-        await User.findByIdAndUpdate(inv.userId, { $inc: { loyaltyPts: Math.floor(inv.totalAmount/10000) } });
-        req.io?.to('admin').emit('bnplPaid', { invoiceId:inv._id, amount:inv.finalAmount });
-        req.io?.to(inv.userId.toString()).emit('bnplConfirmed', { invoiceId:inv._id });
-        console.log(`[SEPAY] BNPL confirmed: ${inv._id}`);
-        handled = true;
-      }
-    }
-
-    // ── 2. Shipper registration fee ──────────────────────────
-    const shipMatch = rawRef.match(/CRSHIP([A-Z0-9]+)/);
-    if (shipMatch && !handled) {
-      const appId = shipMatch[1];
-      const app_ = await Shipper.findOne({ appId: { $regex: appId, $options:'i' }, status:'pending_payment' });
-      if (app_) {
-        await Shipper.findByIdAndUpdate(app_._id, { status:'pending_review', paidAt: new Date(), feePaid: amount });
-        req.io?.to('admin').emit('shipperFeePaid', { shipperId: app_._id });
-        console.log(`[SEPAY] Shipper fee confirmed: ${app_._id}`);
-        handled = true;
-      }
-    }
-
-    // ── 3. Partner registration fee ─────────────────────────
-    const partnerMatch = rawRef.match(/CRPART([A-Z0-9]+)/);
-    if (partnerMatch && !handled) {
-      const appId = partnerMatch[1];
-      for (const Model of [FoodPartner, GiatLa, GiupViec, ChinaShop]) {
-        const p = await Model.findOne({ appId: { $regex: appId, $options:'i' }, status:'pending_payment' });
-        if (p) {
-          await Model.findByIdAndUpdate(p._id, { status:'pending_review', paidAt:new Date(), feePaid:amount });
-          req.io?.to('admin').emit('partnerFeePaid', { partnerId:p._id });
-          handled = true; break;
-        }
-      }
-    }
-
-    // ── 4. Wallet top-up (CRTOPUP + userId) ─────────────────
-    const topupMatch = rawRef.match(/CRTOPUP([A-Z0-9]+)/);
-    if (topupMatch && !handled) {
-      const uid = topupMatch[1];
-      // Try to match userId (last 8 chars)
-      const user = await User.findOne({ _id: { $regex: uid, $options:'i' } }).catch(()=>null);
-      if (user && amount >= 10000) {
-        await walletCredit(user._id, 'user', amount, rawRef, 'Nạp ví CRABOR');
-        req.io?.to(`customer_${user._id}`).emit('walletCredited', { amount, newBalance: (await User.findById(user._id).select('walletBalance').lean())?.walletBalance });
-        handled = true;
-      }
-    }
-
-    // ── 5. Loan repayment ────────────────────────────────────
-    const loanMatch = rawRef.match(/CRLOAN([A-Z0-9]+)/);
-    if (loanMatch && !handled) {
-      const suffix = loanMatch[1];
-      const loan = await Loan.findOne({ _id: { $regex: suffix, $options:'i' }, status:{$in:['approved','active']} });
-      if (loan && amount > 0) {
-        const remaining = loan.totalRepay - loan.paidAmount - amount;
-        const newStatus = remaining <= 0 ? 'repaid' : 'active';
-        await Loan.findByIdAndUpdate(loan._id, { $inc:{paidAmount:amount}, status:newStatus });
-        if (newStatus==='repaid') {
-          req.io?.to(loan.userId.toString()).emit('loanRepaid', { loanId:loan._id });
-        }
-        handled = true;
-      }
-    }
-
-    // ── 6. Order delivery payment (CRORD) ───────────────────
-    const orderMatch = rawRef.match(/CRORD([A-Z0-9]{6,10})/);
-    if (orderMatch && !handled) {
-      const suffix = orderMatch[1];
-      const order = await Order.findOne({
-        sePayRef: { $regex: suffix, $options: "i" },
-        paymentStatus: { $in: ["unpaid", "pending_review"] },
-      });
-      if (order && amount >= (order.finalTotal || order.total) - 1000) {
-        order.paymentStatus = "paid";
-        order.paidAt = new Date();
-        order.statusHistory.push({ status: "payment_confirmed_sepay", by: "system" });
-        await order.save();
-
-        // Tính tiền shipper + partner
-        const { shipperEarn, partnerEarn } = await calcEarnings(order);
-
-        // Xoá wallet queue cũ (nếu đã add lúc confirm thủ công) và tạo lại với status pending
-        await WalletQueue.deleteMany({ orderId: order.orderId, status: "pending" });
-
-        if (order.shipperId) {
-          await WalletQueue.create({
-            orderId: order.orderId, recipientId: order.shipperId,
-            recipientType: "shipper", amount: shipperEarn,
-            paymentMethod: "bank_transfer",
-            note: `Đơn ${order.orderId} — SePay confirmed`,
-            status: "pending",
-          });
-        }
-        if (order.partnerId) {
-          await WalletQueue.create({
-            orderId: order.orderId, recipientId: order.partnerId,
-            recipientType: "partner", amount: partnerEarn,
-            paymentMethod: "bank_transfer",
-            note: `Đơn ${order.orderId} — SePay confirmed`,
-            status: "pending",
-          });
-        }
-
-        // Notify shipper qua socket
-        if (order.shipperId) {
-          req.io.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
-            orderId: order.orderId,
-            amount,
-            message: `Khách đã thanh toán ${amount.toLocaleString("vi-VN")}đ qua SePay!`,
-          });
-        }
-        // Notify customer
-        req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
-          orderId: order.orderId, status: "payment_confirmed",
-          message: "Thanh toán thành công! Cảm ơn bạn đã dùng CRABOR 🦀",
-        });
-        // Notify admin
-        req.io.to("admin").emit("wallet_pending_approval", {
-          orderId: order.orderId, shipperEarn, partnerEarn,
-          paymentMethod: "bank_transfer", source: "sepay_auto",
-        });
-
-        console.log(`[SEPAY] Order payment confirmed: ${order.orderId} — ${amount.toLocaleString("vi-VN")}đ`);
-        handled = true;
-      }
-    }
-
-    // ── 7. Featured request (CRFTR) — quán nổi bật ───────────
-    const ftrMatch = rawRef.match(/CRFTR([A-Z0-9]{6,10})/);
-    if (ftrMatch && !handled) {
-      const suffix = ftrMatch[1];
-      const ftr = await FeaturedRequest.findOne({
-        sePayRef: { $regex: suffix, $options: "i" },
-        paymentStatus: { $in: ["unpaid", "pending_review"] },
-      });
-      if (ftr && amount >= (ftr.amount - 1000)) {
-        ftr.paymentStatus = "paid";
-        ftr.paidAt = new Date();
-        await ftr.save();
-        req.io?.to("admin").emit("featured_request_paid", { requestId: ftr.requestId, partnerName: ftr.partnerName });
-        req.io?.to(`partner_${ftr.partnerId}`).emit("featured_paid", { requestId: ftr.requestId });
-        console.log(`[SEPAY] Featured request confirmed: ${ftr.requestId} — ${amount.toLocaleString("vi-VN")}đ`);
-        handled = true;
-      }
-    }
-
-    if (!handled) {
-      console.log(`[SEPAY] Unmatched webhook: ${rawRef} ${amount}đ — logged only`);
-    }
-
+    await processSePayPayment(req.body, req.io);
     res.json({ success: true }); // Always 200 — SePay retries on non-200
   } catch(err) {
     console.error('[SEPAY Webhook Error]', err.message);
     res.json({ success: true }); // Still 200 to prevent SePay retry loop
   }
+});
+
+// ── SePay API polling — fallback khi webhook miss ─────────────
+// Cần SEPAY_API_TOKEN trong .env (my.sepay.vn → Cài đặt → API Token)
+async function pollSePayTransactions() {
+  if (!SEPAY_CONFIG.apiToken) return;
+  try {
+    const res = await axios.get('https://userapi.sepay.vn/v2/transactions', {
+      params: { transfer_type: 'in', per_page: 30, transaction_date_sort: 'desc', timestamp_format: 'iso8601' },
+      headers: { Authorization: `Bearer ${SEPAY_CONFIG.apiToken}` },
+      timeout: 20000,
+    });
+    const list = res?.data?.data;
+    if (!Array.isArray(list) || !list.length) return;
+    for (const tx of list) {
+      if (tx.transfer_type !== 'in') continue;
+      // Bỏ qua giao dịch đã xử lý (SePayTx txId trùng)
+      const existing = await SePayTx.findOne({ txId: String(tx.id) }).catch(() => null);
+      if (existing) continue;
+      await processSePayPayment({
+        id: tx.id,
+        content: tx.transaction_content,
+        transferAmount: tx.amount_in,
+        transferType: tx.transfer_type,
+        referenceCode: tx.reference_number,
+        transactionDate: tx.transaction_date,
+      }, null);
+    }
+    console.log(`[SEPAY] Polled ${list.length} transactions`);
+  } catch (err) {
+    console.error('[SEPAY Poll]', err.message);
+  }
+}
+// Chạy polling mỗi 45s nếu có token
+setInterval(pollSePayTransactions, 45 * 1000);
+setTimeout(pollSePayTransactions, 15 * 1000);
+
+// GET /api/sepay/config — trả config ngân hàng cho 3 app (bỏ hardcode client)
+app.get("/api/sepay/config", (req, res) => {
+  res.json({
+    success: true,
+    config: {
+      bankCode: SEPAY_CONFIG.bankCode,
+      bankName: SEPAY_CONFIG.bankName,
+      accountNo: SEPAY_CONFIG.accountNo,
+      accountName: SEPAY_CONFIG.accountName,
+      webhookUrl: SEPAY_CONFIG.webhookUrl,
+    },
+  });
+});
+
+// POST /api/sepay/test — endpoint test (dùng nội dung "TEST" để xác minh webhook hoạt động)
+app.post("/api/sepay/test", async (req, res) => {
+  try {
+    const result = await processSePayPayment({ ...req.body, transferType: 'in' }, req.io);
+    res.json({ success: true, ...result });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // ── PAYMENT 1 CHẠM — chuẩn bị (khi có tài khoản DN) ─────────
@@ -3737,7 +3884,7 @@ app.get("/api/payment/methods", (req, res) => {
   res.json({
     success: true,
     available: [
-      { id:'sepay_qr', name:'QR SePay', icon:'📱', status:'active', note:'Chuyển khoản VIB — xác nhận trong 5–30 phút' },
+      { id:'sepay_qr', name:'QR SePay', icon:'📱', status:'active', note:`Chuyển khoản ${SEPAY_CONFIG.bankName} — xác nhận tự động 1–2 phút` },
       { id:'momo',     name:'MoMo',     icon:'💜', status:'coming_soon', note:'Ra mắt sau đăng ký doanh nghiệp T5/2025' },
       { id:'zalopay',  name:'ZaloPay',  icon:'🔵', status:'coming_soon', note:'Ra mắt sau đăng ký doanh nghiệp T5/2025' },
       { id:'vnpay',    name:'VNPay',    icon:'🔴', status:'coming_soon', note:'Ra mắt sau đăng ký doanh nghiệp T5/2025' },
@@ -5842,9 +5989,10 @@ app.get("/api/shipper/cash-stats", async (req, res) => {
         module: o.module,
       })),
       qrInfo: {
-        bankName: "VIB",
-        accountNo: "068394585",
-        accountName: "KIEU THANH HAI",
+        bankName: SEPAY_CONFIG.bankName,
+        bankCode: SEPAY_CONFIG.bankCode,
+        accountNo: SEPAY_CONFIG.accountNo,
+        accountName: SEPAY_CONFIG.accountName,
         transferNote: `PHICRABOR ${String(shipperId).slice(-8).toUpperCase()} ${new Date().toLocaleDateString("vi-VN").replace(/\//g,"")}`,
         note: "Đây là tài khoản cá nhân chính thức của cty. Chúng tôi sẽ sớm ra mắt tài khoản doanh nghiệp trong thời gian tới. Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ.",
       },
@@ -5869,9 +6017,9 @@ app.post("/api/shipper/pay-cash-fee", async (req, res) => {
     if (feeDue <= 0) return res.status(400).json({ success: false, message: "Không có phí cần thanh toán" });
     // Tạo QR thanh toán
     const shipper = await Shipper.findById(shipperId).select("fullName phone");
-    const transferNote = `PHICRABOR \${String(shipperId).slice(-8).toUpperCase()}`;
-    const qrUrl = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=\${feeDue}&des=\${encodeURIComponent(transferNote)}`;
-    const vietqrUrl = `https://img.vietqr.io/image/VIB-068394585-compact2.png?amount=\${feeDue}&addInfo=\${encodeURIComponent(transferNote)}&accountName=KIEU%20THANH%20HAI`;
+    const transferNote = `PHICRABOR ${String(shipperId).slice(-8).toUpperCase()}`;
+    const qrUrl = sepayQrUrl(feeDue, transferNote);
+    const vietqrUrl = vietQrUrl(feeDue, transferNote);
     let payosUrl = null;
     if (method === "payos" && payOS) {
       try {
@@ -5879,9 +6027,9 @@ app.post("/api/shipper/pay-cash-fee", async (req, res) => {
         const link = await (payOS.createPaymentLink || payOS.paymentRequests?.create?.bind(payOS.paymentRequests))({
           orderCode,
           amount: feeDue,
-          description: `PHI \${String(shipperId).slice(-6).toUpperCase()}`,
-          returnUrl: `\${process.env.BASE_URL || ""}/payment/success`,
-          cancelUrl: `\${process.env.BASE_URL || ""}/payment/cancel`,
+          description: `PHI ${String(shipperId).slice(-6).toUpperCase()}`,
+          returnUrl: `${process.env.BASE_URL || ""}/payment/success`,
+          cancelUrl: `${process.env.BASE_URL || ""}/payment/cancel`,
           buyerName: shipper?.fullName,
           buyerPhone: shipper?.phone,
         });
@@ -5904,9 +6052,10 @@ app.post("/api/shipper/pay-cash-fee", async (req, res) => {
       qrUrl,
       vietqrUrl,
       payosUrl,
-      bankName: "VIB",
-      accountNo: "068394585",
-      accountName: "KIEU THANH HAI",
+      bankName: SEPAY_CONFIG.bankName,
+      bankCode: SEPAY_CONFIG.bankCode,
+      accountNo: SEPAY_CONFIG.accountNo,
+      accountName: SEPAY_CONFIG.accountName,
       transferNote,
       note: "Đây là tài khoản cá nhân chính thức của cty. Chúng tôi sẽ sớm ra mắt tài khoản doanh nghiệp. Cảm ơn bạn đã tin tưởng!",
     });
@@ -6773,13 +6922,13 @@ app.post("/api/partner/location", async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 
 // POST /api/orders/:orderId/delivery-qr — Shipper lấy QR để thu tiền
-app.post("/api/orders/:orderId/delivery-qr", async (req, res) => {
+async function handleDeliveryQR(req, res) {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
 
     const order = await Order.findOne({
-      orderId: req.params.orderId,
+      orderId: req.params.orderId || req.params.id,
       shipperId: req.session.shipperId,
     });
     if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
@@ -6790,16 +6939,55 @@ app.post("/api/orders/:orderId/delivery-qr", async (req, res) => {
     // Lưu sePayRef vào order để webhook match
     await Order.findByIdAndUpdate(order._id, { sePayRef });
 
-    const qrUrl = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${amount}&des=${encodeURIComponent(sePayRef)}`;
+    const qrUrl = sepayQrUrl(amount, sePayRef);
 
     res.json({
       success: true,
       qrUrl,
       sePayRef,
       amount,
-      bankName:    "VIB",
-      accountNo:   "068394585",
-      accountName: "KIEU THANH HAI",
+      bankName:    SEPAY_CONFIG.bankName,
+      bankCode:    SEPAY_CONFIG.bankCode,
+      accountNo:   SEPAY_CONFIG.accountNo,
+      accountName: SEPAY_CONFIG.accountName,
+      message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+app.post("/api/orders/:orderId/delivery-qr", handleDeliveryQR);
+app.post("/api/ride/:orderId/delivery-qr", handleDeliveryQR);
+app.post("/api/cleaning/orders/:id/delivery-qr", handleDeliveryQR);
+
+// POST /api/orders/:orderId/customer-qr — Khách tự chuyển khoản thanh toán đơn
+app.post("/api/orders/:orderId/customer-qr", async (req, res) => {
+  try {
+    const customerId = req.session?.userId || req.session?.customerId;
+    if (!customerId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await Order.findOne({
+      orderId: req.params.orderId,
+      customerId,
+      paymentStatus: { $in: ["unpaid", "pending_review"] },
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+
+    const amount   = order.finalTotal || order.total || 0;
+    const sePayRef = "CRORD" + order.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase();
+    await Order.findByIdAndUpdate(order._id, { sePayRef });
+
+    const qrUrl = sepayQrUrl(amount, sePayRef);
+
+    res.json({
+      success: true,
+      qrUrl,
+      sePayRef,
+      amount,
+      bankName:    SEPAY_CONFIG.bankName,
+      bankCode:    SEPAY_CONFIG.bankCode,
+      accountNo:   SEPAY_CONFIG.accountNo,
+      accountName: SEPAY_CONFIG.accountName,
       message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
     });
   } catch (err) {
@@ -6808,13 +6996,13 @@ app.post("/api/orders/:orderId/delivery-qr", async (req, res) => {
 });
 
 // POST /api/orders/:orderId/confirm-payment — Shipper xác nhận thủ công
-app.post("/api/orders/:orderId/confirm-payment", async (req, res) => {
+async function handleConfirmPayment(req, res) {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
 
     const order = await Order.findOne({
-      orderId: req.params.orderId,
+      orderId: req.params.orderId || req.params.id,
       shipperId: req.session.shipperId,
     });
     if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
@@ -6874,6 +7062,40 @@ app.post("/api/orders/:orderId/confirm-payment", async (req, res) => {
       releaseAt,
       shipperEarn,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+app.post("/api/orders/:orderId/confirm-payment", handleConfirmPayment);
+app.post("/api/ride/:orderId/confirm-payment", handleConfirmPayment);
+app.post("/api/cleaning/orders/:id/confirm-payment", handleConfirmPayment);
+
+// POST /api/orders/:orderId/customer-confirm-payment — Khách tự xác nhận đã chuyển khoản
+app.post("/api/orders/:orderId/customer-confirm-payment", async (req, res) => {
+  try {
+    const customerId = req.session?.userId || req.session?.customerId;
+    if (!customerId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await Order.findOne({
+      orderId: req.params.orderId,
+      customerId,
+      paymentStatus: { $in: ["unpaid", "pending_review"] },
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+
+    order.paymentStatus = "pending_review";
+    order.paymentConfirmedAt = new Date();
+    order.paymentNote = req.body.note || "Khách tự xác nhận đã chuyển khoản";
+    order.statusHistory.push({ status: "payment_pending_review", by: "customer" });
+    await order.save();
+
+    req.io.to("admin").emit("wallet_pending_approval", {
+      orderId: order.orderId,
+      type: "customer_self_confirm",
+      message: `Đơn ${order.orderId} — Khách tự xác nhận đã chuyển khoản. Kiểm tra SePay để duyệt.`,
+    });
+
+    res.json({ success: true, message: "Đã ghi nhận, chờ admin xác nhận" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -7347,16 +7569,50 @@ app.post("/api/laundry/orders/:id/delivery-qr", async (req, res) => {
     const sePayRef = "CRLAU" + order.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase();
     await LaundryOrder.findByIdAndUpdate(order._id, { sePayRef });
 
-    const qrUrl = `https://qr.sepay.vn/img?bank=VIB&acc=068394585&template=compact&amount=${amount}&des=${encodeURIComponent(sePayRef)}`;
+    const qrUrl = sepayQrUrl(amount, sePayRef);
 
     res.json({
       success: true,
       qrUrl,
       sePayRef,
       amount,
-      bankName:    "VIB",
-      accountNo:   "068394585",
-      accountName: "KIEU THANH HAI",
+      bankName:    SEPAY_CONFIG.bankName,
+      bankCode:    SEPAY_CONFIG.bankCode,
+      accountNo:   SEPAY_CONFIG.accountNo,
+      accountName: SEPAY_CONFIG.accountName,
+      message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/laundry/orders/:id/customer-qr — Khách tự chuyển khoản thanh toán giặt là
+app.post("/api/laundry/orders/:id/customer-qr", async (req, res) => {
+  try {
+    const customerId = req.session?.userId || req.session?.customerId;
+    if (!customerId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await LaundryOrder.findOne({
+      $or: [{ orderId: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }],
+      customerId,
+      paymentStatus: { $in: ["unpaid", "pending_review"] },
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn giặt" });
+
+    const amount   = order.finalTotal || order.estimatedTotal || 0;
+    const sePayRef = "CRLAU" + order.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase();
+    await LaundryOrder.findByIdAndUpdate(order._id, { sePayRef });
+
+    const qrUrl = sepayQrUrl(amount, sePayRef);
+
+    res.json({
+      success: true,
+      qrUrl,
+      sePayRef,
+      amount,
+      bankName:    SEPAY_CONFIG.bankName,
+      bankCode:    SEPAY_CONFIG.bankCode,
+      accountNo:   SEPAY_CONFIG.accountNo,
+      accountName: SEPAY_CONFIG.accountName,
       message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
@@ -7387,6 +7643,35 @@ app.post("/api/laundry/orders/:id/confirm-payment", async (req, res) => {
     if (order.partnerId)  await addToWalletQueue(order.orderId, order.partnerId,  "partner", partnerEarn, order.paymentMethod, `Giặt là ${order.orderId}`);
 
     res.json({ success: true, message: "Đã ghi nhận thanh toán, chờ admin duyệt" });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/laundry/orders/:id/customer-confirm-payment — Khách tự xác nhận đã chuyển khoản
+app.post("/api/laundry/orders/:id/customer-confirm-payment", async (req, res) => {
+  try {
+    const customerId = req.session?.userId || req.session?.customerId;
+    if (!customerId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    const order = await LaundryOrder.findOne({
+      $or: [{ orderId: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }],
+      customerId,
+      paymentStatus: { $in: ["unpaid", "pending_review"] },
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn giặt" });
+
+    order.paymentStatus = "pending_review";
+    order.paymentConfirmedAt = new Date();
+    order.paymentNote = req.body.note || "Khách tự xác nhận đã chuyển khoản";
+    order.statusHistory.push({ status: "payment_pending_review", by: "customer" });
+    await order.save();
+
+    req.io.to("admin").emit("wallet_pending_approval", {
+      orderId: order.orderId,
+      type: "customer_self_confirm",
+      message: `Đơn giặt ${order.orderId} — Khách tự xác nhận đã chuyển khoản. Kiểm tra SePay để duyệt.`,
+    });
+
+    res.json({ success: true, message: "Đã ghi nhận, chờ admin xác nhận" });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
