@@ -3887,6 +3887,27 @@ async function processSePayPayment(payload, ioRef, force = false) {
     }
   }
 
+  // ── 8. Cash settlement (CRSET) — shipper chuyển tiền mặt về công ty ──
+  const cashMatch = rawRef.match(/CRSET([A-Z0-9]{4,10})/);
+  if (cashMatch && !handled) {
+    const suffix = cashMatch[1];
+    const pay = await CashSettlementPayment.findOne({
+      sePayRef: { $regex: suffix, $options: "i" },
+      status: "pending",
+    });
+    if (pay && amount >= (pay.amount - 1000)) {
+      const result = await applyCashPayment(pay.shipperId, pay.amount, "sepay", pay.note, pay._id);
+      ioInstance?.to(`shipper_${pay.shipperId}`).emit("cash_settlement_paid", {
+        amount: pay.amount, message: `Đã nhận ${pay.amount.toLocaleString("vi-VN")}đ từ shipper chuyển về công ty!`,
+      });
+      ioInstance?.to("admin").emit("cash_settlement_paid", {
+        shipperId: pay.shipperId, amount: pay.amount, method: "sepay", releasedOrders: result.released,
+      });
+      console.log(`[SEPAY] Cash settlement confirmed: ${pay.paymentId} — ${amount.toLocaleString("vi-VN")}đ`);
+      handled = true;
+    }
+  }
+
   // Đánh dấu đã xử lý
   if (txId) await SePayTx.updateOne({ txId }, { handled: true, note: handled ? 'matched' : 'unmatched' }).catch(() => {});
 
@@ -5832,9 +5853,22 @@ app.post("/api/orders", async (req, res) => {
       partnerName: partnerName || null, partnerAddress: partnerAddress || null,
       total, shipFee, serviceFee,
       paymentMethod: paymentMethod || "cash",
+      paymentStatus: (paymentMethod || "cash") === "wallet" ? "paid" : "unpaid",
       note,
       statusHistory: [{ status: "pending", time: new Date(), by: "system" }]
     });
+
+    // WALLET: trừ tiền ví CRABOR khách ngay khi đặt
+    if ((paymentMethod || "cash") === "wallet") {
+      const orderAmount = order.finalTotal ?? Math.max(0, total + shipFee + serviceFee);
+      const userDoc = await User.findById(uid).select("walletBalance");
+      if (!userDoc || (userDoc.walletBalance||0) < orderAmount) {
+        await Order.findByIdAndDelete(order._id);
+        return res.status(400).json({ success: false, message: `Ví CRABOR không đủ số dư. Cần ${orderAmount.toLocaleString("vi-VN")}đ`, walletInsufficient: true });
+      }
+      await walletDebit(uid, "user", orderAmount, "debit", order.orderId, `Thanh toán đơn ${order.orderId} bằng ví CRABOR`);
+      req.io.to(`customer_${uid}`).emit("walletDebited", { amount: orderAmount, orderId: order.orderId });
+    }
 
     // Realtime: thông báo admin và shipper
     req.io.to("admin").emit("newOrder", { orderId: order.orderId, module, total: order.finalTotal });
@@ -6822,6 +6856,20 @@ app.post("/api/cleaning/order", async (req, res) => {
       statusHistory: [{ status: "pending", by: "customer", time: new Date() }],
     });
     await order.save();
+    // WALLET: trừ tiền ví CRABOR ngay khi đặt đơn dọn nhà
+    if (pmCleaning === "wallet") {
+      const amt = Math.round(Number(total) || Number(price) || 200000);
+      const userDoc = await User.findById(customerId).select("walletBalance");
+      if (!userDoc || (userDoc.walletBalance||0) < amt) {
+        await CleaningOrder.findByIdAndDelete(order._id);
+        return res.status(400).json({ success: false, message: `Ví CRABOR không đủ số dư. Cần ${amt.toLocaleString("vi-VN")}đ`, walletInsufficient: true });
+      }
+      order.paymentStatus = "paid";
+      order.paidAt = new Date();
+      await order.save();
+      await walletDebit(customerId, "user", amt, "debit", order.orderId, `Thanh toán đơn dọn nhà ${order.orderId} bằng ví CRABOR`);
+      req.io.to(`customer_${customerId}`).emit("walletDebited", { amount: amt, orderId: order.orderId });
+    }
     let nearbyShippers = [];
     if (addressLat && addressLng) {
       try { nearbyShippers = await findNearbyShippers(addressLat, addressLng, 5, 10); } catch(e) {}
@@ -6903,7 +6951,13 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
     if (order.shipperId && order.shipperId.toString() !== shipperId.toString()) {
       return res.status(403).json({ success: false, message: "Không phải shipper của đơn này" });
     }
-    if (!order.shipperId) order.shipperId = shipperId;
+    if (!order.shipperId) {
+      // Chặn nếu shipper nợ tiền mặt quá hạn
+      if (await isShipperCashBlocked(shipperId)) {
+        return res.status(403).json({ success: false, message: "Bạn đang nợ tiền mặt quá 24h. Vui lòng chuyển tiền về công ty tại màn 'Thanh toán chi phí đơn tiền mặt'." });
+      }
+      order.shipperId = shipperId;
+    }
     const prevStatus = order.status;
     order.status = status;
     order.statusHistory.push({ status, by: "shipper", time: new Date() });
@@ -7151,8 +7205,54 @@ async function handleConfirmPayment(req, res) {
       shipperId: req.session.shipperId,
     });
     if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+
+    // ── ĐƠN TIỀN MẶT: shipper xác nhận đã thu đủ tiền → ghi nợ công ty ──
+    if (order.paymentMethod === "cash") {
+      order.paymentStatus = "paid";
+      order.paymentConfirmedAt = new Date();
+      order.paymentNote = req.body.note || "Shipper xác nhận thu tiền mặt";
+      order.statusHistory.push({ status: "payment_confirmed_cash", by: "shipper" });
+      await order.save();
+
+      // Chỉ ghi nợ nếu chưa có settlement (delivered đã tạo rồi thì bỏ qua)
+      const finalTotal = order.finalTotal ?? Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
+      const existingSettlement = await CashSettlement.findOne({ orderId: order.orderId }).lean().catch(() => null);
+      if (!existingSettlement) {
+        const { shipperEarn, partnerEarn } = await calcEarnings(order);
+        const dueAt = new Date(Date.now() + 24 * 3600 * 1000);
+        await CashSettlement.create({
+          orderId: order.orderId, orderModule: order.module || "food",
+          shipperId: order.shipperId, partnerId: order.partnerId || null,
+          total: finalTotal, amountPaid: 0, shipperEarn, partnerEarn,
+          status: "pending", dueAt,
+          note: `Đơn ${order.orderId} — tiền mặt`,
+        });
+        req.io.to(`shipper_${order.shipperId}`).emit("cash_settlement_created", {
+          orderId: order.orderId, amount: finalTotal, dueAt,
+          message: `Bạn phải chuyển ${finalTotal.toLocaleString("vi-VN")}đ về công ty trong 24h`,
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `Đã ghi nhận thu ${finalTotal.toLocaleString("vi-VN")}đ tiền mặt. Hãy chuyển về công ty trong 24h qua màn 'Thanh toán chi phí đơn tiền mặt'.`,
+        cashSettlement: true,
+      });
+      return;
+    }
+
     if (order.paymentStatus === "paid")
       return res.status(400).json({ success: false, message: "Đơn đã thanh toán rồi" });
+
+    // ── VÍ CRABOR: đã auto-credit ở delivered, chỉ cần confirm là xong ──
+    if (order.paymentMethod === "wallet") {
+      order.paymentStatus = "paid";
+      order.paymentConfirmedAt = new Date();
+      order.paymentNote = req.body.note || "Thanh toán qua ví CRABOR";
+      order.statusHistory.push({ status: "payment_confirmed_wallet", by: "shipper" });
+      await order.save();
+      return res.json({ success: true, message: "Đơn đã thanh toán qua ví CRABOR" });
+    }
 
     // Đánh dấu pending review thay vì paid ngay
     order.paymentStatus = "pending_review";
@@ -7160,6 +7260,7 @@ async function handleConfirmPayment(req, res) {
     order.paymentNote = req.body.note || "Shipper xác nhận";
     order.statusHistory.push({ status: "payment_pending_review", by: "shipper" });
     await order.save();
+
 
     // Tính tiền và đưa vào wallet queue với delay 30 phút
     const { shipperEarn, partnerEarn } = await calcEarnings(order);
@@ -7393,6 +7494,21 @@ app.post("/api/laundry/order", async (req, res) => {
     });
     await order.save();
 
+    // WALLET: trừ tiền ví CRABOR ngay khi đặt đơn giặt
+    if ((paymentMethod || "cash") === "wallet") {
+      const amt = order.finalTotal ?? Math.max(0, estimatedTotal + shipFee - discount);
+      const userDoc = await User.findById(req.session.userId).select("walletBalance");
+      if (!userDoc || (userDoc.walletBalance||0) < amt) {
+        await LaundryOrder.findByIdAndDelete(order._id);
+        return res.status(400).json({ success: false, message: `Ví CRABOR không đủ số dư. Cần ${amt.toLocaleString("vi-VN")}đ`, walletInsufficient: true });
+      }
+      order.paymentStatus = "paid";
+      order.paidAt = new Date();
+      await order.save();
+      await walletDebit(req.session.userId, "user", amt, "debit", order.orderId, `Thanh toán đơn giặt ${order.orderId} bằng ví CRABOR`);
+      req.io.to(`customer_${req.session.userId}`).emit("walletDebited", { amount: amt, orderId: order.orderId });
+    }
+
     // Thông báo partner
     req.io.to(`partner_${providerId}`).emit("new_laundry_order", {
       order: {
@@ -7467,6 +7583,12 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
 
     // ── Shipper nhận đơn: gán shipperId / shipperReturnId ──
     if (isShipper) {
+      // Chặn nếu shipper nợ tiền mặt quá hạn
+      if ((status === "shipper_picking" && !order.shipperId) || (status === "shipper_returning" && !order.shipperReturnId)) {
+        if (await isShipperCashBlocked(req.session.shipperId)) {
+          return res.status(403).json({ success: false, message: "Bạn đang nợ tiền mặt quá 24h. Vui lòng chuyển tiền về công ty tại màn 'Thanh toán chi phí đơn tiền mặt'." });
+        }
+      }
       if (status === "shipper_picking" && !order.shipperId) {
         order.shipperId = req.session.shipperId;
         order.pickupTime = new Date();
@@ -7629,12 +7751,47 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
 
     if (status === "delivered") {
       order.deliveredAt = new Date();
-      order.paymentStatus = order.paymentMethod === "cash" ? "paid" : order.paymentStatus;
+      const pm = order.paymentMethod;
       // Tính phân chia: đọc commission từ DB (mặc định 18%), tính serviceFee
       order.module = "laundry";
       const { shipperEarn, partnerEarn } = await calcEarnings(order);
-      if (order.shipperId)  await addToWalletQueue(order.orderId, order.shipperId,  "shipper",  shipperEarn, order.paymentMethod, `Giặt là ${order.orderId}`);
-      if (order.partnerId)  await addToWalletQueue(order.orderId, order.partnerId,  "partner",  partnerEarn, order.paymentMethod, `Giặt là ${order.orderId}`);
+      if (pm === "cash") {
+        order.paymentStatus = "paid";
+        const finalTotal = order.finalTotal ?? Math.max(0, (order.estimatedTotal||0) + (order.shipFee||0) - (order.discount||0));
+        const dueAt = new Date(Date.now() + 24 * 3600 * 1000);
+        const existingSettlement = await CashSettlement.findOne({ orderId: order.orderId }).lean().catch(() => null);
+        if (!existingSettlement) {
+          await CashSettlement.create({
+            orderId: order.orderId, orderModule: "laundry",
+            shipperId: order.shipperId, partnerId: order.partnerId || null,
+            total: finalTotal, amountPaid: 0,
+            shipperEarn, partnerEarn,
+            status: "pending", dueAt,
+            note: `Giặt là ${order.orderId} — tiền mặt`,
+          });
+          if (order.shipperId) {
+            req.io.to(`shipper_${order.shipperId}`).emit("cash_settlement_created", {
+              orderId: order.orderId, amount: finalTotal, dueAt,
+              message: `Bạn phải chuyển ${finalTotal.toLocaleString("vi-VN")}đ về công ty trong 24h`,
+            });
+          }
+        }
+        req.io.to("admin").emit("cash_settlement_pending", {
+          orderId: order.orderId, shipperEarn, partnerEarn, amount: finalTotal, dueAt,
+        });
+      } else if (pm === "wallet") {
+        order.paymentStatus = "paid";
+        await autoCreditOrderEarnings(order, shipperEarn, partnerEarn, "wallet", `Giặt là ${order.orderId} — ví CRABOR`);
+        if (order.shipperId) {
+          req.io.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
+            orderId: order.orderId, amount: order.finalTotal,
+            message: `Khách đã thanh toán qua ví CRABOR — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
+          });
+        }
+      } else {
+        if (order.shipperId)  await addToWalletQueue(order.orderId, order.shipperId,  "shipper",  shipperEarn, pm, `Giặt là ${order.orderId}`);
+        if (order.partnerId)  await addToWalletQueue(order.orderId, order.partnerId,  "partner",  partnerEarn, pm, `Giặt là ${order.orderId}`);
+      }
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "delivered",
         message: "Đồ đã được trả! Cảm ơn bạn đã dùng CRABOR Giặt là 👕",
@@ -8194,6 +8351,21 @@ app.post("/api/payment/payos/webhook", async (req, res) => {
         global._io?.to("admin").emit("featured_request_paid", { requestId: ftr.requestId, partnerName: ftr.partnerName });
         global._io?.to(`partner_${ftr.partnerId}`).emit("featured_paid", { requestId: ftr.requestId });
         console.log(`[PayOS Webhook] Featured request ${ftr.requestId} PAID — ${amount?.toLocaleString("vi-VN")}đ`);
+      }
+
+      // Cash settlement (shipper chuyển tiền mặt về công ty)
+      const cashPay = await CashSettlementPayment.findOne({
+        payosOrderCode: String(orderCode), status: "pending",
+      }).catch(() => null);
+      if (cashPay && cashPay.status === "pending") {
+        const result = await applyCashPayment(cashPay.shipperId, cashPay.amount, "payos", cashPay.note, cashPay._id);
+        global._io?.to(`shipper_${cashPay.shipperId}`).emit("cash_settlement_paid", {
+          amount: cashPay.amount, message: `Đã nhận ${cashPay.amount.toLocaleString("vi-VN")}đ từ shipper chuyển về công ty!`,
+        });
+        global._io?.to("admin").emit("cash_settlement_paid", {
+          shipperId: cashPay.shipperId, amount: cashPay.amount, method: "payos", releasedOrders: result.released,
+        });
+        console.log(`[PayOS Webhook] Cash settlement ${cashPay.paymentId} PAID — ${cashPay.amount?.toLocaleString("vi-VN")}đ`);
       }
 
       if (order && order.paymentStatus !== "paid") {
@@ -8966,6 +9138,43 @@ const walletQueueSchema = new mongoose.Schema({
 }, { timestamps: true });
 const WalletQueue = mongoose.models.WalletQueue || mongoose.model("WalletQueue", walletQueueSchema);
 
+// ── CASH SETTLEMENT — shipper nợ tiền mặt phải chuyển về công ty ──
+const cashSettlementSchema = new mongoose.Schema({
+  orderId:        { type: String, required: true, unique: true },
+  orderModule:    { type: String, default: "food" },
+  shipperId:      { type: mongoose.Schema.Types.ObjectId, ref: "Shipper", required: true },
+  partnerId:      { type: mongoose.Schema.Types.ObjectId, default: null },
+  total:          { type: Number, required: true, min: 0 },   // finalTotal = tiền khách trả mặt
+  amountPaid:     { type: Number, default: 0 },               // đã chuyển về công ty
+  shipperEarn:    { type: Number, default: 0 },               // shipper sẽ nhận khi hoàn tất
+  partnerEarn:    { type: Number, default: 0 },               // partner sẽ nhận khi hoàn tất
+  status:         { type: String, enum: ["pending","partially_paid","settled","overdue"], default: "pending" },
+  dueAt:          { type: Date },                              // +24h từ khi giao
+  earningsReleased:{ type: Boolean, default: false },          // đã cộng shipper+partner chưa
+  releasedAt:     Date,
+  lastPaidAt:     Date,
+  note:           { type: String },
+}, { timestamps: true });
+cashSettlementSchema.index({ shipperId: 1, status: 1 });
+const CashSettlement = mongoose.models.CashSettlement || mongoose.model("CashSettlement", cashSettlementSchema);
+
+// ── CASH SETTLEMENT PAYMENT — lệnh chuyển tiền về công ty ──
+const cashSettlementPaymentSchema = new mongoose.Schema({
+  paymentId:      { type: String, unique: true, sparse: true },
+  settlementId:   { type: mongoose.Schema.Types.ObjectId, ref: "CashSettlement", default: null },
+  shipperId:      { type: mongoose.Schema.Types.ObjectId, ref: "Shipper", required: true },
+  amount:         { type: Number, required: true, min: 1000 },
+  method:         { type: String, enum: ["payos","sepay","wallet"], required: true },
+  status:         { type: String, enum: ["pending","confirmed","cancelled"], default: "pending" },
+  sePayRef:       { type: String },
+  payosOrderCode: { type: String },
+  payosCheckoutUrl:{ type: String },
+  note:           { type: String },
+  confirmedAt:    Date,
+}, { timestamps: true });
+cashSettlementPaymentSchema.index({ shipperId: 1, status: 1, createdAt: -1 });
+const CashSettlementPayment = mongoose.models.CashSettlementPayment || mongoose.model("CashSettlementPayment", cashSettlementPaymentSchema);
+
 // ── Cron: Auto-approve wallet queue sau 30 phút (mỗi phút check) ──
 setInterval(async () => {
   try {
@@ -8977,9 +9186,10 @@ setInterval(async () => {
     for (const item of readyItems) {
       // Cộng tiền vào ví
       if (item.recipientType === "shipper") {
-        await Shipper.findByIdAndUpdate(item.recipientId, {
+        const upd = await Shipper.findByIdAndUpdate(item.recipientId, {
           $inc: { walletBalance: item.amount, totalEarnings: item.amount }
-        });
+        }, { new: true });
+        if (upd) await WalletTx.create({ ownerId: item.recipientId, ownerType: "shipper", type: "credit", amount: item.amount, balance: upd.walletBalance, ref: item.orderId, note: item.note || "Thu nhập đơn hàng" }).catch(()=>{});
       } else {
         const pModels = [
           mongoose.models.FoodPartner, mongoose.models.GiatLa,
@@ -8988,8 +9198,11 @@ setInterval(async () => {
         for (const m of pModels) {
           const upd = await m.findByIdAndUpdate(item.recipientId, {
             $inc: { walletBalance: item.amount, totalSales: item.amount }
-          });
-          if (upd) break;
+          }, { new: true });
+          if (upd) {
+            await WalletTx.create({ ownerId: item.recipientId, ownerType: "partner", type: "credit", amount: item.amount, balance: upd.walletBalance, ref: item.orderId, note: item.note || "Thu nhập đơn hàng" }).catch(()=>{});
+            break;
+          }
         }
       }
       item.status     = "approved";
@@ -9081,11 +9294,14 @@ async function addToWalletQueue(orderId, recipientId, recipientType, amount, pay
 }
 
 // ── Helper: cộng tiền trực tiếp vào ví (auto-duyệt) ─────────
-async function creditWalletDirect(recipientId, recipientType, amount) {
+async function creditWalletDirect(recipientId, recipientType, amount, ref = null, note = "") {
   if (!recipientId || amount <= 0) return;
   if (recipientType === "shipper") {
-    const upd = await Shipper.findByIdAndUpdate(recipientId, { $inc: { walletBalance: amount, totalEarnings: amount } });
-    if (upd) return upd;
+    const upd = await Shipper.findByIdAndUpdate(recipientId, { $inc: { walletBalance: amount, totalEarnings: amount } }, { new: true });
+    if (upd) {
+      await WalletTx.create({ ownerId: recipientId, ownerType: "shipper", type: "credit", amount, balance: upd.walletBalance, ref, note: note || "Thu nhập đơn hàng" });
+      return upd;
+    }
     return null;
   }
   const pModels = [
@@ -9093,10 +9309,49 @@ async function creditWalletDirect(recipientId, recipientType, amount) {
     mongoose.models.GiupViec,   mongoose.models.ChinaShop,
   ].filter(Boolean);
   for (const m of pModels) {
-    const upd = await m.findByIdAndUpdate(recipientId, { $inc: { walletBalance: amount, totalSales: amount } });
-    if (upd) return upd;
+    const upd = await m.findByIdAndUpdate(recipientId, { $inc: { walletBalance: amount, totalSales: amount } }, { new: true });
+    if (upd) {
+      await WalletTx.create({ ownerId: recipientId, ownerType: "partner", type: "credit", amount, balance: upd.walletBalance, ref, note: note || "Thu nhập đơn hàng" });
+      return upd;
+    }
   }
   return null;
+}
+
+// ── Helper: auto-credit earnings + ghi WalletQueue approved (chống đúp) ──
+async function autoCreditOrderEarnings(order, shipperEarn, partnerEarn, method, baseNote) {
+  if (order.shipperId && shipperEarn > 0) {
+    const already = await WalletQueue.findOne({
+      orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
+      amount: shipperEarn, status: "approved",
+    }).lean().catch(() => null);
+    if (!already) {
+      await creditWalletDirect(order.shipperId, "shipper", shipperEarn, order.orderId, `${baseNote} — phí ship`);
+      await WalletQueue.create({
+        orderId: order.orderId, recipientId: order.shipperId,
+        recipientType: "shipper", amount: shipperEarn,
+        paymentMethod: method,
+        note: `${baseNote} — phí ship`,
+        status: "approved", approvedBy: "auto_credit", approvedAt: new Date(),
+      });
+    }
+  }
+  if (order.partnerId && partnerEarn > 0) {
+    const already = await WalletQueue.findOne({
+      orderId: order.orderId, recipientId: order.partnerId, recipientType: "partner",
+      amount: partnerEarn, status: "approved",
+    }).lean().catch(() => null);
+    if (!already) {
+      await creditWalletDirect(order.partnerId, "partner", partnerEarn, order.orderId, `${baseNote} — tiền hàng`);
+      await WalletQueue.create({
+        orderId: order.orderId, recipientId: order.partnerId,
+        recipientType: "partner", amount: partnerEarn,
+        paymentMethod: method,
+        note: `${baseNote} — tiền hàng`,
+        status: "approved", approvedBy: "auto_credit", approvedAt: new Date(),
+      });
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -9131,8 +9386,12 @@ async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5) {
     isAccepting: true,
   }).select("_id phone fullName location pushToken walletBalance rating totalOrders");
 
+  // Loại shipper đang bị chặn vì nợ tiền mặt quá hạn
+  const blockedIds = await getCashBlockedShipperIds(shippers.map(s => s._id));
+  const active = blockedIds.size ? shippers.filter(s => !blockedIds.has(String(s._id))) : shippers;
+
   const R = 6371;
-  const withDistance = shippers.map(s => {
+  const withDistance = active.map(s => {
     // Nếu shipper có location → tính khoảng cách thực
     if (s.location?.lat && s.location?.lng) {
       const dLat = (s.location.lat - lat) * Math.PI / 180;
@@ -9403,8 +9662,34 @@ app.post("/api/order", async (req, res) => {
         statusHistory: [{ status: "pending", by: "customer" }],
       });
     }
+
+    // ── WALLET: Trừ tiền ví CRABOR của khách NGAY khi đặt đơn ──
+    const isWalletPay = (paymentMethod || "cash") === "wallet";
+    if (isWalletPay) {
+      const orderAmount = Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
+      const userDoc = await User.findById(req.session.userId).select("walletBalance");
+      if (!userDoc || (userDoc.walletBalance||0) < orderAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `Ví CRABOR không đủ số dư. Cần ${orderAmount.toLocaleString("vi-VN")}đ, hiện có ${(userDoc?.walletBalance||0).toLocaleString("vi-VN")}đ.`,
+          walletInsufficient: true,
+        });
+      }
+      // Tạm đánh dấu để save xong mới deduct (cần orderId làm ref)
+      order.paymentStatus = "paid";
+      order.paidAt = new Date();
+    }
     
     await order.save();
+
+    if (isWalletPay) {
+      const orderAmount = Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
+      await walletDebit(req.session.userId, "user", orderAmount, "debit", order.orderId, `Thanh toán đơn ${order.orderId} bằng ví CRABOR`);
+      // Thông báo khách trừ ví thành công
+      req.io.to(`customer_${req.session.userId}`).emit("walletDebited", {
+        amount: orderAmount, orderId: order.orderId, message: `Đã trừ ${orderAmount.toLocaleString("vi-VN")}đ cho đơn ${order.orderId}`,
+      });
+    }
 
     // Thông báo partner có đơn mới
     // FIX: emit này trước đây nằm TRƯỚC order.save(), nên order.orderId và
@@ -9582,6 +9867,13 @@ app.patch("/api/orders/:id/status", async (req, res) => {
 
     // ── Khi shipper nhận cuốc ──
     if (status === "shipper_accepted") {
+      // Chặn nếu shipper nợ tiền mặt quá hạn
+      if (req.session.shipperId && await isShipperCashBlocked(req.session.shipperId)) {
+        req.io.to(`shipper_${req.session.shipperId}`).emit("cash_settlement_blocked", {
+          message: "Bạn đang nợ tiền mặt quá 24h. Vui lòng chuyển tiền về công ty trước khi nhận đơn mới.",
+        });
+        return res.status(403).json({ success: false, message: "Bạn đang nợ tiền mặt quá 24h. Vui lòng chuyển tiền về công ty tại màn 'Thanh toán chi phí đơn tiền mặt'." });
+      }
       order.shipperId = req.session.shipperId;
       // Thông báo customer
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
@@ -9613,23 +9905,63 @@ app.patch("/api/orders/:id/status", async (req, res) => {
     // ── Khi giao thành công (delivered) → xử lý thanh toán ──
     if (status === "delivered") {
       order.deliveredAt = new Date();
-      order.paymentStatus = order.paymentMethod === "cash" ? "paid" : order.paymentStatus;
+      const pm = order.paymentMethod;
 
       // Tính tiền cho shipper và partner
       const { shipperEarn, partnerEarn } = await calcEarnings(order);
 
-      // Thêm vào pending queue (chờ admin duyệt)
-      if (order.shipperId) {
-        await addToWalletQueue(
-          order.orderId, order.shipperId, "shipper", shipperEarn,
-          order.paymentMethod, `Đơn ${order.orderId} — phí ship`
-        );
-      }
-      if (order.partnerId) {
-        await addToWalletQueue(
-          order.orderId, order.partnerId, "partner", partnerEarn,
-          order.paymentMethod, `Đơn ${order.orderId} — tiền hàng`
-        );
+      if (pm === "cash") {
+        // ── ĐƠN TIỀN MẶT: shipper đã thu tiền mặt → ghi nợ công ty ──
+        // Earnings chưa cộng; chờ shipper chuyển đủ tiền về công ty mới release
+        order.paymentStatus = "paid"; // shipper đã thu tiền mặt từ khách
+        const finalTotal = order.finalTotal ?? Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
+        const dueAt = new Date(Date.now() + 24 * 3600 * 1000); // 24h
+        const existingSettlement = await CashSettlement.findOne({ orderId: order.orderId }).lean().catch(() => null);
+        if (!existingSettlement) {
+          await CashSettlement.create({
+            orderId: order.orderId, orderModule: order.module || "food",
+            shipperId: order.shipperId, partnerId: order.partnerId || null,
+            total: finalTotal, amountPaid: 0,
+            shipperEarn, partnerEarn,
+            status: "pending", dueAt,
+            note: `Đơn ${order.orderId} — tiền mặt`,
+          });
+          // Cảnh báo shipper phải chuyển tiền về công ty trong 24h
+          if (order.shipperId) {
+            req.io.to(`shipper_${order.shipperId}`).emit("cash_settlement_created", {
+              orderId: order.orderId, amount: finalTotal, dueAt,
+              message: `Bạn phải chuyển ${finalTotal.toLocaleString("vi-VN")}đ về công ty trong 24h`,
+            });
+          }
+        }
+        req.io.to("admin").emit("cash_settlement_pending", {
+          orderId: order.orderId, shipperEarn, partnerEarn, amount: finalTotal, dueAt,
+        });
+      } else if (pm === "wallet") {
+        // ── VÍ CRABOR: khách đã trừ tiền khi đặt → AUTO CREDIT ngay ──
+        order.paymentStatus = "paid";
+        await autoCreditOrderEarnings(order, shipperEarn, partnerEarn, "wallet", `Đơn ${order.orderId} — ví CRABOR`);
+        if (order.shipperId) {
+          req.io.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
+            orderId: order.orderId, amount: order.finalTotal,
+            message: `Khách đã thanh toán qua ví CRABOR — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
+          });
+        }
+      } else {
+        // ── SEPAY/PAYOS/bank: chờ webhook auto-confirm ──
+        // Vẫn thêm vào wallet queue như pending fallback; webhook sẽ delete + credit
+        if (order.shipperId) {
+          await addToWalletQueue(
+            order.orderId, order.shipperId, "shipper", shipperEarn,
+            pm, `Đơn ${order.orderId} — phí ship`
+          );
+        }
+        if (order.partnerId) {
+          await addToWalletQueue(
+            order.orderId, order.partnerId, "partner", partnerEarn,
+            pm, `Đơn ${order.orderId} — tiền hàng`
+          );
+        }
       }
 
       // Thông báo customer
@@ -9642,7 +9974,7 @@ app.patch("/api/orders/:id/status", async (req, res) => {
       req.io.to("admin").emit("wallet_pending_approval", {
         orderId: order.orderId,
         shipperEarn, partnerEarn,
-        paymentMethod: order.paymentMethod,
+        paymentMethod: pm,
       });
     }
 
@@ -9701,6 +10033,21 @@ app.post("/api/ride/book", async (req, res) => {
       statusHistory: [{ status: "pending", by: "customer" }],
     });
     await rideOrder.save();
+
+    // WALLET: trừ tiền ví CRABOR ngay khi đặt xe
+    if ((ridePayMethod || "cash") === "wallet") {
+      const amt = rideOrder.finalTotal ?? Math.max(0, fee + Math.round(fee * 0.1));
+      const userDoc = await User.findById(req.session.userId).select("walletBalance");
+      if (!userDoc || (userDoc.walletBalance||0) < amt) {
+        await Order.findByIdAndDelete(rideOrder._id);
+        return res.status(400).json({ success: false, message: `Ví CRABOR không đủ số dư. Cần ${amt.toLocaleString("vi-VN")}đ`, walletInsufficient: true });
+      }
+      rideOrder.paymentStatus = "paid";
+      rideOrder.paidAt = new Date();
+      await rideOrder.save();
+      await walletDebit(req.session.userId, "user", amt, "debit", rideOrder.orderId, `Thanh toán cuốc xe ${rideOrder.orderId} bằng ví CRABOR`);
+      req.io.to(`customer_${req.session.userId}`).emit("walletDebited", { amount: amt, orderId: rideOrder.orderId });
+    }
 
     // Tìm shipper gần nhất (dùng fromLat/fromLng của customer)
     const nearby = await findNearbyShippers(
@@ -9765,6 +10112,11 @@ app.post("/api/ride/:orderId/accept", async (req, res) => {
     if (!order) return res.status(404).json({ success: false });
     if (order.shipperId) return res.status(409).json({ success: false, message: "Cuốc đã được tài xế khác nhận" });
 
+    // Chặn nếu shipper nợ tiền mặt quá hạn
+    if (await isShipperCashBlocked(req.session.shipperId)) {
+      return res.status(403).json({ success: false, message: "Bạn đang nợ tiền mặt quá 24h. Vui lòng chuyển tiền về công ty tại màn 'Thanh toán chi phí đơn tiền mặt'." });
+    }
+
     const shipper = await Shipper.findById(req.session.shipperId).select("fullName phone vehiclePlate location");
 
     order.shipperId = req.session.shipperId;
@@ -9810,7 +10162,39 @@ app.post("/api/ride/:orderId/complete", async (req, res) => {
 
     // Tính tiền shipper theo commission DB (mặc định ride=10%, shipper giữ 90%)
     const { shipperEarn } = await calcEarnings(order);
-    await addToWalletQueue(order.orderId, order.shipperId, "shipper", shipperEarn, order.paymentMethod, `Cuốc xe ${order.orderId}`);
+
+    if ((order.paymentMethod || "cash") === "wallet") {
+      // Ví CRABOR: auto-credit ngay
+      await autoCreditOrderEarnings(order, shipperEarn, 0, "wallet", `Cuốc xe ${order.orderId} — ví CRABOR`);
+      req.io.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
+        orderId: order.orderId, amount: order.finalTotal,
+        message: `Khách đã thanh toán qua ví CRABOR — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
+      });
+    } else if ((order.paymentMethod || "cash") === "cash") {
+      // Tiền mặt: ghi nợ công ty
+      const finalTotal = order.finalTotal ?? Math.max(0, (order.total||0) + (order.serviceFee||0));
+      const dueAt = new Date(Date.now() + 24 * 3600 * 1000);
+      const existingSettlement = await CashSettlement.findOne({ orderId: order.orderId }).lean().catch(() => null);
+      if (!existingSettlement) {
+        await CashSettlement.create({
+          orderId: order.orderId, orderModule: "ride",
+          shipperId: order.shipperId, partnerId: null,
+          total: finalTotal, amountPaid: 0,
+          shipperEarn, partnerEarn: 0,
+          status: "pending", dueAt,
+          note: `Cuốc xe ${order.orderId} — tiền mặt`,
+        });
+        req.io.to(`shipper_${order.shipperId}`).emit("cash_settlement_created", {
+          orderId: order.orderId, amount: finalTotal, dueAt,
+          message: `Bạn phải chuyển ${finalTotal.toLocaleString("vi-VN")}đ về công ty trong 24h`,
+        });
+      }
+      req.io.to("admin").emit("cash_settlement_pending", {
+        orderId: order.orderId, shipperEarn, amount: finalTotal, dueAt,
+      });
+    } else {
+      await addToWalletQueue(order.orderId, order.shipperId, "shipper", shipperEarn, order.paymentMethod, `Cuốc xe ${order.orderId}`);
+    }
 
     req.io.to(`customer_${order.customerId}`).emit("ride_completed", {
       orderId: order.orderId,
@@ -10139,9 +10523,10 @@ app.post("/api/admin/wallet-queue/:id/approve", async (req, res) => {
 
     // Cộng tiền vào ví khả dụng
     if (item.recipientType === "shipper") {
-      await Shipper.findByIdAndUpdate(item.recipientId, {
+      const upd = await Shipper.findByIdAndUpdate(item.recipientId, {
         $inc: { walletBalance: item.amount, totalEarnings: item.amount }
-      });
+      }, { new: true });
+      if (upd) await WalletTx.create({ ownerId: item.recipientId, ownerType: "shipper", type: "credit", amount: item.amount, balance: upd.walletBalance, ref: item.orderId, note: item.note || "Thu nhập đơn hàng" }).catch(()=>{});
     } else {
       // Partner — thử tất cả model
       const pModels = [
@@ -10153,8 +10538,11 @@ app.post("/api/admin/wallet-queue/:id/approve", async (req, res) => {
       for (const m of pModels) {
         const upd = await m.findByIdAndUpdate(item.recipientId, {
           $inc: { walletBalance: item.amount, totalSales: item.amount }
-        });
-        if (upd) break;
+        }, { new: true });
+        if (upd) {
+          await WalletTx.create({ ownerId: item.recipientId, ownerType: "partner", type: "credit", amount: item.amount, balance: upd.walletBalance, ref: item.orderId, note: item.note || "Thu nhập đơn hàng" }).catch(()=>{});
+          break;
+        }
       }
     }
 
@@ -10248,12 +10636,16 @@ app.post("/api/admin/wallet-queue/approve-all", async (req, res) => {
     let approved = 0, totalAmount = 0;
     for (const item of items) {
       if (item.recipientType === "shipper") {
-        await Shipper.findByIdAndUpdate(item.recipientId, { $inc: { walletBalance: item.amount, totalEarnings: item.amount } });
+        const upd = await Shipper.findByIdAndUpdate(item.recipientId, { $inc: { walletBalance: item.amount, totalEarnings: item.amount } }, { new: true });
+        if (upd) await WalletTx.create({ ownerId: item.recipientId, ownerType: "shipper", type: "credit", amount: item.amount, balance: upd.walletBalance, ref: item.orderId, note: item.note || "Thu nhập đơn hàng" }).catch(()=>{});
       } else {
         const pModels = [mongoose.models.FoodPartner, mongoose.models.GiatLa, mongoose.models.GiupViec, mongoose.models.ChinaShop].filter(Boolean);
         for (const m of pModels) {
-          const upd = await m.findByIdAndUpdate(item.recipientId, { $inc: { walletBalance: item.amount, totalSales: item.amount } });
-          if (upd) break;
+          const upd = await m.findByIdAndUpdate(item.recipientId, { $inc: { walletBalance: item.amount, totalSales: item.amount } }, { new: true });
+          if (upd) {
+            await WalletTx.create({ ownerId: item.recipientId, ownerType: "partner", type: "credit", amount: item.amount, balance: upd.walletBalance, ref: item.orderId, note: item.note || "Thu nhập đơn hàng" }).catch(()=>{});
+            break;
+          }
         }
       }
       item.status = "approved"; item.approvedBy = "admin_bulk"; item.approvedAt = new Date();
@@ -10266,6 +10658,312 @@ app.post("/api/admin/wallet-queue/approve-all", async (req, res) => {
     res.json({ success: true, approved, totalAmount });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
+
+// ══════════════════════════════════════════════════════════════
+//  CASH SETTLEMENT — Shipper chuyển tiền mặt về công ty
+// ══════════════════════════════════════════════════════════════
+
+// ── Helper: release earnings của settlement khi đã chuyển đủ ──
+async function releaseSettlementEarnings(settlement) {
+  if (!settlement || settlement.earningsReleased) return;
+  const updates = [];
+  if (settlement.shipperId && settlement.shipperEarn > 0) {
+    await creditWalletDirect(settlement.shipperId, "shipper", settlement.shipperEarn,
+      settlement.orderId, `Hoàn tất đối soát tiền mặt đơn ${settlement.orderId}`);
+    const already = await WalletQueue.findOne({
+      orderId: settlement.orderId, recipientId: settlement.shipperId, recipientType: "shipper",
+      amount: settlement.shipperEarn, status: "approved",
+    }).lean().catch(() => null);
+    if (!already) await WalletQueue.create({
+      orderId: settlement.orderId, recipientId: settlement.shipperId,
+      recipientType: "shipper", amount: settlement.shipperEarn,
+      paymentMethod: "cash",
+      note: `Đơn ${settlement.orderId} — tiền mặt (đối soát xong)`,
+      status: "approved", approvedBy: "cash_settlement", approvedAt: new Date(),
+    }).catch(()=>{});
+    updates.push(`shipper_${settlement.shipperId}`);
+  }
+  if (settlement.partnerId && settlement.partnerEarn > 0) {
+    await creditWalletDirect(settlement.partnerId, "partner", settlement.partnerEarn,
+      settlement.orderId, `Hoàn tất đối soát tiền mặt đơn ${settlement.orderId}`);
+    const already = await WalletQueue.findOne({
+      orderId: settlement.orderId, recipientId: settlement.partnerId, recipientType: "partner",
+      amount: settlement.partnerEarn, status: "approved",
+    }).lean().catch(() => null);
+    if (!already) await WalletQueue.create({
+      orderId: settlement.orderId, recipientId: settlement.partnerId,
+      recipientType: "partner", amount: settlement.partnerEarn,
+      paymentMethod: "cash",
+      note: `Đơn ${settlement.orderId} — tiền mặt (đối soát xong)`,
+      status: "approved", approvedBy: "cash_settlement", approvedAt: new Date(),
+    }).catch(()=>{});
+    if (settlement.partnerId) updates.push(`partner_${settlement.partnerId}`);
+  }
+  settlement.earningsReleased = true;
+  settlement.releasedAt = new Date();
+  settlement.status = "settled";
+  await settlement.save();
+  for (const room of updates) {
+    global._io?.to(room).emit("wallet_credited", {
+      amount: (settlement.shipperEarn||0) + (settlement.partnerEarn||0),
+      orderId: settlement.orderId,
+      message: `Đối soát tiền mặt xong — thu nhập đã vào ví!`,
+    });
+  }
+  return settlement;
+}
+
+// ── Helper: áp tiền chuyển về vào các settlement (FIFO) ──
+async function applyCashPayment(shipperId, amount, method, note, paymentId = null) {
+  if (amount <= 0) return { applied: 0 };
+  let remaining = amount;
+  const settlements = await CashSettlement.find({
+    shipperId, status: { $in: ["pending", "partially_paid"] },
+  }).sort({ createdAt: 1 });
+  let released = [];
+  for (const s of settlements) {
+    if (remaining <= 0) break;
+    const debt = s.total - (s.amountPaid || 0);
+    const pay = Math.min(debt, remaining);
+    s.amountPaid = (s.amountPaid || 0) + pay;
+    s.lastPaidAt = new Date();
+    remaining -= pay;
+    if (s.amountPaid >= s.total) {
+      await releaseSettlementEarnings(s);
+      released.push(s.orderId);
+    } else {
+      s.status = "partially_paid";
+      await s.save();
+    }
+  }
+  if (paymentId) {
+    await CashSettlementPayment.findByIdAndUpdate(paymentId, {
+      status: "confirmed", confirmedAt: new Date(),
+    }).catch(()=>{});
+  }
+  return { applied: amount - remaining, remaining, released };
+}
+
+// GET /api/shipper/cash-settlement — Tổng quan + lịch sử
+app.get("/api/shipper/cash-settlement", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+    const shipperId = req.session.shipperId;
+    const now = new Date();
+
+    const [pending, history, payments, unpaidCount] = await Promise.all([
+      CashSettlement.find({
+        shipperId, status: { $in: ["pending", "partially_paid"] },
+      }).sort({ createdAt: 1 }),
+      CashSettlement.find({ shipperId, status: { $in: ["settled"] } })
+        .sort({ updatedAt: -1 }).limit(50),
+      CashSettlementPayment.find({ shipperId }).sort({ createdAt: -1 }).limit(50),
+      CashSettlement.countDocuments({ shipperId, status: { $in: ["pending", "partially_paid"] } }),
+    ]);
+
+    const totalDebt = pending.reduce((s, it) => s + (it.total - (it.amountPaid || 0)), 0);
+    const paidTotal = pending.reduce((s, it) => s + (it.amountPaid || 0), 0);
+    const grandTotal = pending.reduce((s, it) => s + it.total, 0);
+    const pct = grandTotal > 0 ? Math.round(((grandTotal - totalDebt) / grandTotal) * 100) : 100;
+    const overdue = pending.filter(it => it.dueAt && new Date(it.dueAt) < now).length;
+
+    res.json({
+      success: true,
+      totalDebt,
+      paidTotal,
+      grandTotal,
+      percentComplete: pct,
+      overdueCount: overdue,
+      blocked: overdue > 0,
+      unpaidCount,
+      pending: pending.map(p => ({
+        orderId: p.orderId, module: p.orderModule,
+        total: p.total, amountPaid: p.amountPaid, dueAt: p.dueAt,
+        shipperEarn: p.shipperEarn, partnerEarn: p.partnerEarn,
+        status: p.status, note: p.note, createdAt: p.createdAt,
+      })),
+      history,
+      payments: payments.map(p => ({
+        paymentId: p.paymentId, amount: p.amount, method: p.method,
+        status: p.status, note: p.note, createdAt: p.createdAt, confirmedAt: p.confirmedAt,
+      })),
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/shipper/cash-settlement/payos/create — Tạo link PayOS chuyển về công ty
+app.post("/api/shipper/cash-settlement/payos/create", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+    const shipperId = req.session.shipperId;
+    const { amount } = req.body;
+    const pending = await CashSettlement.find({ shipperId, status: { $in: ["pending", "partially_paid"] } });
+    const debt = pending.reduce((s, it) => s + (it.total - (it.amountPaid || 0)), 0);
+    const payAmount = Math.min(Math.round(Number(amount) || debt), debt);
+    if (payAmount <= 0) return res.status(400).json({ success: false, message: "Không có khoản nào cần thanh toán" });
+
+    const orderCode = parseInt(Date.now().toString().slice(-9));
+    const description = "CRABOR CASH SETTLE";
+    if (!payOS) return res.status(500).json({ success: false, message: "PayOS chưa cấu hình" });
+    const paymentData = {
+      orderCode, amount: payAmount, description,
+      items: [{ name: "Chuyển tiền mặt về công ty", quantity: 1, price: payAmount }],
+      returnUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/success?type=cash_settlement`,
+      cancelUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/cancel`,
+    };
+    let link;
+    if (typeof payOS.paymentRequests?.create === 'function') link = await payOS.paymentRequests.create(paymentData);
+    else if (typeof payOS.createPaymentLink === 'function') link = await payOS.createPaymentLink(paymentData);
+    const linkData = link?.data && typeof link.data === 'object' && !Array.isArray(link.data) ? link.data : link;
+
+    const rec = await CashSettlementPayment.create({
+      shipperId, amount: payAmount, method: "payos",
+      payosOrderCode: String(linkData?.orderCode ?? orderCode),
+      payosCheckoutUrl: linkData?.checkoutUrl,
+      status: "pending", note: "Chuyển tiền mặt về công ty",
+    });
+
+    res.json({
+      success: true, checkoutUrl: linkData?.checkoutUrl,
+      orderCode: linkData?.orderCode ?? orderCode,
+      paymentId: rec.paymentId || rec._id,
+      amount: payAmount,
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/shipper/cash-settlement/sepay/prepare — QR SePay chuyển về công ty
+app.post("/api/shipper/cash-settlement/sepay/prepare", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+    const shipperId = req.session.shipperId;
+    const pending = await CashSettlement.find({ shipperId, status: { $in: ["pending", "partially_paid"] } });
+    const debt = pending.reduce((s, it) => s + (it.total - (it.amountPaid || 0)), 0);
+    const amount = Math.round(Number(req.body?.amount) || debt);
+    if (amount <= 0) return res.status(400).json({ success: false, message: "Không có khoản nào cần thanh toán" });
+
+    const sePayRef = "CRSET" + Date.now().toString(36).toUpperCase().slice(-6);
+    const rec = await CashSettlementPayment.create({
+      shipperId, amount, method: "sepay", sePayRef, status: "pending",
+      note: "Chuyển tiền mặt về công ty",
+    });
+    const qrUrl = sepayQrUrl(amount, sePayRef);
+    res.json({
+      success: true, qrUrl, sePayRef, amount,
+      bankName: SEPAY_CONFIG.bankName, bankCode: SEPAY_CONFIG.bankCode,
+      accountNo: SEPAY_CONFIG.accountNo, accountName: SEPAY_CONFIG.accountName,
+      paymentId: rec.paymentId || rec._id,
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/shipper/cash-settlement/wallet/pay — Trả bằng ví CRABOR shipper
+app.post("/api/shipper/cash-settlement/wallet/pay", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+    const shipperId = req.session.shipperId;
+    const { amount } = req.body;
+    const pending = await CashSettlement.find({ shipperId, status: { $in: ["pending", "partially_paid"] } });
+    const debt = pending.reduce((s, it) => s + (it.total - (it.amountPaid || 0)), 0);
+    const payAmount = Math.min(Math.round(Number(amount) || debt), debt);
+    if (payAmount <= 0) return res.status(400).json({ success: false, message: "Không có khoản nào cần thanh toán" });
+
+    const shipper = await Shipper.findById(shipperId).select("walletBalance");
+    if (!shipper || (shipper.walletBalance || 0) < payAmount)
+      return res.status(400).json({ success: false, message: `Ví không đủ tiền. Cần ${payAmount.toLocaleString("vi-VN")}đ` });
+
+    const newBal = await walletDebit(shipperId, 'shipper', payAmount, 'debit', null, 'Chuyển tiền mặt về công ty');
+    const rec = await CashSettlementPayment.create({
+      shipperId, amount: payAmount, method: "wallet", status: "confirmed", confirmedAt: new Date(),
+      note: "Chuyển tiền mặt về công ty bằng ví CRABOR",
+    });
+    const result = await applyCashPayment(shipperId, payAmount, "wallet", "Chuyển tiền mặt về công ty", rec._id);
+
+    req.io.to("admin").emit("cash_settlement_paid", {
+      shipperId, amount: payAmount, method: "wallet", releasedOrders: result.released,
+    });
+
+    res.json({
+      success: true, message: `Đã chuyển ${payAmount.toLocaleString("vi-VN")}đ về công ty`,
+      newBalance: newBal, applied: result.applied, remaining: result.remaining, released: result.released,
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/shipper/cash-settlement/payos/confirm — Poll PayOS
+app.post("/api/shipper/cash-settlement/payos/confirm", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+    const { orderCode } = req.body;
+    if (!orderCode) return res.status(400).json({ success: false, message: "Thiếu orderCode" });
+    const rec = await CashSettlementPayment.findOne({
+      shipperId: req.session.shipperId, payosOrderCode: String(orderCode), status: "pending",
+    });
+    if (!rec) return res.json({ success: false, message: "Không tìm thấy lệnh thanh toán" });
+    if (!payOS) return res.status(500).json({ success: false, message: "PayOS chưa cấu hình" });
+    let info;
+    try {
+      info = payOS.paymentRequestDetails ? await payOS.paymentRequestDetails(Number(orderCode)) : await payOS.getPaymentLinkInformation(Number(orderCode));
+    } catch(e) {
+      try { info = await payOS.getPaymentLinkInformation(Number(orderCode)); } catch(_) { info = null; }
+    }
+    const statusPay = info?.data?.status || info?.status;
+    if (statusPay === "PAID" || statusPay === "00") {
+      const result = await applyCashPayment(rec.shipperId, rec.amount, "payos", rec.note, rec._id);
+      req.io.to("admin").emit("cash_settlement_paid", {
+        shipperId: rec.shipperId, amount: rec.amount, method: "payos", releasedOrders: result.released,
+      });
+      return res.json({ success: true, paid: true, applied: result.applied, released: result.released });
+    }
+    res.json({ success: true, paid: false, status: statusPay });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// Cron: đánh dấu quá hạn + chặn shipper (mỗi 60 giây)
+setInterval(async () => {
+  try {
+    const now = new Date();
+    const overdueItems = await CashSettlement.updateMany(
+      { status: { $in: ["pending", "partially_paid"] }, dueAt: { $lte: now }, $or: [{ status: { $ne: "overdue" } }, { status: "pending" }, { status: "partially_paid" }] },
+      { $set: { status: "overdue" } }
+    );
+    if (overdueItems.modifiedCount > 0) console.log(`[CRON] ${overdueItems.modifiedCount} cash settlements quá hạn`);
+  } catch (e) { console.error("[CRON cash-overdue]", e.message); }
+}, 60 * 1000);
+
+// Helper: shipper có bị chặn nhận đơn vì nợ cash quá hạn không
+async function isShipperCashBlocked(shipperId) {
+  if (!shipperId) return false;
+  try {
+    const now = new Date();
+    const overdue = await CashSettlement.findOne({
+      shipperId, status: { $in: ["pending", "partially_paid", "overdue"] },
+      dueAt: { $lte: now },
+    }).lean();
+    return !!overdue;
+  } catch (_) { return false; }
+}
+
+// Helper: danh sách shipper bị chặn (theo Set) — dùng trong dispatch
+async function getCashBlockedShipperIds(shipperIds) {
+  const set = new Set();
+  if (!shipperIds || !shipperIds.length) return set;
+  try {
+    const now = new Date();
+    const overdue = await CashSettlement.find({
+      shipperId: { $in: shipperIds },
+      status: { $in: ["pending", "partially_paid", "overdue"] },
+      dueAt: { $lte: now },
+    }).distinct("shipperId");
+    for (const id of overdue) set.add(String(id));
+  } catch (_) {}
+  return set;
+}
 
 // ══════════════════════════════════════════════════════════════
 //  SOCKET — Register shipper/partner vào room khi login
