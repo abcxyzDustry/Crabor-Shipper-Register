@@ -2160,7 +2160,10 @@ async function walletDebit(ownerId, ownerType, amount, type='debit', ref, note) 
 // POST /api/orders/:id/rate — Khách đánh giá shipper + partner
 app.post("/api/orders/:id/rate", async (req, res) => {
   try {
-    const { ratingShipper, ratingPartner, ratingComment, userId } = req.body;
+    // Khách app gửi { rating, note } — fallback từ { ratingShipper, ratingComment }
+    const { ratingShipper, ratingPartner, ratingComment, userId, rating, note } = req.body;
+    const finalRatingShipper = ratingShipper || rating || null;
+    const finalRatingComment = ratingComment || note || "";
     const order = await Order.findOne({
       $or: [{ orderId: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }]
     });
@@ -2169,18 +2172,18 @@ app.post("/api/orders/:id/rate", async (req, res) => {
     if (order.status !== "delivered") return res.status(400).json({ success: false, message: "Chỉ đánh giá đơn đã giao" });
 
     await Order.findByIdAndUpdate(order._id, {
-      ratingShipper: ratingShipper || null,
+      ratingShipper: finalRatingShipper,
       ratingPartner: ratingPartner || null,
-      ratingComment: ratingComment || "",
+      ratingComment: finalRatingComment,
       ratedAt: new Date(),
     });
 
     // Update shipper avg rating
-    if (ratingShipper && order.shipperId) {
+    if (finalRatingShipper && order.shipperId) {
       const shipper = await Shipper.findById(order.shipperId);
       if (shipper) {
         const newCount = (shipper.ratingCount || 0) + 1;
-        const newRating = (((shipper.rating || 0) * (shipper.ratingCount || 0)) + ratingShipper) / newCount;
+        const newRating = (((shipper.rating || 0) * (shipper.ratingCount || 0)) + finalRatingShipper) / newCount;
         await Shipper.findByIdAndUpdate(order.shipperId, {
           rating: Math.round(newRating * 10) / 10,
           ratingCount: newCount,
@@ -10461,7 +10464,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       .sort({ deliveredAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select("orderId module items address partnerAddress finalTotal total shipFee serviceFee discount voucherCode voucherDiscount status deliveredAt createdAt ratingShipper ratingComment")
+      .select("orderId module items address partnerAddress finalTotal total shipFee serviceFee discount voucherCode voucherDiscount status deliveredAt createdAt ratingShipper ratingComment customerName customerPhone customerLat customerLng partnerLat partnerLng fromAddress toAddress")
       .lean(),
       Order.countDocuments({ 
         shipperId: req.session.shipperId, 
@@ -10479,9 +10482,12 @@ app.get("/api/shipper/order-history", async (req, res) => {
       voucherCode: o.voucherCode || null,
       shipFee: o.shipFee || 0,
       serviceFee: o.serviceFee || 0,
+      shipperEarn: Math.round((o.shipFee || 0) * 0.65),
       address: o.address,
       partnerAddress: o.partnerAddress,
-      items: (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', '),
+      customerName: o.customerName || o.receiverName || 'Khách hàng',
+      customerPhone: o.customerPhone || '',
+      items: (o.items || []).map(i => ({ name: i.name, qty: i.qty || i.quantity || 1, price: i.price || 0 })),
       ratingShipper: o.ratingShipper || null,
       ratingComment: o.ratingComment || null,
       date: o.deliveredAt || o.createdAt,
