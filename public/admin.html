@@ -2705,7 +2705,8 @@ async function rejectWithdraw(id) {
     if (r.success) { showNotif('❌ Đã từ chối', 'Tiền đã hoàn về ví của chủ ví', 'coral'); loadWithdraws(); }
     else showNotif('Lỗi', r.message || 'Không từ chối được', 'coral');
   } catch (e) { showNotif('Lỗi', e.message || 'Không từ chối được', 'coral'); }
-}
+  }
+function saveSettings() {
   try { var g = function(id) { return document.getElementById(id); }; var payload = { commissionFood: parseFloat((g('comFood') && g('comFood').value) || 20), commissionLaundry: parseFloat((g('comLaundry') && g('comLaundry').value) || 18), commissionCleaning: parseFloat((g('comClean') && g('comClean').value) || 18), commissionShop: parseFloat((g('comChina') && g('comChina').value) || 12), commissionRide: parseFloat((g('comRide') && g('comRide').value) || 0), deliveryBaseFee: parseFloat((g('delBase') && g('delBase').value) || 15000), deliveryPerKm: parseFloat((g('delPerKm') && g('delPerKm').value) || 5000), minOrderAmount: parseFloat((g('minOrder') && g('minOrder').value) || 20000) }; localStorage.setItem('crabor_settings', JSON.stringify(payload)); showNotif('Đã lưu', 'Cài đặt đã được lưu thành công', 'green'); } catch(e) { showNotif('Lỗi', 'Không thể lưu cài đặt', 'coral'); }
 }
 function showSetTab(key, btn) {

@@ -4408,6 +4408,9 @@ app.post("/api/coco/chat", async (req, res) => {
     if (!response) {
       try {
         response = await cocoRespond({ text: userInput, sessionId: sid, userId: req.session.userId || null, userCtx: ctx });
+        if (!response || typeof response !== 'object') {
+          response = { text:"Em chưa có đủ thông tin để trả lời ngay, anh/chị thử hỏi lại hoặc gọi hotline để được hỗ trợ nhanh hơn nhé 🙏", intent:'fallback', confidence:0 };
+        }
       } catch(e2) {
         console.error("[Coco Chat] Engine error:", e2.message);
         response = { text:"Em chưa có đủ thông tin để trả lời ngay, anh/chị thử hỏi lại hoặc gọi hotline để được hỗ trợ nhanh hơn nhé 🙏", intent:'fallback', confidence:0 };
@@ -4470,13 +4473,16 @@ app.post("/api/coco/hotline", async (req, res) => {
     if (!response) {
       try {
         response = await cocoRespond({ text, sessionId, userId:req.session.userId || req.session.partnerId || req.session.shipperId, userCtx });
+        if (!response || typeof response !== 'object') {
+          response = { text:`Em đã ghi nhận yêu cầu của ${userCtx.name||'anh/chị'} ạ. Đội kỹ thuật sẽ phản hồi trong 30 phút. Anh/chị có cần hỗ trợ thêm gì không ạ?`, intent: 'unknown' };
+        }
       } catch(e2) {
         response = { text:`Em đã ghi nhận yêu cầu của ${userCtx.name||'anh/chị'} ạ. Đội kỹ thuật sẽ phản hồi trong 30 phút. Anh/chị có cần hỗ trợ thêm gì không ạ?`, intent: 'unknown' };
       }
     }
 
     // Thêm tông giọng tổng đài
-    let finalText = response.text;
+    let finalText = response?.text || `Em xin lỗi, có chút trục trặc kỹ thuật. Anh/chị gọi trực tiếp vào hotline để được hỗ trợ nhanh nhé 🙏`;
     if (response.intent === 'unknown') {
       finalText = `Em đã ghi nhận yêu cầu của ${userCtx.name||'anh/chị'} ạ. Đội kỹ thuật sẽ phản hồi trong 30 phút. Anh/chị có cần hỗ trợ thêm gì không ạ?`;
     }
@@ -6634,6 +6640,53 @@ app.patch("/api/partner/orders/:id", async (req, res) => {
   }
 });
 
+// GET /api/partner/orders/:id — Chi tiết đơn cho partner (mã đơn, thời gian, tiền món, phí nền tảng, TT, tổng thực nhận)
+app.get("/api/partner/orders/:id", async (req, res) => {
+  try {
+    const partner = await getSessionFoodPartner(req);
+    if (!partner)
+      return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const partnerId = partner._id;
+
+    const order = await Order.findOne({
+      $or: [
+        { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null },
+        { orderId: req.params.id },
+      ]
+    });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+    if (order.partnerId && order.partnerId.toString() !== partnerId.toString())
+      return res.status(403).json({ success: false, message: "Bạn không có quyền xem đơn này" });
+
+    const e = await calcEarnings(order).catch(() => null);
+    const shipFee = order.shipFee || 0;
+    const serviceFee = order.serviceFee || 0;
+    const partnerBase = Math.max(0, order.total || 0);
+    const commissionPct = e?.commissionPct || 0;
+    const platformFee = Math.round(partnerBase * commissionPct / 100);
+
+    res.json({
+      success: true,
+      order: {
+        _id: order._id, orderId: order.orderId, module: order.module, status: order.status,
+        createdAt: order.createdAt, deliveredAt: order.deliveredAt,
+        total: order.total || 0, discount: order.discount || 0,
+        finalTotal: order.finalTotal || order.total || 0,
+        items: order.items || [], customerName: order.customerName,
+        customerPhone: order.customerPhone, address: order.address, note: order.note,
+        paymentMethod: order.paymentMethod || "cash",
+        paymentStatus: order.paymentStatus || (order.isPaid ? "paid" : "unpaid"),
+        shipFee, serviceFee,
+        partnerEarn: e?.partnerEarn || Math.round(partnerBase * (1 - commissionPct/100)),
+        platformFee, commissionPct,
+      },
+    });
+  } catch (err) {
+    console.error("[GET /api/partner/orders/:id] Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/partner/stats
 app.get("/api/partner/stats", async (req, res) => {
   try {
@@ -6676,6 +6729,10 @@ app.get("/api/partner/stats", async (req, res) => {
         createdAt: o.createdAt, deliveredAt: o.deliveredAt,
         total: o.total || 0, discount: o.discount || 0, finalTotal,
         items: o.items || [], customerName: o.customerName,
+        customerPhone: o.customerPhone, address: o.address, note: o.note,
+        paymentMethod: o.paymentMethod || "cash",
+        paymentStatus: o.paymentStatus || (o.isPaid ? "paid" : "unpaid"),
+        shipFee, serviceFee: o.serviceFee || 0,
         partnerEarn: e?.partnerEarn || Math.round(partnerBase * (1 - commissionPct/100)),
         platformFee,
         commissionPct,
