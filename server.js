@@ -10376,6 +10376,16 @@ app.patch("/api/orders/:id/status", async (req, res) => {
         }
       }
       order.shipperId = req.session.shipperId;
+      // Auto message: gửi tin nhắn chào từ shipper cho customer khi kết nối chat
+      const _autoMsg = {
+        from: "shipper",
+        text: `Bạn ơi chờ xíu nhé, CRABOR sắp tới nơi rồi (${order.orderId})`,
+        time: new Date(),
+        type: "text",
+        system: true,
+      };
+      await Order.findOneAndUpdate({ _id: order._id }, { $push: { chatMessages: _autoMsg } }).catch(() => {});
+      req.io.to(`order_${order.orderId}`).emit("chatMessage", { orderId: order.orderId, ..._autoMsg });
       // Thông báo customer
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId,
@@ -10832,6 +10842,52 @@ app.get("/api/shipper/ratings", async (req, res) => {
       total,
       page: parseInt(page),
       hasMore: skip + reviews.length < total
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// GET /api/shipper/:id/public-ratings — Đánh giá công khai (customer app xem shipper)
+app.get("/api/shipper/:id/public-ratings", async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, message: "ID không hợp lệ" });
+    const shipper = await Shipper.findById(id).select("rating ratingCount fullName avatar vehiclePlate totalOrders");
+    if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy shipper" });
+
+    const rated = await Order.find({ shipperId: id, ratingShipper: { $exists: true, $ne: null } })
+      .sort({ ratedAt: -1 })
+      .limit(100)
+      .select("orderId ratingShipper ratingComment ratedAt deliveredAt module items address customerName")
+      .lean();
+
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    rated.forEach(r => { const v = Math.round(r.ratingShipper); if (v >= 1 && v <= 5) distribution[v]++; });
+
+    const reviews = rated.map(r => ({
+      orderId: r.orderId,
+      rating: r.ratingShipper,
+      comment: r.ratingComment || '',
+      date: r.ratedAt || r.deliveredAt,
+      module: r.module || 'food',
+      customerName: r.customerName || 'Khách hàng',
+      orderInfo: (r.items || []).map(i => `${i.qty || i.quantity || 1}× ${i.name || ''}`).join(', ') || r.address || '',
+    }));
+
+    const ratedCount = distribution[1] + distribution[2] + distribution[3] + distribution[4] + distribution[5];
+
+    res.json({
+      success: true,
+      shipper: {
+        _id: shipper._id,
+        fullName: shipper.fullName,
+        avatar: shipper.avatar,
+        vehiclePlate: shipper.vehiclePlate,
+        totalOrders: shipper.totalOrders || 0,
+      },
+      averageRating: shipper?.rating || 5,
+      ratingCount: shipper?.ratingCount || ratedCount || 0,
+      reviews,
+      distribution,
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
