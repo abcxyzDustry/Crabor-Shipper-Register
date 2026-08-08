@@ -6519,6 +6519,42 @@ app.get("/api/partner/orders", async (req, res) => {
   } catch(err) { res.status(500).json({ success:false, message: err.message }); }
 });
 
+// GET /api/partner/ratings — Tất cả đánh giá khách hàng đã cho quán
+app.get("/api/partner/ratings", async (req, res) => {
+  try {
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const ratedOrders = await Order.find({ partnerId: partner._id, ratingPartner: { $exists: true, $ne: null } })
+      .sort({ ratedAt: -1 })
+      .select("orderId ratingPartner ratingComment ratedAt items customerName customerPhone")
+      .lean();
+    const reviews = ratedOrders.map(o => ({
+      orderId: o.orderId,
+      rating: o.ratingPartner,
+      comment: o.ratingComment || '',
+      date: o.ratedAt,
+      customerName: o.customerName || 'Khách hàng',
+      customerPhone: o.customerPhone || '',
+      orderInfo: (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', '),
+    }));
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    reviews.forEach(r => { if (r.rating >= 1 && r.rating <= 5) distribution[r.rating]++; });
+    res.json({ success: true, averageRating: partner.rating || 5, totalRatings: partner.ratingCount || 0, reviews, distribution });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// PATCH /api/partner/banner — Đăng tải ảnh banner quán
+app.patch("/api/partner/banner", async (req, res) => {
+  try {
+    const partner = await getSessionFoodPartner(req);
+    if (!partner) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const { coverImage } = req.body || {};
+    if (!coverImage || coverImage.length < 50) return res.status(400).json({ success: false, message: "Thiếu ảnh banner" });
+    await FoodPartner.findByIdAndUpdate(partner._id, { coverImage });
+    res.json({ success: true, coverImage });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 
 // PATCH /api/partner/orders/:id — Partner xác nhận / từ chối đơn hàng
 // Partner app gọi { action: 'accept' | 'reject' }
@@ -8731,6 +8767,38 @@ app.get("/api/food-partners/:id/products", async (req, res) => {
     const products = await Product.find({ partnerId: req.params.id, available: true })
       .sort({ sold: -1 });
     res.json({ success: true, products });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/food-partners/:id/reviews — Đánh giá + phân bố sao theo tỉ lệ đơn của quán
+app.get("/api/food-partners/:id/reviews", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const partner = await FoodPartner.findById(id).select("rating ratingCount totalOrders");
+    const rated = await Order.find({ partnerId: id, ratingPartner: { $exists: true, $ne: null } })
+      .sort({ ratedAt: -1 })
+      .select("orderId ratingPartner ratingComment ratedAt customerName items")
+      .lean();
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    rated.forEach(r => { const v = Math.round(r.ratingPartner); if (v >= 1 && v <= 5) distribution[v]++; });
+    const reviews = rated.map(r => ({
+      orderId: r.orderId,
+      rating: r.ratingPartner,
+      comment: r.ratingComment || '',
+      date: r.ratedAt,
+      customerName: r.customerName || 'Khách hàng',
+      orderInfo: (r.items || []).map(i => `${i.qty}× ${i.name}`).join(', '),
+    }));
+    res.json({
+      success: true,
+      averageRating: partner?.rating || 5,
+      ratingCount: partner?.ratingCount || 0,
+      totalOrders: partner?.totalOrders || 0,
+      reviews,
+      distribution,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
