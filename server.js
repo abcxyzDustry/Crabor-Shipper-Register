@@ -840,6 +840,7 @@ const foodPartnerSchema = new mongoose.Schema({
   featured:         { type: Boolean, default: false },
   featuredUntil:    { type: Date },
   featuredBanner:   String,
+  featuredBannerVertical: String,
   featuredHours:    Number,
   featuredPackage:  String,
   featuredAt:       Date,
@@ -862,6 +863,7 @@ const featuredRequestSchema = new mongoose.Schema({
   partnerId:      { type: mongoose.Schema.Types.ObjectId, ref: "FoodPartner" },
   partnerName:    String,
   bannerImage:    String,   // base64 hoặc URL banner
+  bannerVertical: String,   // ảnh dọc (9:16) dùng cho màn quảng cáo dọc
   hours:          { type: Number, min: 1, max: 24, default: 4 },
   amount:         { type: Number, default: 0 }, // hours * 50.000
   paymentMethod:  { type: String, enum: ["sepay","payos","wallet"], default: "sepay" },
@@ -2867,13 +2869,14 @@ app.get("/api/food-partners/featured", async (req, res) => {
     const featured = await FoodPartner.find({
       featured: true, featuredUntil: { $gt: now },
       status: { $in:["approved","active"] }
-    }).limit(6).select("_id bizName address district categories rating coverImage avatar featuredBanner");
+    }).limit(6).select("_id bizName address district categories rating coverImage avatar featuredBanner featuredBannerVertical");
     const data = featured.map(p => ({
       _id: p._id,
       name: p.bizName,
       bizName: p.bizName,
       logo: p.avatar || p.featuredBanner || p.coverImage,
       coverImage: p.featuredBanner || p.coverImage,
+      verticalBanner: p.featuredBannerVertical || null,
       address: p.address,
       district: p.district,
       categories: p.categories,
@@ -2904,7 +2907,7 @@ app.post("/api/partner/featured/request", async (req, res) => {
     if (!partner) return res.status(404).json({ success:false, message:"Không tìm thấy quán" });
     if (partner.status !== "approved") return res.status(403).json({ success:false, message:"Quán chưa được duyệt" });
 
-    const { hours, paymentMethod, bannerImage } = req.body || {};
+    const { hours, paymentMethod, bannerImage, bannerVertical } = req.body || {};
     const pkg = FEATURED_PACKAGES.find(p => p.hours === Number(hours));
     if (!pkg) return res.status(400).json({ success:false, message:"Gói giờ không hợp lệ (4/8/12/24)" });
     if (!["sepay","payos","wallet"].includes(paymentMethod))
@@ -2920,6 +2923,7 @@ app.post("/api/partner/featured/request", async (req, res) => {
       partnerId: partner._id,
       partnerName: partner.bizName || partner.fullName || "Quán",
       bannerImage,
+      bannerVertical,
       hours: pkg.hours,
       amount: pkg.price,
       paymentMethod,
@@ -2996,7 +3000,7 @@ app.post("/api/partner/featured/request", async (req, res) => {
       success: true,
       request: { _id: request._id, requestId: request.requestId, hours: request.hours, amount: request.amount,
         paymentMethod, paymentStatus: request.paymentStatus, status: request.status,
-        bannerImage: request.bannerImage, sePayRef: request.sePayRef, payosCheckoutUrl: request.payosCheckoutUrl },
+        bannerImage: request.bannerImage, bannerVertical: request.bannerVertical, sePayRef: request.sePayRef, payosCheckoutUrl: request.payosCheckoutUrl },
       ...payExtra,
     });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
@@ -3035,6 +3039,7 @@ app.get("/api/partner/featured/status", async (req, res) => {
         active: !!(partner?.featured && partner?.featuredUntil && new Date(partner.featuredUntil) > new Date()),
         featuredUntil: partner?.featuredUntil,
         banner: partner?.featuredBanner,
+        bannerVertical: partner?.featuredBannerVertical,
         hours: partner?.featuredHours,
         package: partner?.featuredPackage,
         featuredAt: partner?.featuredAt,
@@ -3068,6 +3073,7 @@ app.post("/api/admin/featured-requests/:id/approve", adminAuth, async (req, res)
       featured: true,
       featuredUntil: until,
       featuredBanner: request.bannerImage,
+      featuredBannerVertical: request.bannerVertical,
       featuredHours: request.hours,
       featuredPackage: `Nổi bật ${request.hours} giờ`,
       featuredAt: new Date(),
