@@ -4372,7 +4372,7 @@ Nội dung: ${message}` }],
 app.post("/api/coco/chat", async (req, res) => {
   try {
     const { text, message, sessionId } = req.body || {};
-    const userInput = (message || text || '').trim();
+    const userInput = String(message || text || '').trim();
     if (!userInput) return res.status(400).json({ success:false, message:"Thiếu nội dung tin nhắn" });
 
     // ── ROLE-AWARE DB CONTEXT (user / partner / shipper realtime) ──

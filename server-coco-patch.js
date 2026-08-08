@@ -48,7 +48,7 @@ module.exports = function installCocoAI(app, io) {
         model,
       } = req.body || {};
 
-      const userInput = (message || text || '').trim();
+      const userInput = String(message || text || '').trim();
       if (!userInput) return res.status(400).json({ success: false, error: 'Thiếu nội dung tin nhắn' });
 
       // ── BUILD FULL USER CONTEXT từ DB ──────────────────────
