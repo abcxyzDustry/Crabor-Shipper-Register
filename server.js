@@ -3807,13 +3807,26 @@ async function processSePayPayment(payload, ioRef, force = false) {
 
   // ── 2. Shipper registration fee ──────────────────────────
   const shipMatch = rawRef.match(/CRSHIP([A-Z0-9]+)/);
+  const regMatch = rawRef.match(/CRB-FP-([A-Z0-9]+)/i);
   if (shipMatch && !handled) {
     const appId = shipMatch[1];
     const app_ = await Shipper.findOne({ appId: { $regex: appId, $options:'i' }, status:'pending_payment' });
     if (app_) {
-      await Shipper.findByIdAndUpdate(app_._id, { status:'pending_review', paidAt: new Date(), feePaid: amount });
+      await Shipper.findByIdAndUpdate(app_._id, { status:'pending_review', paidAt: new Date(), feePaid: amount, feeStatus:'paid' });
       ioInstance?.to('admin').emit('shipperFeePaid', { shipperId: app_._id });
       console.log(`[SEPAY] Shipper fee confirmed: ${app_._id}`);
+      handled = true;
+    }
+  }
+  // App shipper QR: nội dung CRABOR CRB-FP-XXXX → auto đánh dấu feeStatus=paid
+  if (regMatch && !handled) {
+    const regSuffix = regMatch[1];
+    const app_ = await Shipper.findOne({ registerId: { $regex: '^CRB-FP-' + regSuffix + '$', $options:'i' } });
+    if (app_) {
+      await Shipper.findByIdAndUpdate(app_._id, { feeStatus:'paid', paidAt: new Date(), feePaid: amount });
+      ioInstance?.to(`shipper_${app_._id}`).emit('shipper_fee_paid', { paid: true, amount });
+      ioInstance?.to('admin').emit('shipperFeePaid', { shipperId: app_._id, via:'shipper_app_qr' });
+      console.log(`[SEPAY] Shipper app fee confirmed: ${app_.registerId} — ${amount.toLocaleString('vi-VN')}đ`);
       handled = true;
     }
   }
