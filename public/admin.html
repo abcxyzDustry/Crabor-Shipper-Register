@@ -1687,6 +1687,11 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
 
+function fmtDateTime(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
 function fmtMoney(n) {
   return new Intl.NumberFormat('vi-VN', { style:'currency', currency:'VND' }).format(n||0);
 }
@@ -2096,8 +2101,38 @@ async function viewRecord(id, type) {
     </div>
     <hr class="modal-sep"><label class="modal-label">📋 Cập nhật trạng thái</label><select class="modal-select" id="modalStatus" style="margin-bottom:14px;">${statusOptions.map(s=>`<option value="${s}" ${s===data.status?'selected':''}>${statusText(s)}</option>`).join('')}</select>
     <label class="modal-label">📝 Ghi chú admin</label><textarea class="modal-textarea" id="modalNotes" placeholder="Nhập ghi chú cho hồ sơ này...">${data.adminNotes||''}</textarea>
+    ${type === 'shipper' ? `
+      <hr class="modal-sep">
+      <label class="modal-label">🛡️ Xác minh danh tính</label>
+      <div class="detail-grid" style="margin-bottom:12px">
+        <div class="detail-item"><label>Trạng thái xác minh</label><div class="val">${data.identityVerified ? '✅ Đã xác minh' : data.identityStatus === 'submitted' ? '⏳ Đang chờ duyệt' : data.identityStatus === 'rejected' ? '❌ Bị từ chối' : '— Chưa gửi hồ sơ'}</div></div>
+        <div class="detail-item"><label>Thời điểm gửi</label><div class="val mono">${data.identitySubmittedAt ? fmtDateTime(data.identitySubmittedAt) : '—'}</div></div>
+        ${data.identityRejectNote ? `<div class="detail-item full"><label>Lý do từ chối</label><div class="val coral">${data.identityRejectNote}</div></div>` : ''}
+      </div>
+      ${(data.identityStatus === 'submitted' || (data.identityStatus === 'rejected' && (data.documentsUrls?.cccdFront || data.documents?.cccdFront))) ? `
+        <div style="display:flex;gap:10px">
+          <button class="modal-save" style="flex:1;background:linear-gradient(135deg,#27ae60,#1e8a4d)" onclick="verifyIdentityAction('approve')">✅ Duyệt xác minh</button>
+          <button class="modal-save" style="flex:1;background:linear-gradient(135deg,#E8504A,#c93d37)" onclick="verifyIdentityReject()">❌ Từ chối</button>
+        </div>
+        <input type="text" id="identityRejectNote" class="modal-textarea" style="margin-top:10px" placeholder="Lý do từ chối (nếu có)...">
+      ` : ''}
+    ` : ''}
   `;
 }
+
+async function verifyIdentityAction(action) {
+  const { id, type } = selectedRecord;
+  if (!id || type !== 'shipper') return;
+  if (!confirm(action === 'approve' ? '✅ Duyệt xác minh danh tính cho shipper này?' : '❌ Từ chối hồ sơ xác minh?')) return;
+  try {
+    const note = action === 'reject' ? document.getElementById('identityRejectNote')?.value || '' : undefined;
+    const r = await apiFetch('/api/admin/shipper/verify-identity', 'POST', { shipperId: id, action, note });
+    if (r.success) { showNotif('✅ Đã cập nhật', action === 'approve' ? 'Shipper đã được xác minh danh tính' : 'Hồ sơ xác minh đã bị từ chối', 'green'); closeModal(); loadStats(); loadTable('shipper'); }
+    else showNotif('❌ Lỗi', r.message || 'Không cập nhật được', 'coral');
+  } catch(e) { showNotif('❌ Lỗi', 'Không thể kết nối server', 'coral'); }
+}
+
+function verifyIdentityReject() { verifyIdentityAction('reject'); }
 
 async function saveStatus() {
   const status = document.getElementById('modalStatus').value;

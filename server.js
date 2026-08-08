@@ -664,6 +664,12 @@ const shipperSchema = new mongoose.Schema({
   fcmToken:    { type: String },
   tier:        { type: String, default: 'bronze' },
   preferences: { type: mongoose.Schema.Types.Mixed, default: {} },
+  // Xác minh danh tính (CCCD 2 mặt + gương mặt) — bắt buộc trước khi nhận đơn
+  identityVerified:  { type: Boolean, default: false },
+  identityStatus:    { type: String, enum: ["none","submitted","approved","rejected"], default: "none" },
+  identitySubmittedAt: Date,
+  identityRejectedAt: Date,
+  identityRejectNote:  String,
 }, { timestamps: true });
 
 shipperSchema.index({ phone: 1 });
@@ -3366,7 +3372,7 @@ app.get("/api/notifications/my", async (req, res) => {
   try {
     const owner = getWalletOwner(req);
     if (!owner) return res.status(401).json({ success: false });
-    const notifs = await Notification.find({ ownerId: owner.id }).sort({ createdAt: -1 }).limit(100).lean();
+    const notifs = await Notification.find({ ownerId: owner.id, ownerType: owner.type }).sort({ createdAt: -1 }).limit(100).lean();
     const unread = notifs.filter(n => !n.read).length;
     res.json({ success: true, notifications: notifs, unread });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
@@ -3378,8 +3384,8 @@ app.post("/api/notifications/read", async (req, res) => {
     const owner = getWalletOwner(req);
     if (!owner) return res.status(401).json({ success: false });
     const { id } = req.body || {};
-    if (id) await Notification.updateOne({ _id: id, ownerId: owner.id }, { $set: { read: true } });
-    else await Notification.updateMany({ ownerId: owner.id, read: false }, { $set: { read: true } });
+    if (id) await Notification.updateOne({ _id: id, ownerId: owner.id, ownerType: owner.type }, { $set: { read: true } });
+    else await Notification.updateMany({ ownerId: owner.id, ownerType: owner.type, read: false }, { $set: { read: true } });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -3389,7 +3395,7 @@ app.get("/api/notifications/unread-count", async (req, res) => {
   try {
     const owner = getWalletOwner(req);
     if (!owner) return res.json({ success: true, count: 0 });
-    const count = await Notification.countDocuments({ ownerId: owner.id, read: false });
+    const count = await Notification.countDocuments({ ownerId: owner.id, ownerType: owner.type, read: false });
     res.json({ success: true, count });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -5606,6 +5612,115 @@ app.patch("/api/partner/profile", async (req, res) => {
   }
 });
 
+// PATCH /api/shipper/vehicle — Shipper cập nhật biển số + ảnh phương tiện
+app.patch("/api/shipper/vehicle", async (req, res) => {
+  try {
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa xác thực" });
+    const { vehiclePlate, vehicleImg } = req.body;
+    if (!vehiclePlate) return res.status(400).json({ success: false, message: "Thiếu biển số xe" });
+    const update = { vehiclePlate: String(vehiclePlate).toUpperCase().trim() };
+    if (vehicleImg && vehicleImg.startsWith('data:image')) {
+      if (Buffer.byteLength(vehicleImg, 'utf8') > 1.5 * 1024 * 1024)
+        return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 1.5MB)" });
+      update['documents.vehicleImg'] = vehicleImg;
+    }
+    const shipper = await Shipper.findByIdAndUpdate(req.session.shipperId, { $set: update }, { new: true })
+      .select("fullName phone vehiclePlate documents");
+    if (!shipper) return res.status(404).json({ success: false });
+    res.json({
+      success: true, vehiclePlate: shipper.vehiclePlate,
+      vehicleImg: shipper.documents?.vehicleImg || null,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/shipper/verify-identity — Shipper gửi hồ sơ xác minh (CCCD 2 mặt + gương mặt)
+app.post("/api/shipper/verify-identity", async (req, res) => {
+  try {
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa xác thực" });
+    const { cccdFront, cccdBack, selfie } = req.body || {};
+    if (!cccdFront || !cccdBack || !selfie)
+      return res.status(400).json({ success: false, message: "Thiếu ảnh CCCD mặt trước/mặt sau hoặc ảnh gương mặt" });
+    const images = [cccdFront, cccdBack, selfie];
+    if (images.some(img => !String(img).startsWith('data:image') || Buffer.byteLength(img, 'utf8') > 1.5 * 1024 * 1024))
+      return res.status(400).json({ success: false, message: "Ảnh không hợp lệ (cần dạng base64 data URL, tối đa 1.5MB mỗi ảnh)" });
+
+    await Shipper.findByIdAndUpdate(req.session.shipperId, {
+      $set: {
+        'documents.cccdFront': cccdFront,
+        'documents.cccdBack':  cccdBack,
+        'documents.selfie':    selfie,
+        identityStatus: 'submitted',
+        identitySubmittedAt: new Date(),
+        identityVerified: false,
+        identityRejectedAt: null,
+        identityRejectNote: null,
+      },
+    });
+    res.json({ success: true, message: "Hồ sơ xác minh đã được gửi. Chờ admin duyệt (thường 24h)." });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// GET /api/shipper/verify-identity — Trạng thái xác minh danh tính
+app.get("/api/shipper/verify-identity", async (req, res) => {
+  try {
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa xác thực" });
+    const sh = await Shipper.findById(req.session.shipperId)
+      .select("identityStatus identityVerified identitySubmittedAt identityRejectedAt identityRejectNote documents").lean();
+    const doc = sh?.documents || {};
+    res.json({
+      success: true,
+      status: sh?.identityStatus || 'none',
+      verified: !!sh?.identityVerified,
+      submittedAt: sh?.identitySubmittedAt || null,
+      rejectedAt: sh?.identityRejectedAt || null,
+      rejectNote: sh?.identityRejectNote || null,
+      hasFront: !!doc.cccdFront,
+      hasBack: !!doc.cccdBack,
+      hasSelfie: !!doc.selfie,
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/admin/shipper/verify-identity — Admin duyệt/từ chối xác minh
+app.post("/api/admin/shipper/verify-identity", async (req, res) => {
+  try {
+    const _adminKey = req.headers["x-admin-key"];
+    const _validKey = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
+    const _isAdmin = (_adminKey === _validKey) || !!req.session?.adminId;
+    if (!_isAdmin) return res.status(401).json({ success: false, message: "Unauthorized" });
+    const { shipperId, action, note } = req.body || {};
+    if (!shipperId || !['approve','reject'].includes(action))
+      return res.status(400).json({ success: false, message: "Thiếu shipperId hoặc action" });
+    const shipper = await Shipper.findById(shipperId);
+    if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy shipper" });
+    if (action === 'approve') {
+      shipper.identityStatus = 'approved';
+      shipper.identityVerified = true;
+      shipper.identityRejectedAt = null;
+      shipper.identityRejectNote = null;
+      if (shipper.status === 'pending' || shipper.status === 'reviewing') shipper.status = 'approved';
+    } else {
+      shipper.identityStatus = 'rejected';
+      shipper.identityVerified = false;
+      shipper.identityRejectedAt = new Date();
+      shipper.identityRejectNote = note || 'Hồ sơ không hợp lệ';
+    }
+    await shipper.save();
+    // Thông báo realtime cho shipper
+    req.io?.to(`shipper_${shipperId}`).emit("identity_verified", {
+      approved: action === 'approve', note: shipper.identityRejectNote,
+    });
+    await notifyUser('shipper', shipperId, {
+      type: 'support', title: action === 'approve' ? '✅ Xác minh danh tính thành công!' : '❌ Hồ sơ xác minh bị từ chối',
+      body: action === 'approve' ? 'Bạn đã có thể nhận đơn hàng mới.' : `Lí do: ${shipper.identityRejectNote}`,
+    }).catch(()=>{});
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // PATCH /api/shipper/profile — Shipper cập nhật avatar
 app.patch("/api/shipper/profile", async (req, res) => {
   try {
@@ -7248,7 +7363,7 @@ app.get("/api/partner/wallet", async (req, res) => {
     const wallet = await (async () => {
       if (foodPartner) {
         const p = await FoodPartner.findById(foodPartner._id).select("walletBalance walletHistory");
-        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [] };
+        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: foodPartner._id };
       }
       // Dùng partnerId hoặc userPhone để lấy wallet
       const models = [
@@ -7262,11 +7377,23 @@ app.get("/api/partner/wallet", async (req, res) => {
         const p = req.session.partnerId
           ? await model.findById(req.session.partnerId).select("walletBalance walletHistory")
           : await model.findOne({ phone: req.session.userPhone }).select("walletBalance walletHistory");
-        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [] };
+        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: p._id };
       }
-      return { balance: 0, history: [] };
+      return { balance: 0, history: [], partnerId: null };
     })();
-    res.json({ success: true, wallet });
+    // Lịch sử dòng tiền thật từ WalletTx (credit/debit/withdraw/fee) thay vì walletHistory rỗng
+    let transactions = [];
+    if (wallet.partnerId) {
+      const ids = new Set([String(wallet.partnerId)]);
+      if (req.session.partnerId) ids.add(String(req.session.partnerId));
+      const txs = await WalletTx.find({ ownerId: { $in: [...ids].map(id => new mongoose.Types.ObjectId(id)) }, ownerType: "partner" })
+        .sort({ createdAt: -1 }).limit(100).lean();
+      transactions = txs.map(tx => ({
+        _id: tx._id, type: tx.type, amount: tx.amount, balance: tx.balance,
+        note: tx.note || "", ref: tx.ref || "", createdAt: tx.createdAt,
+      }));
+    }
+    res.json({ success: true, wallet: { balance: wallet.balance, history: wallet.history, transactions } });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -10167,6 +10294,28 @@ app.patch("/api/orders/:id/status", async (req, res) => {
         });
         return res.status(403).json({ success: false, message: "Bạn đang nợ tiền mặt quá 24h. Vui lòng chuyển tiền về công ty tại màn 'Thanh toán chi phí đơn tiền mặt'." });
       }
+      // Chặn nếu shipper chưa hoàn tất xác minh danh tính (CCCD + gương mặt)
+      if (req.session.shipperId) {
+        const _sh = await Shipper.findById(req.session.shipperId).select("status documents feeStatus fee identityVerified").lean().catch(() => null);
+        if (_sh) {
+          const doc = _sh.documents || {};
+          const hasDocs = !!doc.cccdFront && !!doc.cccdBack && !!doc.selfie;
+          const verified = !!_sh.identityVerified || hasDocs;
+          if (!verified) {
+            req.io?.to(`shipper_${req.session.shipperId}`).emit("verify_identity_required", {
+              message: "Bạn cần hoàn tất xác minh danh tính (CCCD 2 mặt + ảnh gương mặt) trước khi nhận đơn.",
+            });
+            return res.status(403).json({ success: false, needVerification: true, message: "Bạn cần hoàn tất xác minh danh tính (CCCD 2 mặt + ảnh gương mặt) tại mục 'Xác minh thông tin' trước khi nhận đơn." });
+          }
+          // Chặn nếu chưa đóng phí đăng ký shipper
+          if (_sh.feeStatus !== "paid") {
+            req.io?.to(`shipper_${req.session.shipperId}`).emit("fee_unpaid_blocked", {
+              message: "Bạn chưa đóng phí đăng ký shipper. Vui lòng thanh toán để nhận đơn mới.",
+            });
+            return res.status(403).json({ success: false, needFee: true, message: "Bạn chưa đóng phí đăng ký shipper. Vui lòng thanh toán tại màn 'Thu nhập' để nhận đơn mới." });
+          }
+        }
+      }
       order.shipperId = req.session.shipperId;
       // Thông báo customer
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
@@ -11015,6 +11164,13 @@ async function releaseSettlementEarnings(settlement) {
     await notifyUser('shipper', settlement.shipperId, {
       type: 'income', title: '💰 Đối soát tiền mặt xong!',
       body: `Đơn ${settlement.orderId} — ${settlement.shipperEarn.toLocaleString('vi-VN')}đ đã vào ví`,
+      ref: settlement.orderId, refModule: settlement.orderModule || 'food',
+    });
+  }
+  if (settlement.partnerId && settlement.partnerEarn > 0) {
+    await notifyUser('partner', settlement.partnerId, {
+      type: 'income', title: '💰 Bạn đã nhận được tiền sau đơn hàng!',
+      body: `Đơn ${settlement.orderId} — ${settlement.partnerEarn.toLocaleString('vi-VN')}đ đã vào ví Crabor. Bấm để xem chi tiết`,
       ref: settlement.orderId, refModule: settlement.orderModule || 'food',
     });
   }
