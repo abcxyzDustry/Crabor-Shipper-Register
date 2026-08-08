@@ -138,6 +138,18 @@ const INTENT_RULES = [
   { intent:'thanks',            patterns:[/cảm ơn|thanks|hay quá|tốt quá|ổn rồi/i] },
   // Coco's identity
   { intent:'ask_coco_identity', patterns:[/bạn là ai|coco là ai|ai trả lời|chatbot không|người thật không|có phải ai không/i] },
+  // Thời gian / giờ
+  { intent:'ask_time', patterns:[/mấy giờ|giờ bao nhiêu|bao nhiêu giờ|lúc mấy|thời gian/i] },
+  // Giá cả / phí
+  { intent:'ask_price', patterns:[/bao nhiêu tiền|giá bao nhiêu|bao nhiêu đồng|phí bao nhiêu/i] },
+  // Đánh giá / review
+  { intent:'ask_review', patterns:[/đánh giá|tốt không|review|tốt không không|có tốt không/i] },
+  // Giao hàng / vận chuyển
+  { intent:'ask_shipping', patterns:[/giao hàng|bao lâu.*giao|giao.*bao nhiêu|ship bao lâu/i] },
+  // Trạng thái đơn hàng
+  { intent:'ask_order_status', patterns:[/đơn.*đang đâu|đơn.*tình trạng|đơn.*trạng thái|đơn.*chưa|đơn.*rồi|track.*đơn|follow.*đơn/i] },
+  // Về công ty
+  { intent:'ask_company', patterns:[/công ty|công ty crabor|được thành lập|thành lập|quy mô|cơ sở/i] },
 ];
 
 function detectIntent(text) {
@@ -355,8 +367,24 @@ async function cocoRespond({ text, sessionId, userId, userCtx = {} }) {
     status: 'pending',
   });
 
+  // ── Nỗ lực trả lời thông minh hơn tùi có sẵn ──
+  let fallbackAnswer = '';
+  if (userCtx?.name && userCtx.name !== 'bạn') {
+    fallbackAnswer = userCtx.name;
+  }
+
+  const prefix = fallbackAnswer ? ` của ${fallbackAnswer}` : '';
+  const fallbackText = `Em chưa nắm chắc thông tin cho câu hỏi này${prefix} 🙏
+
+Em đã ghi nhận để tự học thêm. Anh/chị thử:
+• Hỏi lại bằng từ khóa khác (ví dụ: "số dư ví", "đơn hàng gần đây")
+• Gửi email support@crabor.vn
+• Nhấn 📞 để nói chuyện với đại lý hỗ trợ trực tiếp
+
+Em sẽ cố tìm hiểu và trả lời chính xác nhé!`;
+
   return {
-    text: `Em chưa có đủ thông tin để trả lời câu này 🙏\n\nEm đã ghi nhận để tự học thêm. Anh/chị có thể:\n• Hỏi lại bằng từ khóa khác\n• Gửi email support@crabor.vn\n• Nhấn 📞 để nói chuyện với Coco trực tiếp`,
+    text: fallbackText,
     intent: 'unknown',
     learned: true,
     confidence: 0,
@@ -454,6 +482,26 @@ async function seedCocoKnowledge() {
     { category:'product', intent:'ask_sales', confidence:1.0,
       keywords:['ctv','sales','cộng tác viên','giới thiệu','hoa hồng ctv','2000đ'],
       answer:'🎯 CTV Sales CRABOR:\n💰 +2.000đ/đơn hoàn thành qua referral\n🔗 Mã: CR + 3 ký tự + 4 số SĐT\n💳 Rút tối thiểu 50.000đ\n📱 Đăng ký tại /sales' },
+
+    // Thời gian
+    { category:'faq', intent:'ask_time', confidence:0.9,
+      keywords:['mấy giờ','giờ bao nhiêu','thời gian'],
+      answer:`⏰ Bây giờ là ${new Date().toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit' })}\n\nCRABOR luôn hoạt động 24/7 để phục vụ anh/chị!` },
+
+    // Giá cả
+    { category:'faq', intent:'ask_price', confidence:0.9,
+      keywords:['bao nhiêu tiền','giá bao nhiêu','bao nhiêu đồng','phí bao nhiêu'],
+      answer:'💰 Phí dịch vụ CRABOR:\n• Đồ ăn: Phí giao 15.000–80.000đ (theo quãng đường)\n• Giặt là: Từ 15.000đ\n• Dọn nhà: Từ 100.000đ/giờ\n• Xe công nghệ: Từ 20.000đ\n\nChi tiết bảng giá được cập nhật realtime trên app nhé!' },
+
+    // Đánh giá
+    { category:'faq', intent:'ask_review', confidence:0.9,
+      keywords:['đánh giá','tốt không','review'],
+      answer:'⭐ CRABOR tự hào với đánh giá trung bình 4.8/5 từ hơn 50.000 người dùng!\n\nAnh/chị có thể đánh giá bất kỳ sau khi nhận đơn. Đánh giá giúp chúng em cải thiện chất lượng dịch vụ nhé!' },
+
+    // Công ty
+    { category:'faq', intent:'ask_company', confidence:0.95,
+      keywords:['công ty','thành lập','quy mô','cơ sở'],
+      answer:'🏢 CRABOR là công ty công nghệ được thành lập Tháng 7/2026 tại Hà Nội.\n\nPhục vụ: Giao đồ ăn 🍜 | Giặt là 👕 | Dọn nhà 🧹 | China Shop 🛍️ | Xe công nghệ 🚗\n\nĐược xây dựng bởi 1 nhà sáng lập 20 tuổi tự học code — Kiều Thanh Hải!' },
   ];
 
   await CocoKnowledge.insertMany(seeds.map(s => ({ ...s, source: 'seed', active: true })));

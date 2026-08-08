@@ -45,7 +45,10 @@ const cocoEngine = require("./coco-engine");
 const { CocoKnowledge, CocoMemory, CocoLearnLog, CocoTools, cocoRespond, processLearnQueue, seedCocoKnowledge } = cocoEngine;
 const cocoOps   = require("./coco-ops");
 const cocoBrain = require("./coco-brain");
-const { cocoThink, CocoReasoning, checkBrainStatus, printBrainSetupGuide } = cocoBrain;
+const { cocoThink, CocoReasoning, checkBrainStatus, printBrainSetupGuide, mountCocoRoutes } = cocoBrain;
+
+// COCO_BRAIN defaults to 'auto' — tries OpenRouter → Groq → Claude → rule
+process.env.COCO_BRAIN = process.env.COCO_BRAIN || 'auto';
 const novaAgent = require("./nova-agent");
 const { SLAMonitor, RevenueIntel, DispatchIntel, InventoryIntel,
         SystemHealth, OnboardingFlow,
@@ -158,8 +161,11 @@ console.log("[DB] Connecting to MongoDB...");
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(async () => {
     console.log("[OK] MongoDB Atlas connected — DB: crabor");
-    // Coco AI: seed knowledge + start ops crons
+    // Coco AI: seed knowledge + mount brain routes + start ops crons
     seedCocoKnowledge().catch(e => console.log("[Coco] Seed:", e.message));
+    const { mountCocoRoutes } = require("./coco-brain");
+    mountCocoRoutes(app, io);
+    printBrainSetupGuide();
     startCronJobs();
     setTimeout(() => startOpsCrons(io), 3000); // delay 3s để DB ổn định
     // Auto-seed admin nếu chưa có
