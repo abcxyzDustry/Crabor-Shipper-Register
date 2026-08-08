@@ -1903,6 +1903,52 @@ app.post("/api/payment/confirm", async (req, res) => {
   }
 });
 
+// GET /api/shipper/fee — lấy thông tin phí đăng ký cho shipper app (session-based)
+app.get("/api/shipper/fee", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    const shipper = await Shipper.findById(req.session.shipperId).select("registerId phone plan fee feeStatus");
+    if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy hồ sơ Shipper" });
+    res.json({ success: true, data: {
+      registerId: shipper.registerId,
+      phone: shipper.phone,
+      plan: shipper.plan,
+      fee: shipper.fee,
+      feeStatus: shipper.feeStatus,
+    }});
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/shipper/fee/confirm — xác nhận đã thanh toán phí đăng ký từ shipper app (session-based)
+app.post("/api/shipper/fee/confirm", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    const { paid } = req.body;
+    const shipper = await Shipper.findOneAndUpdate(
+      { _id: req.session.shipperId },
+      { feeStatus: paid ? "paid" : "unpaid" },
+      { new: true }
+    ).select("registerId phone plan feeStatus");
+    if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy hồ sơ Shipper" });
+
+    req.io.to("admin").emit("paymentConfirmed", {
+      registerId: shipper.registerId,
+      phone: shipper.phone,
+      plan: shipper.plan,
+      paid,
+      via: "shipper_app",
+    });
+
+    res.json({ success: true, data: { registerId: shipper.registerId, paid } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/admin/config/earlybird — lấy cấu hình early bird
 app.get("/api/admin/config/earlybird", adminAuth, async (req, res) => {
   try {
@@ -3421,13 +3467,13 @@ app.get("/api/wallet/shipper", async (req, res) => {
     if (!req.session.shipperId && !req.session.userId) return res.status(401).json({ success:false });
     let shipper = null;
     if (req.session.shipperId) {
-      shipper = await Shipper.findById(req.session.shipperId).select('walletBalance walletEarned _id totalEarnings totalOrders');
+      shipper = await Shipper.findById(req.session.shipperId).select('walletBalance walletEarned _id totalEarnings totalOrders fee feeStatus plan');
     } else {
       // Legacy: tìm qua userId
-      shipper = await Shipper.findOne({ _id: req.session.userId }).select('walletBalance walletEarned _id totalEarnings totalOrders');
+      shipper = await Shipper.findOne({ _id: req.session.userId }).select('walletBalance walletEarned _id totalEarnings totalOrders fee feeStatus plan');
       if (!shipper) {
         const user = await User.findById(req.session.userId).select('phone');
-        if (user) shipper = await Shipper.findOne({ phone: user.phone }).select('walletBalance walletEarned _id totalEarnings totalOrders');
+        if (user) shipper = await Shipper.findOne({ phone: user.phone }).select('walletBalance walletEarned _id totalEarnings totalOrders fee feeStatus plan');
       }
     }
     if (!shipper) return res.status(404).json({ success:false });
@@ -3452,7 +3498,7 @@ app.get("/api/wallet/shipper", async (req, res) => {
     const monthEarnings = calcEarnings(monthOrders);
     const pending = pendingTx.reduce((s,t) => s + (t.amount||0), 0);
     
-    res.json({ success:true, balance: shipper.walletBalance||0, earned: shipper.walletEarned||0, pending, todayEarnings, weekEarnings, monthEarnings, totalEarnings: shipper.totalEarnings||0, totalOrders: shipper.totalOrders||0, transactions: txs });
+    res.json({ success:true, balance: shipper.walletBalance||0, earned: shipper.walletEarned||0, pending, todayEarnings, weekEarnings, monthEarnings, totalEarnings: shipper.totalEarnings||0, totalOrders: shipper.totalOrders||0, fee: shipper.fee, feeStatus: shipper.feeStatus, plan: shipper.plan, transactions: txs });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -10830,6 +10876,18 @@ app.post("/api/shipper/online", async (req, res) => {
       return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
     }
     const { lat, lng } = req.body;
+    // Chặn bật online nếu chưa hoàn tất xác minh danh tính hoặc chưa đóng phí đăng ký
+    const _gating = await Shipper.findById(req.session.shipperId).select("documents feeStatus identityVerified").lean().catch(() => null);
+    if (_gating) {
+      const _doc = _gating.documents || {};
+      const _verified = !!_gating.identityVerified || (!!_doc.cccdFront && !!_doc.cccdBack && !!_doc.selfie);
+      if (!_verified) {
+        return res.status(403).json({ success: false, needVerification: true, message: "Bạn cần hoàn tất xác minh danh tính (CCCD 2 mặt + ảnh gương mặt) tại mục 'Xác minh thông tin' trước khi bật nhận đơn." });
+      }
+      if (_gating.feeStatus !== "paid") {
+        return res.status(403).json({ success: false, needFee: true, message: "Bạn chưa hoàn tất nghĩa vụ thanh toán phí đăng ký shipper. Vui lòng thanh toán tại màn 'Thu nhập' để nhận đơn." });
+      }
+    }
     const updateData = { online: true, isAccepting: true, lastSeen: new Date() };
     if (lat && lng) {
       updateData.location = { lat, lng };
