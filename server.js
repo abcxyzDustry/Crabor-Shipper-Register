@@ -3498,7 +3498,9 @@ app.get("/api/wallet/shipper", async (req, res) => {
     const monthEarnings = calcEarnings(monthOrders);
     const pending = pendingTx.reduce((s,t) => s + (t.amount||0), 0);
     
-    res.json({ success:true, balance: shipper.walletBalance||0, earned: shipper.walletEarned||0, pending, todayEarnings, weekEarnings, monthEarnings, totalEarnings: shipper.totalEarnings||0, totalOrders: shipper.totalOrders||0, fee: shipper.fee, feeStatus: shipper.feeStatus, plan: shipper.plan, transactions: txs });
+    const { totalOrders: allTimeOrders, todayOrders: todayCount } = await countShipperCompletedOrders(shipper._id);
+    
+    res.json({ success:true, balance: shipper.walletBalance||0, earned: shipper.walletEarned||0, pending, todayEarnings, weekEarnings, monthEarnings, totalEarnings: shipper.totalEarnings||0, totalOrders: allTimeOrders, todayOrders: todayCount, fee: shipper.fee, feeStatus: shipper.feeStatus, plan: shipper.plan, transactions: txs });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -5563,6 +5565,11 @@ app.get("/api/shipper/me", async (req, res) => {
     if (!shipperObj.avatar || shipperObj.avatar === 'pending_upload' || shipperObj.avatar.startsWith('data:')) {
       shipperObj.avatar = shipperObj.documents?.selfie || null;
     }
+
+    // Đếm đơn thực tế từ DB (không phụ thuộc field totalOrders cũ có thể không tăng)
+    const { totalOrders, todayOrders } = await countShipperCompletedOrders(shipper._id);
+    shipperObj.totalOrders = totalOrders;
+    shipperObj.todayOrders = todayOrders;
 
     res.json({ success: true, shipper: shipperObj });
   } catch (err) {
@@ -9740,6 +9747,24 @@ async function calcEarnings(order) {
   const craborEarn = finalTotal - shipperEarn - partnerEarn;
 
   return { shipperEarn, partnerEarn, craborEarn, commissionPct, serviceFee };
+}
+
+// ── Helper: đếm số đơn đã hoàn thành của shipper (all-time + hôm nay) ──
+async function countShipperCompletedOrders(shipperId) {
+  if (!shipperId) return { totalOrders: 0, todayOrders: 0 };
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  try {
+    const [foodTotal, foodToday, cleanTotal, cleanToday] = await Promise.all([
+      Order.countDocuments({ shipperId, status: "delivered" }),
+      Order.countDocuments({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }),
+      mongoose.models.CleaningOrder ? CleaningOrder.countDocuments({ shipperId, status: "completed" }) : 0,
+      mongoose.models.CleaningOrder ? CleaningOrder.countDocuments({ shipperId, status: "completed", completedAt: { $gte: todayStart } }) : 0,
+    ]);
+    return { totalOrders: foodTotal + cleanTotal, todayOrders: foodToday + cleanToday };
+  } catch (e) {
+    console.error('[countShipperCompletedOrders]', e.message);
+    return { totalOrders: 0, todayOrders: 0 };
+  }
 }
 
 // ── Helper: thêm vào wallet pending queue (tránh trùng) ──────
