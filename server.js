@@ -1255,11 +1255,13 @@ function toSpeedPhone(phone) {
 const otpStore      = new Map();
 const emailOtpStore = new Map(); // { email → { code, expiry } }
 const resetTokenStore = new Map(); // { token → { userId, userType, expiry } }
+const pendingLoginStore = new Map(); // { phone|email → { role, userId, phone, email, module, expiry } }
 
 // Dọn expired OTPs mỗi 10 phút
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of otpStore) { if (v.expiry < now) otpStore.delete(k); }
+  for (const [k, v] of pendingLoginStore) { if (v.expiry < now) pendingLoginStore.delete(k); }
 }, 10 * 60 * 1000);
 
 // Gửi OTP qua SpeedSMS
@@ -1595,6 +1597,115 @@ function speedSmsCheckOtp(phone, code) {
   if (entry.code !== String(code).trim()) return false;
   otpStore.delete(phone); // xóa sau khi dùng
   return true;
+}
+
+// ── OTP 2FA: bước 1 — password đúng → gửi OTP (SMS/email), lưu pending login ──
+async function startLoginOtp({ role, userId, phone, email, module }) {
+  const normPhone = phone ? normalizePhone(phone) : null;
+  const normEmail = email ? String(email).trim().toLowerCase() : null;
+  const key = normPhone || normEmail;
+  if (!key) throw new Error("Không có SĐT hoặc email để gửi mã OTP");
+  let via = 'email';
+  if (normPhone) {
+    await speedSmsSendOtp(normPhone);
+    via = 'sms';
+  } else if (normEmail) {
+    await sendEmailOtp(normEmail);
+    via = 'email';
+  }
+  pendingLoginStore.set(key, {
+    role, userId,
+    phone: normPhone,
+    email: normEmail,
+    module: module || null,
+    expiry: Date.now() + 5 * 60 * 1000,
+  });
+  return via;
+}
+
+// ── OTP 2FA: bước 2 — verify OTP + tạo session theo role ──
+async function finalizeLoginOtp(req, res, identifier) {
+  const key = /@/.test(identifier)
+    ? String(identifier).trim().toLowerCase()
+    : normalizePhone(identifier);
+  const pending = pendingLoginStore.get(key);
+  if (!pending) {
+    return res.status(400).json({ success: false, message: "Phiên OTP không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại." });
+  }
+  pendingLoginStore.delete(key);
+
+  try {
+    if (pending.role === 'customer') {
+      const user = await User.findById(pending.userId);
+      if (!user) return res.status(404).json({ success: false, message: "Tài khoản không tồn tại" });
+      req.session.userId    = user._id;
+      req.session.userPhone = user.phone;
+      req.session.role      = user.role;
+      await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
+      const cookieStr = buildSignedSessionCookie(req.session.id);
+      return res.json({
+        success: true,
+        cookie:  cookieStr,
+        user: {
+          _id:          user._id,
+          fullName:     user.fullName,
+          phone:        user.phone || "",
+          email:        user.email || "",
+          role:         user.role  || "customer",
+          isAdmin:      user.isAdmin || user.role === "admin",
+          loyaltyPts:   user.loyaltyPts || 0,
+          walletBalance: user.walletBalance || 0,
+          totalOrders:  user.totalOrders || 0,
+          profileComplete: user.profileComplete || true,
+        },
+      });
+    }
+
+    if (pending.role === 'shipper') {
+      const shipper = await Shipper.findById(pending.userId);
+      if (!shipper) return res.status(404).json({ success: false, message: "Tài khoản không tồn tại" });
+      req.session.shipperId = shipper._id;
+      req.session.userPhone = shipper.phone;
+      req.session.role = "shipper";
+      await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
+      const sessionCookieValue = buildSignedSessionCookie(req.session.id);
+      return res.json({
+        success: true,
+        shipper: { _id: shipper._id, fullName: shipper.fullName, phone: shipper.phone, status: shipper.status },
+        cookie: sessionCookieValue,
+        sessionId: req.session.id,
+        status: shipper.status,
+      });
+    }
+
+    if (pending.role === 'partner') {
+      const modelMap = {
+        giat_la: GiatLa, giup_viec: GiupViec, china_shop: ChinaShop,
+        food_partner: FoodPartner, ride_driver: RideDriver,
+      };
+      const Model = modelMap[pending.module];
+      const p = Model ? await Model.findById(pending.userId) : null;
+      if (!p) return res.status(404).json({ success: false, message: "Không tìm thấy tài khoản" });
+      req.session.userPhone = p.phone;
+      req.session.partnerId = p._id;
+      req.session.partnerModule = pending.module;
+      req.session.role = "partner";
+      await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
+      const cookieStr = buildSignedSessionCookie(req.session.id);
+      return res.json({
+        success: true,
+        partner: p,
+        module: pending.module,
+        cookie: cookieStr,
+        sessionId: req.session.id,
+      });
+    }
+
+    return res.status(400).json({ success: false, message: "Vai trò không hợp lệ" });
+  } catch (err) {
+    console.error('[FinalizeOtp] Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
 }
 
 // Gửi SMS thông báo (không phải OTP) qua SpeedSMS
@@ -5201,29 +5312,9 @@ app.post("/api/auth/login-form", async (req, res) => {
     if (!isMatch)
       return res.status(400).json({ success:false, message:"Mật khẩu không đúng" });
 
-    req.session.userId    = user._id;
-    req.session.userPhone = user.phone;
-    await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
-
-    // Trả cookie để app lưu session (giống register)
-    const cookieStr = buildSignedSessionCookie(req.session.id);
-
-    res.json({
-      success: true,
-      cookie:  cookieStr,
-      user: {
-        _id:          user._id,
-        fullName:     user.fullName,
-        phone:        user.phone || "",
-        email:        user.email || "",
-        role:         user.role  || "customer",
-        isAdmin:      user.isAdmin || user.role === "admin",
-        loyaltyPts:   user.loyaltyPts || 0,
-        walletBalance: user.walletBalance || 0,
-        totalOrders:  user.totalOrders || 0,
-        profileComplete: user.profileComplete || true,
-      },
-    });
+    // OTP 2FA — bước 1: gửi mã về SĐT/email, chưa tạo session
+    await startLoginOtp({ role: 'customer', userId: user._id, phone: user.phone, email: user.email });
+    return res.json({ success: true, needsOtp: true, message: "Đã gửi mã OTP. Vui lòng nhập mã để hoàn tất đăng nhập." });
   } catch(err) {
     res.status(500).json({ success:false, message:err.message });
   }
@@ -5376,9 +5467,6 @@ app.post("/api/admin/notify", adminAuth, async (req, res) => {
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
 // 4 giao diện app chính (Capacitor wrapper sẽ trỏ vào đây)
-app.get("/customer",  (req, res) => res.sendFile(path.join(__dirname, "public", "customer.html")));
-app.get("/shipper",   (req, res) => res.sendFile(path.join(__dirname, "public", "shipper.html")));
-app.get("/partner",   (req, res) => res.sendFile(path.join(__dirname, "public", "partner.html")));
 app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
@@ -5433,6 +5521,56 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       return res.status(400).json({ success: false, message: "Mã OTP không đúng hoặc đã hết hạn" });
 
     res.json({ success: true, message: "Xác minh thành công", phone });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/login/otp — Bước 2 của OTP 2FA: xác nhận mã → tạo session (customer/shipper/partner)
+app.post("/api/auth/login/otp", async (req, res) => {
+  try {
+    const { identifier, otp } = req.body;
+    if (!identifier || !otp)
+      return res.status(400).json({ success: false, message: "Thiếu SĐT/email hoặc mã OTP" });
+    if (!rateLimit(`login-otp:${identifier}`, 5))
+      return res.status(429).json({ success: false, message: "Sai quá nhiều lần. Vui lòng đăng nhập lại." });
+
+    const key = /@/.test(identifier)
+      ? String(identifier).trim().toLowerCase()
+      : normalizePhone(identifier);
+    const ok = key.includes("@")
+      ? verifyEmailOtp(key, otp).ok
+      : speedSmsCheckOtp(key, otp);
+    if (!ok)
+      return res.status(400).json({ success: false, message: "Mã OTP không đúng hoặc đã hết hạn" });
+
+    return await finalizeLoginOtp(req, res, key);
+  } catch (err) {
+    console.error('[Login/Otp] Error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/login/otp/resend — Gửi lại mã OTP 2FA (không cần nhập lại password)
+app.post("/api/auth/login/otp/resend", async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier) return res.status(400).json({ success: false, message: "Thiếu SĐT/email" });
+    if (!rateLimit(`otp:${identifier}`, 3))
+      return res.status(429).json({ success: false, message: "Gửi quá nhiều lần. Thử lại sau 10 phút." });
+
+    const key = /@/.test(identifier)
+      ? String(identifier).trim().toLowerCase()
+      : normalizePhone(identifier);
+    const pending = pendingLoginStore.get(key);
+    if (!pending) {
+      return res.status(400).json({ success: false, message: "Phiên OTP hết hạn. Vui lòng đăng nhập lại." });
+    }
+    pending.expiry = Date.now() + 5 * 60 * 1000;
+    let via = 'email';
+    if (pending.phone) { await speedSmsSendOtp(pending.phone); via = 'sms'; }
+    else if (pending.email) { await sendEmailOtp(pending.email); via = 'email'; }
+    res.json({ success: true, via, message: "Đã gửi lại mã OTP" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -5945,20 +6083,9 @@ app.post("/api/partner/login", async (req, res) => {
         if (p.status === 'rejected') {
           return res.status(403).json({ success: false, status: 'rejected', message: "Tài khoản bị từ chối" });
         }
-        req.session.userPhone = p.phone;
-        req.session.partnerId = p._id;
-        req.session.partnerModule = module;
-        req.session.role = "partner";
-        await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
-        // Trả cookie để app lưu session
-        const cookieStr = buildSignedSessionCookie(req.session.id);
-        return res.json({
-          success: true,
-          partner: p,
-          module,
-          cookie: cookieStr,
-          sessionId: req.session.id,
-        });
+        // OTP 2FA — bước 1: gửi mã về SĐT/email, chưa tạo session
+        await startLoginOtp({ role: 'partner', userId: p._id, phone: p.phone, email: p.email, module });
+        return res.json({ success: true, needsOtp: true, message: "Đã gửi mã OTP. Vui lòng nhập mã để hoàn tất đăng nhập.", module });
       }
     }
     return res.status(404).json({ success: false, message: "Không tìm thấy tài khoản" });
@@ -8516,27 +8643,9 @@ app.post("/api/shipper/login", async (req, res) => {
       return res.status(403).json({ success: false, status: 'rejected', message: "Tài khoản bị từ chối" });
     }
 
-    req.session.shipperId = shipper._id;
-    req.session.userPhone = shipper.phone;
-    req.session.role = "shipper";
-    await new Promise((resolve, reject) => {
-      req.session.save((err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-
-    // FIX: build signed cookie đúng format (có HMAC signature)
-    const sessionCookieValue = buildSignedSessionCookie(req.session.id);
-
-    console.log('[Login] Success:', shipper.phone, 'Session:', req.session.id);
-    res.json({
-      success: true,
-      shipper: { _id: shipper._id, fullName: shipper.fullName, phone: shipper.phone, status: shipper.status },
-      cookie: sessionCookieValue,
-      sessionId: req.session.id,
-      status: shipper.status
-    });
+    // OTP 2FA — bước 1: gửi mã về SĐT/email, chưa tạo session
+    await startLoginOtp({ role: 'shipper', userId: shipper._id, phone: shipper.phone, email: shipper.email });
+    return res.json({ success: true, needsOtp: true, message: "Đã gửi mã OTP. Vui lòng nhập mã để hoàn tất đăng nhập.", status: shipper.status });
   } catch(err) {
     console.error('[Login] Error:', err);
     res.status(500).json({ success: false, message: err.message });
