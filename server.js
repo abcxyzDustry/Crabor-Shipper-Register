@@ -664,6 +664,18 @@ const shipperSchema = new mongoose.Schema({
   fcmToken:    { type: String },
   tier:        { type: String, default: 'bronze' },
   preferences: { type: mongoose.Schema.Types.Mixed, default: {} },
+  // Theo dõi thời gian online (real-time) — cho nhiệm vụ, cấp bậc, chính sách đảm bảo thu nhập
+  onlineAt:           { type: Date },            // thời điểm bật online gần nhất
+  onlineSecondsToday: { type: Number, default: 0 },
+  onlineDay:          { type: String },           // YYYY-MM-DD
+  onlineSecondsMonth: { type: Number, default: 0 },
+  onlineMonth:        { type: String },           // YYYY-MM
+  onlineSecondsTotal: { type: Number, default: 0 },
+  // Nhiệm vụ đã nhận thưởng (chống nhận đúp)
+  missionClaims:      [{ id: String, day: String, claimedAt: Date }],
+  // Đồng ý Điều khoản & Chính sách hợp đồng shipper (hiện 1 lần sau đăng nhập đầu tiên)
+  termsAccepted:    { type: Boolean, default: false },
+  termsAcceptedAt:  { type: Date },
   // Xác minh danh tính (CCCD 2 mặt + gương mặt) — bắt buộc trước khi nhận đơn
   identityVerified:  { type: Boolean, default: false },
   identityStatus:    { type: String, enum: ["none","submitted","approved","rejected"], default: "none" },
@@ -2467,51 +2479,87 @@ app.post("/api/orders/:id/reorder", async (req, res) => {
   }
 });
 
-// GET /api/shipper/missions — Nhiệm vụ ngày của shipper
+// ── Helper: lấy shipper hiện tại từ session (shipper hoặc user đăng nhập) ──
+async function currentShipperFromSession(req, res) {
+  try { await loadSessionFromHeader(req, res); } catch (_) {}
+  if (req.session?.shipperId) return Shipper.findById(req.session.shipperId);
+  if (req.session?.userId) {
+    const user = await User.findById(req.session.userId).select("phone");
+    if (user) return Shipper.findOne({ phone: user.phone });
+  }
+  return null;
+}
+
+// ── Helper: nhiệm vụ ngày (real-time từ dữ liệu thực tế) ──────
+async function buildDailyMissions(shipper) {
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const tk = dayKey();
+  const [todayOrders, ratedToday] = await Promise.all([
+    Order.countDocuments({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: todayStart } }),
+    Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: todayStart }, ratingShipper: { $gte: 1 } }).select("ratingShipper").lean(),
+  ]);
+  const onlineHours = Math.round(((shipper.onlineSecondsToday || 0) / 3600) * 10) / 10;
+  const avgRatingToday = ratedToday.length > 0 ? Math.round((ratedToday.reduce((s,o)=>s+o.ratingShipper,0)/ratedToday.length) * 10) / 10 : 0;
+  const claimed = new Set((shipper.missionClaims||[]).filter(c=>c.day===tk).map(c=>c.id));
+
+  const defs = [
+    { id:'m1', title:'Giao 3 đơn hôm nay',  target:3, reward:5000,  icon:'🛵', desc:'Hoàn thành giao 3 đơn trong ngày', get: () => todayOrders },
+    { id:'m2', title:'Giao 8 đơn hôm nay',  target:8, reward:15000, icon:'⚡', desc:'Hoàn thành giao 8 đơn trong ngày', get: () => todayOrders },
+    { id:'m3', title:'Online 3 tiếng hôm nay', target:3, reward:8000, icon:'🕐', desc:'Bật nhận đơn tổng 3 tiếng trong ngày', get: () => onlineHours },
+    { id:'m4', title:'Giữ sao 4.8 trong ngày', target:1, reward:10000, icon:'⭐', desc:'Đạt 4.8⭐ cho các đơn hôm nay', get: () => (avgRatingToday >= 4.8 ? 1 : 0) },
+  ];
+
+  const missions = defs.map(d => {
+    const raw = d.get();
+    const current = Math.min(raw, d.target);
+    const completed = raw >= d.target;
+    return { id:d.id, title:d.title, target:d.target, reward:d.reward, icon:d.icon, desc:d.desc,
+             current: Math.round(current * 10) / 10, completed, claimed: claimed.has(d.id) };
+  });
+  return { missions, todayOrders, onlineHours, avgRatingToday };
+}
+
+// GET /api/shipper/missions — Nhiệm vụ ngày của shipper (real-time)
 app.get("/api/shipper/missions", async (req, res) => {
   try {
-    if (!req.session.shipperId && !req.session.userId) return res.status(401).json({ success: false });
-    let shipper = null;
-    if (req.session.shipperId) {
-      shipper = await Shipper.findById(req.session.shipperId);
-    } else {
-      const user = await User.findById(req.session.userId).select("phone");
-      if (user) shipper = await Shipper.findOne({ phone: user.phone });
-    }
-    if (!shipper) return res.status(404).json({ success: false });
-
-    const today = new Date(); today.setHours(0,0,0,0);
-    const todayOrders = await Order.countDocuments({
-      shipperId: shipper._id, status: "delivered",
-      deliveredAt: { $gte: today }
-    });
-
-    const missions = [
-      { id:'m1', title:'Giao 3 đơn hôm nay', target:3, current: Math.min(todayOrders,3), reward:5000, icon:'🛵' },
-      { id:'m2', title:'Giao 8 đơn hôm nay', target:8, current: Math.min(todayOrders,8), reward:15000, icon:'⚡' },
-      { id:'m3', title:'Duy trì 4.8⭐ trong ngày', target:1, current: shipper.rating>=4.8?1:0, reward:10000, icon:'⭐' },
-      { id:'m4', title:'Online 4 tiếng liên tục', target:4, current: 0, reward:8000, icon:'🕐' },
-    ];
-    res.json({ success: true, missions, todayOrders, rating: shipper.rating || 0 });
+    const shipper = await currentShipperFromSession(req, res);
+    if (!shipper) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    const data = await buildDailyMissions(shipper);
+    res.json({ success: true, ...data });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// GET /api/shipper/tier — Hạng tài xế
+// POST /api/shipper/missions/claim — Nhận thưởng nhiệm vụ khi đã hoàn thành
+app.post("/api/shipper/missions/claim", async (req, res) => {
+  try {
+    const shipper = await currentShipperFromSession(req, res);
+    if (!shipper) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    const { missionId } = req.body;
+    const data = await buildDailyMissions(shipper);
+    const mission = data.missions.find(m => m.id === missionId);
+    if (!mission) return res.status(404).json({ success: false, message: "Không tìm thấy nhiệm vụ" });
+    if (!mission.completed) return res.status(400).json({ success: false, message: "Nhiệm vụ chưa hoàn thành, tiếp tục cố gắng nhé!" });
+    if (mission.claimed) return res.status(400).json({ success: false, message: "Bạn đã nhận thưởng nhiệm vụ này hôm nay rồi" });
+
+    await Shipper.updateOne({ _id: shipper._id }, { $push: { missionClaims: { id: missionId, day: dayKey(), claimedAt: new Date() } } });
+    await walletCredit(shipper._id, 'shipper', mission.reward, 'mission', `Thưởng nhiệm vụ "${mission.title}"`);
+    console.log(`[Mission] Shipper ${shipper._id} claimed ${missionId} +${mission.reward}`);
+    res.json({ success: true, reward: mission.reward, message: `Nhận thưởng ${mission.reward.toLocaleString('vi-VN')}đ thành công!` });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/shipper/tier — Hạng tài xế (real-time từ đơn thực tế)
 app.get("/api/shipper/tier", async (req, res) => {
   try {
-    if (!req.session.shipperId && !req.session.userId) return res.status(401).json({ success: false });
-    let shipper = null;
-    if (req.session.shipperId) {
-      shipper = await Shipper.findById(req.session.shipperId);
-    } else {
-      const user = await User.findById(req.session.userId).select("phone");
-      if (user) shipper = await Shipper.findOne({ phone: user.phone });
-    }
-    if (!shipper) return res.status(404).json({ success: false });
-    const orders = shipper.ordersCompleted || 0;
-    const rating = shipper.rating || 5;
+    const shipper = await currentShipperFromSession(req, res);
+    if (!shipper) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    const stats = await getShipperStats(shipper._id, shipper);
+    const orders = stats.totalOrders;
+    const rating = stats.rating;
     const tiers = [
       { name:'Đồng', icon:'🥉', minOrders:0,   minRating:0,   color:'#cd7f32', perks:['Nhận đơn cơ bản'] },
       { name:'Bạc',  icon:'🥈', minOrders:50,  minRating:4.5, color:'#aaa',    perks:['Ưu tiên đơn cao','Hỗ trợ 24/7'] },
@@ -2526,7 +2574,58 @@ app.get("/api/shipper/tier", async (req, res) => {
         break;
       }
     }
-    res.json({ success: true, currentTier, nextTier, orders, rating, tiers });
+    const progress = nextTier ? {
+      ordersNeeded: Math.max(0, nextTier.minOrders - orders),
+      ratingNeeded: Math.max(0, Math.round((nextTier.minRating - rating) * 100) / 100),
+      percent: Math.min(100, Math.round(((orders / Math.max(1, nextTier.minOrders)) + (Math.min(rating, nextTier.minRating) / nextTier.minRating)) / 2 * 100)),
+    } : { ordersNeeded: 0, ratingNeeded: 0, percent: 100 };
+    res.json({
+      success: true, currentTier, nextTier, orders, rating, tiers, progress,
+      monthOrders: stats.monthOrders, monthEarnings: stats.monthEarnings,
+    });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/shipper/policy — Chính sách đảm bảo thu nhập tối thiểu
+app.get("/api/shipper/policy", async (req, res) => {
+  try {
+    const shipper = await currentShipperFromSession(req, res);
+    if (!shipper) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    const stats = await getShipperStats(shipper._id, shipper);
+    res.json({
+      success: true,
+      guarantee: {
+        active: true,
+        title: "Đảm bảo thu nhập tối thiểu",
+        dailyTarget: 120000,       // mục tiêu thu nhập / ngày
+        weeklyTarget: 800000,      // mục tiêu thu nhập / tuần
+        monthlyTarget: 3500000,    // mục tiêu thu nhập / tháng
+        terms: [
+          "Đạt đủ 4.8⭐ trở lên và tỷ lệ hoàn thành đơn ≥ 95% trong kỳ.",
+          "Bật nhận đơn tối thiểu 6 tiếng/ngày và hoàn thành ít nhất 20 đơn/tuần.",
+          "Thu nhập bảo hiểm được trả bổ sung chênh lệch cuối kỳ vào ví, không thay thế hoa hồng.",
+        ],
+      },
+      stats: {
+        todayEarnings: stats.todayEarnings,
+        weekEarnings: stats.weekEarnings,
+        monthEarnings: stats.monthEarnings,
+        todayOrders: stats.todayOrders,
+        weekOrders: stats.weekOrders,
+        monthOrders: stats.monthOrders,
+        totalOrders: stats.totalOrders,
+        cancelledOrders: stats.cancelledOrders,
+        completionRate: stats.completionRate,
+        cancelRate: stats.cancelRate,
+        acceptRate: stats.acceptRate,
+        rating: stats.rating,
+        onlineMinutesToday: stats.onlineMinutesToday,
+        onlineHoursMonth: stats.onlineHoursMonth,
+        onlineSecondsTotal: stats.onlineSecondsTotal,
+      },
+    });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -5570,6 +5669,27 @@ app.get("/api/shipper/me", async (req, res) => {
     res.json({ success: true, shipper: shipperObj });
   } catch (err) {
     console.error('[GetMe] Error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/shipper/terms-accept — Shipper đồng ý Điều khoản & Chính sách hợp đồng
+app.post("/api/shipper/terms-accept", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) {
+      return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    }
+    const shipper = await Shipper.findByIdAndUpdate(
+      req.session.shipperId,
+      { termsAccepted: true, termsAcceptedAt: new Date() },
+      { new: true }
+    );
+    if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy tài khoản" });
+    console.log(`[Terms] Shipper ${req.session.shipperId} accepted policy`);
+    res.json({ success: true, termsAccepted: true, termsAcceptedAt: shipper.termsAcceptedAt });
+  } catch (err) {
+    console.error('[Terms] Error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -9763,6 +9883,92 @@ async function countShipperCompletedOrders(shipperId) {
   }
 }
 
+// ── Helper: key ngày / tháng (cho tracking online-time) ─────────
+function dayKey(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function monthKey(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+// ── Helper: cộng dồn thời gian online real-time ────────────────
+// Gọi mỗi khi shipper ping location (10s), bật/tắt online → tích lũy chính xác
+async function flushOnlineTime(shipperId, now = new Date()) {
+  if (!shipperId) return;
+  try {
+    const sh = await Shipper.findById(shipperId).select('onlineAt onlineSecondsToday onlineDay onlineSecondsMonth onlineMonth onlineSecondsTotal').lean().catch(() => null);
+    if (!sh || !sh.onlineAt) return;
+    const secs = Math.max(0, Math.floor((now - new Date(sh.onlineAt)) / 1000));
+    if (secs <= 0) return;
+    const tk = dayKey(now), mk = monthKey(now);
+    const todaySecs = sh.onlineDay === tk ? (sh.onlineSecondsToday || 0) + secs : secs;
+    const monthSecs = sh.onlineMonth === mk ? (sh.onlineSecondsMonth || 0) + secs : secs;
+    await Shipper.updateOne({ _id: shipperId }, {
+      $set: {
+        onlineSecondsToday: todaySecs, onlineDay: tk,
+        onlineSecondsMonth: monthSecs, onlineMonth: mk,
+        onlineSecondsTotal: (sh.onlineSecondsTotal || 0) + secs,
+        onlineAt: now,
+      }
+    });
+  } catch (e) {
+    console.error('[flushOnlineTime]', e.message);
+  }
+}
+
+// ── Helper: thống kê hiệu suất shipper real-time ────────────────
+// Trả về các chỉ số từ dữ liệu đơn thực tế: đã giao, hủy, hoàn thành, nhận đơn, thu nhập
+async function getShipperStats(shipperId, shipper) {
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+  const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0,0,0,0);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const PLATFORM_FEE_PCT = 35; // shipper nhận 65% phí ship
+  const earnSum = (docs) => docs.reduce((s, o) => s + Math.round(((o.deliveryFee || o.shipFee || 15000)) * (1 - PLATFORM_FEE_PCT / 100)), 0);
+
+  const [deliveredToday, deliveredWeek, deliveredMonth, deliveredTotal, cancelledTotal, inProgressTotal, deliveredTodayDocs, deliveredWeekDocs, deliveredMonthDocs, ratedOrders] = await Promise.all([
+    Order.countDocuments({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }),
+    Order.countDocuments({ shipperId, status: "delivered", deliveredAt: { $gte: weekStart } }),
+    Order.countDocuments({ shipperId, status: "delivered", deliveredAt: { $gte: monthStart } }),
+    Order.countDocuments({ shipperId, status: "delivered" }),
+    Order.countDocuments({ shipperId, status: "cancelled" }),
+    Order.countDocuments({ shipperId, status: { $in: ["shipper_accepted","picking_up","at_partner","picked_up","delivering","in_progress","ready_return","shipper_returning","picked_up_by_shipper"] } }),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee").lean(),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee").lean(),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee").lean(),
+    Order.find({ shipperId, status: "delivered", ratingShipper: { $gte: 1 } }).select("ratingShipper").lean(),
+  ]);
+
+  // Thu nhập thực tế từ ví (đã duyệt) + ước tính theo phí ship
+  const todayEarnings = earnSum(deliveredTodayDocs);
+  const weekEarnings  = earnSum(deliveredWeekDocs);
+  const monthEarnings = earnSum(deliveredMonthDocs);
+
+  // Tỷ lệ nhận đơn / hoàn thành / hủy (tính từ đơn thực tế shipper đã làm)
+  const acceptedTotal = deliveredTotal + inProgressTotal;
+  const completionRate = acceptedTotal > 0 ? Math.round((deliveredTotal / acceptedTotal) * 100) : 100;
+  const cancelRate = (deliveredTotal + cancelledTotal) > 0 ? Math.round((cancelledTotal / (deliveredTotal + cancelledTotal)) * 100) : 0;
+  const acceptRate = Math.max(0, 100 - cancelRate);
+  const avgRating = ratedOrders.length > 0 ? ratedOrders.reduce((s, o) => s + o.ratingShipper, 0) / ratedOrders.length : (shipper?.rating || 5);
+
+  return {
+    todayOrders: deliveredToday,
+    weekOrders: deliveredWeek,
+    monthOrders: deliveredMonth,
+    totalOrders: deliveredTotal,
+    cancelledOrders: cancelledTotal,
+    todayEarnings, weekEarnings, monthEarnings,
+    acceptRate, completionRate, cancelRate,
+    rating: Math.round(avgRating * 10) / 10,
+    onlineSecondsToday: shipper?.onlineSecondsToday || 0,
+    onlineSecondsMonth: shipper?.onlineSecondsMonth || 0,
+    onlineSecondsTotal: shipper?.onlineSecondsTotal || 0,
+    onlineMinutesToday: Math.round((shipper?.onlineSecondsToday || 0) / 60),
+    onlineHoursMonth: Math.round(((shipper?.onlineSecondsMonth || 0) / 3600) * 10) / 10,
+  };
+}
+
 // ── Helper: thêm vào wallet pending queue (tránh trùng) ──────
 async function addToWalletQueue(orderId, recipientId, recipientType, amount, paymentMethod, note, releaseAt = null) {
   if (amount <= 0) return;
@@ -10983,6 +11189,9 @@ app.post("/api/shipper/online", async (req, res) => {
       updateData.location = { lat, lng };
       updateData.lastLocationAt = new Date();
     }
+    // Nếu chưa có mốc online → gán onlineAt để tích lũy thời gian online
+    const prev = await Shipper.findById(req.session.shipperId).select('onlineAt onlineDay onlineMonth onlineSecondsToday onlineSecondsMonth onlineSecondsTotal').lean().catch(() => null);
+    if (!prev || !prev.onlineAt) updateData.onlineAt = new Date();
     const shipper = await Shipper.findByIdAndUpdate(req.session.shipperId, updateData, { new: true });
     if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy tài khoản shipper" });
     req.io.to("admin").emit("shipperOnline", { shipperId: req.session.shipperId });
@@ -11001,7 +11210,8 @@ app.post("/api/shipper/offline", async (req, res) => {
     if (!req.session?.shipperId) {
       return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
     }
-    await Shipper.findByIdAndUpdate(req.session.shipperId, { online: false, isAccepting: false });
+    await flushOnlineTime(req.session.shipperId);
+    await Shipper.findByIdAndUpdate(req.session.shipperId, { online: false, isAccepting: false, onlineAt: null });
     req.io.to("admin").emit("shipperOffline", { shipperId: req.session.shipperId });
     console.log('[Offline] Shipper', req.session.shipperId, 'is now OFFLINE');
     res.json({ success: true, online: false });
@@ -11019,6 +11229,7 @@ app.post("/api/shipper/location", async (req, res) => {
     const { lat, lng, heading, speed, orderId } = req.body;
     if (!lat || !lng) return res.status(400).json({ success: false, message: "Thiếu tọa độ" });
 
+    await flushOnlineTime(req.session.shipperId);
     await Shipper.findByIdAndUpdate(req.session.shipperId, {
       location: { lat, lng },
       lastLocationAt: new Date(),
