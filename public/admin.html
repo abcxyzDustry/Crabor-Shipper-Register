@@ -2587,6 +2587,40 @@ function _appendAiMsg(role, html, isLoading=false) { const msgs = document.getEl
 function _showAiTyping() { const msgs = document.getElementById('aiBannerMsgs'); if (!msgs) return; const div = document.createElement('div'); div.className = 'ai-msg bot-msg'; div.id = 'aiTypingIndicator'; div.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>'; msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight; }
 function _hideAiTyping() { document.getElementById('aiTypingIndicator')?.remove(); }
 function aiBannerQuick(prompt) { const inp = document.getElementById('aiBannerInput'); if (inp) { inp.value = prompt; } sendAiBannerMsg(); }
+async function toBannerDataURL(imgOrUrl) {
+  const url = typeof imgOrUrl === 'string' ? imgOrUrl : (imgOrUrl && (imgOrUrl.src || imgOrUrl));
+  if (!url) return null;
+  try {
+    let dataURL = url;
+    if (!dataURL.startsWith('data:')) {
+      const blob = await fetch(url).then(r => r.blob());
+      dataURL = await new Promise(resolve => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.onerror = () => resolve(null);
+        fr.readAsDataURL(blob);
+      });
+    }
+    if (!dataURL) return null;
+    return await new Promise(resolve => {
+      const pic = new Image();
+      pic.onload = () => {
+        const TW = 1296, TH = 576;
+        const canvas = document.createElement('canvas');
+        canvas.width = TW; canvas.height = TH;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, TW, TH);
+        const r = Math.max(TW / pic.naturalWidth, TH / pic.naturalHeight);
+        const rw = pic.naturalWidth * r, rh = pic.naturalHeight * r;
+        const ox = (TW - rw) / 2, oy = (TH - rh) / 2;
+        ctx.drawImage(pic, ox, oy, rw, rh);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      pic.onerror = () => resolve(null);
+      pic.src = dataURL;
+    });
+  } catch(e) { console.error('toBannerDataURL error', e); return null; }
+}
 async function sendAiBannerMsg() {
   const inp = document.getElementById('aiBannerInput');
   const text = inp?.value?.trim();
@@ -2620,19 +2654,22 @@ async function sendAiBannerMsg() {
         if (window.puter) {
           puter.setAuthToken('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InYyIn0.eyJ0IjoidCIsInYiOiIyIiwidG9rZW5fdWlkIjoiNzY0OWNiMGUtYmJkMi00NDdmLWI2NjYtNjUxOTNjZjM5NTRiIiwidXUiOiJFTXQvc2ZtZ1JjT1BzcFEzYlpQcHh3PT0iLCJzdSI6Ilh5aXpDSjEyUW5pRDd2UUMyanJ4RHc9PSIsImFpIjoiRU10L3NmbWdSY09Qc3BRM2JaUHB4dz09IiwiZnVsbF9hY2Nlc3MiOnRydWUsImlhdCI6MTc4NjIwMjIzM30.AQOMk7cF5Ec2ydE3DIX1mkYl-GCwB4AxGBHl-WY43eE');
         }
-        puter.ai.txt2img(imgPrompt, { model: 'gpt-image-2' })
-          .then(imgEl => {
-            const imgUrl = imgEl.src || (imgEl instanceof HTMLImageElement ? imgEl.src : null);
-            if (imgUrl) {
-              _pendingBanner.imageUrl = imgUrl;
-              renderBannerPreview(bannerData, imgUrl);
-              _appendAiMsg('bot', '✅ <strong>Banner ảnh đã tạo xong!</strong> Xem preview bên phải và nhấn <strong>🚀 Đăng banner</strong> để xuất bản.');
-            }
-          })
-          .catch(err => {
-            console.error('Puter image error:', err);
-            _appendAiMsg('bot', '❌ Lỗi tạo ảnh: ' + (err.message || 'không rõ') + '. Thử lại nhé.');
-          });
+        let imgUrl = null;
+        try {
+          const imgEl = await puter.ai.txt2img(imgPrompt, { model: 'gpt-image-2' });
+          const blobUrl = imgEl && (imgEl.src || (imgEl instanceof HTMLImageElement ? imgEl.src : null));
+          if (blobUrl) imgUrl = await toBannerDataURL(blobUrl);
+        } catch(err) {
+          console.error('Puter image error:', err);
+          _appendAiMsg('bot', '❌ Lỗi tạo ảnh: ' + (err.message || 'không rõ') + '. Thử lại nhé.');
+        }
+        if (imgUrl) {
+          _pendingBanner.imageUrl = imgUrl;
+          renderBannerPreview(bannerData, imgUrl);
+          _appendAiMsg('bot', '✅ <strong>Banner ảnh đã tạo xong!</strong> Xem preview bên phải và nhấn <strong>🚀 Đăng banner</strong> để xuất bản.');
+        } else {
+          _appendAiMsg('bot', '❌ Không thể tạo ảnh banner. Vui lòng thử lại.');
+        }
       } catch(e) { _appendAiMsg('bot', displayReply + '<br><small style="color:rgba(255,255,255,.6)">[Lỗi parse JSON banner]</small>'); }
     } else {
       _appendAiMsg('bot', displayReply);
