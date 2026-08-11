@@ -2605,7 +2605,7 @@ async function toBannerDataURL(imgOrUrl) {
     return await new Promise(resolve => {
       const pic = new Image();
       pic.onload = () => {
-        const TW = 1296, TH = 576;
+        const TW = 768, TH = 1152;
         const canvas = document.createElement('canvas');
         canvas.width = TW; canvas.height = TH;
         const ctx = canvas.getContext('2d');
