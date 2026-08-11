@@ -1007,7 +1007,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <div class="panel" style="text-align:center;padding:22px">
           <div style="font-size:.75rem;font-weight:800;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Hoa hồng CRABOR</div>
           <div style="font-size:1.8rem;font-weight:900;color:#E8504A;font-family:'Fredoka One',cursive" id="finCommission">–</div>
-          <div style="font-size:.72rem;color:#aaa;margin-top:4px">Food 20% · Giặt 18% · GV 15% · CS 12%</div>
+          <div style="font-size:.72rem;color:#aaa;margin-top:4px">Food 20% · Giặt 30% · Dọn nhà 30% · CS 20%</div>
         </div>
         <div class="panel" style="text-align:center;padding:22px">
           <div style="font-size:.75rem;font-weight:800;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Phí giao hàng</div>
@@ -1476,25 +1476,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
             </div>
             <div class="set-field"><label>👕 Giặt Là</label>
               <div style="display:flex;align-items:center;gap:8px">
-                <input class="set-inp" id="comLaundry" type="number" value="18" min="0" max="50" style="width:100px">
+                <input class="set-inp" id="comLaundry" type="number" value="30" min="0" max="50" style="width:100px">
                 <span style="color:#aaa;font-weight:700">%/đơn</span>
               </div>
             </div>
             <div class="set-field"><label>🧹 Giúp Việc</label>
               <div style="display:flex;align-items:center;gap:8px">
-                <input class="set-inp" id="comClean" type="number" value="20" min="0" max="50" style="width:100px">
+                <input class="set-inp" id="comClean" type="number" value="30" min="0" max="50" style="width:100px">
                 <span style="color:#aaa;font-weight:700">%/đơn</span>
               </div>
             </div>
             <div class="set-field"><label>🛍️ China Shop</label>
               <div style="display:flex;align-items:center;gap:8px">
-                <input class="set-inp" id="comChina" type="number" value="12" min="0" max="50" style="width:100px">
+                <input class="set-inp" id="comChina" type="number" value="20" min="0" max="50" style="width:100px">
                 <span style="color:#aaa;font-weight:700">%/đơn</span>
               </div>
             </div>
             <div class="set-field"><label>🚗 Tài xế CN</label>
               <div style="display:flex;align-items:center;gap:8px">
-                <input class="set-inp" id="comRide" type="number" value="20" min="0" max="50" style="width:100px">
+                <input class="set-inp" id="comRide" type="number" value="30" min="0" max="50" style="width:100px">
                 <span style="color:#aaa;font-weight:700">%/chuyến</span>
               </div>
             </div>
@@ -1521,7 +1521,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
             </div>
             <div class="set-field"><label>Shipper nhận được</label>
               <div style="display:flex;align-items:center;gap:8px">
-                <input class="set-inp" id="delShipperPct" type="number" value="85" min="50" max="100" style="width:100px">
+                <input class="set-inp" id="delShipperPct" type="number" value="70" min="50" max="100" style="width:100px">
                 <span style="color:#aaa;font-weight:700">% phí ship</span>
               </div>
             </div>
@@ -1901,9 +1901,9 @@ async function loadStats() {
     setW('mbShipperBar', d.shippers/total*100); setW('mbGLBar', (d.partners?.gl||0)/total*100); setW('mbGVBar', (d.partners?.gv||0)/total*100);
     setW('mbCSBar', (d.partners?.cs||0)/total*100); setW('mbFPBar', (d.partners?.fp||0)/total*100); setW('mbRXBar', (d.partners?.rx||0)/total*100);
     if(document.getElementById('mbShipperSub')) document.getElementById('mbShipperSub').textContent = `${d.active||0} active · ${d.earlyBirdUsed||0} Early Bird`;
-    if(document.getElementById('mbGLSub')) document.getElementById('mbGLSub').textContent = `Hoa hồng 18%`;
-    if(document.getElementById('mbGVSub')) document.getElementById('mbGVSub').textContent = `Hoa hồng 15%`;
-    if(document.getElementById('mbCSSub')) document.getElementById('mbCSSub').textContent = `Hoa hồng 12%`;
+    if(document.getElementById('mbGLSub')) document.getElementById('mbGLSub').textContent = `Hoa hồng 30%`;
+    if(document.getElementById('mbGVSub')) document.getElementById('mbGVSub').textContent = `Hoa hồng 30%`;
+    if(document.getElementById('mbCSSub')) document.getElementById('mbCSSub').textContent = `Hoa hồng 20%`;
     if(document.getElementById('mbFPSub')) document.getElementById('mbFPSub').textContent = `Hoa hồng 20%`;
     if(document.getElementById('mbRXSub')) document.getElementById('mbRXSub').textContent = `Đang tuyển dụng`;
     const ebMax = d.earlyBirdMax ?? 50, ebLeft = d.earlyBirdLeft ?? ebMax, ebUsed = d.earlyBirdUsed ?? 0;
@@ -2065,9 +2065,9 @@ async function viewRecord(id, type) {
     ['Email', data.email, ''], ['CCCD', data.cccd, 'mono'], ['Ngày sinh', data.dob, ''], ['Quận/Huyện', data.district, ''], ['Địa chỉ', data.address, 'full'],
   ];
   if (type === 'shipper') fields.push(['Phương tiện', data.vehicle, ''], ['Biển số', data.vehiclePlate, 'mono'], ['Gói tham gia', data.plan === 'early_bird' ? '⚡ Early Bird (giảm 9%)' : 'Standard', ''], ['Phí tham gia', data.feeStatus === 'paid' ? '✅ Đã nộp' : '❌ Chưa nộp', ''], ['Tổng đơn', data.totalOrders + ' đơn', ''], ['Tổng thu', fmtMoney(data.totalEarned||0), ''], ['Đánh giá', data.rating ? data.rating.toFixed(1) + ' ⭐ (' + data.ratingCount + ' lượt)' : '—', '']);
-  if (type === 'giat_la') fields.push(['Tên cơ sở', data.bizName, ''], ['Giá/kg', data.pricePerKg ? (data.pricePerKg/1000).toFixed(0)+'k/kg' : '—', ''], ['Công suất', data.capacity ? data.capacity+'kg/ngày' : '—', ''], ['Giờ mở cửa', data.openTime && data.closeTime ? data.openTime+'–'+data.closeTime : '—', ''], ['Dịch vụ', (data.services||[]).join(', ') || '—', 'full'], ['Hoa hồng', (data.commission||18)+'%', '']);
-  if (type === 'giup_viec') fields.push(['Kinh nghiệm', data.experience, ''], ['Kỹ năng', (data.skills||[]).join(', ')||'—', 'full'], ['Ca sẵn sàng', (data.availableShifts||[]).join(', ')||'—', 'full'], ['Hoa hồng', (data.commission||15)+'%', '']);
-  if (type === 'china_shop') fields.push(['Tên shop', data.bizName, ''], ['Nguồn hàng', data.sourceType, ''], ['Số SKU', data.skuCount ? data.skuCount+' mặt hàng' : '—', ''], ['Giá trị TB', data.avgOrderValue ? fmtMoney(data.avgOrderValue) : '—', ''], ['Thời gian ship', data.shippingDays ? data.shippingDays+' ngày' : '—', ''], ['Phí cửa hàng', data.shopFeeStatus==='paid'?'✅ Đã nộp':'❌ Chưa nộp', ''], ['Hoa hồng', (data.commission||12)+'%', '']);
+  if (type === 'giat_la') fields.push(['Tên cơ sở', data.bizName, ''], ['Giá/kg', data.pricePerKg ? (data.pricePerKg/1000).toFixed(0)+'k/kg' : '—', ''], ['Công suất', data.capacity ? data.capacity+'kg/ngày' : '—', ''], ['Giờ mở cửa', data.openTime && data.closeTime ? data.openTime+'–'+data.closeTime : '—', ''], ['Dịch vụ', (data.services||[]).join(', ') || '—', 'full'], ['Hoa hồng', (data.commission||30)+'%', '']);
+  if (type === 'giup_viec') fields.push(['Kinh nghiệm', data.experience, ''], ['Kỹ năng', (data.skills||[]).join(', ')||'—', 'full'], ['Ca sẵn sàng', (data.availableShifts||[]).join(', ')||'—', 'full'], ['Hoa hồng', (data.commission||30)+'%', '']);
+  if (type === 'china_shop') fields.push(['Tên shop', data.bizName, ''], ['Nguồn hàng', data.sourceType, ''], ['Số SKU', data.skuCount ? data.skuCount+' mặt hàng' : '—', ''], ['Giá trị TB', data.avgOrderValue ? fmtMoney(data.avgOrderValue) : '—', ''], ['Thời gian ship', data.shippingDays ? data.shippingDays+' ngày' : '—', ''], ['Phí cửa hàng', data.shopFeeStatus==='paid'?'✅ Đã nộp':'❌ Chưa nộp', ''], ['Hoa hồng', (data.commission||20)+'%', '']);
   if (type === 'food_partner') fields.push(['Tên quán', data.bizName, ''], ['Danh mục', (data.categories||[]).join(', ')||'—', 'full'], ['Giờ mở cửa', data.openTime && data.closeTime ? data.openTime+'–'+data.closeTime : '—', ''], ['Đánh giá', data.rating ? data.rating.toFixed(1)+' ⭐' : '—', ''], ['Tổng đơn', (data.totalOrders||0)+' đơn', ''], ['Hoa hồng', (data.commission||20)+'%', '']);
   if (type === 'ride_driver') fields.push(['Loại xe', data.vehicleType==='car'?'🚗 Ô tô':'🛵 Xe máy', ''], ['Hãng xe', data.vehicleBrand, ''], ['Biển số', data.vehiclePlate, 'mono'], ['Năm sx', data.vehicleYear, ''], ['Hạng bằng', data.licenseClass, ''], ['Tổng chuyến', (data.totalTrips||0)+' chuyến', ''], ['Tổng thu', fmtMoney(data.totalEarned||0), '']);
   fields.push(['Ngày đăng ký', fmtDate(data.registeredAt || data.createdAt), ''], ['Trạng thái', `<span class="badge b-${data.status}">${statusText(data.status)}</span>`, 'html']);
@@ -2745,7 +2745,7 @@ async function rejectWithdraw(id) {
   } catch (e) { showNotif('Lỗi', e.message || 'Không từ chối được', 'coral'); }
   }
 function saveSettings() {
-  try { var g = function(id) { return document.getElementById(id); }; var payload = { commissionFood: parseFloat((g('comFood') && g('comFood').value) || 20), commissionLaundry: parseFloat((g('comLaundry') && g('comLaundry').value) || 18), commissionCleaning: parseFloat((g('comClean') && g('comClean').value) || 18), commissionShop: parseFloat((g('comChina') && g('comChina').value) || 12), commissionRide: parseFloat((g('comRide') && g('comRide').value) || 0), deliveryBaseFee: parseFloat((g('delBase') && g('delBase').value) || 15000), deliveryPerKm: parseFloat((g('delPerKm') && g('delPerKm').value) || 5000), minOrderAmount: parseFloat((g('minOrder') && g('minOrder').value) || 20000) }; localStorage.setItem('crabor_settings', JSON.stringify(payload)); showNotif('Đã lưu', 'Cài đặt đã được lưu thành công', 'green'); } catch(e) { showNotif('Lỗi', 'Không thể lưu cài đặt', 'coral'); }
+  try { var g = function(id) { return document.getElementById(id); }; var payload = { commissionFood: parseFloat((g('comFood') && g('comFood').value) || 20), commissionLaundry: parseFloat((g('comLaundry') && g('comLaundry').value) || 30), commissionCleaning: parseFloat((g('comClean') && g('comClean').value) || 30), commissionShop: parseFloat((g('comChina') && g('comChina').value) || 20), commissionRide: parseFloat((g('comRide') && g('comRide').value) || 30), deliveryBaseFee: parseFloat((g('delBase') && g('delBase').value) || 15000), deliveryPerKm: parseFloat((g('delPerKm') && g('delPerKm').value) || 5000), minOrderAmount: parseFloat((g('minOrder') && g('minOrder').value) || 20000) }; localStorage.setItem('crabor_settings', JSON.stringify(payload)); showNotif('Đã lưu', 'Cài đặt đã được lưu thành công', 'green'); } catch(e) { showNotif('Lỗi', 'Không thể lưu cài đặt', 'coral'); }
 }
 function showSetTab(key, btn) {
   document.querySelectorAll('.set-pane').forEach(function(p){ if(p) p.style.display = 'none'; });
@@ -2779,7 +2779,7 @@ function deleteBanner(id){if(!confirm('Xóa banner?'))return;bannerList=bannerLi
 const FAQ = [
   { keys:['crabor là gì','crabor','giới thiệu','app gì','ứng dụng gì'], q:'CRABOR là gì?', a:'🦀 CRABOR là super app All-in-One tại Hà Nội:\n• 🍜 Giao đồ ăn\n• 👕 Giặt là lấy & trả tận nơi\n• 🧹 Giúp việc nhà\n• 🛍️ China Shop\n• 🚗 Xe công nghệ (sắp ra)\n\n🚀 Ra mắt chính thức tháng 7/2025 tại Hà Nội!'},
   { keys:['người sáng lập','sáng lập','founder','ai làm','ai tạo','ai xây','của ai','thuộc về','chủ','ceo','kiều thanh hải','hành trình','câu chuyện'], q:'Ai là người sáng lập CRABOR?', a:'👨‍💻 CRABOR được sáng lập bởi **Kiều Thanh Hải** — sinh viên năm 2 ngành Logistics, Đại học Đại Nam, Hà Nội.\n\n🚀 Hành trình:\n• 20 tuổi, tự học code từ con số 0\n• Ngân sách chỉ 3 triệu/tháng, không nhà đầu tư, không mentor\n• Một mình xây toàn bộ: 21.000+ dòng code, 100+ API\n• Tích hợp AI, bản đồ realtime, OTP thật\n\n💬 "Tôi muốn xây dựng một ứng dụng mà mọi người Hà Nội đều muốn có trong điện thoại."\n— Kiều Thanh Hải, Founder & CEO'},
-  { keys:['đăng ký shipper','shipper','giao hàng','trở thành shipper','phí shipper','700','500','early bird'], q:'Đăng ký Shipper như thế nào?', a:'🛵 Đăng ký Shipper CRABOR:\n\n1️⃣ Vào /register → chọn "Shipper"\n2️⃣ Nhập thông tin + upload giấy tờ\n3️⃣ Thanh toán phí kích hoạt\n4️⃣ Tự động duyệt sau khi thanh toán\n\n💰 Gói phí:\n• ⚡ Early Bird: 500.000đ (hoàn tiền sau 1.000 đơn)\n• 🛵 Standard: 700.000đ\n\n📱 Thu nhập 20.000–50.000đ/đơn, nhận 85% phí giao'},
+  { keys:['đăng ký shipper','shipper','giao hàng','trở thành shipper','phí shipper','700','500','early bird'], q:'Đăng ký Shipper như thế nào?', a:'🛵 Đăng ký Shipper CRABOR:\n\n1️⃣ Vào /register → chọn "Shipper"\n2️⃣ Nhập thông tin + upload giấy tờ\n3️⃣ Thanh toán phí kích hoạt\n4️⃣ Tự động duyệt sau khi thanh toán\n\n💰 Gói phí:\n• ⚡ Early Bird: 500.000đ (hoàn tiền sau 1.000 đơn)\n• 🛵 Standard: 700.000đ\n\n📱 Thu nhập 20.000–50.000đ/đơn, nhận 70% phí giao'},
 ];
 const _pageCtx = (()=>{ const p = location.pathname; if(p.includes('register')) return 'register'; if(p.includes('partner')) return 'partner'; if(p.includes('sales')) return 'sales'; if(p.includes('shipper')) return 'shipper'; if(p.includes('admin')) return 'admin'; return 'customer'; })();
 const _QUICK = { customer: ['CRABOR là gì?','Theo dõi đơn?','Điểm tích lũy?','Hoàn tiền?'], shipper: ['Đăng ký Shipper?','Thu nhập bao nhiêu?','Hạng Shipper?','Liên hệ?'], partner: ['Đăng ký đối tác?','Hoa hồng bao nhiêu?','Điều khoản?','Liên hệ?'], sales: ['CTV kiếm tiền?','Mã giới thiệu?','Hoàn tiền?','Liên hệ?'], register: ['Đăng ký Shipper?','Đăng ký đối tác?','Phí bao nhiêu?','Liên hệ?'], admin: ['CRABOR là gì?','Ai sáng lập?','Điều khoản?','Liên hệ?'], default: ['CRABOR là gì?','Ai là người sáng lập?','Dịch vụ gì?','Liên hệ?'] };

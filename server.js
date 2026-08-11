@@ -3622,15 +3622,15 @@ app.get("/api/wallet/shipper", async (req, res) => {
     const weekStart = new Date(now - 7*24*3600*1000);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     
-    const shipperCut = 0.65; // Platform fee 35% — shipper nhận 65%
+    const shipperCut = 0.7; // nền tảng thu 30% — shipper giữ 70%
     const [todayOrders, weekOrders, monthOrders, pendingTx] = await Promise.all([
-      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee").lean(),
-      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee").lean(),
-      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee").lean(),
+      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee module total").lean(),
+      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee module total").lean(),
+      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee module total").lean(),
       WalletQueue.find({ recipientId: shipper._id, recipientType: "shipper", status: "pending" }).lean(),
     ]);
     
-    const calcEarnings = (orders) => orders.reduce((s,o) => s + Math.round((o.deliveryFee||o.shipFee||15000)*shipperCut), 0);
+    const calcEarnings = (orders) => orders.reduce((s,o) => s + Math.round(shipperOrderEarningsBase(o)*shipperCut), 0);
     const todayEarnings = calcEarnings(todayOrders);
     const weekEarnings = calcEarnings(weekOrders);
     const monthEarnings = calcEarnings(monthOrders);
@@ -6568,15 +6568,15 @@ app.get("/api/shipper/earnings", async (req, res) => {
     const matchPeriod = { ...matchBase, deliveredAt: { $gte: since } };
 
     const [allOrders, periodOrders, todayOrders] = await Promise.all([
-      Order.find(matchBase).select("orderId deliveryFee finalTotal status deliveredAt createdAt").lean(),
-      Order.find({ ...matchPeriod, status: "delivered" }).select("orderId deliveryFee finalTotal deliveredAt").lean(),
-      Order.find({ ...matchBase, status: "delivered", deliveredAt: { $gte: (() => { const d=new Date(); d.setHours(0,0,0,0); return d; })() } }).select("deliveryFee").lean(),
+      Order.find(matchBase).select("orderId deliveryFee finalTotal status deliveredAt createdAt module total").lean(),
+      Order.find({ ...matchPeriod, status: "delivered" }).select("orderId deliveryFee finalTotal deliveredAt module total").lean(),
+      Order.find({ ...matchBase, status: "delivered", deliveredAt: { $gte: (() => { const d=new Date(); d.setHours(0,0,0,0); return d; })() } }).select("deliveryFee module total").lean(),
     ]);
 
-    const shipperCut = 0.65; // Platform fee 35% — shipper gets 65% of delivery fee
-    const totalEarnings   = allOrders.filter(o=>o.status==="delivered").reduce((s,o) => s + Math.round((o.deliveryFee||15000)*shipperCut), 0);
-    const periodEarnings  = periodOrders.reduce((s,o) => s + Math.round((o.deliveryFee||15000)*shipperCut), 0);
-    const todayEarnings   = todayOrders.reduce((s,o) => s + Math.round((o.deliveryFee||15000)*shipperCut), 0);
+    const shipperCut = 0.7; // nền tảng thu 30% — shipper giữ 70% phí giao
+    const totalEarnings   = allOrders.filter(o=>o.status==="delivered").reduce((s,o) => s + Math.round(shipperOrderEarningsBase(o)*shipperCut), 0);
+    const periodEarnings  = periodOrders.reduce((s,o) => s + Math.round(shipperOrderEarningsBase(o)*shipperCut), 0);
+    const todayEarnings   = todayOrders.reduce((s,o) => s + Math.round(shipperOrderEarningsBase(o)*shipperCut), 0);
     const allDone         = allOrders.filter(o=>o.status==="delivered").length;
     const allCancelled    = allOrders.filter(o=>o.status==="cancelled").length;
 
@@ -6584,7 +6584,7 @@ app.get("/api/shipper/earnings", async (req, res) => {
       type: "delivery",
       label: "Phí giao hàng",
       orderId: o.orderId,
-      amount: Math.round((o.deliveryFee||15000)*shipperCut),
+      amount: Math.round(shipperOrderEarningsBase(o)*shipperCut),
       createdAt: o.deliveredAt || o.createdAt,
     })).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -9333,7 +9333,7 @@ app.get("/api/analytics/revenue", adminAuth, async (req, res) => {
     const totalModRev  = ordersByModule.reduce((s, m) => s + (m.revenue || 0), 0);
 
     // Tính commission thật: aggregate serviceFee + (partnerBase * commissionPct) theo module
-    const commissionByModule = { food: 20, laundry: 18, cleaning: 15, china_shop: 12, ride: 10 };
+    const commissionByModule = { food: 20, laundry: 30, cleaning: 30, china_shop: 20, ride: 30 };
     let totalCraborCommission = 0;
     let totalServiceFees = 0;
 
@@ -9935,56 +9935,54 @@ setInterval(async () => {
 
 // ── Helper: tính commission shipper & partner ─────────────────
 // Commission mặc định theo module (fallback nếu không có trong DB)
-const DEFAULT_COMMISSION = { food: 20, laundry: 18, cleaning: 15, china_shop: 12, ride: 10 };
+// Tỷ lệ nền tảng thống nhất:
+//   - Shipper / tài xế / người giúp việc: giữ 70% thu nhập (nền tảng thu 30%)
+//   - Partner nhà hàng & China Shop: giữ 80% giá hàng (nền tảng thu 20%/đơn)
+//   - Giặt là & Dọn nhà: nền tảng thu 30%
+const DEFAULT_COMMISSION = { food: 20, laundry: 30, cleaning: 30, china_shop: 20, ride: 30 };
+
+// ── Helper: earnings base của đơn shipper thực hiện ────────────
+// Đồ ăn/giặt: tính trên shipFee. Xe công nghệ (ride): cước nằm ở total (shipFee=0).
+// Dọn nhà (CleaningOrder): không có shipFee/total → tính trên price (giá ca)
+function shipperOrderEarningsBase(o) {
+  if (o.module === 'ride') return o.total || 0;
+  if (o.module === 'cleaning' || o.serviceType) return o.price || 0;
+  return o.deliveryFee || o.shipFee || 15000;
+}
 
 async function calcEarnings(order) {
-  const originalTotal = order.total      || 0;
-  const finalTotal    = order.finalTotal || (originalTotal + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
+  // Dọn nhà là cleaning order: earnings base = price, không có partner
+  const isCleaning = !!(order && (order.module === 'cleaning' || order.serviceType));
+  const originalTotal = isCleaning ? (order.price || 0) : (order.total || 0);
+  const finalTotal = isCleaning
+    ? (order.price || 0)
+    : (order.finalTotal || (originalTotal + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0)));
   const shipFee    = order.shipFee    || 0;
   const serviceFee = order.serviceFee || 0;
   const discount   = order.discount    || 0;
-  const module     = order.module     || 'food';
+  const module     = isCleaning ? 'cleaning' : (order.module || 'food');
 
-  // Platform fee 35% — shipper nhận 65% phí ship
-  const PLATFORM_FEE_PCT = 35;
-  const shipperEarn = Math.round(shipFee * (1 - PLATFORM_FEE_PCT / 100));
+  // Platform thu 30% — shipper/tài xế/giúp việc giữ 70% (ride tính trên cước, dọn nhà trên giá ca)
+  const PLATFORM_FEE_PCT = 30;
+  const shipperEarn = Math.round(shipperOrderEarningsBase(order) * (1 - PLATFORM_FEE_PCT / 100));
 
   // FIX: Platform chịu voucher discount → partner base = originalTotal (không trừ discount)
   // Trước đây: partnerBase = finalTotal - shipFee - serviceFee = originalTotal - discount → partner mất tiền voucher
   // Giờ: partnerBase = originalTotal → platform hấp thụ discount
   const partnerBase = Math.max(0, originalTotal);
 
-  // Lấy commission % từ DB theo partnerId + module, fallback về DEFAULT_COMMISSION
-  let commissionPct = DEFAULT_COMMISSION[module] ?? 15;
-  if (order.partnerId) {
-    try {
-      const modelMap = {
-        food:       mongoose.models.FoodPartner,
-        laundry:    mongoose.models.GiatLaPartner,
-        cleaning:   mongoose.models.GiupViecPartner,
-        china_shop: mongoose.models.ChinaShopPartner,
-      };
-      const Model = modelMap[module];
-      if (Model) {
-        const partner = await Model.findById(order.partnerId).select('commission').lean();
-        if (partner && typeof partner.commission === 'number' && partner.commission > 0) {
-          commissionPct = partner.commission;
-        }
-      }
-    } catch(e) {
-      console.warn('[calcEarnings] Không lấy được commission từ DB, dùng mặc định:', e.message);
-    }
-  }
+  // Hoa hồng thống nhất theo module (không đọc commission tùy biến từng partner)
+  const commissionPct = isCleaning ? 0 : (DEFAULT_COMMISSION[module] ?? 20);
 
-  // Partner nhận partnerBase trừ đi commissionPct%
-  const partnerEarn = Math.round(partnerBase * (1 - commissionPct / 100));
+  // Partner nhận partnerBase trừ đi commissionPct% (dọn nhà không có partner)
+  const partnerEarn = isCleaning ? 0 : Math.round(partnerBase * (1 - commissionPct / 100));
 
   // CRABOR giữ: serviceFee + commission trên partnerBase
   // Platform hấp thụ discount: craborEarn = finalTotal - shipperEarn - partnerEarn
   // (finalTotal đã trừ discount, nhưng partnerEarn vẫn dựa trên originalTotal)
   const craborEarn = finalTotal - shipperEarn - partnerEarn;
 
-  return { shipperEarn, partnerEarn, craborEarn, commissionPct, serviceFee };
+  return { shipperEarn, partnerEarn, craborEarn, commissionPct, serviceFee, module };
 }
 
 // ── Helper: đếm số đơn đã hoàn thành của shipper (all-time + hôm nay) ──
@@ -10046,8 +10044,8 @@ async function getShipperStats(shipperId, shipper) {
   const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0,0,0,0);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const PLATFORM_FEE_PCT = 35; // shipper nhận 65% phí ship
-  const earnSum = (docs) => docs.reduce((s, o) => s + Math.round(((o.deliveryFee || o.shipFee || 15000)) * (1 - PLATFORM_FEE_PCT / 100)), 0);
+  const PLATFORM_FEE_PCT = 30; // nền tảng thu 30% — shipper/tài xế giữ 70% (đơn ride tính trên cước)
+  const earnSum = (docs) => docs.reduce((s, o) => s + Math.round(shipperOrderEarningsBase(o) * (1 - PLATFORM_FEE_PCT / 100)), 0);
 
   const [deliveredToday, deliveredWeek, deliveredMonth, deliveredTotal, cancelledTotal, inProgressTotal, deliveredTodayDocs, deliveredWeekDocs, deliveredMonthDocs, ratedOrders] = await Promise.all([
     Order.countDocuments({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }),
@@ -10056,9 +10054,9 @@ async function getShipperStats(shipperId, shipper) {
     Order.countDocuments({ shipperId, status: "delivered" }),
     Order.countDocuments({ shipperId, status: "cancelled" }),
     Order.countDocuments({ shipperId, status: { $in: ["shipper_accepted","picking_up","at_partner","picked_up","delivering","in_progress","ready_return","shipper_returning","picked_up_by_shipper"] } }),
-    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee").lean(),
-    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee").lean(),
-    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee").lean(),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee module total").lean(),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee module total").lean(),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee module total").lean(),
     Order.find({ shipperId, status: "delivered", ratingShipper: { $gte: 1 } }).select("ratingShipper").lean(),
   ]);
 
@@ -10941,7 +10939,7 @@ app.post("/api/ride/book", async (req, res) => {
       req.io.to(`shipper_${s._id}`).emit("ride_request", ridePayload);
       await notifyUser('shipper', s._id, {
         type: 'new_order', title: '🚗 Yêu cầu đặt xe mới!',
-        body: `${rideOrder.customerName || 'Khách hàng'} — ${(rideOrder.fee || 0).toLocaleString('vi-VN')}đ`,
+        body: `${rideOrder.customerName || 'Khách hàng'} — ${(fee || 0).toLocaleString('vi-VN')}đ`,
         ref: String(rideOrder._id), refModule: 'ride',
       });
     }
@@ -11123,7 +11121,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       voucherCode: o.voucherCode || null,
       shipFee: o.shipFee || 0,
       serviceFee: o.serviceFee || 0,
-      shipperEarn: Math.round((o.shipFee || 0) * 0.65),
+      shipperEarn: Math.round(shipperOrderEarningsBase(o) * 0.7),
       address: o.address,
       partnerAddress: o.partnerAddress,
       customerName: o.customerName || o.receiverName || 'Khách hàng',
@@ -11395,33 +11393,60 @@ app.get("/api/shipper/active-orders", async (req, res) => {
         status: { $in: ["shipper_picking", "picked_up_by_shipper", "at_partner", "washing", "countdown", "ready_return", "shipper_returning"] }
       }).sort({ createdAt: -1 }).lean(),
     ]);
-    const mappedLaundry = laundryOrders.map(o => ({
-      ...o,
-      module: "laundry",
-      orderId: o.orderId,
-      customerName: o.customerName,
-      customerPhone: o.customerPhone,
-      partnerName: o.partnerName,
-      address: o.pickupAddress,
-      addressLat: o.pickupLat, addressLng: o.pickupLng,
-      deliveryAddress: o.pickupAddress,
-      deliveryLat: o.pickupLat, deliveryLng: o.pickupLng,
-      partnerAddress: o.partnerName,
-      finalTotal: o.finalTotal || o.estimatedTotal || 0,
-      total: o.finalTotal || o.estimatedTotal || 0,
-      shipFee: o.shipFee,
-      packageName: o.packageName,
-      items: [{ name: `${o.packageName}`, qty: 1, price: o.finalTotal || o.estimatedTotal || 0 }],
-      deadline: o.deadline,
-    }));
-    // Enrich food orders với discount/finalTotal để shipper app hiển thị đúng
-    const enrichedFood = foodOrders.map(o => ({
-      ...o,
-      discount: o.discount || 0,
-      voucherCode: o.voucherCode || null,
-      voucherDiscount: o.voucherDiscount || 0,
-      finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
-    }));
+
+    // Lấy toạ độ cửa hàng giặt (partner) để shipper vẽ lộ trình theo workflow giặt
+    const laundryPartnerIds = [...new Set(laundryOrders.map(o => String(o.partnerId)).filter(Boolean))];
+    const laundryPartners = laundryPartnerIds.length
+      ? await GiatLa.find({ _id: { $in: laundryPartnerIds } }).select("lastLat lastLng businessLat businessLng baseLat baseLng").lean().catch(() => [])
+      : [];
+    const laundryPartnerMap = new Map(laundryPartners.map(p => [String(p._id), p]));
+    const mappedLaundry = laundryOrders.map(o => {
+      const p = laundryPartnerMap.get(String(o.partnerId));
+      const partnerLat = p?.lastLat ?? p?.businessLat ?? p?.baseLat ?? null;
+      const partnerLng = p?.lastLng ?? p?.businessLng ?? p?.baseLng ?? null;
+      return {
+        ...o,
+        module: "laundry",
+        orderId: o.orderId,
+        customerName: o.customerName,
+        customerPhone: o.customerPhone,
+        partnerName: o.partnerName,
+        address: o.pickupAddress,
+        addressLat: o.pickupLat, addressLng: o.pickupLng,
+        deliveryAddress: o.pickupAddress,
+        deliveryLat: o.pickupLat, deliveryLng: o.pickupLng,
+        pickupLat: o.pickupLat, pickupLng: o.pickupLng,
+        partnerAddress: o.partnerName,
+        partnerLat, partnerLng,
+        finalTotal: o.finalTotal || o.estimatedTotal || 0,
+        total: o.finalTotal || o.estimatedTotal || 0,
+        shipFee: o.shipFee,
+        packageName: o.packageName,
+        items: [{ name: `${o.packageName}`, qty: 1, price: o.finalTotal || o.estimatedTotal || 0 }],
+        deadline: o.deadline,
+      };
+    });
+
+    // Enrich food orders với toạ độ quán (pickup) để vẽ lộ trình quán → người nhận + discount/finalTotal
+    const foodPartnerIds = [...new Set(foodOrders.map(o => String(o.partnerId)).filter(Boolean))];
+    const foodPartners = foodPartnerIds.length
+      ? await FoodPartner.find({ _id: { $in: foodPartnerIds } }).select("lastLat lastLng location").lean().catch(() => [])
+      : [];
+    const foodPartnerMap = new Map(foodPartners.map(p => [String(p._id), p]));
+    const enrichedFood = foodOrders.map(o => {
+      const p = foodPartnerMap.get(String(o.partnerId));
+      const pickupLat = p?.lastLat ?? p?.location?.lat ?? o.partnerLat ?? o.pickupLat ?? o.addressLat ?? null;
+      const pickupLng = p?.lastLng ?? p?.location?.lng ?? o.partnerLng ?? o.pickupLng ?? o.addressLng ?? null;
+      return {
+        ...o,
+        pickupLat, pickupLng,
+        partnerLat: pickupLat, partnerLng: pickupLng,
+        discount: o.discount || 0,
+        voucherCode: o.voucherCode || null,
+        voucherDiscount: o.voucherDiscount || 0,
+        finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
+      };
+    });
     res.json({ success: true, orders: [...mappedLaundry, ...enrichedFood] });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });

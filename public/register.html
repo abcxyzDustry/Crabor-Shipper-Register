@@ -520,11 +520,21 @@ body { padding-top: 36px; }
       <h3>Bạn muốn đăng ký làm gì?</h3>
       <p>Chọn 1 trong 4 dịch vụ dưới đây để bắt đầu quy trình đăng ký</p>
     </div>
+    <div class="welcome-clean-link" onclick="startRegistration('gv')" role="link" tabindex="0"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();startRegistration('gv');}"
+      style="display:flex;align-items:center;gap:14px;margin:0 0 18px;padding:16px 18px;border-radius:16px;border:2px dashed #27AE60;background:#f2fff6;cursor:pointer">
+      <span style="font-size:30px">🧹</span>
+      <div style="flex:1;min-width:0">
+        <b style="display:block;color:#1f7a44;font-size:15px">Mở khoá dịch vụ Dọn nhà / Giúp việc</b>
+        <span style="display:block;color:#3d8f5f;font-size:13px;margin-top:2px">Truy cập thẳng vào đăng ký dọn nhà — thu nhập thêm 200k–350k/ca</span>
+      </div>
+      <span style="color:#27AE60;font-weight:900;font-size:20px">→</span>
+    </div>
     <div class="welcome-modules">
       <div class="welcome-module-btn gl" onclick="startRegistration('gl')">
         <span class="module-icon">👕</span>
         <span class="module-name">Giặt Là</span>
-        <span class="module-desc">Đăng ký tiệm giặt là hợp tác với CRABOR<br>Hoa hồng 18%/đơn</span>
+        <span class="module-desc">Đăng ký tiệm giặt là hợp tác với CRABOR<br>Hoa hồng 30%/đơn</span>
         <span class="module-badge">🚀 Miễn phí đăng ký</span>
       </div>
       <div class="welcome-module-btn gv" onclick="startRegistration('gv')">
@@ -537,7 +547,7 @@ body { padding-top: 36px; }
         <span class="module-icon">🛍️</span>
         <span class="module-name">China Shop</span>
         <span class="module-desc">Bán hàng nội địa Trung trên CRABOR<br>Phí gian hàng 500k/năm</span>
-        <span class="module-badge">🇨🇳 Hoa hồng 12%</span>
+        <span class="module-badge">🇨🇳 Hoa hồng 20%</span>
       </div>
       <div class="welcome-module-btn sp" onclick="startRegistration('sp')">
         <span class="module-icon">🛵</span>
@@ -624,7 +634,7 @@ body { padding-top: 36px; }
       <div class="svc-list">
         <div class="svc-card" onclick="pickService('gl')">
           <span class="svc-ico">👕</span>
-          <div class="svc-info"><b>Giặt Là</b><p>Hoa hồng 18%/đơn · Miễn phí đăng ký</p></div>
+          <div class="svc-info"><b>Giặt Là</b><p>Hoa hồng 30%/đơn · Miễn phí đăng ký</p></div>
           <span class="svc-arr">→</span>
         </div>
         <div class="svc-card" onclick="pickService('gv')">
@@ -634,7 +644,7 @@ body { padding-top: 36px; }
         </div>
         <div class="svc-card" onclick="pickService('cs')">
           <span class="svc-ico">🛍️</span>
-          <div class="svc-info"><b>China Shop</b><p>Hoa hồng 12% · Phí gian hàng 500k/năm</p></div>
+          <div class="svc-info"><b>China Shop</b><p>Hoa hồng 20% · Phí gian hàng 500k/năm</p></div>
           <span class="svc-arr">→</span>
         </div>
         <div class="svc-card" onclick="pickService('sp')">
@@ -839,10 +849,10 @@ const MODULES = {
     badge: '👕 Đối tác Giặt Là · Hà Nội',
     title: 'Đăng ký đối tác<br><em>Giặt Là</em> 🫧',
     sub: 'Kết nối tiệm giặt của bạn với hàng nghìn khách qua app CRABOR',
-    info: 'Bạn đang đăng ký làm <strong>đối tác Giặt Là</strong>. Hoa hồng <strong>18%/đơn</strong>. Shipper CRABOR sẽ lấy và trả đồ tận nơi cho bạn.',
+    info: 'Bạn đang đăng ký làm <strong>đối tác Giặt Là</strong>. Hoa hồng <strong>30%/đơn</strong>. Shipper CRABOR sẽ lấy và trả đồ tận nơi cho bạn.',
     infoClass: 'info-gl', headClass: 'head-gl', logoClass: 'logo-gl',
     progClass: 'prog-gl', btnClass: 'btn-gl',
-    feeAmt: '18%', feeNote: 'Mỗi đơn thành công · Miễn phí đăng ký',
+    feeAmt: '30%', feeNote: 'Mỗi đơn thành công · Miễn phí đăng ký',
     feeBadge: '✅ Đăng ký<br>Miễn phí<br>100%', feeClass: 'fee-gl',
     steps: ['SĐT', 'Xác minh', 'Cơ sở', 'Dịch vụ', 'Giấy tờ', 'Xác nhận'],
     successIcon: '👕', successClass: 'success-title-gl',
@@ -907,10 +917,10 @@ const MODULES = {
     badge: '🧹 Đối tác Giúp Việc · Hà Nội',
     title: 'Đăng ký làm<br><em>Người Giúp Việc</em> 🧹',
     sub: 'Tự chọn lịch — nhận tiền ngay — khách hàng đã xác minh 100%',
-    info: 'Bạn đang đăng ký làm <strong>người giúp việc CRABOR</strong>. Thu nhập <strong>200k–350k/ca</strong>. Phí nền tảng <strong>15%</strong>. Miễn phí đăng ký.',
+    info: 'Bạn đang đăng ký làm <strong>người giúp việc CRABOR</strong>. Thu nhập <strong>200k–350k/ca</strong>. Phí nền tảng <strong>30%</strong>. Miễn phí đăng ký.',
     infoClass: 'info-gv', headClass: 'head-gv', logoClass: 'logo-gv',
     progClass: 'prog-gv', btnClass: 'btn-gv',
-    feeAmt: '15%', feeNote: 'Phí nền tảng · Giữ lại 85% · Nhận tiền ngay',
+    feeAmt: '30%', feeNote: 'Phí nền tảng · Giữ lại 70% · Nhận tiền ngay',
     feeBadge: '🆓 Đăng ký<br>Miễn Phí<br>Hoàn Toàn', feeClass: 'fee-gv',
     steps: ['SĐT', 'Xác minh', 'Bản thân', 'Kỹ năng', 'Giấy tờ', 'Xác nhận'],
     successIcon: '🧹', successClass: 'success-title-gv',
@@ -980,10 +990,10 @@ const MODULES = {
     badge: '🇨🇳 Đối tác China Shop · Hà Nội',
     title: 'Đăng ký đối tác<br><em>China Shop</em> 🛍️',
     sub: 'Nhập hàng nội địa Trung chính hãng — bán qua app CRABOR — giao tận nơi',
-    info: 'Bạn đang đăng ký làm <strong>đối tác China Shop</strong>. Hoa hồng <strong>12%/đơn</strong>. Phí đăng ký gian hàng <strong>500k/năm</strong>.',
+    info: 'Bạn đang đăng ký làm <strong>đối tác China Shop</strong>. Hoa hồng <strong>20%/đơn</strong>. Phí đăng ký gian hàng <strong>500k/năm</strong>.',
     infoClass: 'info-cs', headClass: 'head-cs', logoClass: 'logo-cs',
     progClass: 'prog-cs', btnClass: 'btn-cs',
-    feeAmt: '12%', feeNote: 'Hoa hồng mỗi đơn thành công · Phí gian hàng 500k/năm',
+    feeAmt: '20%', feeNote: 'Hoa hồng mỗi đơn thành công · Phí gian hàng 500k/năm',
     feeBadge: '🇨🇳 Phí<br>500k/năm<br>Gian hàng', feeClass: 'fee-cs',
     steps: ['SĐT', 'Xác minh', 'Cơ sở', 'Sản phẩm', 'Giấy tờ', 'Xác nhận'],
     successIcon: '🛍️', successClass: 'success-title-cs',
@@ -1059,6 +1069,12 @@ const MODULES = {
           <div class="radio-card"><input type="radio" name="vehicle" id="v2" value="bicycle"><label for="v2"><span class="r-icon">🚲</span>Xe đạp điện</label></div>
         </div>
         <div class="err-msg" id="vehicleErr">Vui lòng chọn phương tiện</div>
+      </div>
+      <div class="field">
+        <label class="checkbox-row" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-weight:600">
+          <input type="checkbox" id="cleaningRegister" style="width:20px;height:20px;margin-top:2px">
+          <span>🧹 Mở khoá thêm dịch vụ <b>Dọn nhà / Giúp việc</b> — thu nhập thêm 200k–350k/ca (tùy chọn)</span>
+        </label>
       </div>`,
     step4Title: 'Tải lên giấy tờ',
     step4Sub: 'Ảnh chụp rõ nét, không bị mờ. Chấp nhận JPG, PNG (tối đa 5MB)',
@@ -1141,10 +1157,10 @@ const MODULES = {
     badge: '🚗 Tài xế Công nghệ · Hà Nội',
     title: 'Đăng ký<br><em>Tài xế Công nghệ</em> 🚗',
     sub: 'Chủ động thời gian — thu nhập cao — khách hàng đã xác minh',
-    info: 'Bạn đang đăng ký làm <strong>tài xế công nghệ CRABOR</strong>. Thu nhập ước tính <strong>500k–2tr/ngày</strong>. Phí nền tảng <strong>18%/chuyến</strong>. Miễn phí đăng ký.',
+    info: 'Bạn đang đăng ký làm <strong>tài xế công nghệ CRABOR</strong>. Thu nhập ước tính <strong>500k–2tr/ngày</strong>. Phí nền tảng <strong>30%/chuyến</strong>. Miễn phí đăng ký.',
     infoClass: 'info-gl', headClass: 'head-gl', logoClass: 'logo-gl',
     progClass: 'prog-gl', btnClass: 'btn-gl',
-    feeAmt: '18%', feeNote: 'Phí nền tảng · Giữ 82% · Nhận tiền mỗi ngày',
+    feeAmt: '30%', feeNote: 'Phí nền tảng · Giữ 70% · Nhận tiền mỗi ngày',
     feeBadge: '🆓 Đăng ký<br>Miễn Phí<br>Hoàn Toàn', feeClass: 'fee-gv',
     steps: ['SĐT', 'Xác minh', 'Bản thân', 'Phương tiện', 'Giấy tờ', 'Xác nhận'],
     successIcon: '🚗', successClass: 'success-title-gl',
@@ -1847,7 +1863,7 @@ async function submitForm(redirectToPay = false) {
     if(mod==='gv'){payload.services=getSelectedChips('#serviceChips');payload.shifts=getSelectedChips('#shiftChips');payload.exp=document.querySelector('input[name=exp]:checked')?.value;payload.dob=document.getElementById('dob')?.value;}
     if(mod==='cs'){payload.categories=getSelectedChips('#serviceChips');payload.source=document.querySelector('input[name=source]:checked')?.value;}
   }
-  if(mod==='sp'){payload.dob=document.getElementById('dob')?.value;payload.vehicle=document.querySelector('input[name=vehicle]:checked')?.value;}
+  if(mod==='sp'){payload.dob=document.getElementById('dob')?.value;payload.vehicle=document.querySelector('input[name=vehicle]:checked')?.value;payload.cleaningRegistered=document.getElementById('cleaningRegister')?.checked===true;}
   if(mod==='fd'){
     payload.description=document.getElementById('description')?.value;
     payload.categories=getSelectedChips('#serviceChips');
@@ -1975,7 +1991,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   const rawHash = window.location.hash.replace('#','').toLowerCase().trim();
   if (rawHash && hashMap[rawHash]) {
-    // Tự động bắt đầu form với module tương ứng
+    // Truy cập thẳng: ẩn welcome, mở card rồi tự bắt đầu form với module tương ứng
+    document.getElementById('welcomeScreen').classList.add('hide');
+    document.getElementById('card').classList.remove('hide');
     pickService(hashMap[rawHash]);
   }
 });
@@ -2492,9 +2510,9 @@ html.theme-light .sth-btn { color:#333; }
 const FAQ = [
   { keys:['crabor là gì','crabor','giới thiệu','app gì','ứng dụng gì'], q:'CRABOR là gì?', a:'🦀 CRABOR là super app All-in-One tại Hà Nội:\n• 🍜 Giao đồ ăn\n• 👕 Giặt là lấy & trả tận nơi\n• 🧹 Giúp việc nhà\n• 🛍️ China Shop\n• 🚗 Xe công nghệ (sắp ra)\n\n🚀 Ra mắt chính thức tháng 7/2025 tại Hà Nội!'},
   { keys:['người sáng lập','sáng lập','founder','ai làm','ai tạo','ai xây','của ai','thuộc về','chủ','ceo','kiều thanh hải','hành trình','câu chuyện'], q:'Ai là người sáng lập CRABOR?', a:'👨‍💻 CRABOR được sáng lập bởi **Kiều Thanh Hải** — sinh viên năm 2 ngành Logistics, Đại học Đại Nam, Hà Nội.\n\n🚀 Hành trình:\n• 20 tuổi, tự học code từ con số 0\n• Ngân sách chỉ 3 triệu/tháng, không nhà đầu tư, không mentor\n• Một mình xây toàn bộ: 21.000+ dòng code, 100+ API\n• Tích hợp AI, bản đồ realtime, OTP thật\n\n💬 "Tôi muốn xây dựng một ứng dụng mà mọi người Hà Nội đều muốn có trong điện thoại."\n— Kiều Thanh Hải, Founder & CEO'},
-  { keys:['đăng ký shipper','shipper','giao hàng','trở thành shipper','phí shipper','700','500','early bird'], q:'Đăng ký Shipper như thế nào?', a:'🛵 Đăng ký Shipper CRABOR:\n\n1️⃣ Vào /register → chọn "Shipper"\n2️⃣ Nhập thông tin + upload giấy tờ\n3️⃣ Thanh toán phí kích hoạt\n4️⃣ Tự động duyệt sau khi thanh toán\n\n💰 Gói phí:\n• ⚡ Early Bird: 500.000đ (hoàn tiền sau 1.000 đơn)\n• 🛵 Standard: 700.000đ\n\n📱 Thu nhập 20.000–50.000đ/đơn, nhận 85% phí giao'},
-  { keys:['thu nhập shipper','kiếm được bao nhiêu','lương','tiền giao hàng'], q:'Shipper thu nhập bao nhiêu?', a:'💰 Thu nhập Shipper CRABOR:\n\n• Nhận 85% phí giao hàng mỗi đơn\n• Ước tính 20.000–50.000đ/đơn tùy khoảng cách\n• ⚡ Bonus nhiệm vụ ngày: +5.000–15.000đ\n• 📅 Bonus nhiệm vụ tuần: +30.000–80.000đ\n• 🏆 Hạng Kim Cương: bonus x1.5\n\nChủ động giờ làm, nhận tiền hàng ngày!'},
-  { keys:['đối tác','nhà hàng','quán','mở tiệm','đăng ký đối tác','hoa hồng','18%','20%'], q:'Đăng ký làm đối tác?', a:'🤝 Đăng ký đối tác CRABOR:\n\n1️⃣ Vào /register → chọn loại đối tác\n2️⃣ Điền thông tin cửa hàng\n3️⃣ Tự động duyệt trong 1 giờ ✅\n\n📊 Hoa hồng: CRABOR thu 18–20%/đơn\n✅ Đăng ký miễn phí\n🚀 Shipper CRABOR giao hàng cho bạn\n📱 Dashboard quản lý đơn + doanh thu realtime'},
+  { keys:['đăng ký shipper','shipper','giao hàng','trở thành shipper','phí shipper','700','500','early bird'], q:'Đăng ký Shipper như thế nào?', a:'🛵 Đăng ký Shipper CRABOR:\n\n1️⃣ Vào /register → chọn "Shipper"\n2️⃣ Nhập thông tin + upload giấy tờ\n3️⃣ Thanh toán phí kích hoạt\n4️⃣ Tự động duyệt sau khi thanh toán\n\n💰 Gói phí:\n• ⚡ Early Bird: 500.000đ (hoàn tiền sau 1.000 đơn)\n• 🛵 Standard: 700.000đ\n\n📱 Thu nhập 20.000–50.000đ/đơn, nhận 70% phí giao'},
+  { keys:['thu nhập shipper','kiếm được bao nhiêu','lương','tiền giao hàng'], q:'Shipper thu nhập bao nhiêu?', a:'💰 Thu nhập Shipper CRABOR:\n\n• Nhận 70% phí giao hàng mỗi đơn\n• Ước tính 20.000–50.000đ/đơn tùy khoảng cách\n• ⚡ Bonus nhiệm vụ ngày: +5.000–15.000đ\n• 📅 Bonus nhiệm vụ tuần: +30.000–80.000đ\n• 🏆 Hạng Kim Cương: bonus x1.5\n\nChủ động giờ làm, nhận tiền hàng ngày!'},
+  { keys:['đối tác','nhà hàng','quán','mở tiệm','đăng ký đối tác','hoa hồng','18%','20%'], q:'Đăng ký làm đối tác?', a:'🤝 Đăng ký đối tác CRABOR:\n\n1️⃣ Vào /register → chọn loại đối tác\n2️⃣ Điền thông tin cửa hàng\n3️⃣ Tự động duyệt trong 1 giờ ✅\n\n📊 Hoa hồng: CRABOR thu 20%/đơn nhà hàng · 30% giặt là & dọn nhà\n✅ Đăng ký miễn phí\n🚀 Shipper CRABOR giao hàng cho bạn\n📱 Dashboard quản lý đơn + doanh thu realtime'},
   { keys:['sales','ctv','cộng tác viên','giới thiệu người','hoa hồng','kiếm tiền','mã giới thiệu'], q:'CTV Sales kiếm tiền như thế nào?', a:'🎯 CTV Sales CRABOR:\n\n💰 +2.000đ mỗi đơn hoàn thành của người bạn giới thiệu\n🔗 Mã giới thiệu riêng: CR + 3 ký tự + 4 số SĐT\n💳 Rút tiền tối thiểu 50.000đ\n📲 Chia sẻ qua Zalo, Facebook, SMS\n\n📱 Đăng ký tại /sales'},
   { keys:['dịch vụ','các dịch vụ','module','giặt là','giúp việc','china shop','xe công nghệ'], q:'CRABOR có những dịch vụ gì?', a:'📦 Lộ trình dịch vụ CRABOR:\n\n🍜 Giao đồ ăn — T7/2025 ✅\n👕 Giặt là tận nơi — Q1/2026\n🧹 Giúp việc nhà — Q2/2026\n🚗 Xe công nghệ — Q3/2026\n🛍️ China Shop — Q4/2026'},
   { keys:['thanh toán','momo','zalopay','cod','tiền mặt','phương thức'], q:'Thanh toán bằng gì?', a:'💳 Phương thức thanh toán:\n\n💵 COD — Tiền mặt khi nhận\n📱 MoMo\n📱 ZaloPay\n🏦 Chuyển khoản ngân hàng\n\nAn toàn, nhanh chóng, minh bạch!'},

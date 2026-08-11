@@ -441,12 +441,12 @@ async function seedCocoKnowledge() {
     // Shipper
     { category:'faq', intent:'ask_register_shipper', confidence:1.0,
       keywords:['đăng ký shipper','shipper','early bird','phí 500','phí 700'],
-      answer:'🛵 Đăng ký Shipper:\n1. Vào /register → chọn Shipper\n2. Upload giấy tờ\n3. Thanh toán phí → tự động duyệt\n\n💰 Early Bird: 500.000đ (hoàn sau 1.000 đơn) · Standard: 700.000đ\nNhận 85% phí giao mỗi đơn!' },
+      answer:'🛵 Đăng ký Shipper:\n1. Vào /register → chọn Shipper\n2. Upload giấy tờ\n3. Thanh toán phí → tự động duyệt\n\n💰 Early Bird: 500.000đ (hoàn sau 1.000 đơn) · Standard: 700.000đ\nNhận 70% phí giao mỗi đơn!' },
 
     // Partner
     { category:'faq', intent:'ask_register_partner', confidence:1.0,
       keywords:['đối tác','nhà hàng','đăng ký đối tác','hoa hồng','18%','20%'],
-      answer:'🤝 Đăng ký đối tác CRABOR:\n✅ Miễn phí · Duyệt trong 1 giờ\n📊 Hoa hồng 18–20%/đơn\n📱 Dashboard quản lý realtime\n\nVào /register → chọn loại đối tác!' },
+      answer:'🤝 Đăng ký đối tác CRABOR:\n✅ Miễn phí · Duyệt trong 1 giờ\n📊 Hoa hồng 20% nhà hàng · 30% giặt là & dọn nhà\n📱 Dashboard quản lý realtime\n\nVào /register → chọn loại đối tác!' },
 
     // Chính sách hoàn tiền
     { category:'policy', intent:'request_refund', confidence:1.0,
