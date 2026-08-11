@@ -2217,6 +2217,25 @@ async function walletDebit(ownerId, ownerType, amount, type='debit', ref, note) 
   return updated.walletBalance;
 }
 
+// ── Helper: mô tả nguồn tiền cho giao dịch ví ─────────────────
+function describeTx(tx) {
+  if (!tx) return 'Giao dịch ví CRABOR';
+  if (tx.note) return tx.note;
+  if (tx.ref) {
+    const ref = String(tx.ref);
+    if (ref === 'mission') return 'Thưởng nhiệm vụ';
+    if (ref === 'WITHDRAW_REJECT') return 'Hoàn lại tiền rút bị từ chối';
+    return `Giao dịch đơn #${ref.slice(-6)}`;
+  }
+  if (tx.type === 'withdraw') return 'Rút tiền từ ví';
+  if (tx.type === 'credit') return 'Nhận tiền vào ví';
+  if (tx.type === 'refund') return 'Hoàn tiền';
+  return 'Giao dịch ví CRABOR';
+}
+function withTxDescription(txs) {
+  return (txs || []).map(tx => ({ ...(tx.toObject ? tx.toObject() : tx), description: describeTx(tx) }));
+}
+
 
 // ══════════════════════════════════════════════════════════════
 //  TIER 1 FEATURES: Rating · Chat · Voucher · Delivery Photo
@@ -3401,8 +3420,10 @@ app.post("/api/auth/verify-otp-email", async (req, res) => {
       });
     }
 
-    req.session.userId   = user._id;
+req.session.userId    = user._id;
     req.session.userPhone = user.phone;
+    req.session.role      = user.role || 'customer';
+    pruneSessionRoles(req, 'user');
     await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
 
     res.json({
@@ -3455,8 +3476,11 @@ app.post("/api/auth/verify-otp-email/partner", async (req, res) => {
       if (p) { found = p; module = mod; break; }
     }
     if (!found) return res.status(404).json({ success: false, message: "Email chưa đăng ký đối tác" });
+    req.session.userPhone    = found.phone;
     req.session.partnerId     = found._id;
     req.session.partnerModule = module;
+    req.session.role        = "partner";
+    pruneSessionRoles(req, 'partner');
     await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
     res.json({ success: true, partner: { _id: found._id, bizName: found.bizName, module } });
   } catch(err) {
@@ -3487,8 +3511,10 @@ app.post("/api/auth/verify-otp-email/shipper", async (req, res) => {
     if (!check.ok) return res.status(400).json({ success: false, message: check.reason });
     const shipper = await Shipper.findOne({ email: email.toLowerCase() });
     if (!shipper) return res.status(404).json({ success: false, message: "Email chưa đăng ký shipper" });
-    req.session.userId    = shipper._id;
-    req.session.userPhone = shipper.phone;
+    req.session.shipperId  = shipper._id;
+    req.session.userPhone  = shipper.phone;
+    req.session.role       = "shipper";
+    pruneSessionRoles(req, 'shipper');
     await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
     res.json({ success: true, shipper: { _id: shipper._id, fullName: shipper.fullName, phone: shipper.phone, vehiclePlate: shipper.vehiclePlate, avatar: shipper.avatar || shipper.documents?.selfie || null, status: shipper.status } });
   } catch(err) {
@@ -3505,10 +3531,24 @@ app.post("/api/auth/verify-otp-email/shipper", async (req, res) => {
 
 // Determine owner from session
 function getWalletOwner(req) {
+  const role = req.session.role;
+  if (role === 'shipper' && req.session.shipperId) return { id: req.session.shipperId, type: 'shipper' };
+  if ((role === 'user' || role === 'customer') && req.session.userId) return { id: req.session.userId, type: 'user' };
+  if (role === 'partner' && req.session.partnerId) return { id: req.session.partnerId, type: 'partner' };
   if (req.session.shipperId) return { id: req.session.shipperId, type: 'shipper' };
   if (req.session.userId)    return { id: req.session.userId,    type: 'user' };
   if (req.session.partnerId) return { id: req.session.partnerId, type: 'partner' };
   return null;
+}
+
+// Giữ đúng 1 role duy nhất trong session để tránh nhầm lẫn ví giữa 3 app
+// (1 SĐT đăng ký cả customer + shipper + partner dùng chung cookie → session cũ không được giữ role khác)
+function pruneSessionRoles(req, keepRole) {
+  if (keepRole !== 'shipper') delete req.session.shipperId;
+  if (keepRole !== 'user')    delete req.session.userId;
+  if (keepRole !== 'partner') delete req.session.partnerId;
+  if (keepRole !== 'admin')   delete req.session.adminId;
+  if (keepRole !== 'sales')   delete req.session.salesId;
 }
 
 // GET /api/notifications/my — Danh sách thông báo của owner (shipper/partner/user)
@@ -3554,7 +3594,7 @@ app.get("/api/wallet", async (req, res) => {
     const doc = await Model.findById(owner.id).select('walletBalance walletEarned fullName phone');
     if (!doc) return res.status(404).json({ success:false });
     const txs = await WalletTx.find({ ownerId: owner.id }).sort({ createdAt:-1 }).limit(50);
-    res.json({ success:true, balance: doc.walletBalance||0, earned: doc.walletEarned||0, transactions: txs });
+    res.json({ success:true, balance: doc.walletBalance||0, earned: doc.walletEarned||0, transactions: withTxDescription(txs) });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -3598,7 +3638,7 @@ app.get("/api/wallet/shipper", async (req, res) => {
     
     const { totalOrders: allTimeOrders, todayOrders: todayCount } = await countShipperCompletedOrders(shipper._id);
     
-    res.json({ success:true, balance: shipper.walletBalance||0, earned: shipper.walletEarned||0, pending, todayEarnings, weekEarnings, monthEarnings, totalEarnings: shipper.totalEarnings||0, totalOrders: allTimeOrders, todayOrders: todayCount, fee: shipper.fee, feeStatus: shipper.feeStatus, plan: shipper.plan, transactions: txs });
+    res.json({ success:true, balance: shipper.walletBalance||0, earned: shipper.walletEarned||0, pending, todayEarnings, weekEarnings, monthEarnings, totalEarnings: shipper.totalEarnings||0, totalOrders: allTimeOrders, todayOrders: todayCount, fee: shipper.fee, feeStatus: shipper.feeStatus, plan: shipper.plan, transactions: withTxDescription(txs) });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -5208,6 +5248,8 @@ app.post("/api/auth/register", async (req, res) => {
     // Tạo session
     req.session.userId    = user._id;
     req.session.userPhone = user.phone;
+    req.session.role      = "customer";
+    pruneSessionRoles(req, 'user');
     await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
 
     // Lấy cookie string để trả về app
@@ -5260,6 +5302,8 @@ app.post("/api/auth/register-form", async (req, res) => {
 
     req.session.userId    = user._id;
     req.session.userPhone = user.phone;
+    req.session.role      = "customer";
+    pruneSessionRoles(req, 'user');
     await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
 
     res.json({
@@ -5301,6 +5345,8 @@ app.post("/api/auth/login-form", async (req, res) => {
 
     req.session.userId    = user._id;
     req.session.userPhone = user.phone;
+    req.session.role      = user.role || "customer";
+    pruneSessionRoles(req, 'user');
     await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
 
     // Trả cookie để app lưu session (giống register)
@@ -5552,6 +5598,7 @@ app.post("/api/auth/login", async (req, res) => {
     req.session.userId    = user._id;
     req.session.userPhone = user.phone;
     req.session.role      = user.role;
+    pruneSessionRoles(req, 'user');
     await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
 
     res.json({
@@ -5624,6 +5671,7 @@ app.get("/api/shipper/me", async (req, res) => {
               req.session.shipperId = shipperId;
               req.session.userPhone = userPhone;
               req.session.role = sess.role || 'shipper';
+              pruneSessionRoles(req, 'shipper');
               console.log('[GetMe] Session loaded from MongoDB via X-Session-ID:', xSid.substring(0,8));
             }
           }
@@ -5704,6 +5752,7 @@ app.post("/api/shipper/session", async (req, res) => {
     req.session.userPhone = phone;
     req.session.shipperId = shipper._id;
     req.session.role = "shipper";
+    pruneSessionRoles(req, 'shipper');
     await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
     const cookieStr = buildSignedSessionCookie(req.session.id);
     res.json({ success: true, shipper, cookie: cookieStr, sessionId: req.session.id });
@@ -6065,6 +6114,7 @@ app.post("/api/partner/login", async (req, res) => {
         req.session.partnerId = p._id;
         req.session.partnerModule = module;
         req.session.role = "partner";
+        pruneSessionRoles(req, 'partner');
         await new Promise((resolve, reject) => req.session.save(e => e ? reject(e) : resolve()));
         // Trả cookie để app lưu session
         const cookieStr = buildSignedSessionCookie(req.session.id);
@@ -6703,6 +6753,9 @@ app.post("/api/shipper/register", async (req, res) => {
       phone, firstName, lastName, email, dob, address, district, vehicle,
       plan, fee: plan === "early_bird" ? 500000 : 700000,
       status: "pending", documents,
+      preferences: req.body.cleaningRegistered
+        ? { acceptFood: true, acceptLaundry: true, acceptRide: true, acceptCleaning: true, cleaningRegistered: true }
+        : undefined,
     });
 
     // Save referral if refCode provided
@@ -7175,6 +7228,14 @@ app.post("/api/partner/register", async (req, res) => {
     await sendSms(phone,
       `CRABOR: Ho so doi tac ${modName} (${partner.registerId}) da duoc tiep nhan. Chung toi se lien he trong 24-48h.`).catch(() => {});
 
+    // Nếu là Dọn nhà / Giúp việc và đã có tài khoản Shipper cùng SĐT → mở khoá nhận đơn dọn nhà
+    if (mod === "giup_viec") {
+      await Shipper.updateOne(
+        { phone: normalizePhone(phone) },
+        { $set: { "preferences.cleaningRegistered": true } }
+      ).catch(() => {});
+    }
+
     req.io.to("admin").emit("newPartnerApplication", { registerId: partner.registerId, module: mod, phone, district });
     console.log(` Partner mới [${mod}]: ${partner.registerId} — ${phone}`);
     res.json({ success: true, message: "Đăng ký thành công!", registerId: partner.registerId, module: mod });
@@ -7252,6 +7313,60 @@ app.get("/api/ride/surge", (req, res) => {
   const h = new Date().getHours();
   const isSurge = (h >= 11 && h < 12) || (h >= 19 && h < 20);
   res.json({ success: true, isSurge, multiplier: isSurge ? 1.5 : 1.0 });
+});
+
+// GET /api/ride/nearby-shippers — Shipper online gần điểm đón (cho bản đồ realtime)
+app.get("/api/ride/nearby-shippers", async (req, res) => {
+  try {
+    const { lat, lng, radiusKm = 10, limit = 30 } = req.query;
+    if (!lat || !lng) {
+      return res.status(400).json({ success: false, message: "Thiếu tọa độ" });
+    }
+    const pLat = parseFloat(lat), pLng = parseFloat(lng);
+    const maxRadius = Math.min(Math.max(parseFloat(radiusKm) || 10, 1), 50);
+    const maxLimit = Math.min(Math.max(parseInt(limit) || 30, 1), 100);
+
+    const shippers = await Shipper.find({
+      status: { $in: ["approved", "active"] },
+      online: true,
+      isAccepting: true,
+      "location.lat": { $exists: true, $ne: null },
+      "location.lng": { $exists: true, $ne: null },
+    })
+      .select("fullName vehicle vehiclePlate location rating ratingCount totalOrders avatar tier")
+      .lean();
+
+    const R = 6371;
+    const list = shippers
+      .map(s => {
+        if (!s.location?.lat || !s.location?.lng) return null;
+        const dLat = (s.location.lat - pLat) * Math.PI / 180;
+        const dLng = (s.location.lng - pLng) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 +
+          Math.cos(pLat * Math.PI/180) * Math.cos(s.location.lat * Math.PI/180) * Math.sin(dLng/2)**2;
+        const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return {
+          id: String(s._id),
+          name: s.fullName || "",
+          vehicle: s.vehicle || "motorbike",
+          plate: s.vehiclePlate || "",
+          lat: s.location.lat,
+          lng: s.location.lng,
+          rating: s.rating || 0,
+          ratingCount: s.ratingCount || 0,
+          totalOrders: s.totalOrders || 0,
+          distKm: Math.round(distKm * 10) / 10,
+        };
+      })
+      .filter(Boolean)
+      .filter(s => s.distKm <= maxRadius)
+      .sort((a, b) => a.distKm - b.distKm)
+      .slice(0, maxLimit);
+
+    res.json({ success: true, count: list.length, shippers: list });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // POST /api/ride/book
@@ -7573,6 +7688,7 @@ app.get("/api/partner/wallet", async (req, res) => {
       transactions = txs.map(tx => ({
         _id: tx._id, type: tx.type, amount: tx.amount, balance: tx.balance,
         note: tx.note || "", ref: tx.ref || "", createdAt: tx.createdAt,
+        description: describeTx(tx),
       }));
     }
     res.json({ success: true, wallet: { balance: wallet.balance, history: wallet.history, transactions } });
@@ -8635,6 +8751,7 @@ app.post("/api/shipper/login", async (req, res) => {
     req.session.shipperId = shipper._id;
     req.session.userPhone = shipper.phone;
     req.session.role = "shipper";
+    pruneSessionRoles(req, 'shipper');
     await new Promise((resolve, reject) => {
       req.session.save((err) => {
         if (err) reject(err);
@@ -8689,6 +8806,7 @@ app.post("/api/shipper/set-password", async (req, res) => {
     req.session.shipperId = shipper._id;
     req.session.userPhone = shipper.phone;
     req.session.role = "shipper";
+    pruneSessionRoles(req, 'shipper');
     
     await new Promise((resolve, reject) => {
       req.session.save((err) => {
@@ -8994,6 +9112,8 @@ app.post("/api/auth/test-login", async (req, res) => {
       if (!user) return res.status(404).json({ success: false, message: "Test account chưa được tạo. Restart server." });
       req.session.userId = user._id;
       req.session.userPhone = user.phone;
+      req.session.role = "customer";
+      pruneSessionRoles(req, 'user');
       await new Promise((r, j) => req.session.save(e => e ? j(e) : r()));
       const cookieStr = buildSignedSessionCookie(req.session.id);
       return res.json({ success: true, role: "customer", cookie: cookieStr,
@@ -9006,6 +9126,7 @@ app.post("/api/auth/test-login", async (req, res) => {
       req.session.shipperId = shipper._id;
       req.session.userPhone = shipper.phone;
       req.session.role = "shipper";
+      pruneSessionRoles(req, 'shipper');
       await new Promise((r, j) => req.session.save(e => e ? j(e) : r()));
       const cookieStr = buildSignedSessionCookie(req.session.id);
       return res.json({ success: true, role: "shipper", cookie: cookieStr,
@@ -9019,6 +9140,7 @@ app.post("/api/auth/test-login", async (req, res) => {
       req.session.userPhone = partner.phone;
       req.session.partnerModule = "food_partner";
       req.session.role = "partner";
+      pruneSessionRoles(req, 'partner');
       await new Promise((r, j) => req.session.save(e => e ? j(e) : r()));
       const cookieStr = buildSignedSessionCookie(req.session.id);
       return res.json({ success: true, role: "partner", cookie: cookieStr,
@@ -11132,14 +11254,21 @@ app.post("/api/shipper/preferences", async (req, res) => {
         'preferences.acceptFood': acceptFood !== false, 
         'preferences.acceptLaundry': acceptLaundry !== false, 
         'preferences.acceptRide': acceptRide !== false, 
-        'preferences.acceptCleaning': acceptCleaning !== false 
+        'preferences.acceptCleaning': acceptCleaning === true 
       }},
       { new: true }
     ).select('preferences');
     
+    const prefs = shipper?.preferences || {};
     res.json({ 
       success: true, 
-      preferences: shipper?.preferences || { acceptFood: true, acceptLaundry: true, acceptRide: true, acceptCleaning: true }
+      preferences: {
+        acceptFood: prefs.acceptFood !== false,
+        acceptLaundry: prefs.acceptLaundry !== false,
+        acceptRide: prefs.acceptRide !== false,
+        acceptCleaning: prefs.acceptCleaning === true,
+        cleaningRegistered: !!prefs.cleaningRegistered,
+      }
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -11157,7 +11286,8 @@ app.get("/api/shipper/preferences", async (req, res) => {
         acceptFood: prefs.acceptFood !== false,
         acceptLaundry: prefs.acceptLaundry !== false,
         acceptRide: prefs.acceptRide !== false,
-        acceptCleaning: prefs.acceptCleaning !== false,
+        acceptCleaning: prefs.acceptCleaning === true,
+        cleaningRegistered: !!prefs.cleaningRegistered,
       }
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
@@ -12883,14 +13013,17 @@ app.post("/api/auth/otp/reset-password", async (req, res) => {
       req.session.shipperId = updatedUser._id;
       req.session.userPhone = updatedUser.phone;
       req.session.role = 'shipper';
+      pruneSessionRoles(req, 'shipper');
     } else if (userType === 'customer') {
       req.session.userId = updatedUser._id;
       req.session.userPhone = updatedUser.phone;
       req.session.role = 'customer';
+      pruneSessionRoles(req, 'user');
     } else if (userType === 'partner') {
       req.session.partnerId = updatedUser._id;
       req.session.userPhone = updatedUser.phone;
       req.session.role = 'partner';
+      pruneSessionRoles(req, 'partner');
     }
 
     await new Promise((resolve, reject) => {
