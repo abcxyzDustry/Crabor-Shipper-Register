@@ -3301,6 +3301,9 @@ app.get("/api/banners", async (req, res) => {
     // Track impressions
     const ids = banners.map(b => b._id);
     AIBanner.updateMany({ _id: { $in: ids } }, { $inc: { impressions: 1 } }).catch(()=>{});
+    // Strip non-fetchable image URLs (e.g. browser blob: URLs) so the mobile app renders the
+    // gradient AI card instead of a blank image box
+    banners.forEach(b => { if (b.imageUrl && !/^https?:\/\//i.test(b.imageUrl) && !/^data:/i.test(b.imageUrl)) b.imageUrl = null; });
     res.json({ success: true, data: banners });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
