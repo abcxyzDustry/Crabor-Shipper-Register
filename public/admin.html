@@ -1262,6 +1262,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
               <span class="bpp-meta-label">Link CTA</span>
               <input type="text" class="bpp-meta-input" id="bppCtaLink" placeholder="/customer hoặc /register">
             </div>
+            <div class="bpp-meta-row" style="align-items:flex-start">
+              <span class="bpp-meta-label">Hiển thị trên app</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button type="button" class="app-chip active" id="appChipCustomer" onclick="toggleBannerApp('customer')">📍 Customer</button>
+                <button type="button" class="app-chip" id="appChipPartner" onclick="toggleBannerApp('partner')">🏪 Partner</button>
+                <button type="button" class="app-chip" id="appChipShipper" onclick="toggleBannerApp('shipper')">🛵 Shipper</button>
+              </div>
+            </div>
             <div class="bpp-meta-row" style="font-size:.72rem;color:var(--muted)">
               <span>📊</span>
               <span id="bppStats">Sẵn sàng đăng</span>
@@ -2699,7 +2707,8 @@ function renderBannerPreview(b, imgUrl) {
       </div>
     </div>
   </div>`;
-  if (_pendingBanner) _pendingBanner.imageUrl = imgUrl;
+  if (_pendingBanner) { _pendingBanner.imageUrl = imgUrl; if (!Array.isArray(_pendingBanner.apps)) _pendingBanner.apps = Array.isArray(b.apps) && b.apps.length ? b.apps : ['customer']; }
+  renderAppChips();
   if (meta) meta.style.display = 'flex';
   if (publishBtn) publishBtn.disabled = false;
   if (discardBtn) discardBtn.style.display = 'inline-flex';
@@ -2708,7 +2717,21 @@ function renderBannerPreview(b, imgUrl) {
   const ctaLinkInp = document.getElementById('bppCtaLink'); if(ctaLinkInp) ctaLinkInp.value = b.ctaLink || '/customer';
   const statsSpan = document.getElementById('bppStats'); if(statsSpan) statsSpan.textContent = 'Sẵn sàng đăng · Chưa có impressions';
 }
-function discardBannerPreview() { _pendingBanner = null; const area = document.getElementById('bppPreviewArea'); if(area) area.innerHTML = `<div class="bpp-empty"><div class="bpp-empty-icon">🎨</div><div style="font-weight:800;font-size:.88rem;margin-bottom:6px">Banner đã bị hủy</div><div style="font-size:.78rem">Chat để tạo banner mới</div></div>`; const meta = document.getElementById('bppMeta'); if(meta) meta.style.display = 'none'; const pub = document.getElementById('bppPublishBtn'); if(pub) pub.disabled = true; const disc = document.getElementById('bppDiscardBtn'); if(disc) disc.style.display = 'none'; }
+function renderAppChips() {
+  const apps = Array.isArray(_pendingBanner?.apps) && _pendingBanner.apps.length ? _pendingBanner.apps : ['customer'];
+  ['customer','partner','shipper'].forEach(a => {
+    const chip = document.getElementById('appChip' + a.charAt(0).toUpperCase() + a.slice(1));
+    if (chip) chip.classList.toggle('active', apps.includes(a));
+  });
+}
+function toggleBannerApp(app) {
+  if (!_pendingBanner) return;
+  if (!Array.isArray(_pendingBanner.apps)) _pendingBanner.apps = ['customer'];
+  if (_pendingBanner.apps.includes(app)) _pendingBanner.apps = _pendingBanner.apps.filter(x => x !== app);
+  else _pendingBanner.apps.push(app);
+  renderAppChips();
+}
+function discardBannerPreview() { _pendingBanner = null; renderAppChips(); const area = document.getElementById('bppPreviewArea'); if(area) area.innerHTML = `<div class="bpp-empty"><div class="bpp-empty-icon">🎨</div><div style="font-weight:800;font-size:.88rem;margin-bottom:6px">Banner đã bị hủy</div><div style="font-size:.78rem">Chat để tạo banner mới</div></div>`; const meta = document.getElementById('bppMeta'); if(meta) meta.style.display = 'none'; const pub = document.getElementById('bppPublishBtn'); if(pub) pub.disabled = true; const disc = document.getElementById('bppDiscardBtn'); if(disc) disc.style.display = 'none'; }
 async function publishBanner() {
   if (!_pendingBanner) return;
   const publishBtn = document.getElementById('bppPublishBtn');
@@ -2716,7 +2739,7 @@ async function publishBanner() {
   const expiry = document.getElementById('bppExpiry')?.value;
   const ctaLink = document.getElementById('bppCtaLink')?.value || '/customer';
   try {
-    const payload = { ..._pendingBanner, ctaLink, active: true, expiresAt: expiry ? new Date(expiry) : null };
+    const payload = { ..._pendingBanner, apps: Array.isArray(_pendingBanner.apps) && _pendingBanner.apps.length ? _pendingBanner.apps : ['customer'], ctaLink, active: true, expiresAt: expiry ? new Date(expiry) : null };
     const r = await apiFetch('/api/admin/banners', 'POST', payload);
     if (r.success) { showNotif('🚀 Banner đã được đăng!', 'Đang hiển thị cho khách hàng realtime', 'green'); _appendAiMsg('bot', `✅ <strong>Banner đã được đăng thành công!</strong><br>Khách hàng sẽ thấy ngay lập tức trên app. Muốn tạo banner khác không? 😊`); discardBannerPreview(); loadActiveBanners(); }
     else { showNotif('❌ Lỗi', r.message || 'Không đăng được banner'); if(publishBtn) { publishBtn.disabled = false; publishBtn.textContent = '🚀 Đăng banner'; } }
@@ -2941,6 +2964,8 @@ setInterval(() => { if (currentUser) loadStats(); }, 30000);
 .bpp-meta-label { font-size: .72rem; color: var(--muted); font-weight: 800; width: 70px; flex-shrink: 0; }
 .bpp-meta-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--cream); font-family: inherit; font-size: .78rem; outline: none; }
 .bpp-meta-input:focus { border-color: var(--coral); }
+.app-chip { background: var(--bg); border: 1px solid var(--border); color: var(--muted); border-radius: 50px; padding: 4px 10px; font-weight: 800; font-size: .68rem; cursor: pointer; font-family: inherit; transition: .15s; }
+.app-chip.active { background: var(--coral); border-color: var(--coral); color: #fff; }
 .active-banners-panel { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
 .settings-theme-row { margin: 14px 0; }
 .settings-theme-label { font-size:.75rem; font-weight:900; text-transform:uppercase; letter-spacing:.8px; color:var(--muted,#888); margin-bottom:8px; }

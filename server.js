@@ -986,6 +986,7 @@ const aiBannerSchema = new mongoose.Schema({
   htmlContent: { type: String },       // full custom HTML nếu muốn
   prompt:      { type: String },       // prompt admin đã dùng
   active:      { type: Boolean, default: true },
+  apps:        { type: [String], default: ['customer'] },  // targets: 'customer' | 'partner' | 'shipper'
   order:       { type: Number, default: 0 },
   clicks:      { type: Number, default: 0 },
   impressions: { type: Number, default: 0 },
@@ -3290,13 +3291,19 @@ app.post("/api/admin/featured-requests/:id/reject", adminAuth, async (req, res) 
 // ══════════════════════════════════════════════
 
 // GET /api/banners — Public: lấy banner active để hiển thị cho customer
+// Hỗ trợ ?app=customer|partner|shipper — mỗi app chỉ nhận banner nhắm tới mình
 app.get("/api/banners", async (req, res) => {
   try {
     if (!AIBanner) return res.json({ success: true, data: [] });
     const now = new Date();
+    const targetApp = (req.query.app || "customer").toString();
     const banners = await AIBanner.find({
       active: true,
-      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }]
+      $and: [
+        { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
+        // Banner cũ (chưa có apps) chỉ hiện ở customer app
+        { $or: [{ apps: targetApp }, { apps: { $exists: false } }] },
+      ],
     }).sort({ order: -1, createdAt: -1 }).limit(10);
     // Track impressions
     const ids = banners.map(b => b._id);
