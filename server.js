@@ -3297,12 +3297,15 @@ app.get("/api/banners", async (req, res) => {
     if (!AIBanner) return res.json({ success: true, data: [] });
     const now = new Date();
     const targetApp = (req.query.app || "customer").toString();
+    // Banner cũ (chưa có apps) chỉ hiện ở customer app; partner/shipper chỉ nhận banner được nhắm tới
+    const appFilter = targetApp === "customer"
+      ? { $or: [{ apps: "customer" }, { apps: { $exists: false } }] }
+      : { apps: targetApp };
     const banners = await AIBanner.find({
       active: true,
       $and: [
         { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
-        // Banner cũ (chưa có apps) chỉ hiện ở customer app
-        { $or: [{ apps: targetApp }, { apps: { $exists: false } }] },
+        appFilter,
       ],
     }).sort({ order: -1, createdAt: -1 }).limit(10);
     // Track impressions
