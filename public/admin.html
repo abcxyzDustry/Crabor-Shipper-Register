@@ -1794,10 +1794,10 @@ function bootApp() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//   AUTO "QUÁN NỔI BẬT" — mỗi 48h tự chọn quán nhiều 5★ + tạo banner (Puter AI)
+//   AUTO "QUÁN NỔI BẬT" — mỗi tuần tự chọn quán nhiều 5★ + tạo banner (Puter AI)
 // ─────────────────────────────────────────────────────────────────────────────
 let _autoFeatureDone = false;
-const AUTO_FEATURE_MS = 48 * 3600 * 1000; // 48 giờ
+const AUTO_FEATURE_MS = 7 * 24 * 3600 * 1000; // 1 tuần
 
 async function runAutoFeature() {
   if (_autoFeatureDone) return;
@@ -1834,7 +1834,7 @@ async function runAutoFeature() {
       showNotif('🤖 Auto nổi bật', 'Không tạo được banner (AI/ảnh lỗi), hẹn lần sau.', 'coral');
       return;
     }
-    // Đăng banner cho customer app, hết hạn sau 48h, rồi báo server hoàn tất
+    // Đăng banner cho customer app, hết hạn sau 1 tuần, rồi báo server hoàn tất
     _pendingBanner.apps = ['customer'];
     _pendingBanner.ctaLink = '/customer';
     const exp = document.getElementById('bppExpiry');
@@ -1844,7 +1844,7 @@ async function runAutoFeature() {
     const posted = await publishBanner();
     const completeRes = await apiFetch('/api/admin/auto-feature/complete', 'POST', { bannerUrl: posted ? posted.imageUrl : null });
     if (completeRes && completeRes.success) {
-      showNotif('✨ Quán nổi bật', 'Hệ thống đã tự chọn ' + s.bizName + ' làm Quán nổi bật 48h (nhiều 5★ nhất).', 'green');
+      showNotif('✨ Quán nổi bật', 'Hệ thống đã tự chọn ' + s.bizName + ' làm Quán nổi bật 1 tuần (nhiều 5★ nhất).', 'green');
     }
   } catch (e) {
     console.error('[autoFeature] lỗi', e);

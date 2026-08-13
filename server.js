@@ -3377,9 +3377,10 @@ app.post("/api/admin/featured-requests/:id/reject", adminAuth, async (req, res) 
 
 
 // ═══════════════════════════════════════════════════════════
-//  AUTO "QUÁN NỔI BẬT" — mỗi 48h tự động chọn + tạo banner
+//  AUTO "QUÁN NỔI BẬT" — mỗi tuần (7 ngày) tự động chọn + tạo banner
 // ═══════════════════════════════════════════════════════════
-const AUTO_FEATURE_HOURS = 48;
+const AUTO_FEATURE_HOURS = 24 * 7; // 1 tuần
+const AUTO_FEATURE_LABEL = "1 tuần";
 
 async function autoFeatureTopDish(partnerId) {
   try {
@@ -3443,7 +3444,7 @@ app.get("/api/admin/auto-feature", adminAuth, async (req, res) => {
     if (state && state.status === "in_progress") {
       const selection = await autoFeatureSelectionDoc(state);
       if (!selection) {
-        // Quán đã bị xoá/vô hiệu → reset, lịch lại sau 48h
+        // Quán đã bị xoá/vô hiệu → reset, lịch lại sau 1 tuần
         state.status = "idle";
         state.nextRunAt = new Date(now.getTime() + AUTO_FEATURE_HOURS * 3600e3);
         state.selectedPartnerId = null;
@@ -3486,7 +3487,7 @@ app.get("/api/admin/auto-feature", adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// POST — hoàn tất (banner đã đăng): gắn nổi bật cho quán, lịch tiếp theo +48h
+// POST — hoàn tất (banner đã đăng): gắn nổi bật cho quán, lịch tiếp theo +1 tuần
 app.post("/api/admin/auto-feature/complete", adminAuth, async (req, res) => {
   try {
     const state = await FeatureState.findOne({ key: "auto_feature" });
@@ -3503,14 +3504,14 @@ app.post("/api/admin/auto-feature/complete", adminAuth, async (req, res) => {
         featuredUntil: until,
         featuredAt: now,
         featuredHours: AUTO_FEATURE_HOURS,
-        featuredPackage: `Auto nổi bật ${AUTO_FEATURE_HOURS} giờ`,
+        featuredPackage: `Auto nổi bật ${AUTO_FEATURE_LABEL}`,
         ...(bannerUrl ? { featuredBanner: bannerUrl, featuredBannerVertical: bannerUrl } : {}),
       });
       req.io?.to(`partner_${pid}`).emit("featured_approved", { until, hours: AUTO_FEATURE_HOURS });
       try {
         await notifyUser('partner', pid, {
           type: 'featured', title: '✨ Quán của bạn đã nổi bật!',
-          body: `Hệ thống đã tự động chọn quán bạn làm "Quán nổi bật" (${AUTO_FEATURE_HOURS} giờ) nhờ nhiều đánh giá 5★ nhất.`,
+          body: `Hệ thống đã tự động chọn quán bạn làm "Quán nổi bật" (${AUTO_FEATURE_LABEL}) nhờ nhiều đánh giá 5★ nhất.`,
           refModule: 'featured',
         });
       } catch (e) {}
@@ -3525,7 +3526,7 @@ app.post("/api/admin/auto-feature/complete", adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// POST — bỏ qua (lỗi tạo ảnh/banner): lịch tiếp theo +48h
+// POST — bỏ qua (lỗi tạo ảnh/banner): lịch tiếp theo +1 tuần
 app.post("/api/admin/auto-feature/skip", adminAuth, async (req, res) => {
   try {
     const state = await FeatureState.findOne({ key: "auto_feature" });
