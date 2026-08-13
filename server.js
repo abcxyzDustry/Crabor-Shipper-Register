@@ -6955,7 +6955,24 @@ app.get("/api/partner/orders", async (req, res) => {
       voucherDiscount: o.voucherDiscount || 0,
       finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
     }));
-    res.json({ success: true, orders: enriched });
+    // Nối vị trí realtime của tài xế đang nhận đơn để partner app vẽ đường shipper → quán trên bản đồ
+    const shipperIds = [...new Set(orders.map(o => o.shipperId).filter(Boolean))];
+    const shippers = shipperIds.length
+      ? await Shipper.find({ _id: { $in: shipperIds } }).select("location fullName firstName lastName").lean().catch(() => [])
+      : [];
+    const shipperById = {};
+    shippers.forEach(sh => { shipperById[String(sh._id)] = sh; });
+    const mapped = enriched.map(o => {
+      const sh = o.shipperId ? shipperById[String(o.shipperId)] : null;
+      return {
+        ...o,
+        shipperLocation: sh?.location?.lat != null && sh.location.lng != null
+          ? { latitude: sh.location.lat, longitude: sh.location.lng }
+          : null,
+        shipperName: sh ? (sh.fullName || [sh.firstName, sh.lastName].filter(Boolean).join(" ") || "Shipper") : null,
+      };
+    });
+    res.json({ success: true, orders: mapped });
   } catch(err) { res.status(500).json({ success:false, message: err.message }); }
 });
 
