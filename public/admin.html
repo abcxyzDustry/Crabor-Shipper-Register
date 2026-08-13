@@ -2912,25 +2912,6 @@ function saveBanner() { const title=document.getElementById('bmTitle')?.value.tr
 function pauseBanner(id){const b=bannerList.find(x=>x.id===id);if(b){b.status=b.status==='active'?'paused':'active';saveBannerData();renderBannerGrid();renderBannerHistory();}showNotif('⏸','Banner đã cập nhật');}
 function deleteBanner(id){if(!confirm('Xóa banner?'))return;bannerList=bannerList.filter(x=>x.id!==id);saveBannerData();renderBannerGrid();renderBannerHistory();showNotif('🗑 Đã xóa','');}
 
-// CRABOT CHATBOT
-const FAQ = [
-  { keys:['crabor là gì','crabor','giới thiệu','app gì','ứng dụng gì'], q:'CRABOR là gì?', a:'🦀 CRABOR là super app All-in-One tại Hà Nội:\n• 🍜 Giao đồ ăn\n• 👕 Giặt là lấy & trả tận nơi\n• 🧹 Giúp việc nhà\n• 🛍️ China Shop\n• 🚗 Xe công nghệ (sắp ra)\n\n🚀 Ra mắt chính thức tháng 7/2025 tại Hà Nội!'},
-  { keys:['người sáng lập','sáng lập','founder','ai làm','ai tạo','ai xây','của ai','thuộc về','chủ','ceo','kiều thanh hải','hành trình','câu chuyện'], q:'Ai là người sáng lập CRABOR?', a:'👨‍💻 CRABOR được sáng lập bởi **Kiều Thanh Hải** — sinh viên năm 2 ngành Logistics, Đại học Đại Nam, Hà Nội.\n\n🚀 Hành trình:\n• 20 tuổi, tự học code từ con số 0\n• Ngân sách chỉ 3 triệu/tháng, không nhà đầu tư, không mentor\n• Một mình xây toàn bộ: 21.000+ dòng code, 100+ API\n• Tích hợp AI, bản đồ realtime, OTP thật\n\n💬 "Tôi muốn xây dựng một ứng dụng mà mọi người Hà Nội đều muốn có trong điện thoại."\n— Kiều Thanh Hải, Founder & CEO'},
-  { keys:['đăng ký shipper','shipper','giao hàng','trở thành shipper','phí shipper','700','500','early bird'], q:'Đăng ký Shipper như thế nào?', a:'🛵 Đăng ký Shipper CRABOR:\n\n1️⃣ Vào /register → chọn "Shipper"\n2️⃣ Nhập thông tin + upload giấy tờ\n3️⃣ Thanh toán phí kích hoạt\n4️⃣ Tự động duyệt sau khi thanh toán\n\n💰 Gói phí:\n• ⚡ Early Bird: 500.000đ (hoàn tiền sau 1.000 đơn)\n• 🛵 Standard: 700.000đ\n\n📱 Thu nhập 20.000–50.000đ/đơn, nhận 70% phí giao'},
-];
-const _pageCtx = (()=>{ const p = location.pathname; if(p.includes('register')) return 'register'; if(p.includes('partner')) return 'partner'; if(p.includes('sales')) return 'sales'; if(p.includes('shipper')) return 'shipper'; if(p.includes('admin')) return 'admin'; return 'customer'; })();
-const _QUICK = { customer: ['CRABOR là gì?','Theo dõi đơn?','Điểm tích lũy?','Hoàn tiền?'], shipper: ['Đăng ký Shipper?','Thu nhập bao nhiêu?','Hạng Shipper?','Liên hệ?'], partner: ['Đăng ký đối tác?','Hoa hồng bao nhiêu?','Điều khoản?','Liên hệ?'], sales: ['CTV kiếm tiền?','Mã giới thiệu?','Hoàn tiền?','Liên hệ?'], register: ['Đăng ký Shipper?','Đăng ký đối tác?','Phí bao nhiêu?','Liên hệ?'], admin: ['CRABOR là gì?','Ai sáng lập?','Điều khoản?','Liên hệ?'], default: ['CRABOR là gì?','Ai là người sáng lập?','Dịch vụ gì?','Liên hệ?'] };
-const _welcomes = { customer:'👋 Xin chào! Tôi có thể giúp gì cho bạn hôm nay?', shipper:'🛵 Xin chào Shipper! Cần hỗ trợ gì không?', partner:'🤝 Xin chào Đối tác! Tôi có thể giúp gì cho bạn?', sales:'🎯 Xin chào CTV! Hỏi tôi về chương trình Sales nhé!', register:'🦀 Chào mừng đến CRABOR! Bạn muốn đăng ký vai trò nào?', admin:'👋 Xin chào Admin! Cần hỗ trợ gì không?', default:'🦀 Xin chào! Hỏi tôi bất cứ điều gì về CRABOR nhé!' };
-function findAnswer(input) { const q = input.toLowerCase(); for (const item of FAQ) { if (item.keys.some(k => q.includes(k))) return item; } const words = q.split(/\s+/).filter(w => w.length > 2); let best = null, bestScore = 0; for (const item of FAQ) { const score = item.keys.reduce((s,k) => s + (words.some(w => k.includes(w) || w.includes(k.split(' ')[0])) ? 1 : 0), 0); if (score > bestScore) { bestScore = score; best = item; } } return bestScore > 0 ? best : null; }
-let _cbOpen = false;
-function _cbGetMsgs() { return document.getElementById('crabotMsgs'); }
-function _cbGetInput() { return document.getElementById('crabotInput'); }
-function _cbAppendMsg(role, text) { const el = _cbGetMsgs(); if (!el) return; const div = document.createElement('div'); div.className = 'cmsg ' + role; if (role === 'bot') { div.innerHTML = '<span class="cmsg-icon">🦀</span><div class="cmsg-bubble">' + text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>') + '</div>'; } else { div.textContent = text; } el.appendChild(div); el.scrollTop = el.scrollHeight; }
-function _cbSetChips(chips) { const el = document.getElementById('crabotQuick'); if (!el) return; el.innerHTML = (chips||[]).map(q => '<button class="cb-qbtn" onclick="crabotAsk(\'' + q.replace(/'/g, "\\'") + '\')">' + q + '</button>').join(''); }
-function toggleCrabot() { _cbOpen = !_cbOpen; var win = document.getElementById('crabotWindow'); if (win) win.classList.toggle('open', _cbOpen); const badge = document.getElementById('crabotBadge'); if (badge) badge.style.display = 'none'; if (_cbOpen) _cbGetInput()?.focus(); }
-function crabotAsk(q) { const inp = _cbGetInput(); if (inp) { inp.value = q; crabotSend(); } }
-function crabotSend() { const inp = _cbGetInput(); const text = (inp?.value || '').trim(); if (!text) return; inp.value = ''; _cbSetChips([]); _cbAppendMsg('user', text); setTimeout(() => { const match = findAnswer(text); if (match) { _cbAppendMsg('bot', match.a); _cbSetChips(FAQ.filter(f => f !== match).slice(0,3).map(f => f.q)); } else { _cbAppendMsg('bot', '🤔 Tôi chưa có câu trả lời cho câu hỏi này.\n\nBạn thử:\n• Gửi email support@crabor.vn\n• Dùng nút 🚨 SOS trong app\n• Hỏi lại với từ khóa khác nhé!'); _cbSetChips(_QUICK[_pageCtx] || _QUICK.default); } }, 350); }
-document.addEventListener('DOMContentLoaded', () => { setTimeout(() => { _cbAppendMsg('bot', _welcomes[_pageCtx] || _welcomes.default); _cbSetChips(_QUICK[_pageCtx] || _QUICK.default); }, 600); });
 
 // Auto-refresh
 setInterval(() => { if (currentUser) loadStats(); }, 30000);
@@ -3006,44 +2987,9 @@ setInterval(() => { if (currentUser) loadStats(); }, 30000);
 .sth-btn { padding:7px 14px; border-radius:50px; border:1.5px solid rgba(232,80,74,.25); background:rgba(232,80,74,.06); color:var(--cream,#333); font-size:.78rem; font-weight:800; cursor:pointer; font-family:inherit; transition:.15s; white-space:nowrap; }
 .sth-btn:hover { background:rgba(232,80,74,.18); border-color:#E8504A; }
 .sth-btn.active { background:#E8504A; color:#fff; border-color:#E8504A; }
-.crabot-fab{position:fixed;bottom:80px;right:16px;z-index:8500;width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#E8504A,#c93d37);border:none;color:#fff;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 16px rgba(232,80,74,.5);display:flex;align-items:center;justify-content:center;transition:transform .2s}
-.crabot-fab:hover{transform:scale(1.1)}
-.crabot-fab .cb-badge{position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:#27ae60;border-radius:50%;font-size:.6rem;color:#fff;border:2px solid #fff;display:none;align-items:center;justify-content:center;font-weight:900}
-.crabot-window{position:fixed;bottom:140px;right:16px;width:340px;max-height:480px;background:#fff;border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:8500;display:none;flex-direction:column;overflow:hidden;animation:cbSlide .25s ease}
-@keyframes cbSlide{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-.crabot-window.open{display:flex}
-.cb-head{background:linear-gradient(135deg,#E8504A,#c93d37);padding:12px 14px;display:flex;align-items:center;gap:10px}
-.cb-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
-.cb-head-info{flex:1}
-.cb-head-name{color:#fff;font-weight:900;font-size:.9rem}
-.cb-head-status{color:rgba(255,255,255,.8);font-size:.7rem}
-.cb-close{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center}
-.cb-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#f8f8f8;min-height:200px;max-height:320px}
-.cb-msgs::-webkit-scrollbar{width:3px}
-.cb-msgs::-webkit-scrollbar-thumb{background:rgba(232,80,74,.3);border-radius:3px}
-.cmsg{max-width:82%;padding:9px 12px;border-radius:14px;font-size:.82rem;line-height:1.5;font-weight:600}
-.cmsg.bot{background:#fff;color:#333;align-self:flex-start;border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.1);display:flex;gap:8px;align-items:flex-start}
-.cmsg.bot .cmsg-icon{font-size:1rem;flex-shrink:0;margin-top:1px}
-.cmsg.bot .cmsg-bubble{flex:1}
-.cmsg.user{background:linear-gradient(135deg,#E8504A,#c93d37);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
-.cb-quick{display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border-top:1px solid #f0f0f0;background:#fff}
-.cb-qbtn{background:rgba(232,80,74,.08);border:1px solid rgba(232,80,74,.2);color:#E8504A;border-radius:50px;padding:4px 10px;font-size:.7rem;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;transition:.15s}
-.cb-qbtn:hover{background:rgba(232,80,74,.18)}
-.cb-input-row{padding:8px 10px;border-top:1px solid #eee;display:flex;gap:8px;align-items:center;background:#fff}
-.cb-input{flex:1;border:1.5px solid #eee;border-radius:50px;padding:8px 12px;font-family:inherit;font-size:.82rem;outline:none;color:#333}
-.cb-input:focus{border-color:#E8504A}
-.cb-send{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#E8504A,#c93d37);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
-.cb-send:disabled{opacity:.5;cursor:not-allowed}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 </style>
 
-<button class="crabot-fab" id="crabotFab" onclick="toggleCrabot()">🦀<div class="cb-badge" id="crabotBadge"></div></button>
-<div class="crabot-window" id="crabotWindow">
-  <div class="cb-head"><div class="cb-avatar">🦀</div><div class="cb-head-info"><div class="cb-head-name">CRABOR Assistant</div><div class="cb-head-status">🟢 Luôn sẵn sàng hỗ trợ</div></div><button class="cb-close" onclick="toggleCrabot()">✕</button></div>
-  <div class="cb-msgs" id="crabotMsgs"><div class="cmsg bot"><span class="cmsg-icon">🦀</span><div class="cmsg-bubble">Xin chào! Tôi là CRABOR Assistant 🦀<br>Tôi có thể giúp bạn tìm hiểu về CRABOR, hướng dẫn đăng ký, hoặc trả lời bất kỳ câu hỏi nào!</div></div></div>
-  <div class="cb-quick" id="crabotQuick"></div>
-  <div class="cb-input-row"><input class="cb-input" id="crabotInput" placeholder="Nhập câu hỏi..." onkeydown="if(event.key==='Enter')crabotSend()"><button class="cb-send" id="crabotSendBtn" onclick="crabotSend()">➤</button></div>
-</div>
 
 
   <!-- Coco AI Widget v2 (Groq-powered) -->
