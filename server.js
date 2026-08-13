@@ -2095,17 +2095,19 @@ app.post("/api/upload-doc", async (req, res) => {
     if (Buffer.byteLength(data, 'utf8') > 1.5 * 1024 * 1024)
       return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 1.5MB), vui lòng nén lại" });
 
-    // Lưu base64 trực tiếp vào MongoDB
+    const uploaded = await uploadImageToCloudinary(data, "docs");
+
+    // Lưu vào MongoDB (URL Cloudinary — hoặc base64 nếu chưa cấu hình)
     const Model = getModelByType(type);
     if (!Model) return res.status(400).json({ success: false, message: "Loại không hợp lệ" });
 
     const update = {};
-    update["documents." + field] = data;
+    update["documents." + field] = uploaded;
 
     const doc = await Model.findOneAndUpdate({ registerId }, { $set: update }, { new: true });
     if (!doc) return res.status(404).json({ success: false, message: "Không tìm thấy hồ sơ" });
 
-    res.json({ success: true, url: data });
+    res.json({ success: true, url: uploaded });
   } catch(err) {
     console.error("[upload-doc]", err.message);
     res.status(500).json({ success: false, message: "Upload thất bại: " + err.message });
@@ -2451,15 +2453,16 @@ app.post("/api/orders/:id/delivery-photo", async (req, res) => {
   try {
     const { photo } = req.body; // base64
     if (!photo) return res.status(400).json({ success: false, message: "Thiếu ảnh" });
+    const photoUp = await uploadImageToCloudinary(photo, "orders");
     const order = await Order.findOneAndUpdate(
       { orderId: req.params.id },
-      { deliveryPhoto: photo, status: "delivered", deliveredAt: new Date() },
+      { deliveryPhoto: photoUp, status: "delivered", deliveredAt: new Date() },
       { new: true }
     );
     if (!order) return res.status(404).json({ success: false });
     // Broadcast
-    req.io.to(`order_${order.orderId}`).emit("orderStatusChanged", { orderId: order.orderId, status: "delivered", photo });
-    req.io.to(`customer_${order.customerId}`).emit("orderStatusChanged", { orderId: order.orderId, status: "delivered", photo });
+    req.io.to(`order_${order.orderId}`).emit("orderStatusChanged", { orderId: order.orderId, status: "delivered", photo: photoUp });
+    req.io.to(`customer_${order.customerId}`).emit("orderStatusChanged", { orderId: order.orderId, status: "delivered", photo: photoUp });
     req.io.to("admin").emit("orderUpdated", { orderId: order.orderId, status: "delivered" });
     notifyDiscord("delivered", order);
     // processReferralReward
@@ -3164,10 +3167,11 @@ app.post("/api/partner/featured/request", async (req, res) => {
     if (partner.featured && partner.featuredUntil && new Date(partner.featuredUntil) > new Date())
       return res.status(400).json({ success:false, message:"Quán đang trong thời gian nổi bật" });
 
+    const bannerImageUp = await uploadImageToCloudinary(bannerImage, "banners");
     const request = await FeaturedRequest.create({
       partnerId: partner._id,
       partnerName: partner.bizName || partner.fullName || "Quán",
-      bannerImage,
+      bannerImage: bannerImageUp,
       bannerVertical,
       hours: pkg.hours,
       amount: pkg.price,
@@ -3411,7 +3415,10 @@ app.get("/api/admin/banners", adminAuth, async (req, res) => {
 // POST /api/admin/banners — Admin: tạo banner mới (từ AI hoặc thủ công)
 app.post("/api/admin/banners", adminAuth, async (req, res) => {
   try {
-    const banner = await AIBanner.create(req.body);
+    const body = { ...req.body };
+    if (typeof body.imageUrl === "string" && body.imageUrl.startsWith("data:image"))
+      body.imageUrl = await uploadImageToCloudinary(body.imageUrl, "banners");
+    const banner = await AIBanner.create(body);
     // Broadcast realtime tới tất cả customer
     req.io.to("customer_broadcast").emit("bannersUpdated", { action: "add", bannerId: banner._id });
     res.json({ success: true, data: banner });
@@ -3421,7 +3428,10 @@ app.post("/api/admin/banners", adminAuth, async (req, res) => {
 // PATCH /api/admin/banners/:id — Admin: cập nhật banner
 app.patch("/api/admin/banners/:id", adminAuth, async (req, res) => {
   try {
-    const banner = await AIBanner.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const body = { ...req.body };
+    if (typeof body.imageUrl === "string" && body.imageUrl.startsWith("data:image"))
+      body.imageUrl = await uploadImageToCloudinary(body.imageUrl, "banners");
+    const banner = await AIBanner.findByIdAndUpdate(req.params.id, body, { new: true });
     req.io.to("customer_broadcast").emit("bannersUpdated", { action: "update", bannerId: banner._id });
     res.json({ success: true, data: banner });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
@@ -5907,8 +5917,8 @@ app.patch("/api/partner/profile", async (req, res) => {
     ];
 
     const update = {};
-    if (avatar !== undefined) update.avatar = avatar;
-    if (coverImage !== undefined) update.coverImage = coverImage;
+    if (avatar !== undefined) update.avatar = await uploadImageToCloudinary(avatar, "avatar");
+    if (coverImage !== undefined) update.coverImage = await uploadImageToCloudinary(coverImage, "shop");
     if (bizName !== undefined) update.bizName = bizName;
     if (description !== undefined) update.description = description;
     if (openTime !== undefined) update.openTime = openTime;
@@ -5941,7 +5951,7 @@ app.patch("/api/shipper/vehicle", async (req, res) => {
     if (vehicleImg && vehicleImg.startsWith('data:image')) {
       if (Buffer.byteLength(vehicleImg, 'utf8') > 1.5 * 1024 * 1024)
         return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 1.5MB)" });
-      update['documents.vehicleImg'] = vehicleImg;
+      update['documents.vehicleImg'] = await uploadImageToCloudinary(vehicleImg, "docs");
     }
     const shipper = await Shipper.findByIdAndUpdate(req.session.shipperId, { $set: update }, { new: true })
       .select("fullName phone vehiclePlate documents");
@@ -5966,11 +5976,17 @@ app.post("/api/shipper/verify-identity", async (req, res) => {
     if (images.some(img => !String(img).startsWith('data:image') || Buffer.byteLength(img, 'utf8') > 1.5 * 1024 * 1024))
       return res.status(400).json({ success: false, message: "Ảnh không hợp lệ (cần dạng base64 data URL, tối đa 1.5MB mỗi ảnh)" });
 
+    const [cccdFrontUp, cccdBackUp, selfieUp] = await Promise.all([
+      uploadImageToCloudinary(cccdFront, "docs"),
+      uploadImageToCloudinary(cccdBack, "docs"),
+      uploadImageToCloudinary(selfie, "docs"),
+    ]);
+
     await Shipper.findByIdAndUpdate(req.session.shipperId, {
       $set: {
-        'documents.cccdFront': cccdFront,
-        'documents.cccdBack':  cccdBack,
-        'documents.selfie':    selfie,
+        'documents.cccdFront': cccdFrontUp,
+        'documents.cccdBack':  cccdBackUp,
+        'documents.selfie':    selfieUp,
         identityStatus: 'submitted',
         identitySubmittedAt: new Date(),
         identityVerified: false,
@@ -6046,7 +6062,8 @@ app.patch("/api/shipper/profile", async (req, res) => {
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa xác thực" });
     const { avatar } = req.body;
     if (!avatar) return res.status(400).json({ success: false, message: "Thiếu avatar" });
-    const shipper = await Shipper.findByIdAndUpdate(req.session.shipperId, { $set: { avatar } }, { new: true })
+    const avatarUp = await uploadImageToCloudinary(avatar, "avatar");
+    const shipper = await Shipper.findByIdAndUpdate(req.session.shipperId, { $set: { avatar: avatarUp } }, { new: true })
       .select("fullName phone avatar vehiclePlate");
     if (!shipper) return res.status(404).json({ success: false });
     console.log('[PATCH /shipper/profile] avatar updated for', shipper.phone);
@@ -6056,26 +6073,27 @@ app.patch("/api/shipper/profile", async (req, res) => {
   }
 });
 
-// POST /api/upload/image — Upload ảnh chung (partner/shipper, authenticated)
-// Body: { data: "data:image/...", folder: "menu"|"shop"|"avatar" }
-app.post("/api/upload/image", async (req, res) => {
+// ── CLOUDINARY UPLOAD HELPER (mọi ảnh base64 → URL https Cloudinary) ─────────
+// Nếu chưa cấu hình CLOUDINARY_* trong .env → giữ nguyên base64 (không vỡ luồng).
+async function uploadImageToCloudinary(data, folder = "misc") {
+  if (typeof data !== "string" || !data || data === "pending_upload") return data;
+  if (!data.startsWith("data:image")) return data; // URL sẵn có / PDF / rỗng → giữ nguyên
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey    = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) {
+    if (!uploadImageToCloudinary._warned) {
+      uploadImageToCloudinary._warned = true;
+      console.warn("[Cloudinary] Chưa cấu hình CLOUDINARY_* → giữ ảnh base64 trong MongoDB");
+    }
+    return data;
+  }
   try {
-    const { data, folder = "misc" } = req.body;
-    if (!data || !data.startsWith('data:image'))
-      return res.status(400).json({ success: false, message: "Dữ liệu ảnh không hợp lệ" });
-    if (Buffer.byteLength(data, 'utf8') > 8 * 1024 * 1024)
-      return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 8MB)" });
-
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-    const apiKey    = process.env.CLOUDINARY_API_KEY;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
-    if (!cloudName || !apiKey || !apiSecret)
-      return res.status(500).json({ success: false, message: "Chưa cấu hình Cloudinary" });
-
     const timestamp = Math.floor(Date.now() / 1000);
-    const cdnFolder = "crabor_" + folder;
-    const sigStr    = "folder=" + cdnFolder + "&timestamp=" + timestamp + apiSecret;
-    const signature = crypto.createHash('sha1').update(sigStr).digest('hex');
+    const cdnFolder = "crabor_" + (folder || "misc");
+    const signature = crypto.createHash("sha1")
+      .update("folder=" + cdnFolder + "&timestamp=" + timestamp + apiSecret)
+      .digest("hex");
 
     const params = new URLSearchParams();
     params.append('file',      data);
@@ -6089,9 +6107,37 @@ app.post("/api/upload/image", async (req, res) => {
       params.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, maxContentLength: 20 * 1024 * 1024, maxBodyLength: 20 * 1024 * 1024, timeout: 30000 }
     );
-    const secureUrl = cdnResp.data.secure_url;
-    if (!secureUrl) throw new Error("Cloudinary không trả URL");
-    res.json({ success: true, url: secureUrl });
+    const url = cdnResp.data.secure_url;
+    if (!url) throw new Error("Cloudinary không trả URL");
+    return url;
+  } catch (err) {
+    console.error("[Cloudinary] upload thất bại (" + folder + "):", err.message);
+    return data;
+  }
+}
+
+// Upload đồng thời nhiều field (vd documents) → {key: URL-or-giữ-base64}
+async function uploadImageFields(fields, folder = "docs") {
+  if (!fields || typeof fields !== "object") return fields || {};
+  const entries = await Promise.all(
+    Object.entries(fields).map(async ([k, v]) => [k, await uploadImageToCloudinary(v, folder)])
+  );
+  return Object.fromEntries(entries);
+}
+
+// POST /api/upload/image — Upload ảnh chung (partner/shipper, authenticated)
+// Body: { data: "data:image/...", folder: "menu"|"shop"|"avatar" }
+app.post("/api/upload/image", async (req, res) => {
+  try {
+    const { data, folder = "misc" } = req.body;
+    if (!data || !data.startsWith('data:image'))
+      return res.status(400).json({ success: false, message: "Dữ liệu ảnh không hợp lệ" });
+    if (Buffer.byteLength(data, 'utf8') > 8 * 1024 * 1024)
+      return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 8MB)" });
+
+    const url = await uploadImageToCloudinary(data, folder);
+    if (!url || url === data) throw new Error("Chưa cấu hình Cloudinary hoặc upload thất bại");
+    res.json({ success: true, url });
   } catch (err) {
     console.error("[upload/image]", err.message);
     res.status(500).json({ success: false, message: "Upload thất bại: " + err.message });
@@ -6838,7 +6884,7 @@ app.post("/api/shipper/register", async (req, res) => {
     const ebCount = await Shipper.countDocuments({ plan: "early_bird" });
     const plan = ebCount < ebMax ? "early_bird" : "standard";
 
-    const documents = req.body.documents || {};
+    const documents = await uploadImageFields(req.body.documents || {}, "docs");
     const shipper = await Shipper.create({
       phone, firstName, lastName, email, dob, address, district, vehicle,
       plan, fee: plan === "early_bird" ? 500000 : 700000,
@@ -6905,7 +6951,7 @@ app.post("/api/partner/menu", async (req, res) => {
       category: category?.trim() || "Khác",
       description: description?.trim() || "",
       available: available !== false,
-      image: image || "",
+      image: (await uploadImageToCloudinary(image, "menu")) || "",
     });
     await notifyUser('partner', partner._id, {
       type: 'product', title: '🍽️ Món mới đã thêm',
@@ -6921,9 +6967,11 @@ app.patch("/api/partner/menu/:id", async (req, res) => {
   try {
     const partner = await getSessionFoodPartner(req);
     if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const body = { ...req.body };
+    if (body.image) body.image = await uploadImageToCloudinary(body.image, "menu");
     const item = await Product.findOneAndUpdate(
       { _id: req.params.id, partnerId: partner._id },
-      req.body, { new: true }
+      body, { new: true }
     );
     if (!item) return res.status(404).json({ success:false, message:"Không tìm thấy món" });
     res.json({ success: true, item });
@@ -7007,8 +7055,9 @@ app.patch("/api/partner/banner", async (req, res) => {
     if (!partner) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
     const { coverImage } = req.body || {};
     if (!coverImage || coverImage.length < 50) return res.status(400).json({ success: false, message: "Thiếu ảnh banner" });
-    await FoodPartner.findByIdAndUpdate(partner._id, { coverImage });
-    res.json({ success: true, coverImage });
+    const coverUp = await uploadImageToCloudinary(coverImage, "shop");
+    await FoodPartner.findByIdAndUpdate(partner._id, { coverImage: coverUp });
+    res.json({ success: true, coverImage: coverUp });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -7280,7 +7329,7 @@ app.post("/api/partner/register", async (req, res) => {
       phone: normPhone, firstName: safeFirstName, lastName: safeLastName,
       email: safeEmail, address: address || req.body.address || "Chưa cập nhật",
       district: safeDistrict,
-      refCode: refCode?.toUpperCase(), documents: req.body.documents || {},
+      refCode: refCode?.toUpperCase(), documents: await uploadImageFields(req.body.documents || {}, "docs"),
     };
     let data = { ...base };
 
@@ -9843,15 +9892,17 @@ app.post("/api/admin/registrations/:type/:id/upload-doc", adminAuth, async (req,
     if (Buffer.byteLength(data, 'utf8') > 1.5 * 1024 * 1024)
       return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 1.5MB)" });
 
-    // Lưu base64 trực tiếp vào MongoDB bằng _id
+    const uploaded = await uploadImageToCloudinary(data, "docs");
+
+    // Lưu vào MongoDB bằng _id (URL Cloudinary — hoặc base64 nếu chưa cấu hình)
     const Model = getModelByType(type);
     if (!Model) return res.status(400).json({ success: false, message: "Loại không hợp lệ" });
     const update = {};
-    update["documents." + field] = data;
+    update["documents." + field] = uploaded;
     const doc = await Model.findByIdAndUpdate(id, { $set: update }, { new: true });
     if (!doc) return res.status(404).json({ success: false, message: "Không tìm thấy hồ sơ" });
 
-    res.json({ success: true, url: data, field });
+    res.json({ success: true, url: uploaded, field });
   } catch(err) {
     console.error("[admin upload-doc]", err.message);
     res.status(500).json({ success: false, message: "Upload thất bại: " + err.message });
