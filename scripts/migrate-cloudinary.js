@@ -26,26 +26,26 @@ const TARGETS = [
   ...["cccdFront","cccdBack","selfie","shopFront","shopInside","vehicleImg","productSample","importDoc","licenseImg","driverLicense","vehicleReg"]
     .map(d => ({ coll: "shippers", path: "documents." + d, folder: "docs" })),
   ...["cccdFront","cccdBack","selfie","shopFront","shopInside","vehicleImg","productSample","importDoc","licenseImg","driverLicense","vehicleReg"]
-    .map(d => ({ coll: "foodpartners", path: "documents." + d, folder: "docs" })),
+    .map(d => ({ coll: "food_partners", path: "documents." + d, folder: "docs" })),
   ...["cccdFront","cccdBack","selfie","shopFront","shopInside","vehicleImg","productSample","importDoc","licenseImg","driverLicense","vehicleReg"]
-    .map(d => ({ coll: "giatlas", path: "documents." + d, folder: "docs" })),
+    .map(d => ({ coll: "giatla_partners", path: "documents." + d, folder: "docs" })),
   ...["cccdFront","cccdBack","selfie","shopFront","shopInside","vehicleImg","productSample","importDoc","licenseImg","driverLicense","vehicleReg"]
-    .map(d => ({ coll: "giupviecs", path: "documents." + d, folder: "docs" })),
+    .map(d => ({ coll: "giupviec_partners", path: "documents." + d, folder: "docs" })),
   ...["cccdFront","cccdBack","selfie","shopFront","shopInside","vehicleImg","productSample","importDoc","licenseImg","driverLicense","vehicleReg"]
-    .map(d => ({ coll: "chinaships", path: "documents." + d, folder: "docs" })),
+    .map(d => ({ coll: "chinashop_partners", path: "documents." + d, folder: "docs" })),
   ...["cccdFront","cccdBack","selfie","shopFront","shopInside","vehicleImg","productSample","importDoc","licenseImg","driverLicense","vehicleReg"]
-    .map(d => ({ coll: "ridedrivers", path: "documents." + d, folder: "docs" })),
+    .map(d => ({ coll: "ride_drivers", path: "documents." + d, folder: "docs" })),
   { coll: "shippers", path: "avatar", folder: "avatar" },
-  { coll: "foodpartners", path: "avatar", folder: "avatar" },
-  { coll: "giatlas", path: "avatar", folder: "avatar" },
-  { coll: "giupviecs", path: "avatar", folder: "avatar" },
-  { coll: "chinaships", path: "avatar", folder: "avatar" },
-  { coll: "foodpartners", path: "coverImage", folder: "shop" },
-  { coll: "giatlas", path: "coverImage", folder: "shop" },
-  { coll: "giupviecs", path: "coverImage", folder: "shop" },
-  { coll: "chinaships", path: "coverImage", folder: "shop" },
-  { coll: "foodpartners", path: "featuredBanner", folder: "banners" },
-  { coll: "foodpartners", path: "featuredBannerVertical", folder: "banners" },
+  { coll: "food_partners", path: "avatar", folder: "avatar" },
+  { coll: "giatla_partners", path: "avatar", folder: "avatar" },
+  { coll: "giupviec_partners", path: "avatar", folder: "avatar" },
+  { coll: "chinashop_partners", path: "avatar", folder: "avatar" },
+  { coll: "food_partners", path: "coverImage", folder: "shop" },
+  { coll: "giatla_partners", path: "coverImage", folder: "shop" },
+  { coll: "giupviec_partners", path: "coverImage", folder: "shop" },
+  { coll: "chinashop_partners", path: "coverImage", folder: "shop" },
+  { coll: "food_partners", path: "featuredBanner", folder: "banners" },
+  { coll: "food_partners", path: "featuredBannerVertical", folder: "banners" },
   { coll: "products", path: "image", folder: "menu" },
   { coll: "orders", path: "deliveryPhoto", folder: "orders" },
   { coll: "aibanners", path: "imageUrl", folder: "banners" },
@@ -110,6 +110,7 @@ async function main() {
         const value = getPath(doc, t.path);
         if (typeof value !== "string" || !value.startsWith("data:image")) continue;
         if (Buffer.byteLength(value, "utf8") > 9 * 1024 * 1024) { skipped++; continue; }
+        if (DRY_RUN) { changed = true; uploaded++; totalUploaded++; continue; }
         const url = await uploadOne(value, t.folder);
         setPath(doc, t.path, url);
         changed = true;
