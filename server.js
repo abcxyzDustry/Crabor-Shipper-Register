@@ -1068,6 +1068,18 @@ const aiBannerSchema = new mongoose.Schema({
 const AIBanner = mongoose.model("AIBanner", aiBannerSchema);
 
 
+// ── AUTO FEATURE STATE — tự chọn "quán nổi bật" mỗi 48h ──
+const featureStateSchema = new mongoose.Schema({
+  key:                 { type: String, unique: true, default: "auto_feature" },
+  status:              { type: String, enum: ["idle", "in_progress"], default: "idle" },
+  lastRunAt:           Date,
+  nextRunAt:           Date,
+  selectedPartnerId:   mongoose.Schema.Types.ObjectId,
+  selectedAt:          Date,
+}, { timestamps: true });
+const FeatureState = mongoose.model("FeatureState", featureStateSchema, "featurestate");
+
+
 // ── SUPPORT TICKET ────────────────────────────
 const supportTicketSchema = new mongoose.Schema({
   userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -3361,6 +3373,171 @@ app.post("/api/admin/featured-requests/:id/reject", adminAuth, async (req, res) 
     });
     res.json({ success:true, message:"Đã từ chối yêu cầu" });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+
+// ═══════════════════════════════════════════════════════════
+//  AUTO "QUÁN NỔI BẬT" — mỗi 48h tự động chọn + tạo banner
+// ═══════════════════════════════════════════════════════════
+const AUTO_FEATURE_HOURS = 48;
+
+async function autoFeatureTopDish(partnerId) {
+  try {
+    const dishAgg = await Order.aggregate([
+      { $match: { module: "food", partnerId, status: { $nin: ["cancelled", "refunded"] } } },
+      { $unwind: "$items" },
+      { $group: { _id: { name: "$items.name" }, qty: { $sum: "$items.qty" } } },
+      { $sort: { qty: -1 } },
+      { $limit: 1 },
+    ]);
+    if (dishAgg.length) return dishAgg[0]._id.name;
+    const best = await Product.findOne({ partnerId, available: true }).sort({ sold: -1 });
+    return best ? best.name : null;
+  } catch (err) { return null; }
+}
+
+async function autoFeaturePick() {
+  // Quán có nhiều đánh giá 5★ nhất (chọn ngẫu nhiên nếu hòa)
+  const stars = await Order.aggregate([
+    { $match: { module: "food", status: { $in: ["delivered"] }, ratingPartner: 5 } },
+    { $group: { _id: "$partnerId", stars: { $sum: 1 } } },
+    { $sort: { stars: -1 } },
+  ]);
+  const valid = (stars || []).filter(s => s._id);
+  if (!valid.length) return null;
+  const max = valid[0].stars;
+  const top = valid.filter(s => s.stars === max);
+  const picked = top[Math.floor(Math.random() * top.length)];
+  const partner = await FoodPartner.findOne({ _id: picked._id, status: "approved" });
+  if (!partner) return null;
+  return {
+    partner,
+    fiveStars: max,
+    topDish: await autoFeatureTopDish(partner._id),
+  };
+}
+
+async function autoFeatureSelectionDoc(state) {
+  if (!state || !state.selectedPartnerId) return null;
+  const p = await FoodPartner.findById(state.selectedPartnerId);
+  if (!p) return null;
+  return {
+    partnerId: p._id,
+    bizName: p.bizName,
+    district: p.district,
+    description: p.description,
+    avatar: p.avatar,
+    rating: p.rating || 0,
+    ratingCount: p.ratingCount || 0,
+    topDish: await autoFeatureTopDish(p._id),
+  };
+}
+
+// GET — trạng thái + chọn quán khi đến hạn
+app.get("/api/admin/auto-feature", adminAuth, async (req, res) => {
+  try {
+    const now = new Date();
+    let state = await FeatureState.findOne({ key: "auto_feature" });
+    const due = !state || !state.nextRunAt || now >= new Date(state.nextRunAt);
+
+    if (state && state.status === "in_progress") {
+      const selection = await autoFeatureSelectionDoc(state);
+      if (!selection) {
+        // Quán đã bị xoá/vô hiệu → reset, lịch lại sau 48h
+        state.status = "idle";
+        state.nextRunAt = new Date(now.getTime() + AUTO_FEATURE_HOURS * 3600e3);
+        state.selectedPartnerId = null;
+        state.selectedAt = null;
+        await state.save();
+        return res.json({ success: true, due: false, inProgress: false, nextRunAt: state.nextRunAt });
+      }
+      return res.json({ success: true, due: true, inProgress: true, nextRunAt: state.nextRunAt, selection });
+    }
+    if (!due) {
+      return res.json({ success: true, due: false, inProgress: false, nextRunAt: state && state.nextRunAt });
+    }
+
+    // Đến hạn → chọn quán có nhiều 5★ nhất
+    const picked = await autoFeaturePick();
+    if (!picked) {
+      const next = new Date(now.getTime() + AUTO_FEATURE_HOURS * 3600e3);
+      if (state) { state.nextRunAt = next; await state.save(); }
+      return res.json({ success: true, due: false, inProgress: false, nextRunAt: next, message: "Chưa có quán đủ điều kiện (cần đơn hoàn thành + đánh giá 5★)" });
+    }
+    if (!state) state = new FeatureState({ key: "auto_feature" });
+    state.status = "in_progress";
+    state.selectedPartnerId = picked.partner._id;
+    state.selectedAt = now;
+    await state.save();
+    res.json({
+      success: true, due: true, inProgress: true, nextRunAt: null,
+      selection: {
+        partnerId: picked.partner._id,
+        bizName: picked.partner.bizName,
+        district: picked.partner.district,
+        description: picked.partner.description,
+        avatar: picked.partner.avatar,
+        rating: picked.partner.rating || 0,
+        ratingCount: picked.partner.ratingCount || 0,
+        fiveStars: picked.fiveStars,
+        topDish: picked.topDish,
+      },
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST — hoàn tất (banner đã đăng): gắn nổi bật cho quán, lịch tiếp theo +48h
+app.post("/api/admin/auto-feature/complete", adminAuth, async (req, res) => {
+  try {
+    const state = await FeatureState.findOne({ key: "auto_feature" });
+    if (!state) return res.json({ success: false, message: "Không có tiến trình auto-feature" });
+    const pid = state.selectedPartnerId;
+    const now = new Date();
+    const until = new Date(now.getTime() + AUTO_FEATURE_HOURS * 3600e3);
+    if (pid) {
+      // Xoay vòng: chỉ giữ 1 quán nổi bật tại một thời điểm
+      await FoodPartner.updateMany({ featured: true, _id: { $ne: pid } }, { featured: false });
+      const bannerUrl = req.body && req.body.bannerUrl;
+      await FoodPartner.findByIdAndUpdate(pid, {
+        featured: true,
+        featuredUntil: until,
+        featuredAt: now,
+        featuredHours: AUTO_FEATURE_HOURS,
+        featuredPackage: `Auto nổi bật ${AUTO_FEATURE_HOURS} giờ`,
+        ...(bannerUrl ? { featuredBanner: bannerUrl, featuredBannerVertical: bannerUrl } : {}),
+      });
+      req.io?.to(`partner_${pid}`).emit("featured_approved", { until, hours: AUTO_FEATURE_HOURS });
+      try {
+        await notifyUser('partner', pid, {
+          type: 'featured', title: '✨ Quán của bạn đã nổi bật!',
+          body: `Hệ thống đã tự động chọn quán bạn làm "Quán nổi bật" (${AUTO_FEATURE_HOURS} giờ) nhờ nhiều đánh giá 5★ nhất.`,
+          refModule: 'featured',
+        });
+      } catch (e) {}
+    }
+    state.status = "idle";
+    state.lastRunAt = now;
+    state.nextRunAt = until;
+    state.selectedPartnerId = null;
+    state.selectedAt = null;
+    await state.save();
+    res.json({ success: true, nextRunAt: until });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST — bỏ qua (lỗi tạo ảnh/banner): lịch tiếp theo +48h
+app.post("/api/admin/auto-feature/skip", adminAuth, async (req, res) => {
+  try {
+    const state = await FeatureState.findOne({ key: "auto_feature" });
+    if (state) {
+      state.status = "idle";
+      state.nextRunAt = new Date(Date.now() + AUTO_FEATURE_HOURS * 3600e3);
+      state.selectedPartnerId = null;
+      state.selectedAt = null;
+      await state.save();
+      res.json({ success: true, nextRunAt: state.nextRunAt });
+    } else res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 

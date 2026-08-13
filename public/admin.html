@@ -1790,6 +1790,67 @@ function bootApp() {
   connectSocket();
   loadStats();
   loadTable('shipper');
+  setTimeout(runAutoFeature, 2500);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//   AUTO "QUÁN NỔI BẬT" — mỗi 48h tự chọn quán nhiều 5★ + tạo banner (Puter AI)
+// ─────────────────────────────────────────────────────────────────────────────
+let _autoFeatureDone = false;
+const AUTO_FEATURE_MS = 48 * 3600 * 1000; // 48 giờ
+
+async function runAutoFeature() {
+  if (_autoFeatureDone) return;
+  _autoFeatureDone = true;
+  let st;
+  try {
+    st = await apiFetch('/api/admin/auto-feature');
+    if (!st || !st.success || !st.due || !st.selection) return;
+  } catch (e) { console.error('[autoFeature] trạng thái lỗi', e); return; }
+  const s = st.selection;
+  try {
+    // Chờ puter.js (GPT Image) được tải xong
+    let tries = 0;
+    while (!window.puter && tries < 24) { await new Promise(r => setTimeout(r, 500)); tries++; }
+    const prompt =
+      'Tạo banner nổi bật cho quán "' + (s.bizName || 'Quán') + '"'
+      + (s.district ? ' ở ' + s.district : '')
+      + (s.topDish ? '. Món bán chạy nhất của quán: "' + s.topDish + '"' : '')
+      + (s.fiveStars ? ' — quán đạt ' + s.fiveStars + ' đánh giá 5★.' : '.')
+      + (s.description ? ' Quán này: ' + s.description.slice(0, 140) : '')
+      + ' Hãy làm nổi bật món bán chạy nhất, phong cách hấp dẫn, màu sắc CRABOR.';
+    showNotif('🤖 Auto Quán nổi bật', 'Đang tạo banner cho ' + s.bizName + (s.topDish ? ' — món: ' + s.topDish : ''), 'green');
+    const inp = document.getElementById('aiBannerInput');
+    if (inp) inp.value = prompt;
+    sendAiBannerMsg();
+    // Đợi AI trả BANNER_JSON + sinh ảnh bằng Puter
+    const deadline = Date.now() + 150000;
+    while (Date.now() < deadline) {
+      if (_pendingBanner && _pendingBanner.imageUrl) break;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    if (!_pendingBanner || !_pendingBanner.imageUrl) {
+      await apiFetch('/api/admin/auto-feature/skip', 'POST');
+      showNotif('🤖 Auto nổi bật', 'Không tạo được banner (AI/ảnh lỗi), hẹn lần sau.', 'coral');
+      return;
+    }
+    // Đăng banner cho customer app, hết hạn sau 48h, rồi báo server hoàn tất
+    _pendingBanner.apps = ['customer'];
+    _pendingBanner.ctaLink = '/customer';
+    const exp = document.getElementById('bppExpiry');
+    if (exp && !exp.value) exp.value = new Date(Date.now() + AUTO_FEATURE_MS).toISOString().slice(0, 16);
+    const cta = document.getElementById('bppCtaLink');
+    if (cta) cta.value = '/customer';
+    const posted = await publishBanner();
+    const completeRes = await apiFetch('/api/admin/auto-feature/complete', 'POST', { bannerUrl: posted ? posted.imageUrl : null });
+    if (completeRes && completeRes.success) {
+      showNotif('✨ Quán nổi bật', 'Hệ thống đã tự chọn ' + s.bizName + ' làm Quán nổi bật 48h (nhiều 5★ nhất).', 'green');
+    }
+  } catch (e) {
+    console.error('[autoFeature] lỗi', e);
+    try { await apiFetch('/api/admin/auto-feature/skip', 'POST'); } catch (_) {}
+    showNotif('🤖 Auto nổi bật', 'Tạm dừng, đợi lần sau.', 'coral');
+  }
 }
 
 const saved = localStorage.getItem('craborAdmin');
@@ -2763,7 +2824,7 @@ function toggleBannerApp(app) {
 }
 function discardBannerPreview() { _pendingBanner = null; renderAppChips(); const area = document.getElementById('bppPreviewArea'); if(area) area.innerHTML = `<div class="bpp-empty"><div class="bpp-empty-icon">🎨</div><div style="font-weight:800;font-size:.88rem;margin-bottom:6px">Banner đã bị hủy</div><div style="font-size:.78rem">Chat để tạo banner mới</div></div>`; const meta = document.getElementById('bppMeta'); if(meta) meta.style.display = 'none'; const pub = document.getElementById('bppPublishBtn'); if(pub) pub.disabled = true; const disc = document.getElementById('bppDiscardBtn'); if(disc) disc.style.display = 'none'; }
 async function publishBanner() {
-  if (!_pendingBanner) return;
+  if (!_pendingBanner) return null;
   const publishBtn = document.getElementById('bppPublishBtn');
   if(publishBtn) { publishBtn.disabled = true; publishBtn.textContent = '⏳ Đang đăng...'; }
   const expiry = document.getElementById('bppExpiry')?.value;
@@ -2771,9 +2832,9 @@ async function publishBanner() {
   try {
     const payload = { ..._pendingBanner, apps: Array.isArray(_pendingBanner.apps) && _pendingBanner.apps.length ? _pendingBanner.apps : ['customer'], imageStyle: _bannerStyle, ctaLink, active: true, expiresAt: expiry ? new Date(expiry) : null };
     const r = await apiFetch('/api/admin/banners', 'POST', payload);
-    if (r.success) { showNotif('🚀 Banner đã được đăng!', 'Đang hiển thị cho khách hàng realtime', 'green'); _appendAiMsg('bot', `✅ <strong>Banner đã được đăng thành công!</strong><br>Khách hàng sẽ thấy ngay lập tức trên app. Muốn tạo banner khác không? 😊`); discardBannerPreview(); loadActiveBanners(); }
-    else { showNotif('❌ Lỗi', r.message || 'Không đăng được banner'); if(publishBtn) { publishBtn.disabled = false; publishBtn.textContent = '🚀 Đăng banner'; } }
-  } catch(e) { showNotif('❌ Lỗi kết nối', e.message); if(publishBtn) { publishBtn.disabled = false; publishBtn.textContent = '🚀 Đăng banner'; } }
+    if (r.success) { showNotif('🚀 Banner đã được đăng!', 'Đang hiển thị cho khách hàng realtime', 'green'); _appendAiMsg('bot', `✅ <strong>Banner đã được đăng thành công!</strong><br>Khách hàng sẽ thấy ngay lập tức trên app. Muốn tạo banner khác không? 😊`); discardBannerPreview(); loadActiveBanners(); return r.data || null; }
+    else { showNotif('❌ Lỗi', r.message || 'Không đăng được banner'); if(publishBtn) { publishBtn.disabled = false; publishBtn.textContent = '🚀 Đăng banner'; } return null; }
+  } catch(e) { showNotif('❌ Lỗi kết nối', e.message); if(publishBtn) { publishBtn.disabled = false; publishBtn.textContent = '🚀 Đăng banner'; } return null; }
 }
 async function loadActiveBanners() {
   const el = document.getElementById('activeBannersList'); const badge = document.getElementById('activeBannerCount');
