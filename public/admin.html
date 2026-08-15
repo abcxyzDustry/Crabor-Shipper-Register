@@ -1670,7 +1670,9 @@ let _aiBannerHistory = [];
 //   UTILITIES
 // ─────────────────────────────────────────────────────────────────────────────
 async function apiFetch(url, method = 'GET', body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY } };
+  const hdrs = { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY };
+  if (window.__ADMIN_APP_KEY__) hdrs['x-app-key'] = window.__ADMIN_APP_KEY__;
+  const opts = { method, headers: hdrs };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(`${API}${url}`, opts);
   if (!r.ok) {
@@ -1757,8 +1759,10 @@ async function doLogin() {
   const errEl = document.getElementById('loginErr');
   errEl.style.display = 'none';
   try {
+    const _appHdrs = { 'Content-Type': 'application/json' };
+    if (window.__ADMIN_APP_KEY__) _appHdrs['x-app-key'] = window.__ADMIN_APP_KEY__;
     const r = await fetch('/api/auth/admin-login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: _appHdrs,
       body: JSON.stringify({ username: u, password: p })
     });
     const d = await r.json();
@@ -1863,7 +1867,7 @@ if (saved) {
 //   SOCKET.IO — REAL-TIME
 // ─────────────────────────────────────────────────────────────────────────────
 function connectSocket() {
-  socket = io();
+  socket = window.__ADMIN_APP_KEY__ ? io({ auth: { appKey: window.__ADMIN_APP_KEY__ } }) : io();
   socket.on('connect', () => {
     socket.emit('joinRoom', 'admin');
     setupSosListener();

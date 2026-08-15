@@ -14,6 +14,7 @@ const nodemailer  = require("nodemailer");
 const { OAuth2Client } = require("google-auth-library");
 const cron = require("node-cron");
 const { Expo } = require("expo-server-sdk");
+const fs = require("fs");
 const expo = new Expo();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -295,6 +296,29 @@ app.use((req, res, next) => {
 // Track requests for Nova SystemHealth
 app.use((req,res,next)=>{ res.on("finish",()=>SystemHealth.recordRequest(res.statusCode>=500)); next(); });
 
+function requireApp(req, res, next) {
+  const key = process.env.ADMIN_APP_KEY || "";
+  if (!key) return next();
+  if (req.headers["x-app-key"] !== key) {
+    return res.status(403).json({ success: false, error: "Invalid app key" });
+  }
+  next();
+}
+
+// Admin app key guard: admin pages/APIs require ADMIN_APP_KEY (desktop app only)
+const ADMIN_APP_KEY = process.env.ADMIN_APP_KEY || "";
+if (ADMIN_APP_KEY) {
+  app.get("/admin.html", (req, res) => {
+    const appKey =
+      (req.headers["x-app-key"] || "") === ADMIN_APP_KEY ||
+      (req.query && req.query.app === ADMIN_APP_KEY);
+    if (!appKey) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
+    const html = fs.readFileSync(path.join(__dirname, "public", "admin.html"), "utf8");
+    return res.send(html);
+  });
+  app.use("/api/admin", requireApp);
+}
+
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -388,6 +412,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("joinRoom", (room) => {
+    if (String(room || "").toLowerCase() === "admin") {
+      const key = process.env.ADMIN_APP_KEY || "";
+      const appKey = socket.handshake && socket.handshake.auth && socket.handshake.auth.appKey;
+      if (key && appKey !== key) return;
+    }
     socket.join(room);
     console.log(`   ↳ ${socket.id} joined [${room}]`);
   });
@@ -6479,7 +6508,7 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 // POST /api/auth/admin-login
-app.post("/api/auth/admin-login", async (req, res) => {
+app.post("/api/auth/admin-login", requireApp, async (req, res) => {
   try {
     const { username, password } = req.body;
     const admin = await Admin.findOne({ username });
@@ -7845,9 +7874,26 @@ app.post("/api/cleaning/order", async (req, res) => {
       req.io.to(`customer_${customerId}`).emit("walletDebited", { amount: amt, orderId: order.orderId });
     }
     let nearbyShippers = [];
-    if (addressLat && addressLng) {
-      try { nearbyShippers = await findNearbyShippers(addressLat, addressLng, 5, 10); } catch(e) {}
-    }
+    try {
+      // Dọn nhà: chỉ gửi cho shipper online + đã mở khoá/nhận đơn dọn nhà
+      // Có GPS → mở rộng bán kính dần; không có GPS → gửi tất cả shipper dọn nhà online
+      if (addressLat && addressLng) {
+        nearbyShippers = await findCleaningShippers(addressLat, addressLng, 5, 10);
+      } else {
+        const q = {
+          status: { $in: ["approved", "active"] },
+          online: true,
+          isAccepting: true,
+          $or: [
+            { "preferences.acceptCleaning": true },
+            { "preferences.cleaningRegistered": true },
+          ],
+        };
+        const allCleaning = await Shipper.find(q).select("_id phone fullName location pushToken walletBalance rating totalOrders").limit(20);
+        const blockedIds = await getCashBlockedShipperIds(allCleaning.map(s => s._id));
+        nearbyShippers = blockedIds.size ? allCleaning.filter(s => !blockedIds.has(String(s._id))) : allCleaning;
+      }
+    } catch(e) {}
     const payload = {
       type: "cleaning_request",
       orderId: order.orderId,
@@ -10524,15 +10570,31 @@ async function findLaundryShippers(lat, lng, baseRadiusKm = 5, limit = 5) {
   return best;
 }
 
+// ── Helper: tìm shipper cho đơn dọn nhà — 5km rồi mở rộng dần ──
+async function findCleaningShippers(lat, lng, baseRadiusKm = 5, limit = 10) {
+  const radii = [baseRadiusKm, Math.round(baseRadiusKm * 2), Math.round(baseRadiusKm * 3), Math.round(baseRadiusKm * 5)];
+  let best = [];
+  for (const r of radii) {
+    const found = await findNearbyShippers(lat, lng, r, limit, false, true);
+    if (found.length) { best = found; break; }
+  }
+  return best;
+}
+
 // ── Helper: find nearby shippers ─────────────────────────────
 // requireLaundry=true → chỉ lấy shipper có preferences.acceptLaundry === true
-async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5, requireLaundry = false) {
+// requireCleaning=true → chỉ lấy shipper đã mở khoá/nhận đơn dọn nhà
+async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5, requireLaundry = false, requireCleaning = false) {
   const query = {
     status: { $in: ["approved", "active"] },
     online: true,
     isAccepting: true,
   };
   if (requireLaundry) query["preferences.acceptLaundry"] = true;
+  if (requireCleaning) query["$or"] = [
+    { "preferences.acceptCleaning": true },
+    { "preferences.cleaningRegistered": true },
+  ];
   const shippers = await Shipper.find(query).select("_id phone fullName location pushToken walletBalance rating totalOrders");
 
   // Loại shipper đang bị chặn vì nợ tiền mặt quá hạn
@@ -10541,17 +10603,15 @@ async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5, requireLaun
 
   const R = 6371;
   const withDistance = active.map(s => {
-    // Nếu shipper có location → tính khoảng cách thực
-    if (s.location?.lat && s.location?.lng) {
-      const dLat = (s.location.lat - lat) * Math.PI / 180;
-      const dLng = (s.location.lng - lng) * Math.PI / 180;
-      const a = Math.sin(dLat/2)**2 +
-        Math.cos(lat * Math.PI/180) * Math.cos(s.location.lat * Math.PI/180) * Math.sin(dLng/2)**2;
-      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return { ...s.toObject(), distKm: Math.round(dist * 10) / 10 };
-    }
     // Shipper không có GPS location → fallback distance = 0 (ưu tiên nhận đơn)
-    return { ...s.toObject(), distKm: 0, noLocation: true };
+    const hasLoc = !!(s.location?.lat && s.location?.lng);
+    if (!lat || !lng || !hasLoc) return { ...s.toObject(), distKm: 0, noLocation: !hasLoc };
+    const dLat = (s.location.lat - lat) * Math.PI / 180;
+    const dLng = (s.location.lng - lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 +
+      Math.cos(lat * Math.PI/180) * Math.cos(s.location.lat * Math.PI/180) * Math.sin(dLng/2)**2;
+    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return { ...s.toObject(), distKm: Math.round(dist * 10) / 10 };
   });
 
   // Nếu có shipper với location trong radius → chỉ lấy họ
