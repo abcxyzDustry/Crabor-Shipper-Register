@@ -7875,25 +7875,37 @@ app.post("/api/cleaning/order", async (req, res) => {
     }
     let nearbyShippers = [];
     try {
-      // Dọn nhà: chỉ gửi cho shipper online + đã mở khoá/nhận đơn dọn nhà
-      // Có GPS → mở rộng bán kính dần; không có GPS → gửi tất cả shipper dọn nhà online
+      // Dọn nhà: ưu tiên shipper online + đã mở khoá/nhận đơn dọn nhà
+      // Có GPS → mở rộng bán kính dần; không có GPS → tìm trong lệnh chung
+      const cleaningQ = {
+        status: { $in: ["approved", "active"] },
+        online: true,
+        isAccepting: true,
+        $or: [
+          { "preferences.acceptCleaning": true },
+          { "preferences.cleaningRegistered": true },
+        ],
+      };
       if (addressLat && addressLng) {
         nearbyShippers = await findCleaningShippers(addressLat, addressLng, 5, 10);
       } else {
-        const q = {
+        const all = await Shipper.find(cleaningQ).select("_id phone fullName location pushToken walletBalance rating totalOrders").limit(20);
+        nearbyShippers = all;
+      }
+      // Fallback: không có shipper dọn nhà online → gửi cho mọi shipper online để không sót đơn
+      if (!nearbyShippers.length) {
+        const anyQ = {
           status: { $in: ["approved", "active"] },
           online: true,
           isAccepting: true,
-          $or: [
-            { "preferences.acceptCleaning": true },
-            { "preferences.cleaningRegistered": true },
-          ],
         };
-        const allCleaning = await Shipper.find(q).select("_id phone fullName location pushToken walletBalance rating totalOrders").limit(20);
-        const blockedIds = await getCashBlockedShipperIds(allCleaning.map(s => s._id));
-        nearbyShippers = blockedIds.size ? allCleaning.filter(s => !blockedIds.has(String(s._id))) : allCleaning;
+        const any = await Shipper.find(anyQ).select("_id phone fullName location pushToken walletBalance rating totalOrders").limit(10);
+        nearbyShippers = any;
+        console.log(`[Cleaning] No cleaning-registered shipper online, fallback dispatch to ${any.length} online shippers`);
       }
-    } catch(e) {}
+      const blockedIds = await getCashBlockedShipperIds(nearbyShippers.map(s => s._id));
+      if (blockedIds.size) nearbyShippers = nearbyShippers.filter(s => !blockedIds.has(String(s._id)));
+    } catch(e) { console.error('[Cleaning] dispatch error:', e.message); }
     const payload = {
       type: "cleaning_request",
       orderId: order.orderId,
