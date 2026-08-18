@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CRABOR — Điểm thưởng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --coral:   #E8504A;
+  --coral2:  #c93d37;
+  --cream:   #F5F0DC;
+  --gold:    #F0B429;
+  --green:   #27ae60;
+  --green2:  #219a52;
+  --bg:      #0f0f18;
+  --card:    #1a1a28;
+  --border:  rgba(245,240,220,.12);
+  --font:    'Nunito', sans-serif;
+  --mono:    'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px 60px;
+  color: var(--cream);
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(232,80,74,.18) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 35% at 80% 80%, rgba(240,180,41,.1) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.header {
+  width: 100%; max-width: 480px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 20px 0 16px;
+  position: relative; z-index: 1;
+}
+.header-logo {
+  width: 40px; height: 40px;
+  background: var(--coral);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.header-title { font-family:'Fredoka One',cursive; font-size:1.4rem; color:var(--cream); }
+.header-sub { font-size:.72rem; color:rgba(245,240,220,.5); font-weight:700; }
+.header-back {
+  margin-left:auto;
+  background:var(--card); border:1px solid var(--border);
+  color:var(--cream); border-radius:50px;
+  padding:8px 16px; font-family:var(--font); font-weight:900; font-size:.78rem;
+  cursor:pointer; text-decoration:none;
+}
+
+.card {
+  width: 100%; max-width: 480px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 24px;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Balance hero ── */
+.balance-card {
+  background: linear-gradient(160deg, #2b2540 0%, var(--card) 55%);
+  text-align: center;
+  padding: 32px 24px 28px;
+}
+.balance-label { font-size:.8rem; color:rgba(245,240,220,.55); font-weight:800; letter-spacing:1px; }
+.balance-pts {
+  font-family: var(--mono);
+  font-size: 56px; font-weight: 800;
+  line-height: 1.1; margin: 8px 0 2px;
+  background: linear-gradient(120deg, var(--gold), #fff1c4);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.balance-pts small { font-size: 18px; -webkit-text-fill-color: rgba(240,180,41,.7); }
+.balance-tier { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:8px; }
+
+.progress-wrap { margin-top:18px; }
+.progress-bar {
+  height: 10px; border-radius: 50px;
+  background: rgba(245,240,220,.08); overflow: hidden;
+}
+.progress-fill {
+  height: 100%; border-radius: 50px;
+  background: linear-gradient(90deg, var(--coral), var(--gold));
+  transition: width .6s ease;
+}
+.progress-text {
+  margin-top:8px; font-size:.74rem; color:rgba(245,240,220,.6);
+  font-weight:700; text-align:center;
+}
+
+/* ── Section title ── */
+.s-title {
+  font-weight:900; font-size:.95rem; margin:4px 0 14px;
+  display:flex; align-items:center; gap:8px;
+}
+
+/* ── Earn rules ── */
+.rule {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:12px 0; border-bottom:1px solid var(--border);
+}
+.rule:last-child { border-bottom:none; padding-bottom:2px; }
+.rule-ico {
+  width:38px; height:38px; border-radius:12px; flex-shrink:0;
+  background:rgba(240,180,41,.12);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.15rem;
+}
+.rule-name { font-weight:900; font-size:.88rem; }
+.rule-desc { font-size:.76rem; color:rgba(245,240,220,.55); font-weight:700; margin-top:2px; }
+
+/* ── Tier ladder ── */
+.tier-row {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:14px; margin-bottom:8px;
+  background:rgba(245,240,220,.03);
+}
+.tier-row.active { background:rgba(240,180,41,.1); box-shadow:inset 0 0 0 1px rgba(240,180,41,.35); }
+.tier-ico { font-size:1.4rem; width:34px; text-align:center; }
+.tier-name { font-weight:900; font-size:.88rem; }
+.tier-points { font-size:.72rem; color:rgba(245,240,220,.55); font-weight:800; }
+.tier-perks { font-size:.72rem; color:rgba(245,240,220,.65); font-weight:700; margin-top:2px; }
+.tier-badge { margin-left:auto; font-size:.66rem; font-weight:900; color:var(--gold); background:rgba(240,180,41,.15); border-radius:30px; padding:3px 10px; }
+
+/* ── Redeem levels ── */
+.level {
+  border:1px solid var(--border);
+  border-radius:18px; padding:16px;
+  margin-bottom:12px;
+  display:flex; align-items:center; gap:14px;
+}
+.level-ico { font-size:1.8rem; width:48px; height:48px; flex-shrink:0; background:rgba(232,80,74,.12); border-radius:14px; display:flex; align-items:center; justify-content:center; }
+.level-title { font-weight:900; font-size:.92rem; }
+.level-desc { font-size:.76rem; color:rgba(245,240,220,.55); font-weight:700; margin-top:2px; line-height:1.45; }
+.level-pts { font-size:.72rem; color:var(--gold); font-weight:900; margin-top:4px; font-family:var(--mono); }
+.level-btn {
+  margin-left:auto; flex-shrink:0;
+  background:var(--coral); color:#fff; border:none;
+  border-radius:50px; padding:10px 18px;
+  font-family:var(--font); font-weight:900; font-size:.8rem; cursor:pointer;
+}
+.level-btn:disabled { background:rgba(245,240,220,.1); color:rgba(245,240,220,.35); cursor:not-allowed; }
+
+/* ── Stats row ── */
+.stats {
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+}
+.stat {
+  background:rgba(245,240,220,.04);
+  border:1px solid var(--border);
+  border-radius:16px; padding:14px; text-align:center;
+}
+.stat-num { font-family:var(--mono); font-weight:800; font-size:1.3rem; color:var(--gold); }
+.stat-lbl { font-size:.7rem; color:rgba(245,240,220,.55); font-weight:800; margin-top:2px; }
+
+/* ── Code popup ── */
+.popup-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,.7);
+  display:none; align-items:center; justify-content:center; z-index:50; padding:24px;
+}
+.popup-bg.show { display:flex; }
+.popup {
+  width:100%; max-width:400px;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:24px; padding:28px 24px; text-align:center;
+}
+.popup-code {
+  font-family:var(--mono); font-weight:800; font-size:1.5rem;
+  color:var(--gold); background:rgba(240,180,41,.1);
+  border:1px dashed rgba(240,180,41,.5);
+  border-radius:14px; padding:16px; margin:16px 0;
+  letter-spacing:2px; word-break:break-all;
+}
+.btn { width:100%; padding:12px; border-radius:50px; border:none; cursor:pointer; font-family:var(--font); font-weight:900; font-size:.9rem; }
+.btn-primary { background:var(--coral); color:#fff; }
+.btn-ghost { background:rgba(245,240,220,.06); color:rgba(245,240,220,.7); margin-top:8px; }
+
+.login-box { text-align:center; padding:40px 24px; }
+.login-box .big { font-size:3rem; margin-bottom:16px; }
+.login-box .lbl { font-weight:900; font-size:1.05rem; margin-bottom:8px; }
+.login-box .sub { font-size:.82rem; color:rgba(245,240,220,.55); font-weight:700; line-height:1.5; }
+
+#toast {
+  position:fixed; left:50%; bottom:32px; transform:translateX(-50%) translateY(80px);
+  background:#fff; color:#111; font-weight:900; font-size:.82rem;
+  padding:12px 22px; border-radius:50px; z-index:60;
+  transition:transform .3s ease; max-width:92%; text-align:center;
+}
+#toast.show { transform:translateX(-50%) translateY(0); }
+.spin { border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; width:18px; height:18px; animation:spin .7s linear infinite; display:inline-block; vertical-align:middle; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">🦀</div>
+  <div>
+    <div class="header-title">CRABOR</div>
+    <div class="header-sub">Điểm thưởng & ưu đãi</div>
+  </div>
+  <a class="header-back" href="/">← Về trang chủ</a>
+</div>
+
+<div id="content" style="width:100%;max-width:480px;position:relative;z-index:1"></div>
+
+<div class="popup-bg" id="codePopup">
+  <div class="popup">
+    <div style="font-size:2.2rem;margin-bottom:6px">🎉</div>
+    <div style="font-weight:900;font-size:1.05rem">Đổi điểm thành công!</div>
+    <div style="font-size:.78rem;color:rgba(245,240,220,.55);font-weight:700;margin-top:4px" id="popupTitle"></div>
+    <div class="popup-code" id="popupCode"></div>
+    <div style="font-size:.72rem;color:rgba(245,240,220,.5);font-weight:700" id="popupMeta"></div>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="copyCode()">📋 Sao chép mã</button>
+    <button class="btn btn-ghost" onclick="closePopup()">Đóng</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────
+let meData = null;
+let redeemedCode = null;
+
+// ─────────────────────────────────────
+//  LOAD
+// ─────────────────────────────────────
+async function load() {
+  const el = document.getElementById('content');
+  el.innerHTML = '<div class="card" style="text-align:center;padding:40px"><span class="spin"></span><div style="margin-top:12px;font-weight:800;color:rgba(245,240,220,.6);font-size:.85rem">Đang tải điểm thưởng...</div></div>';
+
+  try {
+    const [me, levels] = await Promise.all([
+      fetch('/api/loyalty/me').then(r => r.status === 401 ? null : r.json()),
+      fetch('/api/loyalty/levels').then(r => r.json()),
+    ]);
+
+    if (!me || !me.success) { renderLogin(); return; }
+    meData = me;
+    render(me, levels && levels.success ? levels.levels : []);
+  } catch(e) {
+    el.innerHTML = '<div class="card" style="text-align:center;padding:32px"><div style="font-size:2.5rem;margin-bottom:12px">⚠️</div><div style="font-weight:900;color:var(--coral)">Không tải được dữ liệu</div><div style="font-size:.8rem;color:rgba(245,240,220,.5);font-weight:700;margin-top:6px">' + e.message + '</div><button class="btn btn-primary" style="margin-top:18px" onclick="load()">Thử lại</button></div>';
+  }
+}
+
+// ─────────────────────────────────────
+//  RENDER
+// ─────────────────────────────────────
+function render(me, levels) {
+  const pts = me.pts || 0;
+  const cur = me.currentTier || { name:'Thành viên', icon:'🥉', color:'#cd7f32' };
+  const next = me.nextTier;
+  const pct = next ? Math.min(100, Math.round((pts - (cur.min||0)) / (next.min - (cur.min||0)) * 100)) : 100;
+
+  const tiers = [
+    { name:'Thành viên', icon:'🥉', min:0,    color:'#cd7f32', perks:['Tích 1đ / 1.000đ đơn'] },
+    { name:'Bạc',        icon:'🥈', min:25000,  color:'#aaa',    perks:['Tích 1đ / 1.000đ đơn','Voucher sinh nhật'] },
+    { name:'Vàng',       icon:'🥇', min:100000, color:'#FFD700', perks:['Tích 1.2đ / 1.000đ đơn','Freeship 2 đơn/tháng'] },
+    { name:'VIP',        icon:'💎', min:300000, color:'#b9f2ff', perks:['Tích 1.5đ / 1.000đ đơn','Freeship không giới hạn','Ưu tiên shipper'] },
+  ];
+
+  const ladderHtml = tiers.map(t => {
+    const active = pts >= t.min;
+    const isCur = cur && cur.name === t.name;
+    return `<div class="tier-row ${active && isCur ? 'active' : ''}" style="${t.tag ? '' : ''}">
+      <div class="tier-ico">${t.icon}</div>
+      <div>
+        <div class="tier-name" style="color:${t.color}">${t.name}${t.min ? ' <span style="font-size:.62rem;color:rgba(245,240,220,.4);font-weight:800">từ ' + t.min.toLocaleString('vi-VN') + ' điểm</span>' : ''}</div>
+        <div class="tier-perks">${t.perks.join(' · ')}</div>
+      </div>
+      ${isCur ? '<div class="tier-badge">HIỆN TẠI</div>' : ''}
+    </div>`;
+  }).join('');
+
+  const levelHtml = (levels || []).map((lv, i) => {
+    const can = pts >= lv.pts;
+    const ico = ['🚚','🚚','🛵'];
+    return `<div class="level">
+      <div class="level-ico">${ico[i] || '🎟️'}</div>
+      <div>
+        <div class="level-title">${lv.title}</div>
+        <div class="level-desc">${lv.desc}</div>
+        <div class="level-pts">${lv.pts.toLocaleString('vi-VN')} điểm</div>
+      </div>
+      <button class="level-btn" ${can ? '' : 'disabled'} onclick="redeem(${lv.pts}, '${lv.title.replace(/'/g, "\\'")}')">${can ? 'Đổi ngay' : 'Chưa đủ'}</button>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="card balance-card">
+      <div class="balance-label">⭐ ĐIỂM CRABOR HIỆN CÓ</div>
+      <div class="balance-pts">${pts.toLocaleString('vi-VN')}<small> điểm</small></div>
+      <div class="balance-tier"><span style="font-size:1.2rem">${cur.icon}</span><span style="font-weight:900;color:${cur.color}">${cur.name}</span></div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-text">${next
+          ? `Cần thêm <strong style="color:var(--gold)">${(next.min - pts).toLocaleString('vi-VN')} điểm</strong> để lên hạng <strong>${next.name} ${next.icon}</strong>`
+          : `Bạn đã đạt hạng cao nhất! 💎`}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="s-title">📈 Cách tích điểm</div>
+      <div class="rule"><div class="rule-ico">💳</div><div><div class="rule-name">Mỗi 1.000đ giá trị đơn = 1 điểm</div><div class="rule-desc">Mọi đơn đã hoàn thành (đồ ăn, giặt là, dọn nhà, xe công nghệ) đều tự động tích điểm.</div></div></div>
+      <div class="rule"><div class="rule-ico">🎖️</div><div><div class="rule-name">Tăng hạng để nhân đôi tốc độ</div><div class="rule-desc">Hạng Vàng tích 1,2đ / 1.000đ · Hạng VIP tích 1,5đ / 1.000đ và nhận nhiều đặc quyền.</div></div></div>
+      <div class="rule"><div class="rule-ico">🎟️</div><div><div class="rule-name">Đổi điểm lấy voucher giảm phí giao</div><div class="rule-desc">Quy đổi bắt đầu từ 10.000 điểm — voucher áp dụng cho mọi dịch vụ dưới đây.</div></div></div>
+    </div>
+
+    <div class="card">
+      <div class="s-title">🪜 Hạng thành viên</div>
+      ${ladderHtml}
+    </div>
+
+    <div class="card">
+      <div class="s-title">🎁 Đổi điểm — Voucher giảm phí giao hàng</div>
+      ${levelHtml}
+      <div style="font-size:.7rem;color:rgba(245,240,220,.45);font-weight:700;margin-top:10px">Sau khi đổi, mã voucher có hiệu lực 30 ngày và dùng được 1 lần ở mọi dịch vụ (đồ ăn, giặt là, dọn nhà, xe công nghệ).</div>
+    </div>
+
+    <div class="card">
+      <div class="s-title">📊 Thống kê</div>
+      <div class="stats">
+        <div class="stat"><div class="stat-num">${(me.totalOrders || 0).toLocaleString('vi-VN')}</div><div class="stat-lbl">Đơn đã hoàn thành</div></div>
+        <div class="stat"><div class="stat-num">${Math.round(me.totalSpent || 0).toLocaleString('vi-VN')}đ</div><div class="stat-lbl">Tổng chi tiêu</div></div>
+      </div>
+    </div>`;
+}
+
+function renderLogin() {
+  const el = document.getElementById('content');
+  el.innerHTML = `
+    <div class="card login-box">
+      <div class="big">🔒</div>
+      <div class="lbl">Bạn chưa đăng nhập</div>
+      <div class="sub">Vui lòng đăng nhập ứng dụng CRABOR rồi mở màn hình <strong>Điểm thưởng</strong> trong app để xem và đổi điểm của bạn.</div>
+      <a href="/" class="btn btn-primary" style="display:inline-block;text-decoration:none;margin-top:20px;max-width:240px">← Về trang chủ</a>
+    </div>`;
+}
+
+// ─────────────────────────────────────
+//  REDEEM
+// ─────────────────────────────────────
+async function redeem(pts, title) {
+  if (!confirm('Đổi ' + pts.toLocaleString('vi-VN') + ' điểm lấy voucher "' + title + '"?')) return;
+  const btn = document.querySelector(`.level-btn[data-pts="${pts}"]`);
+  try {
+    const r = await fetch('/api/loyalty/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pts })
+    });
+    const d = await r.json();
+    if (d.success) {
+      redeemedCode = d.code;
+      document.getElementById('popupTitle').textContent = d.title || title;
+      document.getElementById('popupCode').textContent = d.code;
+      document.getElementById('popupMeta').textContent = `Đã dùng ${d.ptsSpent.toLocaleString('vi-VN')} điểm · Còn ${d.ptsLeft.toLocaleString('vi-VN')} điểm · Hết hạn ${new Date(d.expiry).toLocaleDateString('vi-VN')}`;
+      document.getElementById('codePopup').classList.add('show');
+      load();
+    } else {
+      toast('❌ ' + (d.message || 'Không thể đổi điểm'));
+      if ((d.message || '').includes('không đủ điểm')) load();
+    }
+  } catch(e) {
+    toast('❌ Không kết nối được máy chủ');
+  }
+}
+
+async function copyCode() {
+  if (!redeemedCode) return;
+  try {
+    await navigator.clipboard.writeText(redeemedCode);
+    toast('✅ Đã sao chép mã ' + redeemedCode);
+  } catch(e) {
+    const el = document.createElement('textarea');
+    el.value = redeemedCode; document.body.appendChild(el);
+    el.select(); document.execCommand('copy');
+    document.body.removeChild(el);
+    toast('✅ Đã sao chép mã ' + redeemedCode);
+  }
+}
+
+function closePopup() { document.getElementById('codePopup').classList.remove('show'); }
+
+// ─────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────
+function toast(msg, dur = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+load();
+</script>
+</body>
+</html>

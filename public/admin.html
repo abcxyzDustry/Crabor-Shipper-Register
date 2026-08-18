@@ -442,10 +442,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <span class="ico">👤</span> Khách hàng
       </div>
       <div class="nav-section">Kinh doanh</div>
-      <div class="nav-item" onclick="showPage('sales')">
-        <span class="ico">🎯</span> Sales
-        <span class="nav-badge" id="salesBadge" style="display:none">0</span>
-      </div>
       <div class="nav-item" onclick="showPage('finance')">
         <span class="ico">💰</span> Tài chính
       </div>
@@ -538,11 +534,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           <div class="stat-lbl">Hôm nay</div>
           <div class="stat-num" id="stToday">—</div>
           <div class="stat-sub" id="stTodaySub">Đăng ký mới</div>
-        </div>
-        <div class="stat-card" style="background:linear-gradient(135deg,#f39c12,#e67e22);color:#fff;cursor:pointer" onclick="showPage('sales',event)">
-          <div class="stat-lbl">🎯 Sales Agents</div>
-          <div class="stat-num" id="stSalesCount">—</div>
-          <div class="stat-sub">Hoa hồng: <span id="stSalesRev">—</span></div>
         </div>
         <div class="stat-card" style="background:linear-gradient(135deg,#FFD84D,#f39c12);color:#000;cursor:pointer" onclick="showPage('wallet',event)">
           <div class="stat-lbl">💰 Ví chờ duyệt</div>
@@ -844,78 +835,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
     </section>
 
     <!-- ── FINANCE ── -->
-    <!-- ── SALES AGENTS ── -->
-    <section id="pgSales" class="page-section">
-      <div class="page-header">
-        <div class="page-title">Sales Agents <span class="nav-badge" id="salesCountBadge" style="background:var(--coral);color:#fff;font-size:.75rem;padding:3px 10px;border-radius:50px;font-weight:900;margin-left:8px">0</span></div>
-        <div style="display:flex;gap:8px">
-          <input type="text" class="filter-select" id="salesSearch" placeholder="Tìm SĐT, tên, mã..." style="width:180px" oninput="loadSales()">
-          <button class="filter-btn" onclick="loadSales()">🔍 Tìm</button>
-        </div>
-      </div>
-
-      <!-- Sales stats -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px">
-        <div class="panel" style="text-align:center;padding:18px">
-          <div style="font-size:.7rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">Tổng Sales</div>
-          <div style="font-size:1.8rem;font-weight:900;color:var(--coral);font-family:'Fredoka One',cursive" id="stSalesTotal">–</div>
-        </div>
-        <div class="panel" style="text-align:center;padding:18px">
-          <div style="font-size:.7rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">Đang hoạt động</div>
-          <div style="font-size:1.8rem;font-weight:900;color:var(--green);font-family:'Fredoka One',cursive" id="stSalesActive">–</div>
-        </div>
-        <div class="panel" style="text-align:center;padding:18px">
-          <div style="font-size:.7rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">Hoa hồng đã trả</div>
-          <div style="font-size:1.8rem;font-weight:900;color:var(--yellow);font-family:'Fredoka One',cursive" id="stSalesRevenue">–</div>
-        </div>
-      </div>
-
-      <!-- Sales table -->
-      <div class="panel">
-        <div class="table-wrap">
-          <table class="reg-table">
-            <thead>
-              <tr>
-                <th>Sales</th>
-                <th>Mã giới thiệu</th>
-                <th>Đã mời</th>
-                <th>Đơn hoàn thành</th>
-                <th>Ví (đ)</th>
-                <th>Tổng kiếm</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="salesTbody">
-              <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Đang tải...</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="pager" id="salesPager"></div>
-      </div>
-
-      <!-- Sales referral detail modal -->
-      <div id="salesRefModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:8000;align-items:center;justify-content:center;padding:16px">
-        <div style="background:var(--card);border-radius:20px;width:100%;max-width:600px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border)">
-          <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-            <div>
-              <div style="font-weight:900;font-size:1rem;color:var(--cream)" id="srModalTitle">Referrals</div>
-              <div style="font-size:.75rem;color:var(--muted);margin-top:2px" id="srModalSub">—</div>
-            </div>
-            <button onclick="closeSalesRefModal()" style="background:rgba(255,255,255,.08);border:none;color:var(--cream);border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:1rem;font-weight:900">✕</button>
-          </div>
-          <div style="overflow-y:auto;padding:18px;flex:1">
-            <div id="srModalBody">Đang tải...</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
             <!-- ── VOUCHERS ── -->
     <section id="pgVouchers" class="page-section">
       <div class="page-header">
         <div class="page-title">🎟️ Voucher & Khuyến mãi</div>
         <button class="filter-btn" style="background:#E8504A;color:#fff;border:none;padding:8px 20px;border-radius:30px;font-weight:800;cursor:pointer" onclick="openCreateVoucher()">+ Tạo voucher</button>
+      </div>
+
+      <!-- Weekly voucher card -->
+      <div class="panel" style="margin-bottom:16px;border-left:4px solid #FFD700">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-weight:900">🗓️ Voucher tuần tự động</div>
+            <div id="weeklyVoucherInfo" style="font-size:.82rem;color:var(--muted);margin-top:4px">Đang tải...</div>
+          </div>
+          <button class="filter-btn" style="background:#FFD700;color:#1a1a1a;border:none;padding:8px 20px;border-radius:30px;font-weight:900;cursor:pointer" onclick="loadWeeklyVoucher()">🔄 Kiểm tra / tạo mới</button>
+        </div>
       </div>
 
       <!-- Create voucher form -->
@@ -931,6 +866,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
             <select class="filter-select" id="vcType" style="width:100%">
               <option value="percent">% Phần trăm</option>
               <option value="fixed">Cố định (đ)</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:.75rem;color:var(--muted);font-weight:800;margin-bottom:4px">Áp dụng cho</div>
+            <select class="filter-select" id="vcTarget" style="width:100%">
+              <option value="order">Giá trị đơn</option>
+              <option value="ship">Phí giao hàng</option>
             </select>
           </div>
           <div>
@@ -975,11 +917,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           <table class="reg-table">
             <thead>
               <tr>
-                <th>Mã</th><th>Loại</th><th>Giá trị</th><th>Đã dùng</th><th>Hết hạn</th><th>Module</th><th>Trạng thái</th><th>Thao tác</th>
+                <th>Mã</th><th>Loại</th><th>Giá trị</th><th>Đã dùng</th><th>Hết hạn</th><th>Module</th><th>Áp dụng</th><th>Trạng thái</th><th>Thao tác</th>
               </tr>
             </thead>
             <tbody id="voucherTbody">
-              <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>
+              <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1180,11 +1122,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
     <!-- ── LEADERBOARD ── -->
     <section id="pgLeaderboard" class="page-section">
       <div class="page-header"><div class="page-title">🏆 Leaderboard</div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="panel" style="padding:16px">
-          <div style="font-weight:900;font-size:.88rem;margin-bottom:14px">🎯 Top Sales CTV</div>
-          <div id="salesLeaderboard"></div>
-        </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:14px">
         <div class="panel" style="padding:16px">
           <div style="font-weight:900;font-size:.88rem;margin-bottom:14px">🛵 Top Shipper tháng này</div>
           <div id="shipperLeaderboard"></div>
@@ -1661,7 +1599,6 @@ let feedItems = [];
 let selectedRecord = { id: null, type: null };
 let _advCharts = {};
 let wqCurrentPage = 1;
-let salesPage = 1;
 let _pendingBanner = null;
 let _aiBannerBusy = false;
 let _aiBannerHistory = [];
@@ -1974,7 +1911,6 @@ async function loadStats() {
     if (!r.success) { showApiError('❌ Không tải được stats: ' + (r.message || 'Lỗi')); return; }
     const d = r.data;
     setText('stTotal', d.total); setText('stPending', d.pending); setText('stActive', d.active); setText('stToday', d.todayRegistrations);
-    if (d.salesTotal !== undefined) { setText('stSalesCount', d.salesTotal || 0); setText('stSalesRev', fmtMoney(d.salesRevenue || 0)); }
     if(document.getElementById('shipperBadge')) document.getElementById('shipperBadge').textContent = d.pending || 0;
     if(document.getElementById('partnerBadge')) document.getElementById('partnerBadge').textContent = (d.partners?.gl||0)+(d.partners?.gv||0)+(d.partners?.cs||0);
     const total = d.total || 1;
@@ -1995,7 +1931,6 @@ async function loadStats() {
     const ebMaxInput   = document.getElementById('ebMaxInput');
     if (ebMaxCurrent) ebMaxCurrent.textContent = ebMax;
     if (ebMaxInput && document.activeElement !== ebMaxInput) ebMaxInput.value = ebMax;
-    if (d.salesTotal !== undefined && document.getElementById('salesBadge')) { document.getElementById('salesBadge').textContent = d.salesTotal; document.getElementById('salesBadge').style.display = d.salesTotal ? 'inline' : 'none'; }
     if (d.customers !== undefined) { setText('stCustomers', d.customers); if(document.getElementById('stCustomersSub')) document.getElementById('stCustomersSub').textContent = `+${d.customersToday||0} hôm nay`; }
     if (d.totalOrders !== undefined) { setText('stOrders', d.totalOrders); if(document.getElementById('stOrdersSub')) document.getElementById('stOrdersSub').textContent = `+${d.todayOrders||0} hôm nay`; }
     if(document.getElementById('lastRefresh')) document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString('vi-VN');
@@ -2321,47 +2256,6 @@ async function saveEbMax() {
 function setEbMax(v) { document.getElementById('ebMaxInput').value = v; saveEbMax(); }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//   SALES MANAGEMENT
-// ─────────────────────────────────────────────────────────────────────────────
-async function loadSales() {
-  const q = document.getElementById('salesSearch')?.value?.trim() || '';
-  const tbody = document.getElementById('salesTbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
-  try {
-    const r = await apiFetch('/api/admin/sales?q=' + encodeURIComponent(q) + '&page=' + salesPage);
-    if (!r.success) { if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:var(--coral);text-align:center;padding:20px">❌ Lỗi tải dữ liệu</td></tr>'; return; }
-    const stats = await apiFetch('/api/admin/stats');
-    if (stats.success) {
-      setText('stSalesTotal', stats.data.salesTotal || 0); setText('stSalesActive', stats.data.salesActive || 0); setText('stSalesRevenue', fmtMoney(stats.data.salesRevenue || 0));
-      const badge = document.getElementById('salesBadge'); if (badge) { badge.textContent = stats.data.salesTotal || 0; badge.style.display = stats.data.salesTotal ? 'inline' : 'none'; }
-      const countBadge = document.getElementById('salesCountBadge'); if (countBadge) countBadge.textContent = r.total || 0;
-    }
-    if (!r.data.length) { if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Chưa có Sales nào</td></tr>'; return; }
-    if(tbody) tbody.innerHTML = r.data.map(a => `<tr><td><div style="font-weight:900;color:var(--cream)">${a.fullName}</div><div style="font-size:.73rem;color:var(--muted);font-family:var(--font-mono)">${a.phone}</div></td><td><span style="background:rgba(232,80,74,.15);color:var(--coral);border-radius:6px;padding:3px 10px;font-family:var(--font-mono);font-weight:900;font-size:.85rem;letter-spacing:1px">${a.refCode}</span></td><td><div style="font-weight:900">${a.referralTotal || 0}</div><div style="font-size:.72rem;color:var(--muted)">${a.referralEarned || 0} hoàn thành</div></td><td style="font-weight:900;color:var(--green)">${a.referralEarned || 0}</td><td style="font-weight:900;color:var(--yellow);font-family:var(--font-mono)">${(a.walletBalance||0).toLocaleString('vi-VN')}</td><td style="font-family:var(--font-mono);font-size:.82rem">${(a.totalEarned||0).toLocaleString('vi-VN')}</td><td><span class="status-pill ${a.status === 'active' ? 'approved' : 'rejected'}">${a.status === 'active' ? '🟢 Hoạt động' : '🔴 Khóa'}</span></td><td style="display:flex;gap:4px;flex-wrap:wrap"><button class="act-btn" onclick="viewSalesRefs('${a._id}','${a.fullName}','${a.refCode}')" style="font-size:.72rem;padding:4px 10px">📋 Refs</button><button class="act-btn ${a.status==='active'?'reject':''}" onclick="toggleSalesStatus('${a._id}','${a.status}')" style="font-size:.72rem;padding:4px 10px">${a.status==='active'?'🔒 Khóa':'🔓 Mở'}</button>${(a.walletBalance||0)>0?`<button class="act-btn" onclick="clearBalance('sales','${a._id}')" style="font-size:.72rem;padding:4px 10px" title="Số dư: ${fmtMoney(a.walletBalance)}">💱 Xoá</button>`:''}<button class="act-btn reject" onclick="deleteSales('${a._id}','${a.fullName}')" style="font-size:.72rem;padding:4px 8px">🗑️</button></td></tr>`).join('');
-  } catch(e) { if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:var(--coral);text-align:center;padding:20px">❌ ' + e.message + '</td></tr>'; }
-}
-
-async function viewSalesRefs(salesId, name, refCode) {
-  const modal = document.getElementById('salesRefModal');
-  const body  = document.getElementById('srModalBody');
-  if(document.getElementById('srModalTitle')) document.getElementById('srModalTitle').textContent = '📋 Referrals — ' + name;
-  if(document.getElementById('srModalSub')) document.getElementById('srModalSub').textContent = 'Mã: ' + refCode;
-  if(body) body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">⏳ Đang tải...</div>';
-  if(modal) modal.style.display = 'flex';
-  try {
-    const r = await apiFetch('/api/admin/sales/' + salesId + '/referrals');
-    if (!r.data.length) { if(body) body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Chưa có referral nào</div>'; return; }
-    const typeLabel = { user:'👤 Khách', shipper:'🛵 Shipper', partner:'🏪 Đối tác' };
-    const statLabel = { pending:'⏳ Chờ đơn', earned:'✅ Đã nhận' };
-    const statColor = { pending:'#aaa', earned:'#27ae60' };
-    if(body) body.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + r.data.map(ref => `<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px"><div style="font-size:1.3rem">${ref.targetType==='user'?'👤':ref.targetType==='shipper'?'🛵':'🏪'}</div><div style="flex:1"><div style="font-weight:900;font-size:.88rem;color:var(--cream)">${ref.targetName || ref.targetPhone}</div><div style="font-size:.72rem;color:var(--muted)">${typeLabel[ref.targetType]||ref.targetType} · ${new Date(ref.createdAt).toLocaleDateString('vi-VN')}</div></div><div style="text-align:right"><div style="font-weight:900;font-size:.82rem;color:${statColor[ref.status]||'#aaa'}">${statLabel[ref.status]||ref.status}</div>${ref.status==='earned'?`<div style="font-size:.72rem;color:var(--yellow);font-family:var(--font-mono)">+${(ref.amount||2000).toLocaleString('vi-VN')}đ</div>`:''}</div></div>`).join('') + '</div>';
-  } catch(e) { if(body) body.innerHTML = '<div style="color:var(--coral);padding:20px">❌ ' + e.message + '</div>'; }
-}
-function closeSalesRefModal() { const modal = document.getElementById('salesRefModal'); if(modal) modal.style.display = 'none'; }
-async function toggleSalesStatus(id, cur) { const ns = cur === 'active' ? 'suspended' : 'active'; if (!confirm((ns==='suspended'?'Khóa':'Mở khóa') + ' tài khoản Sales này?')) return; try { const r = await apiFetch('/api/admin/sales/' + id, 'PATCH', { status: ns }); if (r.success) { showNotif(ns==='suspended'?'🔒 Đã khóa':'🔓 Đã mở', 'Tài khoản Sales đã cập nhật'); loadSales(); } } catch(e) {} }
-async function deleteSales(id, name) { if (!confirm('⚠️ XÓA tài khoản Sales "' + name + '"?\n\nToàn bộ referrals sẽ bị xóa!\nNhấn OK để xác nhận.')) return; try { const r = await apiFetch('/api/admin/sales/' + id, 'DELETE'); if (r.success) { showNotif('🗑️ Đã xóa', 'Tài khoản Sales đã bị xóa', 'coral'); loadSales(); } } catch(e) {} }
-
-// ─────────────────────────────────────────────────────────────────────────────
 //   VOUCHER MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────
 function openCreateVoucher() { const p = document.getElementById('createVoucherPanel'); if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'; const inp = document.getElementById('vcExpiry'); if (inp && !inp.value) { const d = new Date(Date.now() + 30*24*3600*1000); inp.value = d.toISOString().slice(0,16); } }
@@ -2374,10 +2268,11 @@ async function createVoucher() {
   const usageLimit = Number(document.getElementById('vcLimit')?.value)||100;
   const expiresAt = document.getElementById('vcExpiry')?.value;
   const module = document.getElementById('vcModule')?.value||'all';
+  const target = document.getElementById('vcTarget')?.value||'order';
   const description = document.getElementById('vcDesc')?.value?.trim();
   if (!code||!value||!expiresAt) { showNotif('⚠️ Thiếu thông tin','Nhập đầy đủ mã, giá trị, hạn sử dụng'); return; }
   try {
-    const r = await apiFetch('/api/vouchers','POST',{code,type,value,minOrder,maxDiscount,usageLimit,expiresAt:new Date(expiresAt),module,description,active:true});
+    const r = await apiFetch('/api/vouchers','POST',{code,type,value,minOrder,maxDiscount,usageLimit,expiresAt:new Date(expiresAt),module,target,description,active:true});
     if (r.success) { showNotif('✅ Đã tạo voucher','Mã '+code+' đã được tạo'); const p=document.getElementById('createVoucherPanel'); if(p) p.style.display='none'; loadVouchers(); }
     else showNotif('❌ Lỗi',r.message);
   } catch(e) { showNotif('❌ Lỗi',e.message); }
@@ -2385,12 +2280,24 @@ async function createVoucher() {
 async function loadVouchers() {
   const tbody = document.getElementById('voucherTbody');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
   try {
     const r = await apiFetch('/api/admin/vouchers');
-    if (!r.success||!r.data.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Chưa có voucher nào</td></tr>'; return; }
-    tbody.innerHTML = r.data.map(v => { const expired = new Date(v.expiresAt) < new Date(); const valStr = v.type==='percent' ? v.value+'%' : v.value.toLocaleString('vi-VN')+'đ'; return `<tr><td><span style="font-family:var(--font-mono);font-weight:900;color:var(--coral)">${v.code}</span></td><td>${v.type==='percent'?'%':'Cố định'}</td><td><strong>${valStr}</strong>${v.minOrder?`<br><span style="font-size:.7rem;color:var(--muted)">Tối thiểu ${v.minOrder.toLocaleString('vi-VN')}đ</span>`:''}</td><td>${v.usedCount||0}/${v.usageLimit}</td><td style="font-size:.78rem">${new Date(v.expiresAt).toLocaleDateString('vi-VN')}${expired?'<br><span style="color:var(--coral);font-weight:900">HẾT HẠN</span>':''}</td><td>${v.module==='all'?'Tất cả':v.module}</td><td><span class="status-pill ${v.active&&!expired?'approved':'rejected'}">${v.active&&!expired?'✅ Active':'❌ Off'}</span></td><td style="display:flex;gap:4px"><button class="act-btn ${v.active?'reject':''}" onclick="toggleVoucher('${v._id}',${v.active})" style="font-size:.72rem;padding:4px 8px">${v.active?'Tắt':'Bật'}</button><button class="act-btn reject" onclick="deleteVoucher('${v._id}','${v.code}')" style="font-size:.72rem;padding:4px 8px">🗑️</button></td></tr>`; }).join('');
-  } catch(e) { tbody.innerHTML = '<tr><td colspan="8" style="color:var(--coral);text-align:center;padding:16px">❌ '+e.message+'</td></tr>'; }
+    if (!r.success||!r.data.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">Chưa có voucher nào</td></tr>'; return; }
+    tbody.innerHTML = r.data.map(v => { const expired = new Date(v.expiresAt) < new Date(); const valStr = v.type==='percent' ? v.value+'%' : v.value.toLocaleString('vi-VN')+'đ'; return `<tr><td><span style="font-family:var(--font-mono);font-weight:900;color:var(--coral)">${v.code}</span>${v.weekly?'<br><span class="badge b-approved" style="font-size:.65rem">🗓️ TUẦN</span>':''}</td><td>${v.type==='percent'?'%':'Cố định'}</td><td><strong>${valStr}</strong>${v.minOrder?`<br><span style="font-size:.7rem;color:var(--muted)">Tối thiểu ${v.minOrder.toLocaleString('vi-VN')}đ</span>`:''}</td><td>${v.usedCount||0}/${v.usageLimit}</td><td style="font-size:.78rem">${new Date(v.expiresAt).toLocaleDateString('vi-VN')}${expired?'<br><span style="color:var(--coral);font-weight:900">HẾT HẠN</span>':''}</td><td>${v.module==='all'?'Tất cả':v.module}</td><td>${(v.target||'order')==='ship'?'🚚 Phí giao':'💳 Giá trị đơn'}</td><td><span class="status-pill ${v.active&&!expired?'approved':'rejected'}">${v.active&&!expired?'✅ Active':'❌ Off'}</span></td><td style="display:flex;gap:4px"><button class="act-btn ${v.active?'reject':''}" onclick="toggleVoucher('${v._id}',${v.active})" style="font-size:.72rem;padding:4px 8px">${v.active?'Tắt':'Bật'}</button><button class="act-btn reject" onclick="deleteVoucher('${v._id}','${v.code}')" style="font-size:.72rem;padding:4px 8px">🗑️</button></td></tr>`; }).join('');
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="9" style="color:var(--coral);text-align:center;padding:16px">❌ '+e.message+'</td></tr>'; }
+}
+async function loadWeeklyVoucher() {
+  const el = document.getElementById('weeklyVoucherInfo');
+  if (!el) return;
+  el.textContent = '⏳ Đang kiểm tra...';
+  try {
+    const r = await apiFetch('/api/admin/weekly-voucher');
+    if (!r.success) throw new Error(r.message || 'Lỗi');
+    const v = r.voucher, s = r.stats || {};
+    const valStr = v.type==='percent' ? v.value+'%' : v.value.toLocaleString('vi-VN')+'đ';
+    el.innerHTML = `Mã <strong style="color:#FFD700">${v.code}</strong> (tuần ${v.weekly}) — <strong>${valStr}</strong> giảm, hết hạn ${new Date(v.expiresAt).toLocaleDateString('vi-VN')} | Đã dùng: <strong>${s.usedCount||0}</strong> đơn | Doanh thu sử dụng: <strong>${fmtMoney(s.turnover||0)}</strong>`;
+  } catch(e) { el.textContent = '❌ ' + e.message; }
 }
 async function toggleVoucher(id, active) { try { await apiFetch('/api/admin/vouchers/'+id,'PATCH',{active:!active}); loadVouchers(); } catch(e) {} }
 async function deleteVoucher(id, code) { if (!confirm('Xóa voucher '+code+'?')) return; try { await apiFetch('/api/admin/vouchers/'+id,'DELETE'); showNotif('🗑️ Đã xóa','Voucher '+code+' đã bị xóa','coral'); loadVouchers(); } catch(e) {} }
@@ -2497,9 +2404,9 @@ function searchCustomers() { clearTimeout(window._custTimer); window._custTimer 
 async function toggleCustStatus(id, cur) { const ns = cur === 'active' ? 'banned' : 'active'; if (!confirm('Bạn có chắc muốn ' + (ns==='banned'?'khóa':'mở khóa') + ' tài khoản này?')) return; try { const r = await apiFetch('/api/admin/customers/' + id + '/status', 'PATCH', { status: ns }); if (r.success) { showNotif(ns==='banned'?'🔒 Đã khóa':'🔓 Đã mở khóa','Tài khoản đã cập nhật'); loadCustomers(); } } catch(e) {} }
 async function deleteCust(id, phone) { if (!confirm(`⚠️ XÓA tài khoản khách hàng ${phone}?\n\nToàn bộ dữ liệu sẽ bị xóa vĩnh viễn!\nNhấn OK để xác nhận.`)) return; try { const r = await apiFetch('/api/admin/customers/' + id, 'DELETE'); if (r.success) { showNotif('🗑️ Đã xóa', 'Tài khoản khách hàng đã bị xóa', 'coral'); loadCustomers(); loadStats(); } else showNotif('❌ Lỗi', r.message || 'Không xóa được', 'coral'); } catch(e) {} }
 
-// Xoá số dư ví về 0 cho khách / shipper / đối tác / sales
+// Xoá số dư ví về 0 cho khách / shipper / đối tác
 async function clearBalance(type, id, module) {
-  const typeLabel = { user:'khách hàng', shipper:'shipper', partner:'đối tác', sales:'sales' };
+  const typeLabel = { user:'khách hàng', shipper:'shipper', partner:'đối tác' };
   if (!confirm(`⚠️ XOÁ SỐ DƯ ví của ${typeLabel[type]||type} này về 0?\n\nHành động này không thể hoàn tác!\nNhấn OK để xác nhận.`)) return;
   try {
     const r = await apiFetch('/api/admin/clear-balance', 'POST', { type, id, module });
@@ -2636,9 +2543,8 @@ async function inProgressTicket(id) { try { await apiFetch('/api/admin/support/'
 // ─────────────────────────────────────────────────────────────────────────────
 async function loadLeaderboard() {
   try {
-    const [sales, shippers] = await Promise.all([ apiFetch('/api/sales/leaderboard'), apiFetch('/api/admin/shippers?limit=10&sort=ordersCompleted') ]);
+    const shippers = await apiFetch('/api/admin/shippers?limit=10&sort=ordersCompleted');
     const rankIcons = ['🥇','🥈','🥉'];
-    if (sales.success && document.getElementById('salesLeaderboard')) { document.getElementById('salesLeaderboard').innerHTML = sales.leaderboard.map((s,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="font-size:1.2rem;width:24px;text-align:center">${rankIcons[i]||('#'+(i+1))}</div><div style="flex:1"><div style="font-weight:900;font-size:.85rem">${s.name}</div><div style="font-size:.7rem;color:var(--muted);font-family:var(--font-mono)">${s.refCode}</div></div><div style="text-align:right"><div style="font-weight:900;color:var(--yellow);font-size:.85rem">${s.earned.toLocaleString('vi-VN')}đ</div></div></div>`).join(''); }
     if (shippers.success && document.getElementById('shipperLeaderboard')) { document.getElementById('shipperLeaderboard').innerHTML = (shippers.data||[]).slice(0,10).map((s,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="font-size:1.2rem;width:24px;text-align:center">${rankIcons[i]||('#'+(i+1))}</div><div style="flex:1"><div style="font-weight:900;font-size:.85rem">${s.fullName||s.firstName+' '+s.lastName}</div><div style="font-size:.7rem;color:var(--muted)">⭐${(s.rating||5).toFixed(1)}</div></div><div style="font-weight:900;color:var(--green);font-size:.85rem">${s.ordersCompleted||0} đơn</div></div>`).join(''); }
   } catch(e) {}
 }
@@ -2856,7 +2762,7 @@ async function deleteBannerAdmin(id) { if (!confirm('Xóa banner này?')) return
 // ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', settings:'pgSettings' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', settings:'pgSettings' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -2866,8 +2772,7 @@ function showPage(key, ev) {
   if (key === 'shippers') loadTable('shipper');
   if (key === 'partners') loadTable('partner');
   if (key === 'orders') loadOrders();
-  if (key === 'sales') loadSales();
-  if (key === 'vouchers') loadVouchers();
+  if (key === 'vouchers') { loadVouchers(); loadWeeklyVoucher(); }
   if (key === 'wallet') loadWalletQueue();
   if (key === 'featured') loadFeatured();
   if (key === 'analytics') loadAdvAnalytics();

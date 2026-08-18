@@ -280,6 +280,60 @@ async function callClaude(messages, systemPrompt, opts = {}) {
   };
 }
 
+/**
+ * Cloudflare Workers AI fallback — zero cost, zero key, zero bans.
+ * Calls the same free CF Workers chat endpoint the local agent uses
+ * (llm-chat-app-template.djthewolf9.workers.dev/api/chat), gathers SSE
+ * tokens → full reply. No API key required.
+ */
+async function callCloudflareWorkers(messages, systemPrompt, opts = {}) {
+  const url = (process.env.CF_WORKERS_URL || 'https://llm-chat-app-template.djthewolf9.workers.dev').replace(/\/$/, '') + '/api/chat';
+
+  const cfMessages = [];
+  if (systemPrompt) cfMessages.push({ role: 'system', content: systemPrompt });
+  cfMessages.push(...messages);
+
+  let reply = '';
+  await new Promise((resolve, reject) => {
+    axios.post(
+      url,
+      { messages: cfMessages },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        },
+        timeout: opts.timeout || 120000,
+        responseType: 'text',
+      }
+    ).then((res) => {
+      for (const line of String(res.data).split(/\r?\n/)) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const obj = JSON.parse(line.slice(5).trim());
+          if (typeof obj.response === 'string' && obj.response) reply += obj.response;
+        } catch { /* skip malformed */ }
+      }
+      if (!reply && typeof res.data === 'string' && res.data.trim()) {
+        reply = res.data.trim().slice(0, 4000);
+      }
+      resolve();
+    }).catch((err) => {
+      reject(new Error(`Cloudflare Workers lỗi: ${err.response?.status || err.message}`));
+    });
+  });
+
+  if (!reply) throw new Error('Cloudflare Workers trả về rỗng');
+
+  return {
+    text:   reply,
+    model:  'cf-workers-ai (Cloudflare)',
+    tokens: 0,
+    backend: 'cloudflare',
+  };
+}
+
 // ══════════════════════════════════════════════════════════════
 //  SYSTEM PROMPT BUILDER — Inject context thật vào prompt
 // ══════════════════════════════════════════════════════════════
@@ -493,6 +547,16 @@ async function cocoThink(messages, opts = {}) {
       }
     }
 
+    // Bước 4: fallback Cloudflare Workers (miễn phí, không key, không ban)
+    if (!result) {
+      try {
+        result = await callCloudflareWorkers(messages, systemPrompt, opts);
+        console.log('[Coco Brain] AUTO → Cloudflare Workers ✅');
+      } catch(e4) {
+        console.warn('[Coco Brain] AUTO: Cloudflare failed —', e4.message);
+      }
+    }
+
     // Không backend nào hoạt động
     if (!result) {
       return { text: null, backend: 'failed', error: 'All backends failed in AUTO mode', canReason: false };
@@ -511,6 +575,8 @@ async function cocoThink(messages, opts = {}) {
       result = await callOllama(messages, systemPrompt, opts);
     } else if (backend === 'claude') {
       result = await callClaude(messages, systemPrompt, opts);
+    } else if (backend === 'cloudflare') {
+      result = await callCloudflareWorkers(messages, systemPrompt, opts);
     }
   } catch(err) {
     lastError = err;
@@ -523,11 +589,19 @@ async function cocoThink(messages, opts = {}) {
         result = await callGroq(messages, systemPrompt, opts);
       } catch(err2) {
         console.error('[Coco Brain] Groq fallback failed:', err2.message);
-        console.log('[Coco Brain] Groq lỗi, fallback → Claude...');
+console.log('[Coco Brain] Groq lỗi, fallback → Claude...');
         try {
           result = await callClaude(messages, systemPrompt, opts);
-        } catch(err3) {
-          console.error('[Coco Brain] Claude fallback failed:', err3.message);
+        } catch(err2) {
+          console.error('[Coco Brain] Claude fallback failed:', err2.message);
+        }
+        if (!result) {
+          try {
+            result = await callCloudflareWorkers(messages, systemPrompt, opts);
+            console.log('[Coco Brain] OpenRouter hết → Cloudflare Workers ✅');
+          } catch(err2c) {
+            console.error('[Coco Brain] Cloudflare fallback failed:', err2c.message);
+          }
         }
       }
     } else if (backend === 'groq' || backend === 'ollama') {
@@ -546,6 +620,14 @@ async function cocoThink(messages, opts = {}) {
           result = await callClaude(messages, systemPrompt, opts);
         } catch(err2) {
           console.error('[Coco Brain] Claude fallback failed:', err2.message);
+        }
+      }
+      if (!result) {
+        try {
+          result = await callCloudflareWorkers(messages, systemPrompt, opts);
+          console.log('[Coco Brain] Hết backend → Cloudflare Workers ✅');
+        } catch(err2c) {
+          console.error('[Coco Brain] Cloudflare fallback failed:', err2c.message);
         }
       }
     }
@@ -1009,7 +1091,10 @@ async function checkBrainStatus() {
     return status;
   }
   if (backend === 'auto') {
-    status.note = 'AUTO mode — OpenRouter → Groq → Claude';
+    status.note = 'AUTO mode — OpenRouter → Groq → Claude → Cloudflare → rule';
+  }
+  if (backend === 'cloudflare') {
+    status.note = 'Cloudflare Workers — miễn phí, không key, không ban';
   }
 
   const start = Date.now();
@@ -1056,7 +1141,7 @@ function printBrainSetupGuide() {
     const hasGroq = !!process.env.GROQ_API_KEY;
     console.log(`║  OR Key  : ${hasOR   ? '✅ Configured              ' : '❌ Set OPENROUTER_API_KEY  '}║`);
     console.log(`║  Groq Key: ${hasGroq ? '✅ Configured              ' : '⚠️  Set GROQ_API_KEY        '}║`);
-    console.log('║  Chain   : OpenRouter → Groq → Claude   ║');
+    console.log('║  Chain   : OR → Groq → Claude → CF → Rule║');
     console.log('║  Mode    : AUTO — best available ✅      ║');
   } else if (backend === 'openrouter') {
     const orKey = process.env.OPENROUTER_API_KEY;
@@ -1065,7 +1150,13 @@ function printBrainSetupGuide() {
     console.log(`║  Model   : ${(orModel + '                    ').slice(0,26)}║`);
     console.log('║  Mode    : Phase 2 — Real Reasoning ✅   ║');
     console.log('║  Limit   : FREE (no daily cap)           ║');
-    console.log('║  Fallback: Groq → Claude → Rule          ║');
+    console.log('║  Fallback: Groq → Claude → CF → Rule    ║');
+  } else if (backend === 'cloudflare') {
+    const url = process.env.CF_WORKERS_URL || 'llm-chat-app-template.djthewolf9.workers.dev';
+    console.log(`║  URL     : ${(url.slice(0,26)                    ).slice(0,26)}║`);
+    console.log('║  Key     : NOT NEEDED — miễn phí         ║');
+    console.log('║  Mode    : Cloudflare Workers AI ✅       ║');
+    console.log('║  Model   : cf-workers-ai                  ║');
   } else if (backend === 'groq') {
     console.log(`║  Key     : ${groqKey ? '✅ Configured              ' : '❌ MISSING! Set GROQ_API_KEY'}║`);
     console.log('║  Model   : llama-3.3-70b-versatile       ║');
@@ -1104,4 +1195,5 @@ module.exports = {
   callGroq,
   callOllama,
   callClaude,
+  callCloudflareWorkers,
 };

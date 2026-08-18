@@ -478,11 +478,6 @@ async function seedCocoKnowledge() {
       keywords:['liên hệ','hotline','email','hỗ trợ','sos'],
       answer:'📞 Liên hệ CRABOR:\n🤖 Coco (Tổng đài AI) — 24/7 ngay trong app\n📧 support@crabor.vn — AI tự động phản hồi\n🚨 Nút SOS khẩn cấp trong app' },
 
-    // CTV Sales
-    { category:'product', intent:'ask_sales', confidence:1.0,
-      keywords:['ctv','sales','cộng tác viên','giới thiệu','hoa hồng ctv','2000đ'],
-      answer:'🎯 CTV Sales CRABOR:\n💰 +2.000đ/đơn hoàn thành qua referral\n🔗 Mã: CR + 3 ký tự + 4 số SĐT\n💳 Rút tối thiểu 50.000đ\n📱 Đăng ký tại /sales' },
-
     // Thời gian
     { category:'faq', intent:'ask_time', confidence:0.9,
       keywords:['mấy giờ','giờ bao nhiêu','thời gian'],

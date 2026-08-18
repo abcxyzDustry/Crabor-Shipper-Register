@@ -115,12 +115,6 @@ nav.scrolled{box-shadow:0 6px 24px rgba(16,24,40,.06);}
   box-shadow:0 6px 18px rgba(232,80,74,.3);
 }
 .nav-cta:hover{background:var(--red2);transform:translateY(-1px);}
-.nav-sales{
-  font-size:.78rem;font-weight:800;color:var(--red);
-  padding:6px 14px;border:1.5px solid rgba(232,80,74,.3);
-  border-radius:50px;transition:.2s;
-}
-.nav-sales:hover{background:rgba(232,80,74,.08);}
 .burger{display:none;flex-direction:column;gap:5px;cursor:pointer;border:none;background:none;}
 .burger span{width:24px;height:2.5px;background:var(--ink);border-radius:2px;transition:.3s;}
 @media(max-width:768px){
@@ -350,6 +344,7 @@ nav.scrolled{box-shadow:0 6px 24px rgba(16,24,40,.06);}
 .srv-clean .srv-icon{background:#ecf7ef;}
 .srv-china .srv-icon{background:#fdeeee;}
 .srv-ride .srv-icon{background:#eef0fb;}
+.srv-agent .srv-icon{background:#f3ebfb;}
 .srv-name{
   font-weight:800;font-size:1.12rem;
   color:var(--ink);margin-bottom:6px;
@@ -740,7 +735,6 @@ footer{
     <li><a href="#download">Tải app</a></li>
   </ul>
   <div style="display:flex;align-items:center;gap:10px">
-    <a class="nav-sales" href="/sales">🎯 Sales</a>
     <button class="nav-cta" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">Tải ngay 🦀</button>
   </div>
   <div class="burger" onclick="toggleMobileMenu()">
@@ -837,6 +831,12 @@ footer{
         <div class="srv-name">Xe công nghệ</div>
         <div class="srv-sub">Đặt xe 4/7 chỗ và xe máy · Giá minh bạch · Q3/2026</div>
       </div>
+      <div class="srv-card srv-agent reveal" style="transition-delay:.55s;cursor:pointer" onclick="window.location.href='/agent'">
+        <div class="srv-icon">🤖</div>
+        <div class="srv-name">CRABOR Agent</div>
+        <div class="srv-sub">Hỏi AI làm bài tập, soạn thảo, tạo Word/Excel · Ngay bây giờ</div>
+        <div class="srv-badge" style="background:#9B59B6;color:#fff">NEW</div>
+      </div>
     </div>
   </div>
 </section>
@@ -878,7 +878,7 @@ footer{
       <div class="feat-card reveal reveal-delay-3">
         <div class="feat-icon fi-orange">🎁</div>
         <div class="feat-name">Điểm thưởng CRABOR</div>
-        <div class="feat-desc">Mỗi đơn tích điểm thưởng, đổi voucher giảm giá cho lần đặt tiếp theo.</div>
+        <div class="feat-desc">Mỗi đơn tích điểm thưởng, đổi voucher giảm giá cho lần đặt tiếp theo. <a href="/points" style="color:#F0B429;font-weight:900">Xem điểm của bạn →</a></div>
       </div>
     </div>
   </div>
@@ -1059,7 +1059,6 @@ footer{
     <div class="footer-col">
       <h4>Kiếm thêm thu nhập</h4>
       <ul>
-        <li onclick="window.location.href='/sales'">🎯 Trở thành CTV Sales</li>
         <li onclick="window.location.href='/register'">🛵 Đăng ký Shipper</li>
         <li onclick="window.location.href='/register'">🍜 Mở tiệm đối tác</li>
       </ul>
@@ -1079,7 +1078,6 @@ footer{
     <p>© 2025 CRABOR TECH CO., LTD. Đã đăng ký bản quyền.</p>
     <div class="footer-mini">
       <a href="/admin.html">⚙️ Admin</a>
-      <a href="/sales">🎯 CTV Sales</a>
     </div>
     <button class="footer-tos" onclick="openModal()">📜 Điều khoản & Chính sách pháp lý</button>
   </div>
@@ -1149,7 +1147,7 @@ footer{
         <div class="tos-part-title">PHẦN IV. CHÍNH SÁCH DÀNH CHO SHIPPER</div>
         <div class="tos-section"><h4>1. Tư cách pháp lý</h4><ul><li>Shipper là đối tác độc lập, không phải nhân viên của Crabor</li><li>Tự chịu trách nhiệm về thuế, bảo hiểm và rủi ro cá nhân</li></ul></div>
         <div class="tos-section"><h4>2. Phí đăng ký</h4><ul><li>Phí đăng ký ban đầu: <strong>700.000 VNĐ</strong></li><li>Bao gồm: kích hoạt tài khoản, đồng phục, xác minh & lưu trữ thông tin giấy tờ</li></ul></div>
-        <div class="tos-section"><h4>3. Thu nhập & khấu trừ</h4><ul><li>Phí giao hàng ~3.000đ/km (giai đoạn đầu)</li><li>Crabor khấu trừ 30% phí giao hàng như phí nền tảng — shipper nhận 70%</li></ul></div>
+        <div class="tos-section"><h4>3. Thu nhập & khấu trừ</h4><ul><li>Phí giao hàng ~3.000đ/km (giai đoạn đầu)</li><li>Crabor khấu trừ 30% phí giao hàng như phí nền tảng — shipper nhận 70%</li><li>Khi khách dùng voucher, khoản giảm giá được khấu trừ vào thu nhập của shipper & đối tác theo tỷ lệ thu nhập thực nhận (Crabor không chịu) — trừ khi cả hai đạt ≥100 đơn/tháng thì Crabor chịu toàn bộ</li></ul></div>
         <div class="tos-section"><h4>4. Nghĩa vụ shipper</h4><ul><li>Giao hàng đúng đơn, đúng người nhận</li><li>Không gian lận GPS, không nhận tiền ngoài hệ thống</li><li>Tuân thủ luật giao thông và quy định ứng dụng</li></ul></div>
         <div class="tos-section"><h4>5. Kỷ luật & xử lý vi phạm</h4><p>Crabor có quyền: Cảnh cáo, Tạm khóa, Khóa vĩnh viễn tài khoản shipper trong trường hợp vi phạm nghiêm trọng, không cần báo trước.</p></div>
         <div class="tos-section"><h4>6. Miễn trừ trách nhiệm</h4><p>Crabor không chịu trách nhiệm đối với: Tai nạn giao thông; Tranh chấp giữa shipper và người dùng; Vi phạm pháp luật cá nhân của shipper.</p></div>

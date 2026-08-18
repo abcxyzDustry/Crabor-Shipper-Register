@@ -21,7 +21,6 @@
     const p = location.pathname.toLowerCase();
     if (p.includes('register')) return 'register';
     if (p.includes('partner'))  return 'partner';
-    if (p.includes('sales'))    return 'sales';
     if (p.includes('shipper'))  return 'shipper';
     if (p.includes('admin'))    return 'admin';
     return 'customer';
@@ -32,7 +31,6 @@
     customer: ['CRABOR là gì?', 'Các dịch vụ?', 'Hỗ trợ đổi/trả?', 'Liên hệ?'],
     shipper:  ['Đăng ký shipper?', 'Thu nhập bao nhiêu?', 'Phí kích hoạt?', 'Hạng shipper?'],
     partner:  ['Đăng ký đối tác?', 'Hoa hồng bao nhiêu?', 'Duyệt mất bao lâu?', 'Liên hệ?'],
-    sales:    ['CTV kiếm tiền?', 'Mã giới thiệu?', 'Rút tiền?', 'Liên hệ?'],
     register: ['Đăng ký shipper?', 'Đăng ký đối tác?', 'Phí là bao nhiêu?', 'Liên hệ?'],
     admin:    ['Tình trạng hệ thống?', 'Thống kê hôm nay?', 'Coco AI status?', 'Liên hệ?'],
     default:  ['CRABOR là gì?', 'Dịch vụ gì?', 'Đăng ký?', 'Liên hệ?'],

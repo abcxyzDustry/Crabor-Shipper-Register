@@ -48,7 +48,7 @@ const cocoOps   = require("./coco-ops");
 const cocoBrain = require("./coco-brain");
 const { cocoThink, CocoReasoning, checkBrainStatus, printBrainSetupGuide, mountCocoRoutes } = cocoBrain;
 
-// COCO_BRAIN defaults to 'auto' — tries OpenRouter → Groq → Claude → rule
+// COCO_BRAIN defaults to 'auto' — tries OpenRouter → Groq → Claude → Cloudflare → rule
 process.env.COCO_BRAIN = process.env.COCO_BRAIN || 'auto';
 const novaAgent = require("./nova-agent");
 const { SLAMonitor, RevenueIntel, DispatchIntel, InventoryIntel,
@@ -555,7 +555,6 @@ const userSchema = new mongoose.Schema({
   phone:           { type: String, required: true, unique: true, trim: true,
                      validate: { validator: v => PHONE_RE.test(v), message: "SĐT không hợp lệ (0xxxxxxxxx)" } },
   fullName:        { type: String, trim: true, maxlength: 100 },
-  refCode:         { type: String, trim: true, uppercase: true },
   email:           { type: String, trim: true, lowercase: true,
                      validate: { validator: v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), message: "Email không hợp lệ" } },
   avatar:          String,
@@ -678,6 +677,13 @@ const orderSchema = new mongoose.Schema({
   // Voucher
   voucherCode:    { type: String, trim: true, uppercase: true },
   voucherDiscount:{ type: Number, default: 0, min: 0 },
+  // Điểm loyalty đã cộng cho đơn này chưa (chống cộng đúp)
+  loyaltyPointsGranted: { type: Boolean, default: false },
+  // Phân bổ chi phí voucher (CRABOR là trung gian, mặc định shipper + đối tác gánh;
+  // chỉ khi cả 2 đạt ≥100 đơn/tháng thì CRABOR chịu toàn bộ)
+  voucherShipperBear: { type: Number, default: 0, min: 0 },
+  voucherPartnerBear: { type: Number, default: 0, min: 0 },
+  voucherCraborBear:  { type: Number, default: 0, min: 0 },
   // Chat messages (inline, không cần collection riêng)
   chatMessages: [{
     from:    { type: String, enum: ['customer','shipper'], required: true },
@@ -713,7 +719,6 @@ const shipperSchema = new mongoose.Schema({
   firstName:   { type: String, required: true, trim: true, maxlength: 50 },
   lastName:    { type: String, required: true, trim: true, maxlength: 50 },
   fullName:    { type: String, trim: true },
-  refCode:      { type: String, trim: true, uppercase: true },
   isAccepting:  { type: Boolean, default: true },
   walletBalance: { type: Number, default: 0, min: 0 },
   walletEarned:  { type: Number, default: 0, min: 0 },
@@ -804,7 +809,6 @@ const partnerBase = {
   registerId:   { type: String, unique: true, sparse: true },
   phone:        { type: String, required: true, unique: true, trim: true,
                   validate: { validator: v => PHONE_RE.test(v), message: "SĐT không hợp lệ" } },
-  refCode:      { type: String, trim: true, uppercase: true },
   isAccepting:  { type: Boolean, default: true },
   walletBalance: { type: Number, default: 0, min: 0 },
   walletEarned:  { type: Number, default: 0, min: 0 },
@@ -1067,6 +1071,8 @@ const voucherSchema = new mongoose.Schema({
   usedCount:   { type: Number, default: 0 },
   usedBy:      [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   module:      { type: String, default: 'all' },           // 'all','food','laundry'...
+  target:      { type: String, enum: ['order','ship'], default: 'order' }, // 'order': giảm giá trị đơn | 'ship': giảm phí giao
+  weekly:      { type: String, default: '' },                // mã tuần ISO (vd 2026W34) nếu là voucher tuần tự động
   active:      { type: Boolean, default: true },
   expiresAt:   { type: Date, required: true },
   description: { type: String, trim: true },
@@ -1128,7 +1134,7 @@ const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
 // ── WALLET TRANSACTION ────────────────────────────────────
 const walletTxSchema = new mongoose.Schema({
   ownerId:   { type: mongoose.Schema.Types.ObjectId, required: true },
-  ownerType: { type: String, enum: ['user','shipper','partner','sales'], required: true },
+  ownerType: { type: String, enum: ['user','shipper','partner'], required: true },
   type:      { type: String, enum: ['credit','debit','refund','withdraw','loan_receive','loan_repay','bnpl_pay'], required: true },
   amount:    { type: Number, required: true, min: 0 },
   balance:   { type: Number, required: true },        // số dư sau giao dịch
@@ -1141,7 +1147,7 @@ const WalletTx = mongoose.model('WalletTx', walletTxSchema);
 
 // ── NOTIFICATION (chuông thông báo) ───────────────────────────
 const notificationSchema = new mongoose.Schema({
-  ownerType: { type: String, enum: ['user','shipper','partner','sales'], required: true },
+  ownerType: { type: String, enum: ['user','shipper','partner'], required: true },
   ownerId:   { type: mongoose.Schema.Types.ObjectId, required: true },
   type:      { type: String, enum: ['featured','new_order','income','withdraw','topup','product','cash_due','support','system'], default: 'system' },
   title:     { type: String, required: true, trim: true },
@@ -1256,42 +1262,6 @@ function getNextBillingDates() {
   const due  = new Date(now.getFullYear(), now.getMonth()+1, 15, 15, 0, 0);
   return { issuedAt: next, dueDate: due };
 }
-
-
-// ── SALES ─────────────────────────────
-const salesSchema = new mongoose.Schema({
-  phone:       { type: String, required: true, unique: true, trim: true,
-                 validate: { validator: v => PHONE_RE.test(v), message: "SĐT không hợp lệ" } },
-  fullName:    { type: String, required: true, trim: true, maxlength: 100 },
-  email:       { type: String, trim: true, lowercase: true },
-  refCode:     { type: String, unique: true, sparse: true, uppercase: true },
-  walletBalance: { type: Number, default: 0, min: 0 },
-  totalEarned:   { type: Number, default: 0, min: 0 },
-  status:      { type: String, enum: ["active","suspended"], default: "active" },
-  notes:       { type: String, trim: true, maxlength: 500 },
-}, { timestamps: true });
-salesSchema.index({ phone: 1 });
-salesSchema.index({ refCode: 1 });
-const Sales = mongoose.model("Sales", salesSchema, "sales");
-
-// ── REFERRAL ──────────────────────────
-const referralSchema = new mongoose.Schema({
-  salesId:     { type: mongoose.Schema.Types.ObjectId, ref: "Sales", required: true },
-  refCode:     { type: String, required: true, uppercase: true },
-  targetType:  { type: String, enum: ["user","shipper","partner"], required: true },
-  targetId:    { type: mongoose.Schema.Types.ObjectId, required: true },
-  targetPhone: { type: String, trim: true },
-  targetName:  { type: String, trim: true },
-  module:      { type: String, trim: true },             // partner module
-  status:      { type: String, enum: ["pending","earned"], default: "pending" },
-  earnedAt:    { type: Date },
-  orderId:     { type: mongoose.Schema.Types.ObjectId }, // triggering order
-  amount:      { type: Number, default: 2000 },
-}, { timestamps: true });
-referralSchema.index({ salesId: 1, createdAt: -1 });
-referralSchema.index({ refCode: 1 });
-referralSchema.index({ targetId: 1 });
-const Referral = mongoose.model("Referral", referralSchema, "referrals");
 
 
 // ── APP CONFIG ────────────────────────
@@ -1752,178 +1722,7 @@ async function sendSms(phone, message) {
 // ==========================================
 
 
-// ── SALES HELPER ──────────────────────
-function generateRefCode(phone) {
-  const suffix = phone.slice(-4);
-  const rand = Math.random().toString(36).substring(2,5).toUpperCase();
-  return "CR" + rand + suffix;
-}
-
-async function createUniqueRefCode(phone) {
-  let code, exists = true;
-  while (exists) {
-    code = generateRefCode(phone);
-    exists = await Sales.exists({ refCode: code });
-  }
-  return code;
-}
-
-// Process referral when order completes
-async function processReferralReward(targetId, targetType, io) {
-  try {
-    const ref = await Referral.findOne({ targetId, targetType, status: "pending" });
-    if (!ref) return;
-    // Mark earned
-    ref.status = "earned";
-    ref.earnedAt = new Date();
-    await ref.save();
-    // Add to sales wallet
-    await Sales.findByIdAndUpdate(ref.salesId, {
-      $inc: { walletBalance: ref.amount, totalEarned: ref.amount }
-    });
-    // Notify admin
-    if (io) io.to("admin").emit("salesReward", { salesId: ref.salesId, refCode: ref.refCode, amount: ref.amount, targetType });
-  } catch(e) {
-    console.error("Referral reward error:", e.message);
-  }
-}
-
-
 // ══════════════════════════════════════
-//  SALES ENDPOINTS
-// ══════════════════════════════════════
-
-// POST /api/sales/register — tạo tài khoản sales
-app.post("/api/sales/register", async (req, res) => {
-  try {
-    const { phone, fullName, email, otp } = req.body;
-    if (!phone || !fullName) return res.status(400).json({ success: false, message: "Thiếu SĐT hoặc họ tên" });
-    const norm = normalizePhone(phone);
-    if (!PHONE_RE.test(norm)) return res.status(400).json({ success: false, message: "SĐT không hợp lệ" });
-
-    // Verify OTP
-    const verified = speedSmsCheckOtp(norm, otp);
-    if (!verified) return res.status(400).json({ success: false, message: "Mã OTP không đúng hoặc đã hết hạn" });
-
-    const exists = await Sales.findOne({ phone: norm });
-    if (exists) return res.status(409).json({ success: false, message: "SĐT này đã có tài khoản Sales" });
-
-    const refCode = await createUniqueRefCode(norm);
-    const agent = await Sales.create({ phone: norm, fullName, email, refCode });
-    req.io.to("admin").emit("newSales", { id: agent._id, phone: norm, fullName, refCode });
-    res.json({ success: true, data: { refCode, fullName, phone: norm, id: agent._id } });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST /api/sales/login — đăng nhập bằng OTP
-app.post("/api/sales/login", async (req, res) => {
-  try {
-    const { phone, otp } = req.body;
-    const norm = normalizePhone(phone);
-    const verified = speedSmsCheckOtp(norm, otp);
-    if (!verified) return res.status(400).json({ success: false, message: "OTP không đúng hoặc đã hết hạn" });
-    const agent = await Sales.findOne({ phone: norm });
-    if (!agent) return res.status(404).json({ success: false, message: "Tài khoản không tồn tại" });
-    if (agent.status === "suspended") return res.status(403).json({ success: false, message: "Tài khoản bị tạm khóa" });
-    req.session.salesId = agent._id.toString();
-    req.session.role = "sales";
-    res.json({ success: true, data: { refCode: agent.refCode, fullName: agent.fullName, walletBalance: agent.walletBalance } });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// GET /api/sales/me — thông tin + danh sách referrals
-app.get("/api/sales/me", async (req, res) => {
-  try {
-    if (!req.session.salesId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
-    const agent = await Sales.findById(req.session.salesId);
-    if (!agent) return res.status(404).json({ success: false, message: "Không tìm thấy" });
-    const referrals = await Referral.find({ salesId: agent._id }).sort({ createdAt: -1 }).limit(100).lean();
-    res.json({ success: true, data: { ...agent.toObject(), referrals } });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// GET /api/validate-ref/:code — validate referral code (public)
-app.get("/api/validate-ref/:code", async (req, res) => {
-  try {
-    const agent = await Sales.findOne({ refCode: req.params.code.toUpperCase(), status: "active" });
-    if (!agent) return res.status(404).json({ success: false, message: "Mã giới thiệu không hợp lệ" });
-    res.json({ success: true, salesName: agent.fullName });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// GET /api/admin/sales — danh sách sales (admin)
-app.get("/api/admin/sales", adminAuth, async (req, res) => {
-  try {
-    const { q, page = 1, limit = 20 } = req.query;
-    const filter = q ? { $or: [
-      { phone: { $regex: q } }, { fullName: { $regex: q, $options: "i" } }, { refCode: { $regex: q, $options: "i" } }
-    ]} : {};
-    const [agents, total] = await Promise.all([
-      Sales.find(filter).sort({ createdAt: -1 }).skip((page-1)*limit).limit(Number(limit)).lean(),
-      Sales.countDocuments(filter)
-    ]);
-    // Attach referral counts per agent
-    const ids = agents.map(a => a._id);
-    const counts = await Referral.aggregate([
-      { $match: { salesId: { $in: ids } } },
-      { $group: { _id: "$salesId", total: { $sum: 1 }, earned: { $sum: { $cond: [{ $eq: ["$status","earned"] }, 1, 0] } } } }
-    ]);
-    const countMap = Object.fromEntries(counts.map(c => [c._id.toString(), c]));
-    const result = agents.map(a => ({
-      ...a,
-      referralTotal: countMap[a._id.toString()]?.total || 0,
-      referralEarned: countMap[a._id.toString()]?.earned || 0,
-    }));
-    res.json({ success: true, data: result, total });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// GET /api/admin/sales/:id/referrals — referrals của 1 sales (admin)
-app.get("/api/admin/sales/:id/referrals", adminAuth, async (req, res) => {
-  try {
-    const refs = await Referral.find({ salesId: req.params.id }).sort({ createdAt: -1 }).limit(200).lean();
-    res.json({ success: true, data: refs });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// PATCH /api/admin/sales/:id — cập nhật status sales (admin)
-app.patch("/api/admin/sales/:id", adminAuth, async (req, res) => {
-  try {
-    const { status, walletBalance } = req.body;
-    const update = {};
-    if (status) update.status = status;
-    if (walletBalance !== undefined) update.walletBalance = walletBalance;
-    const agent = await Sales.findByIdAndUpdate(req.params.id, update, { new: true });
-    if (!agent) return res.status(404).json({ success: false, message: "Không tìm thấy" });
-    res.json({ success: true, data: agent });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// DELETE /api/admin/sales/:id — xóa tài khoản sales (admin)
-app.delete("/api/admin/sales/:id", adminAuth, async (req, res) => {
-  try {
-    await Sales.findByIdAndDelete(req.params.id);
-    await Referral.deleteMany({ salesId: req.params.id });
-    res.json({ success: true });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
 
 // DELETE /api/admin/registrations/:type/:id — Xóa hồ sơ vĩnh viễn
 app.delete("/api/admin/registrations/:type/:id", adminAuth, async (req, res) => {
@@ -2321,13 +2120,13 @@ console.log(" [Bot] Auto-approve bot scheduled (partners: 1h, shipper/driver: on
 
 // ── WALLET HELPER ─────────────────────────────────────────
 async function walletCredit(ownerId, ownerType, amount, ref, note) {
-  const Model = ownerType==='user' ? User : ownerType==='shipper' ? Shipper : ownerType==='sales' ? Sales : FoodPartner;
+  const Model = ownerType==='user' ? User : ownerType==='shipper' ? Shipper : FoodPartner;
   const doc = await Model.findByIdAndUpdate(ownerId, { $inc: { walletBalance: amount, walletEarned: amount } }, { new: true });
   await WalletTx.create({ ownerId, ownerType, type:'credit', amount, balance: doc.walletBalance, ref, note });
   return doc.walletBalance;
 }
 async function walletDebit(ownerId, ownerType, amount, type='debit', ref, note) {
-  const Model = ownerType==='user' ? User : ownerType==='shipper' ? Shipper : ownerType==='sales' ? Sales : FoodPartner;
+  const Model = ownerType==='user' ? User : ownerType==='shipper' ? Shipper : FoodPartner;
   const doc = await Model.findById(ownerId);
   if (!doc || (doc.walletBalance||0) < amount) throw new Error('Số dư không đủ');
   const updated = await Model.findByIdAndUpdate(ownerId, { $inc: { walletBalance: -amount } }, { new: true });
@@ -2506,30 +2305,42 @@ app.post("/api/orders/:id/delivery-photo", async (req, res) => {
     req.io.to(`customer_${order.customerId}`).emit("orderStatusChanged", { orderId: order.orderId, status: "delivered", photo: photoUp });
     req.io.to("admin").emit("orderUpdated", { orderId: order.orderId, status: "delivered" });
     notifyDiscord("delivered", order);
-    // processReferralReward
-    if (order.customerId) await processReferralReward(order.customerId, "user", req.io).catch(()=>{});
+    // Tích điểm loyalty (1/10 giá trị đơn) nếu chưa được cộng
+    if (order.customerId && !order.loyaltyPointsGranted) {
+      order.loyaltyPointsGranted = true;
+      await order.save().catch(()=>{});
+      await earnLoyaltyPoints(order.customerId, orderPaidAmount(order));
+    }
     res.json({ success: true, message: "Đã xác nhận giao thành công!" });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// GET /api/vouchers/validate — Validate mã voucher
+// GET /api/vouchers/validate — Validate mã voucher (hỗ trợ target ship: giảm phí giao)
 app.get("/api/vouchers/validate", async (req, res) => {
   try {
-    const { code, total, userId, module: mod } = req.query;
+    const { code, total, shipFee, userId, module: mod } = req.query;
     if (!code) return res.status(400).json({ success: false });
     const v = await Voucher.findOne({ code: code.toUpperCase().trim(), active: true });
     if (!v) return res.status(404).json({ success: false, message: "Mã không tồn tại hoặc đã hết hạn" });
     if (new Date() > v.expiresAt) return res.status(400).json({ success: false, message: "Mã đã hết hạn" });
     if (v.usedCount >= v.usageLimit) return res.status(400).json({ success: false, message: "Mã đã dùng hết lượt" });
     if (userId && v.usedBy.map(String).includes(String(userId))) return res.status(400).json({ success: false, message: "Bạn đã dùng mã này rồi" });
-    if (Number(total) < v.minOrder) return res.status(400).json({ success: false, message: `Đơn tối thiểu ${v.minOrder.toLocaleString()}đ` });
+
+    // target 'ship': giảm theo phí giao; target 'order': giảm theo giá trị đơn
+    const base = v.target === "ship" ? (Number(shipFee) || Number(total) || 0) : (Number(total) || 0);
+    if (base < v.minOrder) return res.status(400).json({ success: false, message: `Đơn tối thiểu ${v.minOrder.toLocaleString()}đ` });
     if (v.module !== "all" && v.module !== mod) return res.status(400).json({ success: false, message: "Mã không áp dụng cho đơn này" });
-    const discount = v.type === "percent"
-      ? Math.min(Math.round(Number(total) * v.value / 100), v.maxDiscount || Infinity)
-      : v.value;
-    res.json({ success: true, discount, description: v.description || `Giảm ${v.type==='percent'?v.value+'%':v.value.toLocaleString()+'đ'}` });
+    const discount = base > 0 && v.type === "percent"
+      ? Math.min(Math.round(base * v.value / 100), v.maxDiscount || Infinity)
+      : (base > 0 ? Math.min(v.value, base) : 0);
+    res.json({
+      success: true, discount, target: v.target,
+      base: Math.round(base),
+      description: v.description || `Giảm ${v.type==='percent'?v.value+'%':v.value.toLocaleString()+'đ'}`,
+      label: v.target === "ship" ? "phí giao hàng" : "giá trị đơn",
+    });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -2550,11 +2361,84 @@ app.post("/api/vouchers", adminAuth, async (req, res) => {
       description: v.description,
       expiresAt:   v.expiresAt,
       module:      v.module,
+      target:      v.target || "order",
     });
     res.json({ success: true, data: v });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
+});
+
+// ── Weekly Voucher (voucher tuần — tự tạo đầu mỗi tuần, giảm phí giao) ──
+const WEEKLY_VOUCHER_CFG = {
+  type: "percent", value: 50, maxDiscount: 25000, minOrder: 50000,
+  target: "ship", module: "all", days: 7,
+  description: "Voucher tuần: Giảm 50% phí giao hàng (tối đa 25.000đ) — áp dụng mọi dịch vụ",
+};
+
+function isoWeekKey(d = new Date()) {
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}W${String(week).padStart(2, "0")}`;
+}
+
+async function generateWeeklyVoucher() {
+  try {
+    const key = isoWeekKey(new Date());
+    const existing = await Voucher.findOne({ weekly: { $exists: true, $ne: "" } }).lean().catch(() => null);
+    if (existing && existing.weekly === key) return existing;
+    const code = "WEEKLY-" + key.replace("W", "");
+    const v = await Voucher.create({
+      code,
+      type: WEEKLY_VOUCHER_CFG.type,
+      value: WEEKLY_VOUCHER_CFG.value,
+      minOrder: WEEKLY_VOUCHER_CFG.minOrder,
+      maxDiscount: WEEKLY_VOUCHER_CFG.maxDiscount,
+      usageLimit: 100000,
+      expiresAt: new Date(Date.now() + WEEKLY_VOUCHER_CFG.days * 24 * 3600 * 1000),
+      description: WEEKLY_VOUCHER_CFG.description,
+      module: WEEKLY_VOUCHER_CFG.module,
+      target: WEEKLY_VOUCHER_CFG.target,
+      weekly: key,
+      active: true,
+    });
+    console.log(`[WeeklyVoucher] Đã tạo voucher tuần mới: ${code} (${key})`);
+    return v;
+  } catch (e) {
+    console.error("[WeeklyVoucher] Tạo voucher thất bại:", e.message);
+    return null;
+  }
+}
+
+// Check & tạo voucher tuần mới: lúc khởi động + mỗi 3 giờ
+setTimeout(generateWeeklyVoucher, 15000);
+setInterval(generateWeeklyVoucher, 3 * 3600 * 1000);
+
+// GET /api/admin/weekly-voucher — Thông tin voucher tuần cho trang quản trị
+app.get("/api/admin/weekly-voucher", adminAuth, async (req, res) => {
+  try {
+    const v = await generateWeeklyVoucher();
+    if (!v) return res.status(500).json({ success: false, message: "Không tạo được voucher tuần" });
+    const [usedCount, turnover] = await Promise.all([
+      Order.countDocuments({ voucherCode: v.code, status: { $nin: ["cancelled", "expired"] } }),
+      Order.aggregate([
+        { $match: { voucherCode: v.code, status: "delivered" } },
+        { $group: { _id: null, t: { $sum: { $ifNull: ["$finalTotal", 0] } } } },
+      ]),
+    ]);
+    res.json({
+      success: true,
+      voucher: v,
+      stats: {
+        week: v.weekly,
+        usedCount,
+        turnover: turnover[0]?.t || 0,
+      },
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // GET /api/vouchers/public — Public list vouchers cho customer app
@@ -2978,17 +2862,23 @@ app.patch("/api/orders/:id/schedule", async (req, res) => {
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// POST /api/loyalty/earn — Cộng điểm sau đơn delivered (gọi sau processReferralReward)
+// POST /api/loyalty/earn — Cộng điểm sau đơn delivered (gọi sau delivered/completed)
 async function earnLoyaltyPoints(userId, orderTotal) {
   try {
     if (!userId || !orderTotal) return;
-    const pts = Math.floor(orderTotal / 10000); // 1 điểm / 10k chi tiêu
+    const pts = Math.floor(orderTotal / 10); // điểm = 1/10 giá trị đơn
     if (pts <= 0) return;
     await User.findByIdAndUpdate(userId, {
       $inc: { loyaltyPts: pts, totalSpent: orderTotal }
     });
-    console.log(` [Loyalty] +${pts} pts for user ${userId}`);
+    console.log(` [Loyalty] +${pts} pts (đơn ${orderTotal}) cho user ${userId}`);
   } catch(e) {}
+}
+
+// ── Helper: tính tổng tiền thực trả của đơn để cộng điểm ──
+function orderPaidAmount(order, extra = {}) {
+  if (order.finalTotal != null && order.finalTotal > 0) return Math.round(order.finalTotal);
+  return Math.max(0, Math.round((order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0)));
 }
 
 // GET /api/loyalty/me — Điểm tích lũy của user
@@ -2999,10 +2889,10 @@ app.get("/api/loyalty/me", async (req, res) => {
     if (!user) return res.status(404).json({ success: false });
     const pts = user.loyaltyPts || 0;
     const tiers = [
-      { name:'Thành viên', icon:'🥉', min:0,    color:'#cd7f32', perks:['Tích 1đ/10k'] },
-      { name:'Bạc',        icon:'🥈', min:100,  color:'#aaa',    perks:['Tích 1.2đ/10k','Voucher sinh nhật'] },
-      { name:'Vàng',       icon:'🥇', min:500,  color:'#FFD700', perks:['Tích 1.5đ/10k','Freeship 2 đơn/tháng'] },
-      { name:'VIP',        icon:'💎', min:2000, color:'#b9f2ff', perks:['Tích 2đ/10k','Freeship không giới hạn','Ưu tiên shipper'] },
+      { name:'Thành viên', icon:'🥉', min:0,    color:'#cd7f32', perks:['Tích điểm 10% giá trị đơn'] },
+      { name:'Bạc',        icon:'🥈', min:25000,  color:'#aaa',    perks:['Tích điểm 10% giá trị đơn','Voucher sinh nhật'] },
+      { name:'Vàng',       icon:'🥇', min:100000, color:'#FFD700', perks:['Tích điểm 12% giá trị đơn','Freeship 2 đơn/tháng'] },
+      { name:'VIP',        icon:'💎', min:300000, color:'#b9f2ff', perks:['Tích điểm 15% giá trị đơn','Freeship không giới hạn','Ưu tiên shipper'] },
     ];
     let currentTier = tiers[0];
     for (let i = tiers.length-1; i >= 0; i--) {
@@ -3013,21 +2903,44 @@ app.get("/api/loyalty/me", async (req, res) => {
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// POST /api/loyalty/redeem — Đổi điểm lấy voucher
+// ── Mức đổi điểm → voucher (quy đổi bắt đầu từ 10.000 điểm) ──
+const LOYALTY_LEVELS = [
+  { pts: 10000, title: 'Giảm 20% phí giao hàng', target: 'ship', type: 'percent', value: 20, maxDiscount: 30000, days: 30,
+    desc: 'Voucher giảm 20% phí giao hàng (tối đa 30.000đ) — áp dụng mọi dịch vụ' },
+  { pts: 20000, title: 'Giảm 50% phí giao hàng', target: 'ship', type: 'percent', value: 50, maxDiscount: 50000, days: 30,
+    desc: 'Voucher giảm 50% phí giao hàng (tối đa 50.000đ) — áp dụng mọi dịch vụ' },
+  { pts: 30000, title: 'Miễn phí giao hàng (Freeship)', target: 'ship', type: 'percent', value: 100, maxDiscount: 80000, days: 30,
+    desc: 'Voucher miễn phí giao hàng (tối đa 80.000đ) — áp dụng mọi dịch vụ' },
+];
+
+// GET /api/loyalty/levels — Danh sách voucher đổi được bằng điểm
+app.get("/api/loyalty/levels", async (req, res) => {
+  try {
+    res.json({ success: true, levels: LOYALTY_LEVELS });
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/loyalty/redeem — Đổi điểm tích lũy lấy voucher (tối thiểu 10.000 điểm)
 app.post("/api/loyalty/redeem", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false });
-    const { pts } = req.body; // số điểm muốn đổi
-    if (!pts || pts < 50) return res.status(400).json({ success: false, message: "Tối thiểu 50 điểm để đổi" });
+    const { pts } = req.body;
+    const level = LOYALTY_LEVELS.find(l => l.pts === Number(pts));
+    if (!level) return res.status(400).json({ success: false, message: "Mức điểm không hợp lệ. Hãy chọn gói có sẵn." });
+    if (level.pts < 10000) return res.status(400).json({ success: false, message: "Tối thiểu 10.000 điểm để quy đổi" });
     const user = await User.findById(req.session.userId);
-    if (!user || (user.loyaltyPts || 0) < pts) return res.status(400).json({ success: false, message: "Không đủ điểm" });
-    const discount = pts * 200; // 1 điểm = 200đ
-    // Create one-time voucher
-    const code = "LYL" + Date.now().toString(36).toUpperCase();
-    const expiry = new Date(Date.now() + 7*24*3600*1000); // 7 ngày
-    await Voucher.create({ code, type:"fixed", value:discount, minOrder:0, usageLimit:1, expiresAt:expiry, description:`Đổi ${pts} điểm`, module:"all", active:true });
-    await User.findByIdAndUpdate(req.session.userId, { $inc: { loyaltyPts: -pts } });
-    res.json({ success: true, code, discount, message: `Đã đổi ${pts} điểm thành voucher ${code} (giảm ${discount.toLocaleString('vi-VN')}đ)` });
+    if (!user || (user.loyaltyPts || 0) < level.pts) return res.status(400).json({ success: false, message: `Không đủ điểm (bạn có ${(user.loyaltyPts||0).toLocaleString('vi-VN')} điểm)` });
+    // Tạo voucher dùng 1 lần
+    const code = "LPT" + Date.now().toString(36).toUpperCase();
+    const expiry = new Date(Date.now() + level.days * 24 * 3600 * 1000);
+    await Voucher.create({
+      code, type: level.type, value: level.value, minOrder: 0,
+      maxDiscount: level.maxDiscount, usageLimit: 1, expiresAt: expiry,
+      description: level.desc || level.title, module: "all", target: level.target, active: true,
+    });
+    await User.findByIdAndUpdate(req.session.userId, { $inc: { loyaltyPts: -level.pts } });
+    res.json({ success: true, code, ptsSpent: level.pts, ptsLeft: Math.max(0, (user.loyaltyPts||0) - level.pts), title: level.title, expiry,
+      message: `Đã đổi ${level.pts.toLocaleString('vi-VN')} điểm thành voucher ${code} (${level.title})` });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -3075,21 +2988,6 @@ app.get("/api/analytics/zones", adminAuth, async (req, res) => {
       { $sort:{ count:-1 } }, { $limit:20 }
     ]);
     res.json({ success:true, zones });
-  } catch(err) { res.status(500).json({ success:false, message:err.message }); }
-});
-
-// GET /api/sales/leaderboard — Top Sales CTV tháng này
-app.get("/api/sales/leaderboard", async (req, res) => {
-  try {
-    const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
-    const top = await Sales.find({ status:"active" })
-      .sort({ totalEarned:-1 }).limit(10)
-      .select("fullName refCode walletBalance totalEarned phone");
-    const leaderboard = top.map((s, i) => ({
-      rank: i+1, name: s.fullName, refCode: s.refCode,
-      earned: s.totalEarned, phone: s.phone.slice(0,4)+"****"+s.phone.slice(-3),
-    }));
-    res.json({ success:true, leaderboard });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -3853,7 +3751,6 @@ function pruneSessionRoles(req, keepRole) {
   if (keepRole !== 'user')    delete req.session.userId;
   if (keepRole !== 'partner') delete req.session.partnerId;
   if (keepRole !== 'admin')   delete req.session.adminId;
-  if (keepRole !== 'sales')   delete req.session.salesId;
 }
 
 // GET /api/notifications/my — Danh sách thông báo của owner (shipper/partner/user)
@@ -3895,7 +3792,7 @@ app.get("/api/wallet", async (req, res) => {
     const owner = getWalletOwner(req);
     if (!owner) return res.status(401).json({ success:false });
     const Model = owner.type==='user' ? User : owner.type==='shipper' ? Shipper
-               : owner.type==='sales' ? Sales : FoodPartner;
+               : FoodPartner;
     const doc = await Model.findById(owner.id).select('walletBalance walletEarned fullName phone');
     if (!doc) return res.status(404).json({ success:false });
     const txs = await WalletTx.find({ ownerId: owner.id }).sort({ createdAt:-1 }).limit(50);
@@ -3927,15 +3824,14 @@ app.get("/api/wallet/shipper", async (req, res) => {
     const weekStart = new Date(now - 7*24*3600*1000);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     
-    const shipperCut = 0.7; // nền tảng thu 30% — shipper giữ 70%
     const [todayOrders, weekOrders, monthOrders, pendingTx] = await Promise.all([
-      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee module total").lean(),
-      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee module total").lean(),
-      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee module total").lean(),
+      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee module total discount voucherShipperBear").lean(),
+      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee module total discount voucherShipperBear").lean(),
+      Order.find({ shipperId: shipper._id, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee module total discount voucherShipperBear").lean(),
       WalletQueue.find({ recipientId: shipper._id, recipientType: "shipper", status: "pending" }).lean(),
     ]);
     
-    const calcEarnings = (orders) => orders.reduce((s,o) => s + Math.round(shipperOrderEarningsBase(o)*shipperCut), 0);
+    const calcEarnings = (orders) => orders.reduce((s,o) => s + shipperOrderEarnNet(o), 0);
     const todayEarnings = calcEarnings(todayOrders);
     const weekEarnings = calcEarnings(weekOrders);
     const monthEarnings = calcEarnings(monthOrders);
@@ -4103,7 +3999,7 @@ app.post("/api/bnpl/invoice/:id/confirm-paid", adminAuth, async (req,res) => {
     const inv = await BNPLInvoice.findByIdAndUpdate(req.params.id,{status:'paid',paidAt:new Date()},{new:true});
     if (!inv) return res.status(404).json({success:false});
     await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
-    await User.findByIdAndUpdate(inv.userId,{$inc:{loyaltyPts:Math.floor(inv.totalAmount/10000)}});
+    await User.findByIdAndUpdate(inv.userId,{$inc:{loyaltyPts:Math.floor(inv.totalAmount/10)}});
     req.io.to('admin').emit('bnplPaid',{invoiceId:inv._id,amount:inv.finalAmount});
     res.json({success:true});
   } catch(e){res.status(500).json({success:false,message:e.message});}
@@ -4242,7 +4138,7 @@ async function processSePayPayment(payload, ioRef, force = false) {
     if (inv && amount >= (inv.finalAmount - 1000)) { // tolerance 1k
       await BNPLInvoice.findByIdAndUpdate(inv._id, { status:'paid', paidAt: new Date() });
       await BNPLTx.updateMany({ invoiceId: inv._id }, { status:'paid' });
-      await User.findByIdAndUpdate(inv.userId, { $inc: { loyaltyPts: Math.floor(inv.totalAmount/10000) } });
+      await User.findByIdAndUpdate(inv.userId, { $inc: { loyaltyPts: Math.floor(inv.totalAmount/10) } });
       ioInstance?.to('admin').emit('bnplPaid', { invoiceId:inv._id, amount:inv.finalAmount });
       ioInstance?.to(inv.userId.toString()).emit('bnplConfirmed', { invoiceId:inv._id });
       console.log(`[SEPAY] BNPL confirmed: ${inv._id}`);
@@ -5821,6 +5717,160 @@ app.post("/api/admin/notify", adminAuth, async (req, res) => {
 });
 
 
+// ══════════════════════════════════════════
+//  CRABOR AGENT — học tập & văn phòng
+//  Chat AI làm bài tập, soạn thảo, Word/Excel
+// ══════════════════════════════════════════
+const AGENT_DISCLAIMER = "⚠️ Lưu ý: Đây là nội dung do AI (CRABOR Agent) tạo ra, có thể có sai sót hoặc không đúng với thực tế. Hãy kiểm tra lại trước khi sử dụng cho bài tập, văn bản quan trọng.";
+
+const AGENT_SYSTEM_PROMPT = `Bạn là CRABOR Agent — trợ lý AI thông minh của CRABOR, chuyên giúp người dùng việc học tập và công việc văn phòng.
+Hỗ trợ: giải bài tập (toán, lý, hóa, văn, tiếng Anh...), giải thích khái niệm, soạn thảo nội dung, viết văn bản, tạo bảng Word/Excel, gợi ý công thức.
+Trả lời bằng tiếng Việt, đầy đủ và dễ hiểu. Nếu đề bài yêu cầu tính toán, hãy trình bày từng bước rõ ràng.
+Với nội dung tạo ra có tính chuyên môn (bài tập, giấy tờ), hãy kết thúc bằng ghi chú: "⚠️ Nội dung do AI tạo, có thể có sai sót. Bạn nên kiểm tra lại."`;
+
+function agentMarkdownToWord(content) {
+  const { AlignmentType } = require('docx');
+  const Paragraph = require('docx').Paragraph;
+  const TextRun = require('docx').TextRun;
+  const lines = String(content || '').split('\n');
+  const paragraphs = [];
+  for (const raw of lines) {
+    const line = raw.replace(/\r$/, '');
+    const t = line.trim();
+    if (!t) { paragraphs.push(new Paragraph({ text: '', spacing: { after: 60 } })); continue; }
+    if (/^#{1,3}\s/.test(t)) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: t.replace(/^#{1,3}\s*/, ''), bold: true, size: 30, color: '1F3A5F' })],
+        spacing: { before: 200, after: 120 },
+      }));
+      continue;
+    }
+    if (/^[-*•]\s/.test(t)) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: '• ' + t.replace(/^[-*•]\s*/, '') })],
+        bullet: { level: 0 },
+      }));
+      continue;
+    }
+    if (/^\d+\.\s/.test(t)) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: t })],
+        numbering: { reference: 'default', level: 0 },
+      }));
+      continue;
+    }
+    paragraphs.push(new Paragraph({
+      children: [new TextRun({ text: t, size: 24 })],
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: 100 },
+    }));
+  }
+  return paragraphs;
+}
+
+// POST /api/agent/chat — chat với CRABOR Agent (học tập / văn phòng)
+app.post("/api/agent/chat", async (req, res) => {
+  try {
+    const { text, message, sessionId } = req.body || {};
+    const userInput = String(message || text || '').trim();
+    if (!userInput) return res.status(400).json({ success: false, error: 'Thiếu nội dung tin nhắn' });
+
+    const cocoBrainMod = require('./coco-brain');
+    const { cocoThink, ConversationManager } = cocoBrainMod;
+    const sid = sessionId || `agent_${req.session?.userId || 'anon'}_${Date.now()}`;
+
+    let history = [];
+    try {
+      history = await ConversationManager.getHistory(sid, 10);
+    } catch(_) { history = []; }
+
+    const messages = [...history.slice(-8), { role: 'user', content: userInput }];
+    const result = await cocoThink(messages, {
+      task: 'chat',
+      temperature: 0.6,
+      maxTokens: 1200,
+      systemPrompt: AGENT_SYSTEM_PROMPT + (process.env.AGENT_TOKEN_NOTE || ''),
+    });
+
+    let reply = result && result.text ? result.text : 'Xin lỗi, Agent chưa xử lý được yêu cầu này ngay lúc này 🙏. Hãy thử lại sau.';
+    let display = reply.trim();
+
+    try {
+      await ConversationManager.saveMessages(sid, userInput, display, result?.model || 'rule', 'agent');
+    } catch(_) {}
+
+    return res.json({
+      success: true,
+      text: display + '\n\n' + AGENT_DISCLAIMER,
+      reply: display,
+      disclaimer: AGENT_DISCLAIMER,
+      sessionId: sid,
+      backend: result?.backend || 'rule',
+      canReason: !!result?.canReason,
+    });
+  } catch (err) {
+    console.error('[Agent Chat]', err.message);
+    return res.status(500).json({ success: false, message: 'CRABOR Agent tạm thời gián đoạn 🙏' });
+  }
+});
+
+// POST /api/agent/export — tạo file Word (.docx) hoặc Excel (.xlsx)
+app.post("/api/agent/export", async (req, res) => {
+  try {
+    const { format = 'word', title = 'CRABOR Agent', content = '' } = req.body || {};
+    const docx = require('docx');
+    const XLSX = require('xlsx');
+
+    if (format === 'excel') {
+      const rows = [];
+      (String(content || '').split('\n')).forEach(line => {
+        const t = line.replace(/\r$/, '').trim();
+        if (!t) return;
+        if (t.includes('\t') || t.includes(' | ')) {
+          rows.push(t.split(/\t|\s\|\s/).map(c => c.trim()));
+        } else {
+          rows.push([t]);
+        }
+      });
+      if (!rows.length) rows.push([content || '']);
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Agent');
+      const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+      const fname = `${(title || 'CRABOR-Agent').replace(/[^\w\sÀ-ỹà-ỹ-]/gi, '')}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fname)}"`);
+      return res.send(Buffer.from(buf));
+    }
+
+    // Word
+    const { Document, Packer, Paragraph, TextRun, AlignmentType, NumberFormat } = docx;
+    const children = agentMarkdownToWord(content);
+    const doc = new Document({
+      numbering: { config: [{ reference: 'default', levels: [{ level: 0, format: NumberFormat.DECIMAL, text: '%1.', alignment: AlignmentType.LEFT }] }] },
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 240 },
+            children: [new TextRun({ text: title || 'CRABOR Agent', bold: true, size: 44, color: 'E8504A' })],
+          }),
+          ...children,
+        ],
+      }],
+    });
+    const buf = await Packer.toBuffer(doc);
+    const fname = `${(title || 'CRABOR-Agent').replace(/[^\w\sÀ-ỹà-ỹ-]/gi, '')}.docx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fname)}"`);
+    return res.send(Buffer.from(buf));
+  } catch (err) {
+    console.error('[Agent Export]', err.message);
+    return res.status(500).json({ success: false, message: 'Không tạo được file 🙏' });
+  }
+});
+
 // Landing (root) — Màn hình chọn vai trò
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
@@ -5828,8 +5878,9 @@ app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.ht
 app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
-app.get("/sales",    (req, res) => res.sendFile(path.join(__dirname, "public", "sales.html")));
 app.get("/payment",  (req, res) => res.sendFile(path.join(__dirname, "public", "payment.html")));
+app.get("/points",   (req, res) => res.sendFile(path.join(__dirname, "public", "points.html")));
+app.get("/agent",    (req, res) => res.sendFile(path.join(__dirname, "public", "agent.html")));
 
 // Form đăng ký unified (public)
 app.get("/register", (req, res) => res.sendFile(path.join(__dirname, "public", "register.html")));
@@ -5922,26 +5973,11 @@ app.post("/api/auth/complete-profile", async (req, res) => {
   try {
     if (!req.session.userId)
       return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
-    const { fullName, email, district, dob, gender, refCode } = req.body;
+    const { fullName, email, district, dob, gender } = req.body;
     if (!fullName || fullName.trim().length < 2)
       return res.status(400).json({ success: false, message: "Vui lòng nhập họ tên (ít nhất 2 ký tự)" });
     const updateData = { fullName: fullName.trim(), email, district, dob, gender, profileComplete: true };
-    if (refCode) updateData.refCode = refCode.trim().toUpperCase();
     const user = await User.findByIdAndUpdate(req.session.userId, updateData, { new: true });
-    // Save referral if refCode valid
-    if (refCode) {
-      const agent = await Sales.findOne({ refCode: refCode.trim().toUpperCase(), status: "active" });
-      if (agent && user) {
-        const alreadyRef = await Referral.exists({ targetId: user._id, targetType: "user" });
-        if (!alreadyRef) {
-          await Referral.create({
-            salesId: agent._id, refCode: agent.refCode,
-            targetType: "user", targetId: user._id,
-            targetPhone: user.phone, targetName: fullName.trim()
-          });
-        }
-      }
-    }
     res.json({ success: true, user: { _id: user._id, phone: user.phone, fullName: user.fullName, email: user.email, district: user.district, role: user.role, totalOrders: user.totalOrders, loyaltyPts: user.loyaltyPts } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -6911,15 +6947,15 @@ app.get("/api/shipper/earnings", async (req, res) => {
     const matchPeriod = { ...matchBase, deliveredAt: { $gte: since } };
 
     const [allOrders, periodOrders, todayOrders] = await Promise.all([
-      Order.find(matchBase).select("orderId deliveryFee finalTotal status deliveredAt createdAt module total").lean(),
-      Order.find({ ...matchPeriod, status: "delivered" }).select("orderId deliveryFee finalTotal deliveredAt module total").lean(),
-      Order.find({ ...matchBase, status: "delivered", deliveredAt: { $gte: (() => { const d=new Date(); d.setHours(0,0,0,0); return d; })() } }).select("deliveryFee module total").lean(),
+      Order.find(matchBase).select("orderId deliveryFee finalTotal status deliveredAt createdAt module total discount voucherShipperBear").lean(),
+      Order.find({ ...matchPeriod, status: "delivered" }).select("orderId deliveryFee finalTotal deliveredAt module total discount voucherShipperBear").lean(),
+      Order.find({ ...matchBase, status: "delivered", deliveredAt: { $gte: (() => { const d=new Date(); d.setHours(0,0,0,0); return d; })() } }).select("deliveryFee module total discount voucherShipperBear").lean(),
     ]);
 
-    const shipperCut = 0.7; // nền tảng thu 30% — shipper giữ 70% phí giao
-    const totalEarnings   = allOrders.filter(o=>o.status==="delivered").reduce((s,o) => s + Math.round(shipperOrderEarningsBase(o)*shipperCut), 0);
-    const periodEarnings  = periodOrders.reduce((s,o) => s + Math.round(shipperOrderEarningsBase(o)*shipperCut), 0);
-    const todayEarnings   = todayOrders.reduce((s,o) => s + Math.round(shipperOrderEarningsBase(o)*shipperCut), 0);
+    // Thu nhập thực nhận đã trừ phần shipper gánh voucher (CRABOR trung gian không chịu)
+    const totalEarnings   = allOrders.filter(o=>o.status==="delivered").reduce((s,o) => s + shipperOrderEarnNet(o), 0);
+    const periodEarnings  = periodOrders.reduce((s,o) => s + shipperOrderEarnNet(o), 0);
+    const todayEarnings   = todayOrders.reduce((s,o) => s + shipperOrderEarnNet(o), 0);
     const allDone         = allOrders.filter(o=>o.status==="delivered").length;
     const allCancelled    = allOrders.filter(o=>o.status==="cancelled").length;
 
@@ -6927,7 +6963,7 @@ app.get("/api/shipper/earnings", async (req, res) => {
       type: "delivery",
       label: "Phí giao hàng",
       orderId: o.orderId,
-      amount: Math.round(shipperOrderEarningsBase(o)*shipperCut),
+      amount: shipperOrderEarnNet(o),
       createdAt: o.deliveredAt || o.createdAt,
     })).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -7100,20 +7136,6 @@ app.post("/api/shipper/register", async (req, res) => {
         ? { acceptFood: true, acceptLaundry: true, acceptRide: true, acceptCleaning: true, cleaningRegistered: true }
         : undefined,
     });
-
-    // Save referral if refCode provided
-    const refCode = req.body.refCode;
-    if (refCode) {
-      const agent = await Sales.findOne({ refCode: refCode.toUpperCase(), status: "active" });
-      if (agent) {
-        await Referral.create({
-          salesId: agent._id, refCode: agent.refCode,
-          targetType: "shipper", targetId: shipper._id,
-          targetPhone: phone, targetName: `${lastName} ${firstName}`.trim(),
-          module: "shipper"
-        });
-      }
-    }
 
     // SMS xác nhận
     await sendSms(phone,
@@ -7516,7 +7538,6 @@ app.post("/api/partner/register", async (req, res) => {
       bizYear, services, pricePerKg, capacity, turnaround, openTime, closeTime,
       dob, experience, skills, availableShifts, maxShiftsPerWeek, transport,
       sourceType, categories, skuCount, avgOrderValue, shippingDays, description,
-      refCode,
     } = req.body;
 
     const mod   = slugify(modFe);
@@ -7536,7 +7557,7 @@ app.post("/api/partner/register", async (req, res) => {
       phone: normPhone, firstName: safeFirstName, lastName: safeLastName,
       email: safeEmail, address: address || req.body.address || "Chưa cập nhật",
       district: safeDistrict,
-      refCode: refCode?.toUpperCase(), documents: await uploadImageFields(req.body.documents || {}, "docs"),
+      documents: await uploadImageFields(req.body.documents || {}, "docs"),
     };
     let data = { ...base };
 
@@ -7576,19 +7597,6 @@ app.post("/api/partner/register", async (req, res) => {
       giat_la: "Giat La", giup_viec: "Giup Viec",
       china_shop: "China Shop", food_partner: "Nha hang"
     }[mod] || mod;
-
-    // Referral tracking
-    if (refCode) {
-      const agent = await Sales.findOne({ refCode: refCode.toUpperCase(), status: "active" });
-      if (agent) {
-        await Referral.create({
-          salesId: agent._id, refCode: agent.refCode,
-          targetType: "partner", targetId: partner._id,
-          targetPhone: phone, targetName: partner.bizName || `${firstName} ${lastName}`.trim(),
-          module: mod
-        });
-      }
-    }
 
     await sendSms(phone,
       `CRABOR: Ho so doi tac ${modName} (${partner.registerId}) da duoc tiep nhan. Chung toi se lien he trong 24-48h.`).catch(() => {});
@@ -7841,6 +7849,10 @@ app.post("/api/cleaning/order", async (req, res) => {
     if (pmCleaning === "cash" && user?.cashBlocked) {
       return res.status(403).json({ success: false, message: "Bạn đã hủy đơn quá 2 lần. Vui lòng dùng PayOS, SePay hoặc ví CRABOR.", cashBlocked: true });
     }
+    // ── ÁP VOUCHER (trước đây bị bỏ qua → khách xem giảm giá nhưng không được trừ) ──
+    const servicePrice = Number(price) || 200000;
+    const { discount: cleaningDiscount, applied: appliedVoucher } = await applyVoucher(voucherCode, { order: servicePrice, ship: 0 }, customerId, "cleaning");
+    const finalPrice = Math.max(0, servicePrice - cleaningDiscount);
     const order = new CleaningOrder({
       customerId,
       customerName: receiverName || user?.fullName || "Khách hàng",
@@ -7850,21 +7862,26 @@ app.post("/api/cleaning/order", async (req, res) => {
       addressLng: finalLng,
       serviceType: serviceId,
       serviceName,
-      price: price || 200000,
+      price: servicePrice,
+      discount: cleaningDiscount,
+      voucherCode,
+      voucherDiscount: cleaningDiscount,
       duration: duration || "2-3 tiếng",
       note,
       bookingDate: new Date(finalDate),
       bookingTime: finalTime,
+      paymentMethod: pmCleaning,
       status: "pending",
       statusHistory: [{ status: "pending", by: "customer", time: new Date() }],
     });
     await order.save();
-    // WALLET: trừ tiền ví CRABOR ngay khi đặt đơn dọn nhà
+    // WALLET: trừ tiền ví CRABOR ngay khi đặt đơn dọn nhà (đã trừ discount)
     if (pmCleaning === "wallet") {
-      const amt = Math.round(Number(total) || Number(price) || 200000);
+      const amt = order.finalTotal ?? finalPrice;
       const userDoc = await User.findById(customerId).select("walletBalance");
       if (!userDoc || (userDoc.walletBalance||0) < amt) {
         await CleaningOrder.findByIdAndDelete(order._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: customerId } }).catch(() => {});
         return res.status(400).json({ success: false, message: `Ví CRABOR không đủ số dư. Cần ${amt.toLocaleString("vi-VN")}đ`, walletInsufficient: true });
       }
       order.paymentStatus = "paid";
@@ -7911,7 +7928,8 @@ app.post("/api/cleaning/order", async (req, res) => {
       orderId: order.orderId,
       order: {
         _id: order._id, orderId: order.orderId, serviceName: order.serviceName,
-        price: order.price, duration: order.duration, address: order.address,
+        price: order.price, discount: order.discount || 0, finalTotal: order.finalTotal ?? Math.max(0, (order.price||0) - (order.discount||0)),
+        duration: order.duration, address: order.address,
         addressLat: order.addressLat, addressLng: order.addressLng,
         bookingDate: order.bookingDate, bookingTime: order.bookingTime,
         note: order.note, customerName: order.customerName,
@@ -7923,7 +7941,12 @@ app.post("/api/cleaning/order", async (req, res) => {
       req.io.to(`shipper_${shipper._id}`).emit("order_request", payload);
       console.log(`[Cleaning] Dispatched to shipper ${shipper._id}`);
     }
-    res.status(201).json({ success: true, orderId: order.orderId });
+    res.status(201).json({
+      success: true, orderId: order.orderId,
+      discount: order.discount || 0,
+      finalTotal: order.finalTotal ?? finalPrice,
+      message: cleaningDiscount > 0 ? `Đã áp voucher tiết kiệm ${cleaningDiscount.toLocaleString("vi-VN")}đ` : undefined,
+    });
   } catch (err) {
     console.error('[Cleaning Order] Error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -8002,6 +8025,10 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
     });
     if (status === "completed") {
       order.completedAt = new Date();
+      if (!order.loyaltyPointsGranted && order.customerId) {
+        order.loyaltyPointsGranted = true;
+        await earnLoyaltyPoints(order.customerId, orderPaidAmount(order, { cleaning: true }));
+      }
       const { shipperEarn } = await calcEarnings(order);
       const WalletQueue = mongoose.models.WalletQueue;
       if (WalletQueue) {
@@ -8412,6 +8439,10 @@ const laundryOrderSchema = new mongoose.Schema({
   shipFee:       Number,
   discount:      Number,
   voucherCode:   String,
+  // Phân bổ chi phí voucher (CRABOR trung gian — shipper + đối tác gánh, trừ khi milestone 100 đơn/tháng)
+  voucherShipperBear: { type: Number, default: 0, min: 0 },
+  voucherPartnerBear: { type: Number, default: 0, min: 0 },
+  voucherCraborBear:  { type: Number, default: 0, min: 0 },
   // Payment
   paymentMethod: { type: String, default: "cash" },
   paymentStatus: { type: String, default: "unpaid" },
@@ -8509,16 +8540,8 @@ app.post("/api/laundry/order", async (req, res) => {
     }
     const shipFee = Math.round(distKm * 5000 / 1000) * 1000 * 2; // đi + về
 
-    // Validate voucher
-    let discount = 0;
-    if (voucherCode) {
-      const v = await Voucher.findOne({ code: voucherCode.toUpperCase(), active: true, expiresAt: { $gt: new Date() } });
-      if (v) {
-        discount = v.type === "percent"
-          ? Math.min(Math.round(estimatedTotal * v.value / 100), v.maxDiscount || Infinity)
-          : v.value;
-      }
-    }
+    // Validate voucher — dùng applyVoucher thống nhất (percent/fixed + minOrder + usageLimit + module + target)
+    const { discount, applied: appliedVoucher } = await applyVoucher(voucherCode, { order: estimatedTotal, ship: shipFee }, req.session.userId, "laundry");
 
     // Deadline
     const turnaroundMap = { "5h": 5*3600000, "10h": 10*3600000, "24h": 24*3600000 };
@@ -8547,6 +8570,7 @@ app.post("/api/laundry/order", async (req, res) => {
       const userDoc = await User.findById(req.session.userId).select("walletBalance");
       if (!userDoc || (userDoc.walletBalance||0) < amt) {
         await LaundryOrder.findByIdAndDelete(order._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
         return res.status(400).json({ success: false, message: `Ví CRABOR không đủ số dư. Cần ${amt.toLocaleString("vi-VN")}đ`, walletInsufficient: true });
       }
       order.paymentStatus = "paid";
@@ -8807,6 +8831,11 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
     if (status === "delivered") {
       order.deliveredAt = new Date();
       const pm = order.paymentMethod;
+      // Tích điểm loyalty (1/10 giá trị đơn)
+      if (order.customerId && !order.loyaltyPointsGranted) {
+        order.loyaltyPointsGranted = true;
+        await earnLoyaltyPoints(order.customerId, orderPaidAmount(order));
+      }
       // Tính phân chia: đọc commission từ DB (mặc định 18%), tính serviceFee
       order.module = "laundry";
       const { shipperEarn, partnerEarn } = await calcEarnings(order);
@@ -9890,10 +9919,6 @@ app.get("/api/admin/stats", adminAuth, async (req, res) => {
       earlyBirdMax:  await getConfig("earlyBirdMax", 50),
       earlyBirdLeft: Math.max(0, await getConfig("earlyBirdMax", 50) - earlyBird),
       earlyBirdRevenue: earlyBird * 500000,
-      // Sales
-      salesTotal: await Sales.countDocuments(),
-      salesActive: await Sales.countDocuments({ status: "active" }),
-      salesRevenue: (await Referral.aggregate([{ $match: { status: "earned" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]))[0]?.total || 0,
       // Đơn hàng
       totalOrders,
       todayOrders,
@@ -10346,39 +10371,159 @@ function shipperOrderEarningsBase(o) {
   return o.deliveryFee || o.shipFee || 15000;
 }
 
+// ── Số đơn hoàn thành tối thiểu/tháng để CRABOR chịu toàn bộ voucher ──
+const VOUCHER_MILESTONE_ORDERS = 100;
+
+// CRABOR là ứng dụng trung gian KHÔNG chịu chi phí voucher. Mặc định shipper +
+// đối tác cùng gánh. Chỉ khi CẢ HAI đạt ≥100 đơn hoàn thành trong tháng dương
+// lịch hiện tại thì CRABOR chịu hoàn toàn mức giảm giá do voucher gây ra.
+async function voucherBorneByCrabor(order) {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // ── Đếm đơn hoàn thành của shipper trong tháng (food + ride + giặt + dọn nhà) ──
+    let shipperMonth = 0;
+    if (order.shipperId) {
+      const [foodRide, clean] = await Promise.all([
+        Order.countDocuments({ shipperId: order.shipperId, status: "delivered", deliveredAt: { $gte: monthStart, $lt: monthEnd } }),
+        mongoose.models.CleaningOrder ? CleaningOrder.countDocuments({ shipperId: order.shipperId, status: "completed", completedAt: { $gte: monthStart, $lt: monthEnd } }) : 0,
+      ]);
+      let laundry = 0;
+      if (mongoose.models.LaundryOrder) {
+        const [l1, l2] = await Promise.all([
+          LaundryOrder.countDocuments({ shipperId: order.shipperId, status: "delivered", deliveredAt: { $gte: monthStart, $lt: monthEnd } }),
+          LaundryOrder.countDocuments({ shipperReturnId: order.shipperId, status: "delivered", deliveredAt: { $gte: monthStart, $lt: monthEnd } }),
+        ]);
+        laundry = l1 + l2;
+      }
+      shipperMonth = foodRide + clean + laundry;
+    }
+
+    // ── Đếm đơn hoàn thành của đối tác trong tháng (theo module của đơn) ──
+    const pid = order.partnerId;
+    const hasPartner = !!(pid && String(pid) !== "0" && String(pid) !== "null");
+    let partnerMonth = 0;
+    if (hasPartner) {
+      if (order.module === "laundry" && mongoose.models.LaundryOrder) {
+        partnerMonth = await LaundryOrder.countDocuments({ partnerId: pid, status: "delivered", deliveredAt: { $gte: monthStart, $lt: monthEnd } });
+      } else {
+        partnerMonth = await Order.countDocuments({ partnerId: pid, status: "delivered", deliveredAt: { $gte: monthStart, $lt: monthEnd } });
+      }
+    }
+
+    const shipperOk = order.shipperId ? shipperMonth >= VOUCHER_MILESTONE_ORDERS : false;
+    const partnerOk = hasPartner ? partnerMonth >= VOUCHER_MILESTONE_ORDERS : true;
+    return shipperOk && partnerOk;
+  } catch (e) {
+    console.error('[voucherBorneByCrabor]', e.message);
+    return false; // mặc định: shipper/đối tác gánh
+  }
+}
+
+// ── Helper: áp voucher (dùng chung food/laundry/cleaning/ride) ──
+// bases: { order: giá trị đơn, ship: phí giao (ride = cước xe) }
+// target 'order' → tính trên giá trị đơn; target 'ship' → tính trên phí giao.
+// Trả về discount theo type (percent + maxDiscount / fixed VNĐ) và ghi nhận lượt dùng.
+async function applyVoucher(code, bases, customerId, module) {
+  if (!code) return { discount: 0, applied: null };
+  try {
+    const v = await Voucher.findOne({ code: String(code).toUpperCase().trim(), active: true, expiresAt: { $gt: new Date() } });
+    if (!v) return { discount: 0, applied: null };
+    if (v.usedCount >= v.usageLimit) return { discount: 0, applied: null };
+    if (v.module !== "all" && v.module !== module) return { discount: 0, applied: null };
+    // Chọn base giảm theo target
+    const subtotal = v.target === "ship" ? (bases.ship || bases.order || 0) : (bases.order || 0);
+    if (subtotal < (v.minOrder || 0)) return { discount: 0, applied: null };
+    const discount = subtotal > 0 && v.type === "percent"
+      ? Math.min(Math.round(subtotal * v.value / 100), v.maxDiscount || Infinity)
+      : (subtotal > 0 ? Math.min(v.value, subtotal) : 0);
+    await Voucher.updateOne({ _id: v._id }, { $inc: { usedCount: 1 }, $addToSet: { usedBy: customerId } });
+    return { discount, applied: v };
+  } catch (e) {
+    console.error('[applyVoucher]', e.message);
+    return { discount: 0, applied: null };
+  }
+}
+
+// ── Helper: thu nhập thực nhận của shipper sau khi gánh voucher (đồng bộ, cho thống kê) ──
+function shipperOrderEarnNet(o) {
+  const raw = Math.round(shipperOrderEarningsBase(o) * 0.7);
+  const bear = typeof o.voucherShipperBear === "number" ? o.voucherShipperBear : 0;
+  return Math.max(0, raw - bear);
+}
+
 async function calcEarnings(order) {
   // Dọn nhà là cleaning order: earnings base = price, không có partner
   const isCleaning = !!(order && (order.module === 'cleaning' || order.serviceType));
   const originalTotal = isCleaning ? (order.price || 0) : (order.total || 0);
   const finalTotal = isCleaning
-    ? (order.price || 0)
+    ? Math.max(0, (order.price || 0) - (order.discount || 0))
     : (order.finalTotal || (originalTotal + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0)));
   const shipFee    = order.shipFee    || 0;
   const serviceFee = order.serviceFee || 0;
-  const discount   = order.discount    || 0;
+  const discount   = order.discount   || 0;
   const module     = isCleaning ? 'cleaning' : (order.module || 'food');
 
   // Platform thu 30% — shipper/tài xế/giúp việc giữ 70% (ride tính trên cước, dọn nhà trên giá ca)
   const PLATFORM_FEE_PCT = 30;
-  const shipperEarn = Math.round(shipperOrderEarningsBase(order) * (1 - PLATFORM_FEE_PCT / 100));
-
-  // FIX: Platform chịu voucher discount → partner base = originalTotal (không trừ discount)
-  // Trước đây: partnerBase = finalTotal - shipFee - serviceFee = originalTotal - discount → partner mất tiền voucher
-  // Giờ: partnerBase = originalTotal → platform hấp thụ discount
-  const partnerBase = Math.max(0, originalTotal);
+  const shipperEarnRaw = Math.round(shipperOrderEarningsBase(order) * (1 - PLATFORM_FEE_PCT / 100));
 
   // Hoa hồng thống nhất theo module (không đọc commission tùy biến từng partner)
   const commissionPct = isCleaning ? 0 : (DEFAULT_COMMISSION[module] ?? 20);
+  const partnerBase = Math.max(0, originalTotal);
+  const partnerEarnRaw = isCleaning ? 0 : Math.round(partnerBase * (1 - commissionPct / 100));
 
-  // Partner nhận partnerBase trừ đi commissionPct% (dọn nhà không có partner)
-  const partnerEarn = isCleaning ? 0 : Math.round(partnerBase * (1 - commissionPct / 100));
+  // ── PHÂN BỔ VOUCHER ──
+  // CRABOR chỉ là trung gian → KHÔNG chịu voucher. Mặc định shipper + đối tác
+  // cùng gánh theo đúng TỶ LỆ THU NHẬP THỰC NHẬN của họ; đơn không có đối tác
+  // (xe công nghệ, dọn nhà) → shipper gánh 100%.
+  // Chỉ khi cả shipper VÀ đối tác đạt ≥100 đơn/tháng thì CRABOR chịu toàn bộ.
+  let voucherShipperBear = 0, voucherPartnerBear = 0, voucherCraborBear = 0;
+  if (discount > 0) {
+    const hasPartner = !isCleaning && !!(order.partnerId && String(order.partnerId) !== "0");
+    if (await voucherBorneByCrabor(order)) {
+      voucherCraborBear = discount;
+    } else if (hasPartner) {
+      const earnSum12 = shipperEarnRaw + partnerEarnRaw;
+      if (earnSum12 > 0) {
+        voucherShipperBear = Math.round(discount * shipperEarnRaw / earnSum12);
+        voucherPartnerBear = discount - voucherShipperBear;
+      } else {
+        voucherShipperBear = discount;
+      }
+    } else {
+      voucherShipperBear = discount; // ride/dọn nhà: shipper gánh 100%
+    }
+  }
 
-  // CRABOR giữ: serviceFee + commission trên partnerBase
-  // Platform hấp thụ discount: craborEarn = finalTotal - shipperEarn - partnerEarn
-  // (finalTotal đã trừ discount, nhưng partnerEarn vẫn dựa trên originalTotal)
+  const shipperEarn = Math.max(0, shipperEarnRaw - voucherShipperBear);
+  const partnerEarn = Math.max(0, partnerEarnRaw - voucherPartnerBear);
+
+  // CRABOR giữ đúng serviceFee + hoa hồng (không mất tiền voucher).
+  // Chỉ khi milestone (CRABOR chịu) thì craborEarn giảm đúng bằng discount.
   const craborEarn = finalTotal - shipperEarn - partnerEarn;
 
-  return { shipperEarn, partnerEarn, craborEarn, commissionPct, serviceFee, module };
+  // Lưu phân bổ voucher vào đơn để thống kê/đối soát chính xác (chỉ ghi khi có thay đổi)
+  if (typeof order.save === 'function') {
+    const changed = order.voucherShipperBear !== voucherShipperBear ||
+                    order.voucherPartnerBear !== voucherPartnerBear ||
+                    order.voucherCraborBear  !== voucherCraborBear;
+    if (changed) {
+      try {
+        order.voucherShipperBear = voucherShipperBear;
+        order.voucherPartnerBear = voucherPartnerBear;
+        order.voucherCraborBear  = voucherCraborBear;
+        await order.save();
+      } catch (e) {
+        console.error('[calcEarnings] save voucher attribution:', e.message);
+      }
+    }
+  }
+
+  return { shipperEarn, partnerEarn, craborEarn, commissionPct, serviceFee, module, discount,
+           voucherShipperBear, voucherPartnerBear, voucherCraborBear };
 }
 
 // ── Helper: đếm số đơn đã hoàn thành của shipper (all-time + hôm nay) ──
@@ -10440,8 +10585,8 @@ async function getShipperStats(shipperId, shipper) {
   const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0,0,0,0);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const PLATFORM_FEE_PCT = 30; // nền tảng thu 30% — shipper/tài xế giữ 70% (đơn ride tính trên cước)
-  const earnSum = (docs) => docs.reduce((s, o) => s + Math.round(shipperOrderEarningsBase(o) * (1 - PLATFORM_FEE_PCT / 100)), 0);
+  // Thu nhập thực nhận = base × 70% trừ phần shipper gánh voucher (CRABOR trung gian không chịu)
+  const earnSum = (docs) => docs.reduce((s, o) => s + shipperOrderEarnNet(o), 0);
 
   const [deliveredToday, deliveredWeek, deliveredMonth, deliveredTotal, cancelledTotal, inProgressTotal, deliveredTodayDocs, deliveredWeekDocs, deliveredMonthDocs, ratedOrders] = await Promise.all([
     Order.countDocuments({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }),
@@ -10450,9 +10595,9 @@ async function getShipperStats(shipperId, shipper) {
     Order.countDocuments({ shipperId, status: "delivered" }),
     Order.countDocuments({ shipperId, status: "cancelled" }),
     Order.countDocuments({ shipperId, status: { $in: ["shipper_accepted","picking_up","at_partner","picked_up","delivering","in_progress","ready_return","shipper_returning","picked_up_by_shipper"] } }),
-    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee module total").lean(),
-    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee module total").lean(),
-    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee module total").lean(),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: todayStart } }).select("shipFee deliveryFee module total discount voucherShipperBear").lean(),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: weekStart } }).select("shipFee deliveryFee module total discount voucherShipperBear").lean(),
+    Order.find({ shipperId, status: "delivered", deliveredAt: { $gte: monthStart } }).select("shipFee deliveryFee module total discount voucherShipperBear").lean(),
     Order.find({ shipperId, status: "delivered", ratingShipper: { $gte: 1 } }).select("ratingShipper").lean(),
   ]);
 
@@ -10848,23 +10993,11 @@ app.post("/api/order", async (req, res) => {
       const serviceFee = Math.round(total * 0.05);
 
       // Validate voucher nếu có
-      // FIX: Voucher schema KHÔNG có field "discount" (chỉ có type + value),
-      // nên "v.discount || 0" trước đây luôn = 0 → đơn food lưu server luôn
-      // bị mất giảm giá dù customer app đã tính và hiển thị đúng ở bước preview.
-      // Dùng đúng công thức percent/fixed giống /api/vouchers/validate và /api/laundry/order.
+      // Validate voucher nếu có — dùng applyVoucher thống nhất (percent/fixed + minOrder + usageLimit + module)
       let discount = 0;
       if (voucherCode) {
-        const Voucher = mongoose.models.Voucher;
-        if (Voucher) {
-          const v = await Voucher.findOne({ code: voucherCode.toUpperCase(), active: true, expiresAt: { $gt: new Date() } });
-          if (v && total >= (v.minOrder || 0) && v.usedCount < v.usageLimit && (v.module === "all" || v.module === "food")) {
-            discount = v.type === "percent"
-              ? Math.min(Math.round(total * v.value / 100), v.maxDiscount || Infinity)
-              : v.value;
-            // Ghi nhận lượt dùng ngay khi tạo đơn để tránh áp lại nhiều lần
-            await Voucher.updateOne({ _id: v._id }, { $inc: { usedCount: 1 }, $addToSet: { usedBy: req.session.userId } });
-          }
-        }
+        const vres = await applyVoucher(voucherCode, { order: total, ship: fShipFee }, req.session.userId, "food");
+        discount = vres.discount;
       }
 
       order = new Order({
@@ -11175,6 +11308,12 @@ app.patch("/api/orders/:id/status", async (req, res) => {
       order.deliveredAt = new Date();
       const pm = order.paymentMethod;
 
+      // Tích điểm loyalty (1/10 giá trị đơn) — chỉ 1 lần/đơn
+      if (order.customerId && !order.loyaltyPointsGranted) {
+        order.loyaltyPointsGranted = true;
+        await earnLoyaltyPoints(order.customerId, orderPaidAmount(order));
+      }
+
       // Tính tiền cho shipper và partner
       const { shipperEarn, partnerEarn } = await calcEarnings(order);
 
@@ -11276,11 +11415,14 @@ app.post("/api/ride/book", async (req, res) => {
     if (!req.session.userId)
       return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
 
-    const { vehicleType, fromAddress, fromLat, fromLng, toAddress, toLat, toLng, fee, note, paymentMethod: ridePayMethod } = req.body;
+    const { vehicleType, fromAddress, fromLat, fromLng, toAddress, toLat, toLng, fee, note, paymentMethod: ridePayMethod, voucherCode } = req.body;
     if (!vehicleType || !fromAddress || !toAddress || !fee)
       return res.status(400).json({ success: false, message: "Thiếu thông tin đặt xe" });
 
     const user = await User.findById(req.session.userId).select("fullName phone");
+
+    // Áp voucher (nếu có) — voucher giảm phí ship/giảm cước xe
+    const { discount: rideDiscount, applied: appliedVoucher } = await applyVoucher(voucherCode, { order: fee, ship: fee }, req.session.userId, "ride");
 
     // Tạo ride order
     const rideOrder = new Order({
@@ -11295,6 +11437,9 @@ app.post("/api/ride/book", async (req, res) => {
       total: fee,
       shipFee: 0,
       serviceFee: Math.round(fee * 0.1),
+      discount: rideDiscount,
+      voucherCode,
+      voucherDiscount: rideDiscount,
       paymentMethod: ridePayMethod || "cash",
       note,
       customerName: user?.fullName || "Khách hàng",
@@ -11304,10 +11449,11 @@ app.post("/api/ride/book", async (req, res) => {
 
     // WALLET: trừ tiền ví CRABOR ngay khi đặt xe
     if ((ridePayMethod || "cash") === "wallet") {
-      const amt = rideOrder.finalTotal ?? Math.max(0, fee + Math.round(fee * 0.1));
+      const amt = rideOrder.finalTotal ?? Math.max(0, fee + Math.round(fee * 0.1) - rideDiscount);
       const userDoc = await User.findById(req.session.userId).select("walletBalance");
       if (!userDoc || (userDoc.walletBalance||0) < amt) {
         await Order.findByIdAndDelete(rideOrder._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
         return res.status(400).json({ success: false, message: `Ví CRABOR không đủ số dư. Cần ${amt.toLocaleString("vi-VN")}đ`, walletInsufficient: true });
       }
       rideOrder.paymentStatus = "paid";
@@ -11431,7 +11577,10 @@ app.post("/api/ride/:orderId/complete", async (req, res) => {
     order.deliveredAt = new Date();
     order.paymentStatus = "paid";
     order.statusHistory.push({ status: "delivered", by: "shipper" });
+    // Tích điểm loyalty (1/10 giá trị đơn) — chỉ 1 lần
+    order.loyaltyPointsGranted = true;
     await order.save();
+    await earnLoyaltyPoints(order.customerId, orderPaidAmount(order));
 
     // Tính tiền shipper theo commission DB (mặc định ride=10%, shipper giữ 90%)
     const { shipperEarn } = await calcEarnings(order);
@@ -11513,7 +11662,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       .sort({ deliveredAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select("orderId module items address partnerAddress finalTotal total shipFee serviceFee discount voucherCode voucherDiscount status deliveredAt createdAt ratingShipper ratingComment customerName customerPhone customerLat customerLng partnerLat partnerLng fromAddress toAddress")
+      .select("orderId module items address partnerAddress finalTotal total shipFee serviceFee discount voucherCode voucherDiscount voucherShipperBear status deliveredAt createdAt ratingShipper ratingComment customerName customerPhone customerLat customerLng partnerLat partnerLng fromAddress toAddress")
       .lean(),
       Order.countDocuments({ 
         shipperId: req.session.shipperId, 
@@ -11531,7 +11680,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       voucherCode: o.voucherCode || null,
       shipFee: o.shipFee || 0,
       serviceFee: o.serviceFee || 0,
-      shipperEarn: Math.round(shipperOrderEarningsBase(o) * 0.7),
+      shipperEarn: shipperOrderEarnNet(o),
       address: o.address,
       partnerAddress: o.partnerAddress,
       customerName: o.customerName || o.receiverName || 'Khách hàng',
@@ -12395,7 +12544,7 @@ app.patch("/api/admin/customers/:id/status", adminAuth, async (req, res) => {
   }
 });
 
-// POST /api/admin/clear-balance — Xoá số dư ví về 0 (khách/shipper/đối tác/sales)
+// POST /api/admin/clear-balance — Xoá số dư ví về 0 (khách/shipper/đối tác)
 app.post("/api/admin/clear-balance", adminAuth, async (req, res) => {
   try {
     const { type, id, module } = req.body || {};
@@ -12403,7 +12552,6 @@ app.post("/api/admin/clear-balance", adminAuth, async (req, res) => {
     let Model = null, ownerType = null, label = "";
     if (type === "user")       { Model = User; ownerType = "user"; label = "khách hàng"; }
     else if (type === "shipper") { Model = Shipper; ownerType = "shipper"; label = "shipper"; }
-    else if (type === "sales") { Model = Sales; ownerType = "sales"; label = "sales"; }
     else if (type === "partner") { Model = module ? getPartnerModel(module) : FoodPartner; ownerType = "partner"; label = "đối tác"; }
     if (!Model) return res.status(400).json({ success: false, message: "Loại tài khoản không hợp lệ" });
 
@@ -13012,10 +13160,21 @@ const cleaningOrderSchema = new mongoose.Schema({
   serviceType:   { type: String, enum: ["basic","medium","deep"], default: "basic" },
   serviceName:   String,
   price:         Number,
+  discount:      { type: Number, default: 0, min: 0 },
+  voucherCode:   { type: String, trim: true, uppercase: true },
+  voucherDiscount:{ type: Number, default: 0, min: 0 },
+  finalTotal:    { type: Number, min: 0 },
   duration:      String,
   note:          String,
   bookingDate:   Date,
   bookingTime:   String,
+  paymentMethod: { type: String, default: "cash" },
+  paymentStatus: { type: String, default: "unpaid" },
+  paidAt:        Date,
+  // Phân bổ chi phí voucher (CRABOR trung gian — shipper gánh 100%, trừ khi ≥100 đơn/tháng)
+  voucherShipperBear: { type: Number, default: 0, min: 0 },
+  voucherPartnerBear: { type: Number, default: 0, min: 0 },
+  voucherCraborBear:  { type: Number, default: 0, min: 0 },
   status: {
     type: String,
     enum: ["pending","shipper_accepted","picking_up","working","completed","cancelled"],
@@ -13029,6 +13188,7 @@ const cleaningOrderSchema = new mongoose.Schema({
 
 cleaningOrderSchema.pre("save", function(next) {
   if (!this.orderId) this.orderId = "CLN-" + Date.now().toString(36).toUpperCase();
+  this.finalTotal = Math.max(0, (this.price||0) - (this.discount||0));
   next();
 });
 const CleaningOrder = mongoose.models.CleaningOrder || mongoose.model("CleaningOrder", cleaningOrderSchema);

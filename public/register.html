@@ -762,18 +762,6 @@ body { padding-top: 36px; }
     <div id="step6" class="step-panel">
       <div class="panel-title">Xác nhận đăng ký</div>
       <div class="panel-sub">Kiểm tra lại toàn bộ thông tin trước khi hoàn tất</div>
-      <!-- Mã giới thiệu -->
-      <div class="field" style="margin-bottom:16px">
-        <label>Mã giới thiệu <span style="color:#aaa;font-weight:600;font-size:.85rem">(Không bắt buộc)</span></label>
-        <div style="position:relative">
-          <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1rem">🎟️</span>
-          <input type="text" id="refCodeInput" placeholder="Nhập mã giới thiệu của Sales CRABOR"
-            style="width:100%;padding:12px 14px 12px 40px;border:2px solid #e8e8e8;border-radius:12px;font-family:inherit;font-size:.9rem;font-weight:700;text-transform:uppercase;outline:none;transition:.2s"
-            oninput="this.value=this.value.toUpperCase()"
-            onfocus="this.style.borderColor='#E8504A'" onblur="this.style.borderColor='#e8e8e8';validateRefCode(this.value)">
-        </div>
-        <div id="refCodeMsg" style="font-size:.75rem;margin-top:4px;font-weight:700;display:none"></div>
-      </div>
       <div class="summary-box" id="summaryBox"></div>
       <div class="fee-box fee-gl" id="feeBox">
         <div class="fl">
@@ -1819,37 +1807,16 @@ async function lookupProfile() {
 }
 
 
-async function validateRefCode(code) {
-  const msg = document.getElementById('refCodeMsg');
-  if (!msg) return;
-  if (!code || code.length < 4) { msg.style.display = 'none'; return; }
-  try {
-    const r = await fetch('/api/validate-ref/' + code);
-    const d = await r.json();
-    if (d.success) {
-      msg.style.display = 'block';
-      msg.style.color = '#27ae60';
-      msg.textContent = '✅ Mã hợp lệ — Sales: ' + d.salesName;
-    } else {
-      msg.style.display = 'block';
-      msg.style.color = '#E8504A';
-      msg.textContent = '❌ Mã giới thiệu không hợp lệ';
-    }
-  } catch(e) {}
-}
-
 async function submitForm(redirectToPay = false) {
   const btn=document.getElementById('btnSubmit');
   btn.disabled=true; btn.textContent='⏳ Đang xử lý...';
 
-  // Collect refCode
-  const refCode = document.getElementById('refCodeInput')?.value?.trim()?.toUpperCase() || '';
   // Build documents: nếu là URL dùng URL, nếu vẫn còn base64 thì gửi kèm
   const documents = {};
   Object.entries(state.files||{}).forEach(([k,v])=>{ if(v) documents[k]=v; });
 
   const payload={
-    phone, firstName:document.getElementById('firstName')?.value, refCode,
+    phone, firstName:document.getElementById('firstName')?.value,
     lastName:document.getElementById('lastName')?.value,
     email:document.getElementById('email')?.value,
     district:document.getElementById('district')?.value,
@@ -1945,13 +1912,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   currentStep = 1;
   const sb = document.getElementById('stepsBar');
   if(sb) sb.innerHTML = '';
-
-  // Auto-fill refCode from URL param (?ref=XXXX)
-  const urlRef = new URLSearchParams(location.search).get('ref');
-  if (urlRef) {
-    const inp = document.getElementById('refCodeInput');
-    if (inp) { inp.value = urlRef.toUpperCase(); validateRefCode(urlRef); }
-  }
 
   // Fetch earlyBird slot count for welcome screen badge
   fetch('/api/public/earlybird').then(r=>r.json()).then(d => {
@@ -2071,17 +2031,20 @@ window.addEventListener("message", async (e) => {
           <p>Đối tác/Shipper cam kết: (a) Duy trì điểm đánh giá tối thiểu 4.0/5.0 sao; (b) Phản hồi đơn hàng trong vòng 5 phút; (c) Không tự ý hủy đơn quá 3 lần/tháng; (d) Mặc đồng phục CRABOR trong giờ làm việc (nếu có); (e) Không tiếp nhận đơn hàng khi không đảm bảo an toàn thực phẩm hoặc vận chuyển.</p>
           <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">3. HOA HỒNG & THANH TOÁN</h3>
           <p>CRABOR thu hoa hồng trên mỗi đơn hàng hoàn thành theo tỷ lệ đã thỏa thuận tại màn hình đăng ký. Thanh toán cho đối tác được thực hiện <strong>hàng tuần vào thứ Hai</strong>, chuyển khoản trực tiếp về tài khoản đã đăng ký. Tranh chấp về doanh thu phải được khiếu nại trong vòng 7 ngày.</p>
-          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">4. PHÍ THAM GIA (SHIPPER EARLY BIRD)</h3>
+          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">4. CHÍNH SÁCH VOUCHER (QUAN TRỌNG)</h3>
+          <p>CRABOR chỉ là <strong>ứng dụng trung gian</strong> kết nối Khách hàng – Shipper – Đối tác. Khi khách hàng áp dụng mã giảm giá (voucher) cho một đơn hàng, chi phí giảm giá đó <strong>KHÔNG do CRABOR chịu</strong> mà được khấu trừ vào thu nhập của <strong>Shipper và Đối tác</strong> theo đúng <strong>tỷ lệ thu nhập thực nhận</strong> của từng bên trên đơn hàng đó. Đơn không có đối tác (xe công nghệ, dọn nhà) thì <strong>Shipper chịu 100%</strong> khoản giảm giá.</p>
+          <p><strong>Đặc quyền CRABOR chịu toàn bộ:</strong> nếu <strong>cả Shipper lẫn Đối tác đều đạt ≥100 đơn hoàn thành trong cùng một tháng dương lịch</strong>, CRABOR sẽ chịu <strong>hoàn toàn</strong> mức phí miễn phí phát sinh do khách sử dụng voucher. Mốc 100 đơn được đếm theo từng đơn giao thành công trong tháng.</p>
+          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">5. PHÍ THAM GIA (SHIPPER EARLY BIRD)</h3>
           <p>Gói <strong>Early Bird</strong> yêu cầu nộp phí kích hoạt tài khoản <strong>500.000đ</strong> (một lần duy nhất). Khoản phí này sẽ được <strong>hoàn trả 100%</strong> sau khi hoàn thành 50 đơn giao hàng thành công trong 3 tháng đầu. CRABOR cam kết ưu tiên phân bổ đơn hàng cho tài xế Early Bird.</p>
-          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">5. BẢO MẬT THÔNG TIN</h3>
+          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">6. BẢO MẬT THÔNG TIN</h3>
           <p>CRABOR cam kết bảo mật toàn bộ thông tin cá nhân của đối tác theo <em>Luật An ninh mạng 2018</em> và <em>Nghị định 13/2023/NĐ-CP</em>. Thông tin chỉ được sử dụng để vận hành dịch vụ và không được chia sẻ cho bên thứ ba khi chưa có sự đồng ý, trừ trường hợp pháp luật yêu cầu.</p>
-          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">6. QUYỀN & NGHĨA VỤ CỦA CRABOR</h3>
+          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">7. QUYỀN & NGHĨA VỤ CỦA CRABOR</h3>
           <p>CRABOR có quyền: (a) Tạm khóa tài khoản khi phát hiện vi phạm; (b) Điều chỉnh tỷ lệ hoa hồng với thông báo trước 30 ngày; (c) Chấm dứt hợp tác khi đối tác vi phạm nghiêm trọng. CRABOR có nghĩa vụ: (a) Cung cấp hỗ trợ kỹ thuật 24/7; (b) Thanh toán đúng hạn; (c) Cung cấp bảo hiểm tai nạn cho shipper.</p>
-          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">7. VI PHẠM & CHẾ TÀI</h3>
+          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">8. VI PHẠM & CHẾ TÀI</h3>
           <p>Các hành vi bị cấm tuyệt đối: gian lận đơn hàng, tự thỏa thuận trực tiếp với khách hàng ngoài nền tảng, tiết lộ thông tin khách hàng, xúc phạm hoặc quấy rối người dùng. Vi phạm lần đầu: cảnh cáo. Vi phạm lần 2: khóa tài khoản 30 ngày. Vi phạm lần 3: chấm dứt hợp tác vĩnh viễn.</p>
-          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">8. GIẢI QUYẾT TRANH CHẤP</h3>
+          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">9. GIẢI QUYẾT TRANH CHẤP</h3>
           <p>Mọi tranh chấp phát sinh từ hợp tác này được ưu tiên giải quyết qua thương lượng. Nếu không thể thương lượng, tranh chấp sẽ được giải quyết tại <strong>Tòa án nhân dân TP. Hà Nội</strong> theo pháp luật Việt Nam hiện hành.</p>
-          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">9. HIỆU LỰC</h3>
+          <h3 style="color:#E8504A;margin:16px 0 8px;font-size:1rem">10. HIỆU LỰC</h3>
           <p>Điều khoản này có hiệu lực kể từ ngày đối tác nhấn "Tôi đồng ý" và sẽ tiếp tục có hiệu lực cho đến khi một trong hai bên chấm dứt hợp tác theo đúng quy trình.</p>
           <!-- Scroll indicator -->
           <div id="legalScrollHint" style="text-align:center;padding:20px 0;color:#aaa;font-size:.85rem">
