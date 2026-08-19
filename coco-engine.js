@@ -346,7 +346,7 @@ async function cocoRespond({ text, sessionId, userId, userCtx = {} }) {
 
   if (intent === 'ask_points') {
     if (userCtx.loyaltyPts !== undefined) {
-      return { text:`⭐ Anh/chị đang có **${userCtx.loyaltyPts||0} điểm** tích lũy\n\n50 điểm = voucher 10.000đ\nTổng chi tiêu: ${(userCtx.totalSpent||0).toLocaleString('vi-VN')}đ`, intent, learned: false };
+      return { text:`⭐ Anh/chị đang có **${userCtx.loyaltyPts||0} điểm** tích lũy\n\n100 điểm = voucher 10.000đ\nTổng chi tiêu: ${(userCtx.totalSpent||0).toLocaleString('vi-VN')}đ`, intent, learned: false };
     }
     return { text:'Đăng nhập để xem điểm tích lũy nhé anh/chị 🙏', intent, learned: false };
   }

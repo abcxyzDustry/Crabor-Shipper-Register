@@ -1081,6 +1081,17 @@ const voucherSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Voucher = mongoose.model('Voucher', voucherSchema);
 
+// ── LOYALTY LOG — lịch sử tích/đổi điểm thưởng ──
+const loyaltyLogSchema = new mongoose.Schema({
+  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+  delta:     { type: Number, required: true },            // + tích điểm | - trừ điểm khi đổi
+  points:    { type: Number, default: 0 },                // số dư sau khi đổi
+  type:      { type: String, enum: ['earn','redeem','bonus'], default: 'earn' },
+  description:{ type: String, trim: true },
+  voucherCode:{ type: String, default: '' },
+}, { timestamps: true });
+const LoyaltyLog = mongoose.model('LoyaltyLog', loyaltyLogSchema);
+
 
 // ── AI BANNER ─────────────────────────────────
 const aiBannerSchema = new mongoose.Schema({
@@ -2925,6 +2936,12 @@ async function earnLoyaltyPoints(userId, orderTotal) {
     await User.findByIdAndUpdate(userId, {
       $inc: { loyaltyPts: pts, totalSpent: orderTotal }
     });
+    try {
+      await LoyaltyLog.create({
+        userId, delta: pts, type: 'earn',
+        description: `Tích điểm từ đơn hàng ${orderTotal.toLocaleString('vi-VN')}đ`,
+      });
+    } catch(_) {}
     console.log(` [Loyalty] +${pts} pts (đơn ${orderTotal}) cho user ${userId}`);
   } catch(e) {}
 }
@@ -2953,18 +2970,25 @@ app.get("/api/loyalty/me", async (req, res) => {
       if (pts >= tiers[i].min) { currentTier = tiers[i]; break; }
     }
     const nextTier = tiers[tiers.indexOf(currentTier)+1] || null;
-    res.json({ success: true, pts, currentTier, nextTier, totalOrders: user.totalOrders || 0, totalSpent: user.totalSpent || 0 });
+    const history = await LoyaltyLog.find({ userId: req.session.userId }).sort({ createdAt: -1 }).limit(50).lean();
+    res.json({
+      success: true, pts,
+      points: pts,                                  // FE đọc field này
+      currentTier, nextTier,
+      totalOrders: user.totalOrders || 0, totalSpent: user.totalSpent || 0,
+      history: history.map(h => ({ id: h._id, points: h.delta, description: h.description, type: h.type, voucherCode: h.voucherCode, createdAt: h.createdAt })),
+    });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// ── Mức đổi điểm → voucher (quy đổi bắt đầu từ 10.000 điểm) ──
+// ── Mức đổi điểm → voucher (100 điểm = 10.000đ) ──
 const LOYALTY_LEVELS = [
-  { pts: 10000, title: 'Giảm 20% phí giao hàng', target: 'ship', type: 'percent', value: 20, maxDiscount: 30000, days: 30,
-    desc: 'Voucher giảm 20% phí giao hàng (tối đa 30.000đ) — áp dụng mọi dịch vụ' },
-  { pts: 20000, title: 'Giảm 50% phí giao hàng', target: 'ship', type: 'percent', value: 50, maxDiscount: 50000, days: 30,
-    desc: 'Voucher giảm 50% phí giao hàng (tối đa 50.000đ) — áp dụng mọi dịch vụ' },
-  { pts: 30000, title: 'Miễn phí giao hàng (Freeship)', target: 'ship', type: 'percent', value: 100, maxDiscount: 80000, days: 30,
-    desc: 'Voucher miễn phí giao hàng (tối đa 80.000đ) — áp dụng mọi dịch vụ' },
+  { pts: 100,  title: 'Voucher 10.000đ', discount: 10000, days: 30,
+    desc: 'Voucher giảm 10.000đ cho đơn hàng bất kỳ — 100 điểm' },
+  { pts: 200,  title: 'Voucher 20.000đ', discount: 20000, days: 30,
+    desc: 'Voucher giảm 20.000đ cho đơn hàng bất kỳ — 200 điểm' },
+  { pts: 300,  title: 'Voucher 30.000đ', discount: 30000, days: 30,
+    desc: 'Voucher giảm 30.000đ cho đơn hàng bất kỳ — 300 điểm' },
 ];
 
 // GET /api/loyalty/levels — Danh sách voucher đổi được bằng điểm
@@ -2974,27 +2998,31 @@ app.get("/api/loyalty/levels", async (req, res) => {
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// POST /api/loyalty/redeem — Đổi điểm tích lũy lấy voucher (tối thiểu 10.000 điểm)
+// POST /api/loyalty/redeem — Đổi điểm tích lũy lấy voucher (100 điểm = 10.000đ)
 app.post("/api/loyalty/redeem", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false });
-    const { pts } = req.body;
-    const level = LOYALTY_LEVELS.find(l => l.pts === Number(pts));
-    if (!level) return res.status(400).json({ success: false, message: "Mức điểm không hợp lệ. Hãy chọn gói có sẵn." });
-    if (level.pts < 10000) return res.status(400).json({ success: false, message: "Tối thiểu 10.000 điểm để quy đổi" });
+    const { pts, points, levelId } = req.body || {};
+    const want = Number(pts != null ? pts : points);
+    const level = want ? LOYALTY_LEVELS.find(l => l.pts === want) : (levelId != null ? LOYALTY_LEVELS[Number(levelId)] : null);
+    if (!level) return res.status(400).json({ success: false, message: "Mức điểm không hợp lệ. Hãy chọn gói có sẵn (100/200/300 điểm)." });
     const user = await User.findById(req.session.userId);
     if (!user || (user.loyaltyPts || 0) < level.pts) return res.status(400).json({ success: false, message: `Không đủ điểm (bạn có ${(user.loyaltyPts||0).toLocaleString('vi-VN')} điểm)` });
-    // Tạo voucher dùng 1 lần
+    // Tạo voucher giảm giá cố định dùng 1 lần
     const code = "LPT" + Date.now().toString(36).toUpperCase();
     const expiry = new Date(Date.now() + level.days * 24 * 3600 * 1000);
     await Voucher.create({
-      code, type: level.type, value: level.value, minOrder: 0,
-      maxDiscount: level.maxDiscount, usageLimit: 1, expiresAt: expiry,
-      description: level.desc || level.title, module: "all", target: level.target, active: true,
+      code, type: 'fixed', value: level.discount, minOrder: 0,
+      usageLimit: 1, expiresAt: expiry,
+      description: level.desc || level.title, module: "all", target: "order", active: true,
     });
     await User.findByIdAndUpdate(req.session.userId, { $inc: { loyaltyPts: -level.pts } });
+    await LoyaltyLog.create({
+      userId: req.session.userId, delta: -level.pts, points: Math.max(0, (user.loyaltyPts||0) - level.pts),
+      type: 'redeem', description: `Đổi ${level.pts} điểm lấy ${level.title}`, voucherCode: code,
+    });
     res.json({ success: true, code, ptsSpent: level.pts, ptsLeft: Math.max(0, (user.loyaltyPts||0) - level.pts), title: level.title, expiry,
-      message: `Đã đổi ${level.pts.toLocaleString('vi-VN')} điểm thành voucher ${code} (${level.title})` });
+      message: `Đã đổi ${level.pts} điểm thành voucher ${code} (${level.title})` });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
