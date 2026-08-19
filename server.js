@@ -48,8 +48,9 @@ const cocoOps   = require("./coco-ops");
 const cocoBrain = require("./coco-brain");
 const { cocoThink, CocoReasoning, checkBrainStatus, printBrainSetupGuide, mountCocoRoutes } = cocoBrain;
 
-// COCO_BRAIN defaults to 'auto' — tries OpenRouter → Groq → Claude → Cloudflare → rule
-process.env.COCO_BRAIN = process.env.COCO_BRAIN || 'auto';
+// COCO_BRAIN defaults to 'groq' — Coco AI chạy Groq; CRABOR Agent override backend cloudflare
+// (fallback giữ sẵn: Groq → OpenRouter → Claude → Cloudflare → rule)
+process.env.COCO_BRAIN = process.env.COCO_BRAIN || 'groq';
 const novaAgent = require("./nova-agent");
 const { SLAMonitor, RevenueIntel, DispatchIntel, InventoryIntel,
         SystemHealth, OnboardingFlow,
@@ -1279,6 +1280,59 @@ async function getConfig(key, defaultVal) {
 async function setConfig(key, value) {
   await Config.findOneAndUpdate({ key }, { value }, { upsert: true });
 }
+
+
+// ── TRAINING QA — train CRABOR Agent / Coco bằng cặp câu hỏi–câu trả lời ──
+const trainingQaSchema = new mongoose.Schema({
+  agent:    { type: String, enum: ['agent', 'coco', 'all'], default: 'agent' }, // đối tượng được train
+  question: { type: String, required: true },        // mẫu câu hỏi / từ khóa
+  answer:   { type: String, required: true },        // câu trả lời mong muốn
+  category: { type: String, default: 'general' },    // nhóm: tài chính, đơn hàng, nhân viên...
+  enabled:  { type: Boolean, default: true },
+}, { timestamps: true });
+const TrainingQA = mongoose.models.TrainingQA || mongoose.model("TrainingQA", trainingQaSchema);
+
+// Lấy training list theo agent, build thành chuỗi nhúng vào system prompt
+async function buildTrainingPrompt(agent = 'agent') {
+  try {
+    const items = await TrainingQA.find({ enabled: true, $or: [{ agent: 'all' }, { agent }] }).sort({ createdAt: -1 }).limit(40).lean();
+    if (!items.length) return '';
+    const lines = items.map(t => `- Hỏi: "${t.question}"\n  Trả lời: ${t.answer}`);
+    return `\n\n─── DỮ LIỆU ĐƯỢC QUẢN TRỊ VIÊN ĐÀO TẠO (hãy nhớ và tuân thủ khi gặp câu tương tự) ───\n${lines.join('\n')}`;
+  } catch(e) {
+    console.error('[TrainingQA] build prompt error:', e.message);
+    return '';
+  }
+}
+
+// Admin APIs — Training Agent
+app.get("/api/admin/training", adminAuth, async (req, res) => {
+  try {
+    const list = await TrainingQA.find({}).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, data: list });
+  } catch(e) { res.status(500).json({ success: false, message: e.message }); }
+});
+app.post("/api/admin/training", adminAuth, async (req, res) => {
+  try {
+    const { agent = 'agent', question, answer, category = 'general', enabled = true } = req.body || {};
+    if (!question || !answer) return res.status(400).json({ success: false, message: 'Cần câu hỏi và câu trả lời' });
+    const doc = await TrainingQA.create({ agent, question: String(question), answer: String(answer), category, enabled });
+    res.json({ success: true, data: doc });
+  } catch(e) { res.status(500).json({ success: false, message: e.message }); }
+});
+app.patch("/api/admin/training/:id", adminAuth, async (req, res) => {
+  try {
+    const doc = await TrainingQA.findByIdAndUpdate(req.params.id, req.body || {}, { new: true });
+    if (!doc) return res.status(404).json({ success: false, message: 'Không tìm thấy' });
+    res.json({ success: true, data: doc });
+  } catch(e) { res.status(500).json({ success: false, message: e.message }); }
+});
+app.delete("/api/admin/training/:id", adminAuth, async (req, res) => {
+  try {
+    await TrainingQA.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ success: false, message: e.message }); }
+});
 
 
 
@@ -4812,7 +4866,7 @@ app.post("/api/coco/chat", async (req, res) => {
       };
       const brainResult = await cocoThink(
         [{ role:'user', content: userInput }],
-        { userContext: enriched, task:'chat', maxTokens:500 }
+        { userContext: enriched, task:'chat', backend:'groq', maxTokens:500 }
       );
       if (brainResult.canReason && brainResult.text) {
         response = { text: brainResult.text, intent:'ai_reasoning', confidence:0.95, backend: brainResult.backend };
@@ -4877,7 +4931,7 @@ app.post("/api/coco/hotline", async (req, res) => {
     try {
       const hotlineBrain = await cocoThink(
         [{ role:'user', content:text }],
-        { userContext: userCtx, task:'chat', temperature:0.7,
+        { userContext: userCtx, task:'chat', backend:'groq', temperature:0.7,
           systemPrompt: `Bạn là Coco, nhân viên tổng đài AI của CRABOR. Xưng "Coco" hoặc "em". Lịch sự, chuyên nghiệp, giải quyết vấn đề cụ thể. Tối đa 120 từ mỗi câu.${userCtx.name ? ' Khách hàng tên: '+userCtx.name+'.' : ''}${userCtx.walletBal !== undefined ? ' Số dư ví: '+Number(userCtx.walletBal||0).toLocaleString('vi-VN')+'đ.' : ''}` }
       );
       if (hotlineBrain.canReason && hotlineBrain.text) {
@@ -5835,11 +5889,13 @@ app.post("/api/agent/chat", async (req, res) => {
     } catch(_) { history = []; }
 
     const messages = [...history.slice(-8), { role: 'user', content: userInput }];
+    const trainingPrompt = await buildTrainingPrompt('agent');
     const result = await cocoThink(messages, {
       task: 'chat',
+      backend: 'cloudflare',          // CRABOR Agent dedeicated: Cloudflare Workers
       temperature: 0.6,
       maxTokens: 2600,
-      systemPrompt: AGENT_SYSTEM_PROMPT + (process.env.AGENT_TOKEN_NOTE || ''),
+      systemPrompt: AGENT_SYSTEM_PROMPT + trainingPrompt + (process.env.AGENT_TOKEN_NOTE || ''),
     });
 
     let reply = result && result.text ? result.text : 'Xin lỗi, Agent chưa xử lý được yêu cầu này ngay lúc này 🙏. Hãy thử lại sau.';

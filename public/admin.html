@@ -474,6 +474,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <span class="ico">✨</span> Quán nổi bật
         <span class="nav-badge" id="featuredBadge" style="display:none;background:#FFD84D;color:#000">0</span>
       </div>
+      <div class="nav-section">AI</div>
+      <div class="nav-item" onclick="showPage('training')">
+        <span class="ico">🧠</span> Training Agent
+      </div>
       <div class="nav-item" onclick="showPage('settings')">
         <span class="ico">⚙️</span> Cài đặt
       </div>
@@ -1559,6 +1563,62 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
 
     </section>
 
+    <section id="pgTraining" class="page-section">
+      <div class="page-header">
+        <div class="page-title">🧠 Training Agent</div>
+        <button class="filter-btn" style="background:#E8504A;color:#fff;border:none;padding:8px 20px;border-radius:30px;font-weight:800;cursor:pointer" onclick="testTrainedAgent()">🧪 Test Agent</button>
+      </div>
+
+      <!-- Thêm cặp Q&A -->
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-head"><span class="panel-title">➕ Thêm dữ liệu đào tạo</span></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+          <div class="set-field"><label>Áp dụng cho</label>
+            <select class="set-inp" id="trAgent" style="background:#1e1e2e;color:#eee;border:1px solid var(--border)">
+              <option value="agent">🤖 CRABOR Agent (Cloudflare)</option>
+              <option value="coco">💬 Coco AI (Groq)</option>
+              <option value="all">🌐 Cả hai</option>
+            </select>
+          </div>
+          <div class="set-field"><label>Nhóm (category)</label><input class="set-inp" id="trCategory" placeholder="vd: tài chính, đơn hàng, công việc, kiến thức..." value="general"></div>
+          <div class="set-field"><label>Mẫu câu hỏi (người dùng sẽ hỏi kiểu này)</label>
+            <textarea class="set-inp" id="trQuestion" rows="2" style="min-height:56px" placeholder="vd: CRABOR có hỗ trợ thanh toán khi nhận hàng không?"></textarea>
+          </div>
+          <div class="set-field"><label>Câu trả lời mong muốn (Agent phải trả lời đúng ý này)</label>
+            <textarea class="set-inp" id="trAnswer" rows="4" style="min-height:96px" placeholder="vd: Có ạ! CRABOR hỗ trợ thanh toán khi nhận hàng (COD) ..."></textarea>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="act-btn" style="background:var(--coral);color:#fff;border:none;padding:10px 22px;border-radius:30px;font-weight:800;cursor:pointer" onclick="saveTraining()">💾 Lưu training</button>
+            <span id="trSaveMsg" style="font-size:.8rem;color:#3aaa5c;font-weight:800"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test nhanh -->
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-head"><span class="panel-title">🧪 Test Agent với câu hỏi</span></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+          <div class="set-field"><label>Câu hỏi thử</label>
+            <input class="set-inp" id="trTestQ" placeholder="Nhập câu hỏi để xem Agent trả lời..." onkeydown="if(event.key==='Enter')testTrainedAgent()">
+          </div>
+          <div class="set-field"><label>Kết quả</label>
+            <div id="trTestResult" style="background:#1a1a28;border:1px solid var(--border);border-radius:12px;padding:14px;min-height:70px;font-size:.9rem;line-height:1.6;white-space:pre-wrap;color:var(--text)">Chưa test.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danh sách training -->
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">📚 Dữ liệu đã đào tạo (<span id="trCount">0</span>)</span></div>
+        <div style="overflow-x:auto">
+          <table class="tbl">
+            <thead><tr><th>Agent</th><th>Nhóm</th><th>Câu hỏi</th><th>Câu trả lời</th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody id="trTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -1632,6 +1692,85 @@ function showApiError(msg) {
     document.body.prepend(el);
   }
   document.getElementById('apiErrorMsg').textContent = msg;
+}
+
+// ── TRAINING AGENT ─────────────────────────────────────────
+async function loadTraining() {
+  try {
+    const r = await apiFetch('/api/admin/training');
+    const list = r.data || [];
+    document.getElementById('trCount').textContent = list.length;
+    const tb = document.getElementById('trTbody');
+    if (!list.length) {
+      tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#999;padding:24px">Chưa có dữ liệu training. Thêm cặp câu hỏi/trả lời phía trên.</td></tr>`;
+      return;
+    }
+    const agentLabel = { agent: '🤖 CRABOR Agent', coco: '💬 Coco AI', all: '🌐 Cả hai' };
+    const short = (t) => t && t.length > 90 ? t.slice(0, 90) + '…' : (t || '');
+    tb.innerHTML = list.map(t => `
+      <tr>
+        <td>${agentLabel[t.agent] || t.agent || 'all'}</td>
+        <td style="font-size:.78rem;color:var(--muted)">${short(t.category)}</td>
+        <td style="max-width:260px">${short(t.question)}</td>
+        <td style="max-width:300px;font-size:.82rem;color:var(--muted)">${short(t.answer)}</td>
+        <td>${t.enabled ? '<span style="color:#3aaa5c;font-weight:900">✅ Bật</span>' : '<span style="color:#999">⏸ Tắt</span>'}</td>
+        <td>
+          <button class="act-btn" style="color:${t.enabled ? '#999' : '#3aaa5c'};border:1px solid ${t.enabled ? '#555' : 'rgba(58,170,92,.4)'};background:none;padding:5px 10px;font-size:.72rem;cursor:pointer" onclick="toggleTraining('${t._id}', ${!t.enabled})">${t.enabled ? 'Tắt' : 'Bật'}</button>
+          <button class="act-btn" style="color:#E8504A;border:1px solid rgba(232,80,74,.4);background:none;padding:5px 10px;font-size:.72rem;cursor:pointer" onclick="deleteTraining('${t._id}')">🗑 Xóa</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { showNotif('Lỗi tải training', e.message, 'coral'); }
+}
+
+async function saveTraining() {
+  const agent = document.getElementById('trAgent').value;
+  const category = (document.getElementById('trCategory').value || 'general').trim();
+  const question = document.getElementById('trQuestion').value.trim();
+  const answer = document.getElementById('trAnswer').value.trim();
+  if (!question || !answer) { showNotif('Thiếu nội dung', 'Nhập cả câu hỏi và câu trả lời', 'coral'); return; }
+  const msg = document.getElementById('trSaveMsg');
+  try {
+    await apiFetch('/api/admin/training', 'POST', { agent, question, answer, category });
+    msg.textContent = '✅ Đã lưu training!';
+    document.getElementById('trQuestion').value = '';
+    document.getElementById('trAnswer').value = '';
+    loadTraining();
+    setTimeout(() => msg.textContent = '', 2500);
+  } catch(e) { showNotif('Lỗi lưu', e.message, 'coral'); }
+}
+
+async function toggleTraining(id, enabled) {
+  try {
+    await apiFetch('/api/admin/training/' + id, 'PATCH', { enabled });
+    loadTraining();
+  } catch(e) { showNotif('Lỗi', e.message, 'coral'); }
+}
+
+async function deleteTraining(id) {
+  if (!confirm('Xóa dữ liệu training này?')) return;
+  try {
+    await apiFetch('/api/admin/training/' + id, 'DELETE');
+    showNotif('🗑️ Đã xóa', 'Đã gỡ khỏi dữ liệu training');
+    loadTraining();
+  } catch(e) { showNotif('Lỗi', e.message, 'coral'); }
+}
+
+async function testTrainedAgent() {
+  const q = (document.getElementById('trTestQ').value || '').trim();
+  if (!q) { showNotif('Nhập câu hỏi', 'Gõ câu hỏi test vào ô "Câu hỏi thử"', 'coral'); return; }
+  const out = document.getElementById('trTestResult');
+  out.textContent = '⏳ Đang hỏi Agent...';
+  try {
+    const r = await fetch(`${API}/api/agent/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: q, message: q, sessionId: 'admin_train_test_' + Date.now() }),
+    });
+    const d = await r.json();
+    out.textContent = (d.reply || d.text || (d.message || 'Không có phản hồi')) + (d.canReason ? `\n\n[backend: ${d.backend}]` : `\n\n[chế độ cơ bản: ${d.backend}]`);
+  } catch(e) {
+    out.textContent = '❌ Lỗi: ' + e.message;
+  }
 }
 
 function statusText(s) {
@@ -2762,7 +2901,7 @@ async function deleteBannerAdmin(id) { if (!confirm('Xóa banner này?')) return
 // ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', settings:'pgSettings' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', settings:'pgSettings', training:'pgTraining' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -2784,6 +2923,7 @@ function showPage(key, ev) {
   if (key === 'finance') loadFinance();
   if (key === 'withdraws') loadWithdraws();
   if (key === 'settings') { loadSettings(); }
+  if (key === 'training') { loadTraining(); }
 }
 function viewOrderDetail(orderId) { apiFetch('/api/admin/orders/' + orderId).then(function(data) { var o = data.order || data; var body = document.getElementById('modalBody'); var modal = document.getElementById('overlay'); if (!body || !modal) { alert('Chi tiet don: ' + orderId); return; } body.innerHTML = '<div style="line-height:2"><b>Ma don:</b> ' + (o._id || orderId) + '<br><b>Khach hang:</b> ' + (o.customerName || o.customer || '-') + '<br><b>SDT:</b> ' + (o.customerPhone || '-') + '<br><b>Dia chi:</b> ' + (o.deliveryAddress || '-') + '<br><b>Tong tien:</b> ' + fmtMoney(o.total || 0) + '<br><b>Trang thai:</b> ' + (o.status || '-') + '<br><b>Thoi gian:</b> ' + fmtDate(o.createdAt) + '</div>'; modal.classList.add('show'); }).catch(function(e) { showNotif('Loi', (e && e.message) || 'Khong tai duoc don', 'coral'); }); }
 

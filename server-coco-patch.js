@@ -217,6 +217,7 @@ module.exports = function installCocoAI(app, io) {
           {
             userContext: userCtx,
             task: 'chat',
+            backend: 'groq',   // Coco AI: Groq
             temperature: 0.6,
             maxTokens: 400,
             systemPromptOverride: `Bạn là Coco, nhân viên tổng đài AI của CRABOR. Xưng "em", gọi khách bằng tên nếu biết. Lịch sự, chuyên nghiệp, giải quyết vấn đề cụ thể. Tối đa 120 từ.${userCtx.name && userCtx.name !== 'bạn' ? ' Khách hàng tên: ' + userCtx.name + '.' : ''}${userCtx.walletBal !== undefined ? ' Số dư ví: ' + (userCtx.walletBal || 0).toLocaleString('vi-VN') + 'đ.' : ''}`,

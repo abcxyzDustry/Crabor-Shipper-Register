@@ -186,8 +186,8 @@ body::before {
   <div class="input-row">
     <input class="input" id="input" placeholder="Nhập bài tập / yêu cầu soạn thảo của bạn..."
       autocomplete="off"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}">
-    <button class="send" id="sendBtn" onclick="send()">➤</button>
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._agentSend();}">
+    <button class="send" id="sendBtn" onclick="window._agentSend()">➤</button>
   </div>
 </div>
 
@@ -317,6 +317,7 @@ body::before {
   }
 
   window._agentSend = send;
+  window.send = send;
 
   // init
   addMsg('bot', fmt(WELCOME));

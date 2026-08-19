@@ -500,7 +500,9 @@ const ConversationManager = {
  *   - sessionId:    lưu vào DB nếu có
  */
 async function cocoThink(messages, opts = {}) {
-  const backend = process.env.COCO_BRAIN || 'rule';
+  // opts.backend (nếu có) ghi đè COCO_BRAIN — cho phép tách backend theo route:
+  //   Coco AI -> groq, CRABOR Agent -> cloudflare
+  const backend = opts.backend || process.env.COCO_BRAIN || 'rule';
 
   // Rule-only mode → không suy luận
   if (backend === 'rule') {
