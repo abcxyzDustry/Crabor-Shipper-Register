@@ -1611,7 +1611,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
       <div class="panel">
         <div class="panel-head"><span class="panel-title">📚 Dữ liệu đã đào tạo (<span id="trCount">0</span>)</span></div>
         <div style="overflow-x:auto">
-          <table class="tbl">
+          <table class="reg-table">
             <thead><tr><th>Agent</th><th>Nhóm</th><th>Câu hỏi</th><th>Câu trả lời</th><th>Trạng thái</th><th></th></tr></thead>
             <tbody id="trTbody"></tbody>
           </table>
@@ -1767,7 +1767,11 @@ async function testTrainedAgent() {
       body: JSON.stringify({ text: q, message: q, sessionId: 'admin_train_test_' + Date.now() }),
     });
     const d = await r.json();
-    out.textContent = (d.reply || d.text || (d.message || 'Không có phản hồi')) + (d.canReason ? `\n\n[backend: ${d.backend}]` : `\n\n[chế độ cơ bản: ${d.backend}]`);
+    out.textContent = (d.reply || d.text || (d.message || 'Không có phản hồi')) + (d.canReason ? `
+
+[backend: ${d.backend}]` : `
+
+[chế độ cơ bản: ${d.backend}]`);
   } catch(e) {
     out.textContent = '❌ Lỗi: ' + e.message;
   }
