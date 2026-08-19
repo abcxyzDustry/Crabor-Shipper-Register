@@ -68,7 +68,7 @@ const rows = [
 
 (async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 15000 });
+    await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 15000, dbName: 'crabor' });
     const coll = TrainingQA.collection.name;
     let i = 0;
     for (const r of rows) {
