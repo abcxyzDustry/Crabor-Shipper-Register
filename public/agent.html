@@ -196,8 +196,8 @@ body::before {
   'use strict';
   const API = '/api/agent/chat';
   const EXPORT = '/api/agent/export';
-  const QUICK = ['Giải bài tập toán này', 'Viết bài văn nghị luận', 'Giải thích khái niệm', 'Tạo mẫu bảng Excel chi tiêu', 'Soạn biên bản họp', 'Dịch đoạn văn sang tiếng Anh'];
-  const WELCOME = 'Xin chào! 👋 Em là **CRABOR Agent** 🤖 — trợ lý AI giúp anh/chị:\n\n📚 Giải bài tập (toán, lý, hóa, văn, tiếng Anh...)\n📝 Soạn thảo văn bản, bài văn\n📊 Tạo bảng Word / Excel\n🧠 Giải thích khái niệm, gợi ý công thức\n\nHãy gửi bài tập hoặc yêu cầu của anh/chị nhé!';
+  const QUICK = ['Giải bài tập toán này', 'Viết bài văn nghị luận', 'Giải thích khái niệm', 'Tạo mẫu bảng Excel chi tiêu', 'Soạn biên bản họp', 'Dịch đoạn văn sang tiếng Anh', 'Tạo website giới thiệu ngắn', 'Compile plugin game .jar', 'Deploy code lên hosting'];
+  const WELCOME = 'Xin chào! 👋 Em là **CRABOR Agent** 🤖 — trợ lý AI giúp anh/chị:\n\n📚 Giải bài tập (toán, lý, hóa, văn, tiếng Anh...)\n📝 Soạn thảo văn bản, bài văn\n📊 Tạo bảng Word / Excel\n🌐 Tạo website / app đầy đủ (frontend + backend)\n♨️ Compile plugin game thành .jar\n🚀 Deploy code lên hosting (Render, GitHub)\n\nHãy gửi bài tập hoặc yêu cầu của anh/chị nhé!';
 
   const sessionId = 'agent_web_' + (localStorage.getItem('agent_sid') || (function(){const id=Math.random().toString(36).slice(2,10);localStorage.setItem('agent_sid',id);return id;})());
   const msgs = document.getElementById('msgs');
