@@ -257,6 +257,25 @@ body::before {
 
   window._agentAsk = function (q) { input.value = q; send(); };
 
+  window._agentDownloadJar = async function (jobId) {
+    try {
+      const r = await fetch('/api/agent/jobs/' + jobId + '/download');
+      if (!r.ok) throw new Error('Chưa sẵn sàng');
+      const blob = await r.blob();
+      const cd = r.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename="?([^";]+)"?/);
+      const fname = (m ? m[1] : 'plugin.jar');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) { alert('Jar chưa sẵn sàng: ' + e.message); }
+  };
+
   window._agentExport = async function (format) {
     if (!lastReply) return alert('Chưa có nội dung để tải. Hãy hỏi Agent trước nhé!');
     const typeLabel = format === 'word' ? 'Word' : 'Excel';
@@ -302,7 +321,15 @@ body::before {
       const d = await r.json();
       if (!d.success) throw new Error(d.message || 'Lỗi');
       lastReply = d.reply || d.text || '';
-      addMsg('bot', fmt(d.text), lastReply);
+      const row = addMsg('bot', fmt(d.text), lastReply);
+      if (d.download && d.download.jobId) {
+        const er = document.createElement('div');
+        er.className = 'export-row';
+        er.innerHTML = `<button class="export-btn" onclick="window._agentDownloadJar('${d.download.jobId}')">🔽 Tải plugin .jar</button>`;
+        const bubble = row.querySelector('.bubble');
+        if (bubble) bubble.appendChild(er);
+        else { er.style.marginTop = '8px'; row.appendChild(er); }
+      }
       if (d.canReason) statusTxt.textContent = '🧠 AI đang hoạt động';
       else statusTxt.textContent = '🟡 Chế độ cơ bản';
     } catch (e) {

@@ -1104,6 +1104,7 @@ const aiBannerSchema = new mongoose.Schema({
   ctaText:     { type: String, default: "Đặt ngay" },
   ctaLink:     { type: String, default: "/customer" },
   htmlContent: { type: String },       // full custom HTML nếu muốn
+  content:     { type: String },       // nội dung bài viết / tin tức (text, scroll để đọc)
   prompt:      { type: String },       // prompt admin đã dùng
   active:      { type: Boolean, default: true },
   apps:        { type: [String], default: ['customer'] },  // targets: 'customer' | 'partner' | 'shipper'
@@ -1302,6 +1303,58 @@ const trainingQaSchema = new mongoose.Schema({
   enabled:  { type: Boolean, default: true },
 }, { timestamps: true });
 const TrainingQA = mongoose.models.TrainingQA || mongoose.model("TrainingQA", trainingQaSchema);
+
+// ── AGENT JOBS — CRABOR Agent nhận task compile plugin, gửi xuống môi trường local (laptop) ──
+// Render không chạy gradle/javac được → laptop chạy executor poll các job: status queued → running → done/failed
+const agentJobSchema = new mongoose.Schema({
+  jobType:  { type: String, default: 'compile-plugin' },
+  sessionId:{ type: String, default: '' },
+  status:   { type: String, enum: ['queued', 'running', 'done', 'failed', 'canceled'], default: 'queued' },
+  request:  { type: mongoose.Schema.Types.Mixed, default: {} }, // { pluginName, files: [{name, content}], prompt }
+  result:   { type: mongoose.Schema.Types.Mixed, default: null }, // { jarB64: gzip+base64, jarName, jarSize, buildLog }
+  error:    { type: String, default: '' },
+  attempts: { type: Number, default: 0 },
+}, { timestamps: true });
+agentJobSchema.index({ status: 1, createdAt: 1 });
+const AgentJob = mongoose.models.AgentJob || mongoose.model("AgentJob", agentJobSchema);
+
+// Auth cho executor (laptop) gọi API lấy/trả job
+function executorAuth(req, res, next) {
+  const token = String(req.headers['x-executor-token'] || req.query.token || '');
+  const secret = process.env.AGENT_EXECUTOR_TOKEN;
+  if (!secret) return res.status(503).json({ success: false, message: 'AGENT_EXECUTOR_TOKEN chưa cấu hình' });
+  try {
+    const a = Buffer.from(token); const b = Buffer.from(secret);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(401).json({ success: false, message: 'Sai token executor' });
+  } catch (e) { return res.status(401).json({ success: false, message: 'Sai token executor' }); }
+  next();
+}
+
+// Helper: tách khối code từ tin nhắn (```...``` hoặc code fence) + đoán tên file
+function extractAgentFiles(text) {
+  const files = [];
+  const re = /```(?:[a-zA-Z0-9_\-]*)?\r?\n?([\s\S]*?)```/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const block = m[1].replace(/\r\n/g, '\n').replace(/^\n+/, '').trimEnd();
+    if (!block) continue;
+    const name = guessAgentFilename(block);
+    files.push({ name, content: block });
+  }
+  return files;
+}
+function guessAgentFilename(block) {
+  const head = block.trim();
+  if (/^\s*plugins\s*\{/.test(head) || /^\s*repositories\s*\{/.test(head) || /^\s*dependencies\s*\{/.test(head)) return 'build.gradle';
+  if (/["']?(name|main|displayName|author)["']?\s*:/.test(head) && head.startsWith('{')) return 'mod.json';
+  const pkg = head.match(/package\s+([\w.]+)\s*;/);
+  if (pkg) {
+    const cls = head.match(/public\s+(?:final\s+)?class\s+(\w+)/) || head.match(/\bclass\s+(\w+)/);
+    const name = cls ? cls[1] : 'Plugin';
+    return `src/${pkg[1].replace(/\./g, '/')}/${name}.java`;
+  }
+  return null;
+}
 
 // Lấy training list theo agent, build thành chuỗi nhúng vào system prompt
 async function buildTrainingPrompt(agent = 'agent') {
@@ -5907,9 +5960,65 @@ app.post("/api/agent/chat", async (req, res) => {
     const userInput = String(message || text || '').trim();
     if (!userInput) return res.status(400).json({ success: false, error: 'Thiếu nội dung tin nhắn' });
 
+    const sid = sessionId || `agent_${req.session?.userId || 'anon'}_${Date.now()}`;
+
     const cocoBrainMod = require('./coco-brain');
     const { cocoThink, ConversationManager } = cocoBrainMod;
-    const sid = sessionId || `agent_${req.session?.userId || 'anon'}_${Date.now()}`;
+
+    // ── CỔNG PLUGIN EXECUTOR: người dùng gửi source .java để biên dịch thành .jar ──
+    // Render không chạy gradle được → tạo job, laptop (local executor) polling + compile thật rồi trả kết quả.
+    const wantsCompile = /(biên dịch|compile|build|tạo plugin|dựng plugin|làm plugin|đóng gói|\.jar)/i.test(userInput)
+      && /(plugin|mod|\.jar|jar|mindustry)/i.test(userInput);
+    if (wantsCompile) {
+      const extracts = extractAgentFiles(userInput);
+      const hasJava = extracts.some(f => f.name && f.name.endsWith('.java'));
+      if (hasJava) {
+        try {
+          const javaFile = extracts.find(f => f.name && f.name.endsWith('.java'));
+          const pluginName = (javaFile?.name.match(/([^/\\]+)\.java$/) || [])[1] || 'Plugin';
+          const job = await AgentJob.create({
+            status: 'queued',
+            sessionId: sid,
+            request: {
+              pluginName,
+              files: extracts,
+              prompt: userInput,
+            },
+          });
+          console.log(`[AgentJob] Created ${job._id} plugin='${pluginName}' (${extracts.length} files) sess=${sid.slice(0,12)}`);
+          const reply = `🎯 CRABOR nhận được **${pluginName}** (${extracts.length} khối mã nguồn) và đang biên dịch thành file .jar trên máy chủ CRABOR.\n\n⏳ Quá trình mất ~20–60 giây. Bạn hãy nhắn tiếp: **"kiểm tra trạng thái compile"** để xem kết quả vaì tải file.\n\n${AGENT_DISCLAIMER}`;
+          try { await ConversationManager.saveMessages(sid, userInput, reply.replace(/\n\n.*$/, ''), 'rule', 'agent'); } catch (_) {}
+          return res.json({ success: true, text: reply, reply, disclaimer: AGENT_DISCLAIMER, sessionId: sid, backend: 'executor', agentJobId: String(job._id) });
+        } catch (e) {
+          console.error('[AgentJob Create]', e.message);
+        }
+      }
+    }
+
+    // ── HỎI TRẠNG THÁI JOB COMPILE ──
+    if (/(trạng thái|kiểm tra|xong chưa|xem kết quả|status|kết quả compile|kết quả build)/i.test(userInput)
+        && /(compile|plugin|jar|build)/i.test(userInput)) {
+      const job = await AgentJob.findOne({ sessionId: sid, jobType: 'compile-plugin' }).sort({ createdAt: -1 }).lean();
+      if (job) {
+        let reply;
+        if (job.status === 'done' && job.result?.jarB64) {
+          const sizeKb = Math.round((job.result.jarSize || 0) / 1024);
+          reply = `✅ Plugin **${job.request?.pluginName || 'plugin'}** đã biên dịch xong! (${sizeKb} KB)\n\n🔽 **Tải file .jar:** bấm nút bên dưới (đã sẵn sàng).\n\n🛠 Bước chơi: bỏ file .jar vào thư mục **mods/** của Mindustry rồi mở game.`;
+          try { await ConversationManager.saveMessages(sid, userInput, reply, 'rule', 'agent'); } catch (_) {}
+          return res.json({
+            success: true, text: reply, reply, disclaimer: AGENT_DISCLAIMER, sessionId: sid, backend: 'executor',
+            agentJobId: String(job._id),
+            download: { jobId: String(job._id), jarName: job.result.jarName || 'plugin.jar' },
+          });
+        } else if (job.status === 'failed') {
+          reply = `⚠️ Plugin **${job.request?.pluginName || 'plugin'}** biên dịch lỗi:\n\n\`\`\`\n${String(job.error || 'Không rõ lỗi').slice(0, 1500)}\n\`\`\`\n\nGửi lại source đã sửa và yêu cầu compile lần nữa nhé.`;
+        } else {
+          reply = `⏳ Plugin **${job.request?.pluginName || 'plugin'}** đang ${job.status === 'running' ? 'được biên dịch' : 'chờ trong hàng đợi'}. Bạn chờ ~30 giây rồi hỏi lại nhé.`;
+        }
+        try { await ConversationManager.saveMessages(sid, userInput, reply, 'rule', 'agent'); } catch (_) {}
+        return res.json({ success: true, text: reply, reply, disclaimer: AGENT_DISCLAIMER, sessionId: sid, backend: 'executor', agentJobId: String(job._id) });
+      }
+    }
 
     let history = [];
     try {
@@ -5945,6 +6054,60 @@ app.post("/api/agent/chat", async (req, res) => {
   } catch (err) {
     console.error('[Agent Chat]', err.message);
     return res.status(500).json({ success: false, message: 'CRABOR Agent tạm thời gián đoạn 🙏' });
+  }
+});
+
+// POST /api/agent/jobs/claim — executor (laptop) nhận một job compile-plugin đang chờ (atomically)
+app.post("/api/agent/jobs/claim", executorAuth, async (req, res) => {
+  try {
+    const job = await AgentJob.findOneAndUpdate(
+      { jobType: 'compile-plugin', status: 'queued' },
+      { $set: { status: 'running' }, $inc: { attempts: 1 } },
+      { new: true, sort: { createdAt: 1 } }
+    );
+    if (!job) return res.json({ success: true, job: null });
+    return res.json({ success: true, job });
+  } catch (err) {
+    console.error('[AgentJob Claim]', err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/agent/jobs/:id/result — executor gửi kết quả compile (jar gzip base64 + log) về server
+app.post("/api/agent/jobs/:id/result", executorAuth, async (req, res) => {
+  try {
+    const { success, result, error } = req.body || {};
+    const patch = {
+      status: success ? 'done' : 'failed',
+      result: result || null,
+      error: success ? '' : String(error || 'Build thất bại'),
+    };
+    const job = await AgentJob.findByIdAndUpdate(req.params.id, { $set: patch }, { new: true });
+    if (!job) return res.status(404).json({ success: false, message: 'Không tìm thấy job' });
+    console.log(`[AgentJob] ${job._id} → ${job.status}`);
+    return res.json({ success: true, job });
+  } catch (err) {
+    console.error('[AgentJob Result]', err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/agent/jobs/:id/download — người dùng tải file .jar đã compile (giải nén gzip+base64)
+app.get("/api/agent/jobs/:id/download", async (req, res) => {
+  try {
+    const job = await AgentJob.findById(req.params.id).lean();
+    if (!job || job.status !== 'done' || !job.result?.jarB64) {
+      return res.status(404).json({ success: false, message: 'Jar chưa sẵn sàng' });
+    }
+    const zlib = require('zlib');
+    const buf = zlib.gunzipSync(Buffer.from(job.result.jarB64, 'base64'));
+    const fname = String(job.result.jarName || (job.request?.pluginName || 'plugin') + '.jar').replace(/[^\w.\-]/g, '_');
+    res.setHeader('Content-Type', 'application/java-archive');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    return res.send(buf);
+  } catch (err) {
+    console.error('[AgentJob Download]', err.message);
+    return res.status(500).json({ success: false, message: 'Lỗi tải file' });
   }
 });
 
