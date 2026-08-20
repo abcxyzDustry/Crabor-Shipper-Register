@@ -6095,6 +6095,7 @@ app.post("/api/agent/jobs/:id/result", executorAuth, async (req, res) => {
 // GET /api/agent/jobs/:id/download — người dùng tải file .jar đã compile (giải nén gzip+base64)
 app.get("/api/agent/jobs/:id/download", async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ success: false, message: 'Jar chưa sẵn sàng' });
     const job = await AgentJob.findById(req.params.id).lean();
     if (!job || job.status !== 'done' || !job.result?.jarB64) {
       return res.status(404).json({ success: false, message: 'Jar chưa sẵn sàng' });
