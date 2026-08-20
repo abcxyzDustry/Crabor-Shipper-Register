@@ -1343,8 +1343,16 @@ function extractAgentFiles(text) {
   }
   return files;
 }
+// Validate java sinh từ LLM: phải đúng Mindustry (không phải Bukkit/Minecraft/Spigot)
+function agentJavaIsValid(content) {
+  const c = String(content || '');
+  if (/org\.bukkit|net\.md_5\.|org\.spigotmc|org\.papermc|net\.luckperms|org\.gradle\.api/i.test(c)) return false;
+  return /extends\s+Plugin\b/.test(c) && /\bmindustry\b/.test(c);
+}
 function guessAgentFilename(block) {
   const head = block.trim();
+  const named = head.match(/^\s*\/\/\s*([\w./\\@~-]+\.(?:java|gradle|json))\s*(?:\r?\n|$)/i);
+  if (named) return named[1];
   if (/^\s*plugins\s*\{/.test(head) || /^\s*repositories\s*\{/.test(head) || /^\s*dependencies\s*\{/.test(head)) return 'build.gradle';
   if (/["']?(name|main|displayName|author)["']?\s*:/.test(head) && head.startsWith('{')) return 'mod.json';
   const pkg = head.match(/package\s+([\w.]+)\s*;/);
@@ -1355,6 +1363,55 @@ function guessAgentFilename(block) {
   }
   return null;
 }
+
+// Parse JSON thuần từ output LLM (bỏ markdown fence / text thừa)
+function parseAgentJson(reply) {
+  let s = String(reply || '').trim();
+  const fence = s.match(/```(?:json|java)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  const st = s.indexOf('{');
+  const en = s.lastIndexOf('}');
+  if (st >= 0 && en > st) s = s.slice(st, en + 1);
+  try { return JSON.parse(s); } catch (e) { return null; }
+}
+function cleanCodeContent(c) {
+  return String(c || '').replace(/^\s*```[^\n]*\r?\n?/, '').replace(/```\s*$/, '').trim();
+}
+// Tạo AgentJob từ files + trả về reply chuẩn cho chat
+async function createAgentJob(sid, pluginName, files, prompt) {
+  const javaFile = files.find(f => f.name && f.name.endsWith('.java')) || files[0];
+  const name = (javaFile?.name.match(/([^/\\]+)\.java$/) || [])[1] || pluginName || 'Plugin';
+  const job = await AgentJob.create({ status: 'queued', sessionId: sid, request: { pluginName: name, files, prompt: String(prompt || '') } });
+  console.log(`[AgentJob] Created ${job._id} plugin='${name}' (${files.length} files) sess=${String(sid).slice(0,12)}`);
+  return job;
+}
+function jobQueuedReply(job) {
+  return `🎯 CRABOR đã nhận và đang biên dịch **${job.request?.pluginName || 'plugin'}** thành file .jar trên máy chủ CRABOR.\n\n⏳ Quá trình mất ~20–60 giây. Cứ nhắn tiếp: **"kiểm tra trạng thái compile"** để xem kết quả và tải file.\n\n${AGENT_DISCLAIMER}`;
+}
+
+// System prompt cho executor (laptop) khi cần TỰ VIẾT code plugin từ ý tưởng
+// (được gửi qua proxy LLM cục bộ — not dùng trên Render vì cần model mạnh không bị chặn game code)
+const AGENT_EXECUTOR_GEN_PROMPT = `Bạn là lập trình viên Java viết plugin cho trò chơi Mindustry (API mindustry.mod.Plugin, Java 17).
+Người dùng mô tả Ý TƯỞNG plugin. Nhiệm vụ: xuất ĐÚNG MỘT khối code duy nhất — file JAVA. KHÔNG viết build.gradle, KHÔNG viết file khác, KHÔNG có lời dẫn, KHÔNG giải thích.
+Khuôn bắt buộc (chỉ đổi tên ở ███ và thay LOGIC trong init() theo ý tưởng). Dòng đầu của khối là chú thích // tên file.
+
+// src/███/███.java
+package ███;
+import arc.Events;
+import mindustry.game.EventType;
+import mindustry.gen.Call;
+import mindustry.gen.Player;
+import mindustry.mod.Plugin;
+
+public class ███ extends Plugin {
+  @Override
+  public void init() {
+    // ███ logic đầy đủ theo ý tưởng, đúng cú pháp Java
+  }
+}
+
+Chỉ dùng API có sẵn trong Mindustry core: arc.Events, mindustry.game.EventType, mindustry.gen.Call, mindustry.gen.Player, mindustry.core.GameState, mindustry.content.Blocks. Logic để trong init(). Sự kiện: Events.on(EventType.X.class, event -> { ... }); Chat: Call.sendMessage("..."); Code phải NGẮN GỌN, ĐẦY ĐỦ, đúng cú pháp.
+CHÚ Ý: ĐÂY LÀ GAME MINDUSTRY (2D tower-defense), KHÔNG PHẢI Minecraft. TUYỆT ĐỐI KHÔNG dùng org.bukkit, JavaPlugin, onEnable, Spigot. Chỉ dùng mindustry.mod.Plugin với phương thức init().`;
 
 // Lấy training list theo agent, build thành chuỗi nhúng vào system prompt
 async function buildTrainingPrompt(agent = 'agent') {
@@ -5965,32 +6022,31 @@ app.post("/api/agent/chat", async (req, res) => {
     const cocoBrainMod = require('./coco-brain');
     const { cocoThink, ConversationManager } = cocoBrainMod;
 
-    // ── CỔNG PLUGIN EXECUTOR: người dùng gửi source .java để biên dịch thành .jar ──
+    // ── CỔNG PLUGIN EXECUTOR: người dùng dán source HOẶC nêu ý tưởng → agent viết code + compile .jar ──
     // Render không chạy gradle được → tạo job, laptop (local executor) polling + compile thật rồi trả kết quả.
-    const wantsCompile = /(biên dịch|compile|build|tạo plugin|dựng plugin|làm plugin|đóng gói|\.jar)/i.test(userInput)
-      && /(plugin|mod|\.jar|jar|mindustry)/i.test(userInput);
-    if (wantsCompile) {
+    const isCompileIntent = /(compile|biên dịch|build|tạo plugin|dựng plugin|làm plugin|viết plugin|đóng gói|\.jar|jar game)/i.test(userInput)
+      && /(plugin|mod|\.jar|jar|mindustry|game)/i.test(userInput);
+    if (isCompileIntent) {
       const extracts = extractAgentFiles(userInput);
       const hasJava = extracts.some(f => f.name && f.name.endsWith('.java'));
+
       if (hasJava) {
         try {
-          const javaFile = extracts.find(f => f.name && f.name.endsWith('.java'));
-          const pluginName = (javaFile?.name.match(/([^/\\]+)\.java$/) || [])[1] || 'Plugin';
-          const job = await AgentJob.create({
-            status: 'queued',
-            sessionId: sid,
-            request: {
-              pluginName,
-              files: extracts,
-              prompt: userInput,
-            },
-          });
-          console.log(`[AgentJob] Created ${job._id} plugin='${pluginName}' (${extracts.length} files) sess=${sid.slice(0,12)}`);
-          const reply = `🎯 CRABOR nhận được **${pluginName}** (${extracts.length} khối mã nguồn) và đang biên dịch thành file .jar trên máy chủ CRABOR.\n\n⏳ Quá trình mất ~20–60 giây. Bạn hãy nhắn tiếp: **"kiểm tra trạng thái compile"** để xem kết quả vaì tải file.\n\n${AGENT_DISCLAIMER}`;
-          try { await ConversationManager.saveMessages(sid, userInput, reply.replace(/\n\n.*$/, ''), 'rule', 'agent'); } catch (_) {}
-          return res.json({ success: true, text: reply, reply, disclaimer: AGENT_DISCLAIMER, sessionId: sid, backend: 'executor', agentJobId: String(job._id) });
+          const job = await createAgentJob(sid, 'Plugin', extracts, userInput);
+          return res.json({ success: true, text: jobQueuedReply(job), reply: jobQueuedReply(job), disclaimer: AGENT_DISCLAIMER, sessionId: sid, backend: 'executor', agentJobId: String(job._id) });
         } catch (e) {
           console.error('[AgentJob Create]', e.message);
+        }
+      } else {
+        // Người dùng chỉ nêu Ý TƯỞNG → tạo job khuyết source; executor (laptop) tự viết code + compile
+        try {
+          const job = await createAgentJob(sid, 'Plugin', [], userInput);
+          console.log(`[AgentJob] Idea-only job ${job._id} — chờ executor tự viết + compile`);
+          const reply = `🎯 CRABOR đã nhận ý tưởng và sẽ TỰ VIẾT code + biên dịch thành .jar trên máy chủ CRABOR.\n\n⏳ Quá trình gồm viết code + compile mất ~30–120 giây. Cứ nhắn tiếp: **"kiểm tra trạng thái compile"** để xem kết quả và tải file.\n\n${AGENT_DISCLAIMER}`;
+          try { await ConversationManager.saveMessages(sid, userInput, reply, 'rule', 'agent'); } catch (_) {}
+          return res.json({ success: true, text: reply, reply, disclaimer: AGENT_DISCLAIMER, sessionId: sid, backend: 'executor', agentJobId: String(job._id) });
+        } catch (e) {
+          console.error('[AgentJob Idea]', e.message);
         }
       }
     }
