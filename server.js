@@ -2235,6 +2235,8 @@ const SocialComment = mongoose.models.SocialComment || mongoose.model("SocialCom
 // GET /api/social/posts — feed bài viết từ banner AI đang chạy
 app.get("/api/social/posts", async (req, res) => {
   try {
+    await loadSessionFromHeader(req, res);
+    const uid = req.session?.userId || req.session?.partnerId || req.session?.shipperId || null;
     const banners = await AIBanner.find({ active: true }).sort({ createdAt: -1 }).limit(30).lean();
     const ids = banners.map(b => b._id);
     let cmap = {};
@@ -2245,7 +2247,7 @@ app.get("/api/social/posts", async (req, res) => {
       ]);
       cmap = Object.fromEntries(agg.map(c => [String(c._id), c.count]));
     }
-    const uid = req.session?.userId ? String(req.session.userId) : null;
+    const uidStr = uid ? String(uid) : null;
     const posts = banners.map(b => ({
       _id: b._id,
       imageUrl: b.imageUrl,
@@ -2259,7 +2261,7 @@ app.get("/api/social/posts", async (req, res) => {
       createdAt: b.createdAt,
       commentCount: cmap[String(b._id)] || 0,
       likes: b.likes || 0,
-      liked: uid ? (b.likedBy || []).map(String).includes(uid) : false,
+      liked: uidStr ? (b.likedBy || []).map(String).includes(uidStr) : false,
     }));
     res.json({ success: true, posts });
   } catch(err) {
@@ -2267,13 +2269,14 @@ app.get("/api/social/posts", async (req, res) => {
   }
 });
 
-// POST /api/social/posts/:id/like — tym / bỏ tym (1 user 1 tym)
+// POST /api/social/posts/:id/like — tym / bỏ tym (1 tài khoản 1 tym — mọi vai trò)
 app.post("/api/social/posts/:id/like", async (req, res) => {
   try {
-    if (!req.session.userId) return res.status(401).json({ success: false, needLogin: true, message: "Đăng nhập để thả tym" });
+    await loadSessionFromHeader(req, res);
+    const uid = req.session?.userId || req.session?.partnerId || req.session?.shipperId || null;
+    if (!uid) return res.status(401).json({ success: false, needLogin: true, message: "Đăng nhập để thả tym" });
     const banner = await AIBanner.findById(req.params.id).select("likes likedBy");
     if (!banner) return res.status(404).json({ success: false, message: "Bài viết không tồn tại" });
-    const uid = req.session.userId;
     const already = (banner.likedBy || []).map(String).includes(String(uid));
     if (already) {
       await AIBanner.findByIdAndUpdate(banner._id, { $pull: { likedBy: uid }, $inc: { likes: -1 } });
@@ -2414,10 +2417,12 @@ function containsAbuse(text) {
   return false;
 }
 
-// POST /api/social/posts/:id/comment — bình luận + Coco AI đọc và trả lời
+// POST /api/social/posts/:id/comment — bình luận + Coco AI đọc và trả lời (mọi vai trò)
 app.post("/api/social/posts/:id/comment", async (req, res) => {
   try {
-    if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    await loadSessionFromHeader(req, res);
+    const uid = req.session?.userId || req.session?.partnerId || req.session?.shipperId || null;
+    if (!uid) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
     const text = String(req.body?.text || "").trim();
     if (!text) return res.status(400).json({ success: false, message: "Thiếu nội dung bình luận" });
 
@@ -2433,11 +2438,28 @@ app.post("/api/social/posts/:id/comment", async (req, res) => {
     const banner = await AIBanner.findById(req.params.id).select("title").lean();
     if (!banner) return res.status(404).json({ success: false, message: "Bài viết không tồn tại" });
 
-    const user = await User.findById(req.session.userId).select("fullName").lean();
+    // Tác giả theo vai trò: customer / partner / shipper
+    let authorName = "Khách hàng CRABOR";
+    try {
+      if (req.session.shipperId) {
+        const sh = await Shipper.findById(req.session.shipperId).select("fullName").lean();
+        authorName = sh?.fullName ? `${sh.fullName} 🛵` : "Shipper CRABOR";
+      } else if (req.session.partnerId) {
+        const models = [mongoose.models.FoodPartner, mongoose.models.GiatLaPartner, mongoose.models.GiupViecPartner, mongoose.models.ChinaShop].filter(Boolean);
+        for (const m of models) {
+          const p = await m.findById(req.session.partnerId).select("bizName fullName").lean();
+          if (p) { authorName = `${p.bizName || p.fullName || "Đối tác"} 🏪`; break; }
+        }
+      } else if (req.session.userId) {
+        const u = await User.findById(req.session.userId).select("fullName").lean();
+        authorName = u?.fullName || "Khách hàng CRABOR";
+      }
+    } catch(_) {}
+
     const comment = await SocialComment.create({
       postId: req.params.id,
-      userId: req.session.userId,
-      authorName: user?.fullName || "Khách hàng CRABOR",
+      userId: uid,
+      authorName,
       text,
     });
 
@@ -2479,7 +2501,7 @@ app.post("/api/social/posts/:id/comment", async (req, res) => {
     if (!aiText) {
       try {
         const { cocoRespondSmart } = require("./coco-engine");
-        const r = await cocoRespondSmart({ text, sessionId: `social_${req.params.id}`, userId: req.session.userId, userCtx: {} });
+        const r = await cocoRespondSmart({ text, sessionId: `social_${req.params.id}`, userId: uid, userCtx: {} });
         aiText = r?.text || "";
       } catch(_) {}
     }
