@@ -484,6 +484,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
       <div class="nav-item" onclick="showPage('social')">
         <span class="ico">🌐</span> Mạng xã hội
       </div>
+      <div class="nav-item" onclick="showPage('hocho')">
+        <span class="ico">🎓</span> Học Hộ
+      </div>
       <div class="nav-item" onclick="showPage('settings')">
         <span class="ico">⚙️</span> Cài đặt
       </div>
@@ -1493,6 +1496,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         </div>
         <div id="soBotMsg" style="margin-top:10px;font-size:.75rem;color:var(--green);display:none">✅ Đã lưu cấu hình bot</div>
       </div>
+    </section>
+
+    <!-- ── HỌC HỘ (hocho admin — nhúng iframe) ── -->
+    <section id="pgHocho" class="page-section">
+      <div class="page-header">
+        <div class="page-title">🎓 Quản trị Học Hộ</div>
+        <div class="header-actions">
+          <button class="filter-btn" onclick="document.getElementById('hochoFrame').src='/hocho-admin.html'">🔄 Tải lại</button>
+        </div>
+      </div>
+      <iframe id="hochoFrame" src="about:blank" style="width:100%;height:calc(100vh - 130px);border:none;border-radius:14px;background:#0a0f0a"></iframe>
     </section>
 
     <section id="pgSettings" class="page-section">
@@ -3207,7 +3221,7 @@ function setSocialBotRange(min, max) {
 // ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', storage:'pgStorage', social:'pgSocial', settings:'pgSettings', training:'pgTraining' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', storage:'pgStorage', social:'pgSocial', hocho:'pgHocho', settings:'pgSettings', training:'pgTraining' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -3227,6 +3241,7 @@ function showPage(key, ev) {
   if (key === 'users') loadCustomers();
   if (key === 'storage') loadStorageStats();
   if (key === 'social') loadSocialBot();
+  if (key === 'hocho') { const fr = document.getElementById('hochoFrame'); if (fr && fr.src !== '/hocho-admin.html' && fr.src.indexOf('hocho-admin') === -1) fr.src = '/hocho-admin.html'; }
   if (key === 'dashboard') loadStats();
   if (key === 'finance') loadFinance();
   if (key === 'withdraws') loadWithdraws();
