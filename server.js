@@ -1252,6 +1252,8 @@ const bnplInvoiceSchema = new mongoose.Schema({
   paidAt:         Date,
   status:         { type: String, enum: ['draft','issued','paid','overdue','installment'], default: 'draft' },
   sePayRef:       { type: String },   // mã chuyển khoản SePay
+  payosOrderCode: { type: String },   // mã PayOS khi trả hoá đơn bằng PayOS
+  paymentMethod:  { type: String },   // wallet | sepay | payos
 }, { timestamps: true });
 bnplInvoiceSchema.index({ userId: 1, billingMonth: 1 }, { unique: true });
 const BNPLInvoice = mongoose.model('BNPLInvoice', bnplInvoiceSchema);
@@ -1259,11 +1261,10 @@ const BNPLInvoice = mongoose.model('BNPLInvoice', bnplInvoiceSchema);
 // ── BNPL CREDIT LIMIT ─────────────────────────────────────
 // (calculated dynamically from totalSpent, no separate schema needed)
 function getBnplLimit(totalSpent) {
-  if (totalSpent <  2000000)  return 0;
-  if (totalSpent <  5000000)  return 2000000;
-  if (totalSpent < 10000000)  return 5000000;
-  if (totalSpent < 20000000)  return 10000000;
-  return 20000000;
+  if (totalSpent <  5000000)  return 0;        // chưa đủ điều kiện mở khoá (cần ≥5tr)
+  if (totalSpent < 10000000)  return 2000000;  // hạn mức mặc định khi mở khoá
+  if (totalSpent < 20000000)  return 5000000;
+  return 10000000;
 }
 function getCurrentBillingMonth() {
   const now = new Date();
@@ -4277,20 +4278,19 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ success:false });
     const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin');
     if (!user) return res.status(404).json({ success:false });
-    // Admin luôn đủ điều kiện
-    const orderCount = user.totalOrders || 0;
-    const eligible   = user.isAdmin || orderCount >= 10;
+    // Admin luôn đủ điều kiện; điều kiện mở khoá: tổng chi tiêu ≥ 5.000.000đ
     const spent      = user.totalSpent || 0;
-    const limit      = eligible ? getBnplLimit(Math.max(spent, 2000000)) : 0;
+    const eligible   = user.isAdmin || spent >= 5000000;
+    const limit      = eligible ? getBnplLimit(spent) : 0;
     const month      = getCurrentBillingMonth();
     const txs        = await BNPLTx.find({ userId:req.session.userId, billingMonth:month, status:{$in:['pending_bill','billed']} });
     const usedThisMonth = txs.reduce((s,t)=>s+t.amount,0);
     const available  = Math.max(0, limit - usedThisMonth);
     const unpaid     = await BNPLInvoice.find({ userId:req.session.userId, status:{$in:['issued','overdue','installment']} }).sort({dueDate:1});
-    res.json({ success:true, eligible, limit, spent, orderCount, usedThisMonth, available,
+    res.json({ success:true, eligible, limit, spent, orderCount: user.totalOrders || 0, usedThisMonth, available,
       message: eligible
         ? `Hạn mức: ${limit.toLocaleString('vi-VN')}đ | Còn: ${available.toLocaleString('vi-VN')}đ`
-        : `Cần thêm ${Math.max(0, 10 - orderCount)} đơn hàng để mở Ví Trả Sau (cần tối thiểu 10 đơn)`,
+        : `Cần chi tiêu thêm ${(5000000 - spent).toLocaleString('vi-VN')}đ để mở Ví Trả Sau (tổng chi tiêu tối thiểu 5.000.000đ)`,
       unpaidInvoices: unpaid });
   } catch(e){ res.status(500).json({success:false,message:e.message}); }
 });
@@ -4386,6 +4386,161 @@ setInterval(async()=>{
     await BNPLInvoice.updateMany({status:'issued',dueDate:{$lt:new Date()}},{$set:{status:'overdue',lateFee:30000}});
   } catch(e){}
 }, 6*60*60*1000);
+
+// POST /api/bnpl/invoice/:id/pay — khách tự trả hoá đơn bằng ví CRABOR | SePay QR | PayOS
+app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
+  try {
+    if (!req.session.userId) return res.status(401).json({success:false});
+    const method = String(req.body?.method || 'sepay').toLowerCase();
+    if (!['wallet','sepay','payos'].includes(method))
+      return res.status(400).json({success:false,message:'Phương thức không hợp lệ (wallet/sepay/payos)'});
+    const inv = await BNPLInvoice.findOne({_id:req.params.id, userId:req.session.userId});
+    if (!inv) return res.status(404).json({success:false,message:'Không tìm thấy hóa đơn'});
+    if (inv.status==='paid') return res.status(400).json({success:false,message:'Hóa đơn đã thanh toán'});
+    const now = new Date();
+    const late = now > inv.dueDate && inv.status!=='installment';
+    const lateFee = late ? 30000 : 0;
+    const finalAmount = inv.totalAmount + inv.installFee + lateFee;
+    await BNPLInvoice.findByIdAndUpdate(inv._id,{lateFee,finalAmount});
+
+    if (method === 'wallet') {
+      try {
+        await walletDebit(req.session.userId, 'user', finalAmount, 'bnpl_pay', inv._id.toString(), `Thanh toán hóa đơn trả sau ${inv.billingMonth||''} bằng ví CRABOR`);
+      } catch (e) {
+        return res.status(400).json({ success:false, walletInsufficient:true, message:`Ví CRABOR không đủ số dư. Cần ${finalAmount.toLocaleString('vi-VN')}đ` });
+      }
+      await BNPLInvoice.findByIdAndUpdate(inv._id,{status:'paid',paidAt:new Date(),paymentMethod:'wallet'});
+      await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
+      req.io.to('admin').emit('bnplPaid',{invoiceId:inv._id,amount:finalAmount,method:'wallet'});
+      return res.json({ success:true, status:'paid', method:'wallet', finalAmount, message:`Đã thanh toán ${finalAmount.toLocaleString('vi-VN')}đ bằng ví CRABOR` });
+    }
+
+    if (method === 'sepay') {
+      const sePayRef = 'BNPL'+inv._id.toString().slice(-8).toUpperCase();
+      await BNPLInvoice.findByIdAndUpdate(inv._id,{sePayRef,paymentMethod:'sepay'});
+      return res.json({ success:true, status:'pending', method:'sepay', finalAmount, lateFee, sePayRef,
+        qrUrl: sepayQrUrl(finalAmount, sePayRef),
+        bankName: SEPAY_CONFIG.bankName, bankCode: SEPAY_CONFIG.bankCode,
+        accountNo: SEPAY_CONFIG.accountNo, accountName: SEPAY_CONFIG.accountName,
+        message:`Chuyển khoản ${finalAmount.toLocaleString('vi-VN')}đ · Nội dung: ${sePayRef}` });
+    }
+
+    // payos
+    if (!payOS) return res.status(503).json({success:false,message:'PayOS chưa cấu hình'});
+    const orderCode = Number(String(Date.now()).slice(-9));
+    const paymentData = {
+      orderCode,
+      amount: Math.round(finalAmount),
+      description: ('BNPL ' + inv._id.toString().slice(-6)).replace(/[^a-zA-Z0-9 ]/g,'').slice(0,25),
+      returnUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/success`,
+      cancelUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/cancel`,
+      items: [{ name: 'Hoa don tra sau CRABOR'.slice(0,40), quantity:1, price: Math.round(finalAmount) }],
+    };
+    let paymentLink;
+    if (typeof payOS.paymentRequests?.create === 'function') paymentLink = await payOS.paymentRequests.create(paymentData);
+    else if (typeof payOS.createPaymentLink === 'function') paymentLink = await payOS.createPaymentLink(paymentData);
+    else throw new Error('PayOS SDK không hợp lệ');
+    const linkData = paymentLink?.data && typeof paymentLink.data === 'object' && !Array.isArray(paymentLink.data)
+      ? paymentLink.data : paymentLink;
+    await BNPLInvoice.findByIdAndUpdate(inv._id,{payosOrderCode:String(orderCode),paymentMethod:'payos'});
+    return res.json({ success:true, status:'pending', method:'payos', finalAmount, orderCode,
+      checkoutUrl: linkData?.checkoutUrl, qrCode: linkData?.qrCode });
+  } catch(e){ res.status(500).json({success:false,message:e.message}); }
+});
+
+// GET /api/bnpl/invoice/payos/:orderCode — poll trạng thái thanh toán PayOS của hoá đơn
+app.get("/api/bnpl/invoice/payos/:orderCode", async (req,res) => {
+  try {
+    const inv = await BNPLInvoice.findOne({ payosOrderCode: String(req.params.orderCode) });
+    if (!inv) return res.status(404).json({success:false,message:'Không tìm thấy hóa đơn'});
+    if (inv.status==='paid') return res.json({success:true,status:'paid'});
+    if (!payOS) return res.status(503).json({success:false});
+    let info;
+    if (typeof payOS.getPaymentLinkInformation === 'function') info = await payOS.getPaymentLinkInformation(req.params.orderCode);
+    else if (typeof payOS.paymentRequests?.get === 'function') info = await payOS.paymentRequests.get({ id: req.params.orderCode });
+    const data = info?.data && typeof info.data === 'object' ? info.data : info;
+    const st = String(data?.status||'').toUpperCase();
+    if (st === 'PAID') {
+      await BNPLInvoice.findByIdAndUpdate(inv._id,{status:'paid',paidAt:new Date()});
+      await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
+      global._io?.to('admin').emit('bnplPaid',{invoiceId:inv._id,amount:inv.finalAmount,method:'payos'});
+      return res.json({success:true,status:'paid'});
+    }
+    res.json({success:true,status:'pending',payosStatus:st});
+  } catch(e){ res.status(500).json({success:false,message:e.message}); }
+});
+
+// ── AUTO-CANCEL: huỷ đơn quá 30 phút không được xác nhận ──
+// food/laundry/cleaning: partner không xác nhận trong 30p → huỷ
+// ride: 30p không tìm được tài xế → huỷ
+// Hoàn tiền: chỉ hoàn về ví CRABOR nếu đơn trả bằng ví; đơn bnpl xoá giao dịch trả sau; phương thức khác không hoàn
+async function refundOnAutoCancel(order) {
+  try {
+    const amt = order.finalTotal
+      ?? order.finalPrice
+      ?? Math.max(0, (order.total || order.estimatedTotal || order.price || 0)
+        + (order.shipFee || 0) + (order.serviceFee || 0)
+        - (order.discount || order.voucherDiscount || 0));
+    if (order.paymentMethod === 'wallet' && amt > 0) {
+      await walletCredit(order.customerId, 'user', amt, order.orderId, `Hoàn tiền đơn ${order.orderId} (tự động huỷ)`);
+      global._io?.to(`customer_${order.customerId}`).emit('walletCredited', { amount: amt, orderId: order.orderId, message: `Hoàn ${amt.toLocaleString('vi-VN')}đ vào ví CRABOR` });
+      return 'refunded_wallet';
+    }
+    if (order.paymentMethod === 'bnpl') {
+      await BNPLTx.deleteMany({ orderId: order.orderId, status: 'pending_bill' });
+      return 'bnpl_reversed';
+    }
+    return 'no_refund';
+  } catch(e) { console.error('[AutoCancel] hoàn tiền lỗi:', e.message); return 'error'; }
+}
+
+setInterval(async () => {
+  try {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    // Food (bảng Order): pending quá 30p chưa được partner xác nhận
+    const staleOrders = await Order.find({
+      module: 'food',
+      status: 'pending',
+      createdAt: { $lt: cutoff },
+    }).limit(30);
+    // Ride: pending quá 30p chưa có tài xế nhận
+    const staleRides = await Order.find({
+      module: 'ride',
+      status: 'pending',
+      shipperId: null,
+      createdAt: { $lt: cutoff },
+    }).limit(30);
+    // Laundry (bảng riêng LaundryOrder): pending quá 30p chưa được partner xác nhận
+    const staleLaundry = await LaundryOrder.find({
+      status: 'pending',
+      createdAt: { $lt: cutoff },
+    }).limit(30);
+    // Cleaning (bảng riêng CleaningOrder): pending quá 30p chưa được xác nhận
+    const staleCleaning = await CleaningOrder.find({
+      status: 'pending',
+      createdAt: { $lt: cutoff },
+    }).limit(30);
+
+    const all = [...staleOrders, ...staleRides, ...staleLaundry, ...staleCleaning];
+    for (const o of all) {
+      try {
+        const reason = o.module === 'ride'
+          ? 'Tự động huỷ: không tìm được tài xế sau 30 phút'
+          : 'Tự động huỷ: đối tác không xác nhận sau 30 phút';
+        o.status = 'cancelled';
+        o.cancelReason = reason;
+        if (Array.isArray(o.statusHistory)) o.statusHistory.push({ status: 'cancelled', by: 'system', time: new Date(), note: reason });
+        await o.save();
+        const refundResult = await refundOnAutoCancel(o);
+        global._io?.to(`customer_${o.customerId}`).emit('order_status_update', {
+          orderId: o.orderId, status: 'cancelled',
+          message: reason + (refundResult === 'refunded_wallet' ? '. Tiền đã hoàn vào ví CRABOR.' : refundResult === 'bnpl_reversed' ? '. Đã gỡ khỏi Ví Trả Sau.' : ''),
+        });
+        console.log(`[AutoCancel] Đã huỷ ${o.module} ${o.orderId} — ${refundResult}`);
+      } catch (e) { console.error('[AutoCancel] lỗi xử lý đơn:', e.message); }
+    }
+  } catch (e) { console.error('[AutoCancel] cron lỗi:', e.message); }
+}, 60 * 1000);
 
 
 // ── VAY NHANH ────────────────────────────────────────────
@@ -11615,16 +11770,16 @@ app.post("/api/order", async (req, res) => {
     let bnplOrderAmount = 0;
     if (isBnplPay) {
       bnplOrderAmount = Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
-      const bnplUser = await User.findById(req.session.userId).select("totalSpent totalOrders isAdmin");
-      const bnplEligible = bnplUser?.isAdmin || (bnplUser?.totalOrders||0) >= 10;
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin");
+      const bnplEligible = bnplUser?.isAdmin || (bnplUser?.totalSpent||0) >= 5000000;
       if (!bnplEligible) {
         return res.status(403).json({
           success: false,
           bnplNotEligible: true,
-          message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Cần hoàn thành tối thiểu 10 đơn hàng để mở khoá.",
+          message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Tổng chi tiêu cần tối thiểu 5.000.000đ.",
         });
       }
-      const bnplLimit = getBnplLimit(Math.max(bnplUser?.totalSpent||0, 2000000));
+      const bnplLimit = getBnplLimit(bnplUser?.totalSpent||0);
       bnplBillingMonth = getCurrentBillingMonth();
       const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplBillingMonth, status:{$in:['pending_bill','billed']} });
       const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
@@ -11702,9 +11857,14 @@ app.post("/api/order", async (req, res) => {
       });
     }
     
-    // GỬI ĐƠN ĐẾN SHIPPER NGAY LẬP TỨC
+    // ── DISPATCH SHIPPER ──
+    // Đơn FOOD: CHỜ PARTNER XÁC NHẬN CÒN MÓN đã (endpoint accept của partner
+    // sẽ dispatch shipper ngay lúc đó). Các module khác (ride...) dispatch ngay.
+    if (order.module === 'food') {
+      console.log(`[Order] Food order ${order.orderId} chờ partner xác nhận trước khi tìm shipper`);
+    } else {
     let pickupLat, pickupLng;
-    
+
     if (order.module === 'food' && order.partnerId) {
       const FoodPartner = mongoose.models.FoodPartner;
       const partner = await FoodPartner.findById(order.partnerId).select("lastLat lastLng location");
@@ -11766,6 +11926,7 @@ app.post("/api/order", async (req, res) => {
       });
     } else {
       console.log(`[Order] No nearby shipper for order ${order.orderId}`);
+    }
     }
     
     req.io.to("admin").emit("newOrderNotification", { orderId: order.orderId, module: order.module, total: order.finalTotal });
