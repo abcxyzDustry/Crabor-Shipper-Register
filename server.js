@@ -1162,7 +1162,7 @@ const WalletTx = mongoose.model('WalletTx', walletTxSchema);
 const notificationSchema = new mongoose.Schema({
   ownerType: { type: String, enum: ['user','shipper','partner'], required: true },
   ownerId:   { type: mongoose.Schema.Types.ObjectId, required: true },
-  type:      { type: String, enum: ['featured','new_order','income','withdraw','topup','product','cash_due','support','system'], default: 'system' },
+  type:      { type: String, enum: ['featured','new_order','income','withdraw','topup','product','cash_due','support','warning','system'], default: 'system' },
   title:     { type: String, required: true, trim: true },
   body:      { type: String, trim: true, maxlength: 500 },
   ref:       { type: String, trim: true },               // orderId, productId...
@@ -1381,12 +1381,71 @@ function cleanCodeContent(c) {
 async function createAgentJob(sid, pluginName, files, prompt) {
   const javaFile = files.find(f => f.name && f.name.endsWith('.java')) || files[0];
   const name = (javaFile?.name.match(/([^/\\]+)\.java$/) || [])[1] || pluginName || 'Plugin';
-  const job = await AgentJob.create({ status: 'queued', sessionId: sid, request: { pluginName: name, files, prompt: String(prompt || '') } });
-  console.log(`[AgentJob] Created ${job._id} plugin='${name}' (${files.length} files) sess=${String(sid).slice(0,12)}`);
+  const idea = classifyIdea(prompt);
+  const req = {
+    pluginName: name,
+    files,
+    prompt: String(prompt || ''),
+    genMode: files.length ? 'auto' : (idea.simple ? 'auto' : 'manual'),
+    complexity: idea,
+  };
+  const job = await AgentJob.create({ status: 'queued', sessionId: sid, request: req });
+  console.log(`[AgentJob] Created ${job._id} plugin='${name}' (${files.length} files) mode=${req.genMode} sess=${String(sid).slice(0,12)}`);
   return job;
 }
+
+// ── ĐỊNH TUYẾN LLM: ý tưởng đơn giản → executor tự viết (Cloudflare/Meta)
+//    ý tưởng phức tạp (app/web/db/hệ thống) → job ở chế độ 'manual': chủ hệ thống
+//    code trực tiếp rồi gửi source compile (không bắt LLM nhỏ viết bừa).
+const COMPLEX_IDEA_RULES = [
+  { re: /\b(app|application|ứng dụng|web app|website|trang web|fullstack|backend|frontend|crm|erp|cms|e-commerce|shop online|đặt hàng|đặt xe|chatbot|thanh toán|vnpay|payos)\b/i, label: 'phạm vi phần mềm' },
+  { re: /\b(database|cơ sở dữ liệu|mongodb|mysql|postgres|sqlite)\b/i, label: 'database' },
+  { re: /\b(server|api|rest|websocket|socket|auth|đăng nhập|login|jwt|admin|báo cáo|dashboard|multithread|thread|microservice)\b/i, label: 'hạ tầng hệ thống' },
+  { re: /\b(multi.?file|nhiều file|vài file|modul|module|thư viện|library|framework)\b/i, label: 'nhiều thành phần' },
+];
+function classifyIdea(prompt) {
+  const p = String(prompt || '').trim();
+  const words = p.split(/\s+/).filter(Boolean).length;
+  const reasons = [];
+  const isGameScope = /(plugin|mod|mindustry|\.jar|jar game|game)/i.test(p);
+  for (const rule of COMPLEX_IDEA_RULES) {
+    // Chỉ trừ là phức tạp khi KHÔNG thuộc phạm vi plugin game đơn lẻ
+    if (!isGameScope && rule.re.test(p) && !reasons.includes(rule.label)) reasons.push(rule.label);
+  }
+  if (words > 60 && !reasons.includes('mô tả quá dài')) reasons.push('mô tả quá dài');
+  if (/\.git|github|repository|repo\b/.test(p) && !reasons.includes('import nguồn ngoài')) reasons.push('import nguồn ngoài');
+  return {
+    simple: reasons.length === 0,
+    reasons,
+    words,
+    routedTo: reasons.length === 0 ? 'cloudflare-meta-executor' : 'manual-owner',
+  };
+}
+
+// Dựng spec đầy đủ cho job mode 'manual' — để chủ hệ thống (hoặc CRABOR bên ngoài) code đúng yêu cầu
+function buildManualSpec(job) {
+  const r = job.request || {};
+  const idea = r.complexity || classifyIdea(r.prompt);
+  return {
+    jobId: String(job._id),
+    sessionId: job.sessionId,
+    pluginName: r.pluginName || 'Plugin',
+    status: job.status,
+    complexity: idea.reasons.join(', ') || 'đơn giản',
+    routedTo: idea.routedTo,
+    idea: r.prompt || '',
+    filesProvided: (r.files || []).length,
+    createdAt: job.createdAt,
+    note: 'Chế độ manual: LLM nhỏ không sinh code cho ý tưởng phức tạp. Chủ hệ thống viết source Java rồi dán lại vào CRABOR Agent kèm "compile" để đóng gói .jar.',
+  };
+}
+
 function jobQueuedReply(job) {
-  return `🎯 CRABOR đã nhận và đang biên dịch **${job.request?.pluginName || 'plugin'}** thành file .jar trên máy chủ CRABOR.\n\n⏳ Quá trình mất ~20–60 giây. Cứ nhắn tiếp: **"kiểm tra trạng thái compile"** để xem kết quả và tải file.\n\n${AGENT_DISCLAIMER}`;
+  const r = job.request || {};
+  if (r.genMode === 'manual') {
+    return `🧠 **Ý tưởng phức tạp** — CRABOR định tuyến tay để đảm bảo chất lượng.\n\nYêu cầu: _${String(r.prompt || '').slice(0, 300)}_\n\n⚠️ LLM tự động chỉ đảm nhận ý tưởng **đơn giản** (plugin game đơn lẻ — Cloudflare/Meta). Việc này gồm ` + (r.complexity?.reasons || []).map(x => `• ${x}`).join(', ') + `.\n\n🔧 Cách hoàn tất:\n1️⃣ Gửi **source Java** trực tiếp kèm từ khóa **"compile"** → máy chủ đóng gói .jar ngay.\n2️⃣ Hoặc nhờ **CRABOR Agent code thay** (xử lý thủ công bởi đội phát triển).\n\n${AGENT_DISCLAIMER}`;
+  }
+  return `🎯 CRABOR đã nhận và đang biên dịch **${r.pluginName || 'plugin'}** thành file .jar trên máy chủ CRABOR.\n\n⏳ Quá trình mất ~20–60 giây. Cứ nhắn tiếp: **"kiểm tra trạng thái compile"** để xem kết quả và tải file.\n\n${AGENT_DISCLAIMER}`;
 }
 
 // System prompt cho executor (laptop) khi cần TỰ VIẾT code plugin từ ý tưởng
@@ -3218,6 +3277,130 @@ app.get("/api/support/my", async (req, res) => {
     res.json({ success:true, data:tickets, total:tickets.length });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
+
+// POST /api/support/order — Hỗ trợ ĐƠN HÀNG (workflow)
+// 1) Khách chọn danh mục + (gần nhất) + mã shipper/partner → gửi
+// 2) Coco AI đọc & phân tích lý do
+// 3) Nếu khiếu nại về quán/shipper → lập tức cảnh cáo tài khoản tương ứng
+app.post("/api/support/order", async (req, res) => {
+  try {
+    const { category, orderId, shipperCode, partnerCode, message, description } = req.body || {};
+    const text = String(message || description || '').trim();
+    if (!text) return res.status(400).json({ success:false, message:"Thiếu nội dung hỗ trợ" });
+    const categoryLabel = String(category || 'chung');
+
+    // 1) Tra đơn (nếu khách chọn đơn)
+    let orderRef = null;
+    if (orderId) {
+      orderRef = await Order.findOne({
+        $or: [{ orderId: String(orderId) }, mongoose.isValidObjectId(orderId) ? { _id: orderId } : null],
+      }).lean();
+    }
+
+    // Lưu ticket đơn hàng
+    const ticket = await SupportTicket.create({
+      userId: req.session.userId || null,
+      role: "customer",
+      orderId: orderRef?.orderId || String(orderId || ""),
+      type: "order",
+      category: categoryLabel,
+      message: `[${categoryLabel}] ${text}`,
+      priority: /mất|hỏng|thiu|kém|không|giao sai|muộn|còn|thiếu/i.test(text) ? "urgent" : "high",
+    });
+
+    // 2) Coco AI phân tích (backend = Cloudflare, retry 3 lần qua cocoThink)
+    let aiReply = "";
+    try {
+      const { cocoThink } = require("./coco-brain");
+      const prompt = `Khách hàng gửi hỗ trợ về đơn hàng (danh mục: ${categoryLabel}).\nNội dung: "${text}"\n\nHãy đánh giá trong 3-5 câu tiếng Việt:\na) Có phàn nàn về QUÁN / đối tác không? (chất lượng kém, đồ thiu, sai món, ít đồ, đồ nguội...)\nb) Có phàn nàn về SHIPPER không? (thái độ tệ, giao chậm, giao sai, làm rơi, mất đồ...)\nc) đề xuất hướng xử lý phù hợp cho CRABOR. Nếu không phải khiếu nại ai thì xác nhận đã ghi nhận.`;
+      const r = await cocoThink([{ role: "user", content: prompt }], {
+        task: "complaint", backend: "cloudflare", temperature: 0.4, maxTokens: 450,
+      });
+      aiReply = (r && r.text) ? String(r.text).trim() : "";
+    } catch (e) { console.warn("[Support Order] cocoThink:", e.message); }
+    if (!aiReply) aiReply = `Coco đã ghi nhận hỗ trợ thuộc danh mục "${categoryLabel}". Đội ngũ CRABOR sẽ phản hồi trong 1-2 giờ.`;
+
+    // 3) Xác định đối tượng bị khiếu nại
+    const textLower = text.toLowerCase();
+    const COMPLAINT_PARTNER_RE = /quán|nhà hàng|tiệm|partner|chất lượng|thiu|hỏng|sai món|ít đồ|đồ nguội|khai vị|giá chênh|không ngon|dở/;
+    const COMPLAINT_SHIPPER_RE = /shipper|tài xế|giao chậm|giao sai|mất đồ|làm rơi|thái độ|quẳng|vứt|nói khó|điện thoại không nghe/;
+    const complaintPartner = COMPLAINT_PARTNER_RE.test(textLower);
+    const complaintShipper = COMPLAINT_SHIPPER_RE.test(textLower);
+    const warnings = [];
+    const cleanCode = (s) => String(s || "").replace(/[^\w@.\-]/g, "").trim();
+
+    // ── Cảnh cáo PARTNER ──
+    if (complaintPartner) {
+      let partnerTarget = null;
+      if (orderRef?.partnerId) partnerTarget = await FoodPartner.findById(orderRef.partnerId).lean();
+      if (!partnerTarget && partnerCode) {
+        const c = new RegExp(`^${cleanCode(partnerCode)}$`, 'i');
+        partnerTarget = await FoodPartner.findOne({ $or: [{ registerId: c }, { phone: c }] }).lean();
+      }
+      if (partnerTarget) {
+        await notifyUser("partner", partnerTarget._id, {
+          type: "warning",
+          title: "⚠️ Cảnh cáo chất lượng từ khách hàng",
+          body: `Đơn ${orderRef?.orderId || '#'} — ${text.slice(0, 200)}. Vui lòng kiểm tra quy trình & an toàn vệ sinh thực phẩm (CRABOR 24/7).`,
+          ref: orderRef?.orderId || "",
+          refModule: String(orderRef?.module || categoryLabel),
+        });
+        warnings.push({ target: "partner", name: partnerTarget.bizName, code: partnerTarget.registerId, _id: partnerTarget._id });
+      } else {
+        warnings.push({ target: "partner", name: partnerCode || "đối tác (không tìm thấy mã)", code: partnerCode || "", unresolved: true });
+      }
+    }
+
+    // ── Cảnh cáo SHIPPER ──
+    if (complaintShipper) {
+      let shipperTarget = null;
+      if (orderRef?.shipperId) shipperTarget = await Shipper.findById(orderRef.shipperId).lean();
+      if (!shipperTarget && shipperCode) {
+        const c = new RegExp(`^${cleanCode(shipperCode)}$`, 'i');
+        shipperTarget = await Shipper.findOne({ $or: [{ registerId: c }, { phone: cleanCode(shipperCode) }] }).lean();
+      }
+      if (shipperTarget) {
+        await notifyUser("shipper", shipperTarget._id, {
+          type: "warning",
+          title: "⚠️ Cảnh cáo thái độ/trách nhiệm từ khách hàng",
+          body: `Đơn ${orderRef?.orderId || '#'} — ${text.slice(0, 200)}. Hãy tuân thủ quy trình giao hàng CRABOR.`,
+          ref: orderRef?.orderId || "",
+          refModule: String(orderRef?.module || categoryLabel),
+        });
+        warnings.push({ target: "shipper", name: shipperTarget.fullName || shipperTarget.registerId, code: shipperTarget.registerId, _id: shipperTarget._id });
+      } else {
+        warnings.push({ target: "shipper", name: shipperCode || "shipper (không tìm thấy mã)", code: shipperCode || "", unresolved: true });
+      }
+    }
+
+    req.io && req.io.to("admin").emit("newSupportTicket", {
+      id: ticket._id, type: "order", role: "customer", message: `[${categoryLabel}] ${text.slice(0, 80)}`, priority: ticket.priority,
+    });
+
+    const reply = buildSupportAiReply(aiReply, warnings);
+    res.json({
+      success: true, ticketId: ticket._id, aiReply: reply, warnings,
+      message: "Đã gửi hỗ trợ. " + (warnings.length ? `Đã gửi cảnh cáo tới ${warnings.length} tài khoản liên quan.` : ""),
+    });
+  } catch (err) {
+    console.error("[Support Order]", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+function buildSupportAiReply(ai, warnings) {
+  let s = `🦀 **Coco AI đã đọc hỗ trợ của bạn.**\n\n${ai || ""}\n\n`;
+  if (warnings.length) {
+    s += "⚖️ **Đã lập tức gửi cảnh cáo:**\n" + warnings.map(w =>
+      w.target === "shipper"
+        ? `• 🛵 Shipper ${w.name} (${w.code})`
+        : `• 🏪 ${w.name} (${w.code})`
+    ).join("\n") + "\n\nCRABOR sẽ theo dõi — nếu tái phạm sẽ xử lý kỷ luật.";
+  } else {
+    s += "Hỗ trợ của bạn đã được ghi nhận. Đội ngũ CS 24/7 sẽ phản hồi trong 1-2 giờ tới.";
+  }
+  return s;
+}
 
 // GET /api/admin/support — Admin list tickets
 app.get("/api/admin/support", adminAuth, async (req, res) => {
@@ -6038,13 +6221,14 @@ app.post("/api/agent/chat", async (req, res) => {
           console.error('[AgentJob Create]', e.message);
         }
       } else {
-        // Người dùng chỉ nêu Ý TƯỞNG → tạo job khuyết source; executor (laptop) tự viết code + compile
+        // Người dùng chỉ nêu Ý TƯỞNG → đơn giản: executor tự viết (Cloudflare/Meta); phức tạp: manual
         try {
           const job = await createAgentJob(sid, 'Plugin', [], userInput);
-          console.log(`[AgentJob] Idea-only job ${job._id} — chờ executor tự viết + compile`);
-          const reply = `🎯 CRABOR đã nhận ý tưởng và sẽ TỰ VIẾT code + biên dịch thành .jar trên máy chủ CRABOR.\n\n⏳ Quá trình gồm viết code + compile mất ~30–120 giây. Cứ nhắn tiếp: **"kiểm tra trạng thái compile"** để xem kết quả và tải file.\n\n${AGENT_DISCLAIMER}`;
+          const isManual = job.request?.genMode === 'manual';
+          console.log(`[AgentJob] Idea-only job ${job._id} mode=${job.request?.genMode} — ${isManual ? 'chờ owner code' : 'chờ executor tự viết + compile'}`);
+          const reply = isManual ? jobQueuedReply(job) : `🎯 CRABOR đã nhận ý tưởng và sẽ TỰ VIẾT code + biên dịch thành .jar trên máy chủ CRABOR.\n\n⏳ Quá trình gồm viết code + compile mất ~30–120 giây. Cứ nhắn tiếp: **"kiểm tra trạng thái compile"** để xem kết quả và tải file.\n\n${AGENT_DISCLAIMER}`;
           try { await ConversationManager.saveMessages(sid, userInput, reply, 'rule', 'agent'); } catch (_) {}
-          return res.json({ success: true, text: reply, reply, disclaimer: AGENT_DISCLAIMER, sessionId: sid, backend: 'executor', agentJobId: String(job._id) });
+          return res.json({ success: true, text: reply, reply, disclaimer: AGENT_DISCLAIMER, sessionId: sid, backend: 'executor', agentJobId: String(job._id), genMode: job.request?.genMode, complexity: job.request?.complexity });
         } catch (e) {
           console.error('[AgentJob Idea]', e.message);
         }
@@ -6117,7 +6301,7 @@ app.post("/api/agent/chat", async (req, res) => {
 app.post("/api/agent/jobs/claim", executorAuth, async (req, res) => {
   try {
     const job = await AgentJob.findOneAndUpdate(
-      { jobType: 'compile-plugin', status: 'queued' },
+      { jobType: 'compile-plugin', status: 'queued', 'request.genMode': { $ne: 'manual' } },
       { $set: { status: 'running' }, $inc: { attempts: 1 } },
       { new: true, sort: { createdAt: 1 } }
     );
@@ -6165,6 +6349,33 @@ app.get("/api/agent/jobs/:id/download", async (req, res) => {
   } catch (err) {
     console.error('[AgentJob Download]', err.message);
     return res.status(500).json({ success: false, message: 'Lỗi tải file' });
+  }
+});
+
+// GET /api/agent/jobs/:id/spec — lấy spec đầy đủ của job (cho owner/chủ hệ thống code tiếp)
+app.get("/api/agent/jobs/:id/spec", async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ success: false, message: 'Không tìm thấy job' });
+    const job = await AgentJob.findById(req.params.id).lean();
+    if (!job) return res.status(404).json({ success: false, message: 'Không tìm thấy job' });
+    return res.json({ success: true, spec: buildManualSpec(job) });
+  } catch (err) {
+    console.error('[AgentJob Spec]', err.message);
+    return res.status(500).json({ success: false, message: 'Lỗi đọc spec' });
+  }
+});
+
+// GET /api/agent/queue/manual — danh sách job cần owner code (ý tưởng phức tạp, chưa có source)
+app.get("/api/agent/queue/manual", async (req, res) => {
+  try {
+    const jobs = await AgentJob.find({ jobType: 'compile-plugin', 'request.genMode': 'manual' })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    return res.json({ success: true, count: jobs.length, jobs: jobs.map(buildManualSpec) });
+  } catch (err) {
+    console.error('[AgentJob Manual Queue]', err.message);
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
