@@ -2354,6 +2354,21 @@ setInterval(async () => {
   } catch(e) { console.error("[SocialBot] lỗi:", e.message); }
 }, 3 * 60 * 1000);
 
+// ── BACKFILL 1 LẦN: voucher LPT cũ chưa có source → đánh dấu loyalty + gán chủ sở hữu từ LoyaltyLog ──
+setTimeout(async () => {
+  try {
+    const oldLpt = await Voucher.find({ code: /^LPT/, source: { $ne: 'loyalty' } }).limit(500).lean();
+    if (!oldLpt.length) return;
+    let fixed = 0;
+    for (const v of oldLpt) {
+      const log = await LoyaltyLog.findOne({ voucherCode: v.code }).sort({ createdAt: -1 }).select("userId").lean();
+      await Voucher.updateOne({ _id: v._id }, { $set: { source: 'loyalty', ownerId: log?.userId || null } });
+      fixed++;
+    }
+    console.log(`[Backfill] Đã đánh dấu ${fixed} voucher loyalty cũ (LPT*)`);
+  } catch(e) { console.error("[Backfill] Lỗi:", e.message); }
+}, 30 * 1000);
+
 // GET /api/social/posts/:id/comments — danh sách bình luận
 app.get("/api/social/posts/:id/comments", async (req, res) => {
   try {
