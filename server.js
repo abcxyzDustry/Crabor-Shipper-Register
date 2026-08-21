@@ -657,7 +657,7 @@ const orderSchema = new mongoose.Schema({
   discount:     { type: Number, default: 0, min: 0 },
   finalTotal:   { type: Number, min: 0 },
   status:          { type: String, enum: ["pending","confirmed","preparing","shipper_accepted","picking_up","at_partner","picked_up","delivering","delivered","cancelled","refunded","payment_pending_review","payment_confirmed","payment_confirmed_payos","payment_confirmed_sepay","finding_driver","no_driver","partner_accepted","ready","ready_return"], default: "pending" },
-  paymentMethod:{ type: String, enum: ["cash","momo","zalopay","bank","payos","sepay","bank_transfer","wallet","vnpay"], default: "cash" },
+  paymentMethod:{ type: String, enum: ["cash","momo","zalopay","bank","payos","sepay","bank_transfer","wallet","vnpay","bnpl"], default: "cash" },
   paymentStatus:{ type: String, enum: ["unpaid","paid","refunded","pending_review"], default: "unpaid" },
   note:         { type: String, trim: true, maxlength: 500 },
   prepTime:     { type: Number, default: 15 }, // minutos de preparación estimado
@@ -8881,8 +8881,8 @@ async function handleConfirmPayment(req, res) {
     if (order.paymentStatus === "paid")
       return res.status(400).json({ success: false, message: "Đơn đã thanh toán rồi" });
 
-    // ── VÍ CRABOR: đã auto-credit ở delivered, chỉ cần confirm là xong ──
-    if (order.paymentMethod === "wallet") {
+    // ── VÍ CRABOR / VÍ TRẢ SAU: đã auto-credit ở delivered, chỉ cần confirm là xong ──
+    if (order.paymentMethod === "wallet" || order.paymentMethod === "bnpl") {
       order.paymentStatus = "paid";
       order.paymentConfirmedAt = new Date();
       order.paymentNote = req.body.note || "Thanh toán qua ví CRABOR";
@@ -11608,7 +11608,38 @@ app.post("/api/order", async (req, res) => {
       order.paymentStatus = "paid";
       order.paidAt = new Date();
     }
-    
+
+    // ── VÍ TRẢ SAU (BNPL): check điều kiện + hạn mức, ghi nợ trả sau ──
+    const isBnplPay = (paymentMethod || "cash") === "bnpl";
+    let bnplBillingMonth = null;
+    let bnplOrderAmount = 0;
+    if (isBnplPay) {
+      bnplOrderAmount = Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent totalOrders isAdmin");
+      const bnplEligible = bnplUser?.isAdmin || (bnplUser?.totalOrders||0) >= 10;
+      if (!bnplEligible) {
+        return res.status(403).json({
+          success: false,
+          bnplNotEligible: true,
+          message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Cần hoàn thành tối thiểu 10 đơn hàng để mở khoá.",
+        });
+      }
+      const bnplLimit = getBnplLimit(Math.max(bnplUser?.totalSpent||0, 2000000));
+      bnplBillingMonth = getCurrentBillingMonth();
+      const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplBillingMonth, status:{$in:['pending_bill','billed']} });
+      const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
+      if (bnplUsed + bnplOrderAmount > bnplLimit) {
+        return res.status(400).json({
+          success: false,
+          bnplLimitExceeded: true,
+          message: `Vượt hạn mức Ví Trả Sau. Hạn mức: ${bnplLimit.toLocaleString("vi-VN")}đ, còn lại: ${Math.max(0, bnplLimit-bnplUsed).toLocaleString("vi-VN")}đ, cần: ${bnplOrderAmount.toLocaleString("vi-VN")}đ.`,
+        });
+      }
+      // Nợ trả sau: đơn được coi là đã thanh toán (công ty ứng trước), khách trả vào hóa đơn cuối tháng
+      order.paymentStatus = "paid";
+      order.paidAt = new Date();
+    }
+
     await order.save();
 
     if (isWalletPay) {
@@ -11618,6 +11649,25 @@ app.post("/api/order", async (req, res) => {
       req.io.to(`customer_${req.session.userId}`).emit("walletDebited", {
         amount: orderAmount, orderId: order.orderId, message: `Đã trừ ${orderAmount.toLocaleString("vi-VN")}đ cho đơn ${order.orderId}`,
       });
+    }
+
+    // ── VÍ TRẢ SAU: lập tức ghi giao dịch trả sau (lên hóa đơn kỳ này) ──
+    if (isBnplPay) {
+      try {
+        await BNPLTx.create({
+          userId: req.session.userId,
+          orderId: order.orderId,
+          amount: bnplOrderAmount,
+          serviceType: order.module || 'food',
+          billingMonth: bnplBillingMonth,
+        });
+        req.io.to(`customer_${req.session.userId}`).emit("bnplUsed", {
+          amount: bnplOrderAmount, orderId: order.orderId,
+          message: `Đơn ${order.orderId} đã vào Ví Trả Sau — thanh toán trước ngày 15 tháng sau`,
+        });
+      } catch (bnplErr) {
+        console.error('[BNPL] tạo BNPLTx lỗi:', bnplErr.message);
+      }
     }
 
     // Thông báo partner có đơn mới
@@ -11909,14 +11959,14 @@ app.patch("/api/orders/:id/status", async (req, res) => {
         req.io.to("admin").emit("cash_settlement_pending", {
           orderId: order.orderId, shipperEarn, partnerEarn, amount: finalTotal, dueAt,
         });
-      } else if (pm === "wallet") {
-        // ── VÍ CRABOR: khách đã trừ tiền khi đặt → AUTO CREDIT ngay ──
+      } else if (pm === "wallet" || pm === "bnpl") {
+        // ── VÍ CRABOR / VÍ TRẢ SAU: tiền đã được bảo đảm khi đặt → AUTO CREDIT ngay ──
         order.paymentStatus = "paid";
-        await autoCreditOrderEarnings(order, shipperEarn, partnerEarn, "wallet", `Đơn ${order.orderId} — ví CRABOR`);
+        await autoCreditOrderEarnings(order, shipperEarn, partnerEarn, pm, `Đơn ${order.orderId} — ${pm === "bnpl" ? "ví trả sau" : "ví CRABOR"}`);
         if (order.shipperId) {
           req.io.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
             orderId: order.orderId, amount: order.finalTotal,
-            message: `Khách đã thanh toán qua ví CRABOR — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
+            message: `Khách đã thanh toán qua ${pm === "bnpl" ? "ví trả sau" : "ví CRABOR"} — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
           });
         }
       } else {
