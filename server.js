@@ -8782,14 +8782,28 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
     const order = await CleaningOrder.findOne({ orderId: req.params.id });
     if (!order) return res.status(404).json({ success: false });
     if (order.shipperId && order.shipperId.toString() !== shipperId.toString()) {
-      return res.status(403).json({ success: false, message: "Không phải shipper của đơn này" });
+      // Shipper khác đã nhận trước đó
+      req.io.to(`shipper_${shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
+      return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
     }
     if (!order.shipperId) {
       // Chặn nếu shipper nợ tiền mặt quá hạn
       if (await isShipperCashBlocked(shipperId)) {
         return res.status(403).json({ success: false, message: "Bạn đang nợ tiền mặt quá 24h. Vui lòng chuyển tiền về công ty tại màn 'Thanh toán chi phí đơn tiền mặt'." });
       }
-      order.shipperId = shipperId;
+      // ── CHỐT ĐƠN: chỉ 1 shipper được nhận (atomic claim) ──
+      const _claimC = await CleaningOrder.findOneAndUpdate(
+        { _id: order._id, $or: [{ shipperId: null }, { shipperId: { $exists: false } }] },
+        { $set: { shipperId } },
+        { new: true }
+      );
+      if (!_claimC) {
+        req.io.to(`shipper_${shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
+        return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
+      }
+      order.shipperId = _claimC.shipperId;
+      // Thông báo toàn bộ shipper đang giữ modal đơn này: đã có người nhận
+      req.io.to("shipper_broadcast").emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
     }
     const prevStatus = order.status;
     order.status = status;
@@ -9444,11 +9458,30 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
         }
       }
       if (status === "shipper_picking" && !order.shipperId) {
-        order.shipperId = req.session.shipperId;
-        order.pickupTime = new Date();
+        // ── CHỐT ĐƠN: chỉ 1 shipper được nhận (atomic claim) ──
+        const _claimL = await LaundryOrder.findOneAndUpdate(
+          { _id: order._id, $or: [{ shipperId: null }, { shipperId: { $exists: false } }] },
+          { $set: { shipperId: req.session.shipperId, pickupTime: new Date() } },
+          { new: true }
+        );
+        if (!_claimL) {
+          req.io.to(`shipper_${req.session.shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
+          return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
+        }
+        order.shipperId = _claimL.shipperId;
+        order.pickupTime = _claimL.pickupTime;
       }
       if (status === "shipper_returning" && !order.shipperReturnId) {
-        order.shipperReturnId = req.session.shipperId;
+        const _claimR = await LaundryOrder.findOneAndUpdate(
+          { _id: order._id, $or: [{ shipperReturnId: null }, { shipperReturnId: { $exists: false } }] },
+          { $set: { shipperReturnId: req.session.shipperId } },
+          { new: true }
+        );
+        if (!_claimR) {
+          req.io.to(`shipper_${req.session.shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
+          return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
+        }
+        order.shipperReturnId = _claimR.shipperReturnId;
       }
     }
 
@@ -12106,8 +12139,24 @@ app.patch("/api/orders/:id/status", async (req, res) => {
           }
         }
       }
+      // ── CHỐT ĐƠN: chỉ DUY NHẤT 1 shipper được nhận (atomic claim) ──
+      const _claimFood = await Order.findOneAndUpdate(
+        { _id: order._id, $or: [{ shipperId: null }, { shipperId: { $exists: false } }] },
+        { $set: { shipperId: req.session.shipperId } },
+        { new: true }
+      );
+      if (!_claimFood) {
+        // Shipper khác đã nhận trước đó
+        req.io.to(`shipper_${req.session.shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
+        return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
+      }
       order.shipperId = req.session.shipperId;
-      // Auto message: gửi tin nhắn chào từ shipper cho customer khi kết nối chat
+      // Thông báo các shipper khác từng được dispatch: đơn đã có người nhận
+      const _otherDispatched = (order.dispatchedTo || []).map(String).filter(id => id !== String(req.session.shipperId));
+      for (const sid of _otherDispatched) {
+        req.io.to(`shipper_${sid}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
+      }
+      req.io.to("shipper_broadcast").emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
       const _autoMsg = {
         from: "shipper",
         text: `Bạn ơi chờ xíu nhé, CRABOR sắp tới nơi rồi (${order.orderId})`,
@@ -12379,6 +12428,16 @@ app.post("/api/ride/:orderId/accept", async (req, res) => {
 
     const shipper = await Shipper.findById(req.session.shipperId).select("fullName phone vehiclePlate location");
 
+    // ── CHỐT CUỐC: chỉ DUY NHẤT 1 tài xế được nhận (atomic claim) ──
+    const _claimRide = await Order.findOneAndUpdate(
+      { _id: order._id, $or: [{ shipperId: null }, { shipperId: { $exists: false } }] },
+      { $set: { shipperId: req.session.shipperId } },
+      { new: true }
+    );
+    if (!_claimRide) {
+      req.io.to(`shipper_${req.session.shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Cuốc xe đã có người nhận" });
+      return res.status(409).json({ success: false, taken: true, message: "Cuốc xe đã có người nhận" });
+    }
     order.shipperId = req.session.shipperId;
     order.status = "shipper_accepted";
     order.statusHistory.push({ status: "shipper_accepted", by: "shipper" });
