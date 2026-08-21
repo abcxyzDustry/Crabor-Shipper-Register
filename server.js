@@ -4969,8 +4969,16 @@ setInterval(async () => {
       const last = _cleaningRedispatchAt.get(key) || 0;
       if (Date.now() - last < 90 * 1000) continue;
       _cleaningRedispatchAt.set(key, Date.now());
-      const shippers = await findCleaningShippers(o.addressLat, o.addressLng, 5, 5);
-      if (!shippers.length) continue;
+      let shippers = await findCleaningShippers(o.addressLat, o.addressLng, 5, 5);
+      // Fallback: không có shipper dọn nhà online → phát cho MỌI shipper online (như lúc đặt đơn)
+      if (!shippers.length) {
+        shippers = await findNearbyShippers(o.addressLat || 21.0285, o.addressLng || 105.8542, 25, 10);
+        console.log(`[Cleaning][Re-dispatch] ${o.orderId}: 0 shipper cleaning-pref → fallback ${shippers.length} shipper online`);
+      }
+      if (!shippers.length) {
+        console.log(`[Cleaning][Re-dispatch] ${o.orderId}: KHÔNG có shipper nào online — bỏ lượt`);
+        continue;
+      }
       const payload = {
         type: 'cleaning_request',
         orderId: o.orderId,
@@ -4993,6 +5001,42 @@ setInterval(async () => {
     }
   } catch (e) { console.error('[Cleaning][Re-dispatch] lỗi:', e.message); }
 }, 60 * 1000);
+
+// GET /api/admin/cleaning-debug — chẩn đoán vì sao đơn dọn nhà không ghép được shipper
+app.get("/api/admin/cleaning-debug", adminAuth, async (req, res) => {
+  try {
+    const total            = await Shipper.countDocuments({});
+    const byStatus         = await Shipper.aggregate([{ $group: { _id: "$status", n: { $sum: 1 } } }]);
+    const online           = await Shipper.countDocuments({ online: true });
+    const accepting        = await Shipper.countDocuments({ online: true, isAccepting: true });
+    const approvedOnline   = await Shipper.countDocuments({ status: { $in: ["approved","active"] }, online: true, isAccepting: true });
+    const withAcceptClean  = await Shipper.countDocuments({ "preferences.acceptCleaning": true });
+    const withCleanReg     = await Shipper.countDocuments({ "preferences.cleaningRegistered": true });
+    const workTypeCleaning = await Shipper.countDocuments({ workType: "cleaning" });
+    const matchFull        = await Shipper.countDocuments({
+      status: { $in: ["approved","active"] }, online: true, isAccepting: true,
+      $or: [{ "preferences.acceptCleaning": true }, { "preferences.cleaningRegistered": true }],
+    });
+
+    const shippers = await Shipper.find({
+      $or: [
+        { "preferences.acceptCleaning": true },
+        { "preferences.cleaningRegistered": true },
+        { workType: "cleaning" },
+        { online: true },
+      ],
+    }).select("phone fullName status online isAccepting preferences workType feeStatus identityVerified").limit(30).lean();
+
+    const recentOrders = await CleaningOrder.find().sort({ createdAt: -1 }).limit(10)
+      .select("orderId status createdAt addressLat addressLng paymentMethod paymentStatus shipperId").lean();
+
+    res.json({ success: true, counts: {
+      total, byStatus, online, accepting, approvedOnline,
+      withAcceptCleaning: withAcceptClean, withCleaningRegistered: withCleanReg,
+      workTypeCleaning, matchFullQuery: matchFull,
+    }, shippers, recentOrders });
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+});
 
 
 // ── VAY NHANH ────────────────────────────────────────────
