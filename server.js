@@ -2379,18 +2379,48 @@ app.post("/api/social/posts/:id/comment", async (req, res) => {
       text,
     });
 
-    // Coco AI đọc bình luận và trả lời
+    // Coco AI đọc bình luận và trả lời — Groq LLM (cocoThink), KHÔNG dùng rule form
     let aiText = "";
     try {
-      const { cocoRespondSmart } = require("./coco-engine");
-      const r = await cocoRespondSmart({
-        text: `Bài viết "${banner.title}": khách hàng bình luận: "${text}". Hãy trả lời ngắn gọn thân thiện với tư cách fanpage CRABOR.`,
-        sessionId: `social_${req.params.id}`,
-        userId: req.session.userId,
-        userCtx: {},
-      });
-      aiText = typeof r === "string" ? r : (r?.text || r?.reply || "");
-    } catch(e) { console.error("[Social] Coco AI lỗi:", e.message); }
+      // Ngữ cảnh thread: vài bình luận gần nhất để AI hiểu mạch hội thoại
+      const recentCmts = await SocialComment.find({ postId: req.params.id })
+        .sort({ createdAt: -1 }).limit(6).lean();
+      const historyMsgs = recentCmts.reverse().map(c => ({
+        role: c.isAI ? "assistant" : "user",
+        content: `${c.authorName}${c.isAI ? "" : " (khách hàng)"}: ${c.text}`,
+      }));
+
+      const { cocoThink } = require("./coco-brain");
+      const result = await cocoThink(
+        [...historyMsgs, { role: "user", content: text }],
+        {
+          userContext: {},
+          task: "chat",
+          backend: "groq",
+          temperature: 0.7,
+          maxTokens: 250,
+          systemPromptOverride:
+            `Bạn là Coco AI — quản lý fanpage mạng xã hội của CRABOR (super app giao đồ ăn, giặt là, dọn nhà, xe công nghệ tại Hà Nội). ` +
+            `Bài viết đang đăng: "${banner.title}". ` +
+            `Nhiệm vụ: trả lời bình luận của khách hàng một cách TỰ NHIÊN, ĐÚNG TRỌNG TÂM nội dung họ nói — tuyệt đối không trả lời máy móc theo mẫu câu. ` +
+            `Xưng "CRABOR" hoặc "bên mình", gọi khách là "bạn". Dùng 1-2 emoji cho sinh động. Tối đa 80 từ. ` +
+            `- Khách khen → cảm ơn chân thành và mời tiếp tục trải nghiệm.` +
+            `- Khách chê/góp ý → xin lỗi ngắn gọn, hứa cải thiện, mời gửi chi tiết qua mục Hỗ trợ trong app.` +
+            `- Khách hỏi giá/khuyến mãi/đặt món → hướng dẫn cụ thể cách đặt trong app CRABOR.` +
+            `- Khách hỏi chuyện/lạc đề → trả lời vui vẻ tự nhiên rồi khéo léo quay về chủ đề bài viết.`,
+        }
+      );
+      if (result?.canReason && result?.text) aiText = result.text;
+    } catch(e) { console.error("[Social] Coco AI (groq) lỗi:", e.message); }
+    // Fallback 1: rule engine nếu LLM không khả dụng
+    if (!aiText) {
+      try {
+        const { cocoRespondSmart } = require("./coco-engine");
+        const r = await cocoRespondSmart({ text, sessionId: `social_${req.params.id}`, userId: req.session.userId, userCtx: {} });
+        aiText = r?.text || "";
+      } catch(_) {}
+    }
+    // Fallback cuối
     if (!aiText) {
       aiText = `Cảm ơn bạn đã quan tâm đến "${banner.title}" 🦀 Đặt ngay trong app CRABOR để nhận ưu đãi nhé!`;
     }
