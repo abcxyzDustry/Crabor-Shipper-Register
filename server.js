@@ -5007,6 +5007,21 @@ app.get("/api/admin/cleaning-debug", adminAuth, async (req, res) => {
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// POST /api/admin/cleaning-orders/cancel-all — huỷ TOÀN BỘ đơn dọn nhà chưa hoàn thành (reset để test)
+app.post("/api/admin/cleaning-orders/cancel-all", adminAuth, async (req, res) => {
+  try {
+    const r = await CleaningOrder.updateMany(
+      { status: { $nin: ["completed", "cancelled"] } },
+      {
+        $set: { status: "cancelled" },
+        $push: { statusHistory: { status: "cancelled", by: "admin", time: new Date() } },
+      }
+    );
+    console.log(`[Cleaning] Admin reset: đã huỷ ${r.modifiedCount} đơn`);
+    res.json({ success: true, cancelled: r.modifiedCount });
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // POST /api/admin/cash-settlements/:id/settle — Admin xác nhận đã nhận tiền → mở khoá shipper
 app.post("/api/admin/cash-settlements/:id/settle", adminAuth, async (req, res) => {
   try {
