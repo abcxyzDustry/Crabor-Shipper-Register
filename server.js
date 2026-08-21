@@ -2233,11 +2233,15 @@ const socialCommentSchema = new mongoose.Schema({
 const SocialComment = mongoose.models.SocialComment || mongoose.model("SocialComment", socialCommentSchema);
 
 // GET /api/social/posts — feed bài viết từ banner AI đang chạy
+// ?app=customer|partner|shipper → chỉ lấy banner nhắm đúng đối tượng đó (tránh loãng bài)
 app.get("/api/social/posts", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
     const uid = req.session?.userId || req.session?.partnerId || req.session?.shipperId || null;
-    const banners = await AIBanner.find({ active: true }).sort({ createdAt: -1 }).limit(30).lean();
+    const appFilter = ["customer","partner","shipper"].includes(String(req.query.app)) ? String(req.query.app) : null;
+    const q = { active: true };
+    if (appFilter) q.apps = appFilter;
+    const banners = await AIBanner.find(q).sort({ createdAt: -1 }).limit(30).lean();
     const ids = banners.map(b => b._id);
     let cmap = {};
     if (ids.length) {
