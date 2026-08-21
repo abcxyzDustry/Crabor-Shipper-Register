@@ -5030,11 +5030,27 @@ app.get("/api/admin/cleaning-debug", adminAuth, async (req, res) => {
     const recentOrders = await CleaningOrder.find().sort({ createdAt: -1 }).limit(10)
       .select("orderId status createdAt addressLat addressLng paymentMethod paymentStatus shipperId").lean();
 
+    // CashSettlements của các shipper liên quan — nguyên nhân âm thầm khiến shipper bị loại khỏi dispatch
+    const CashSettlement = mongoose.models.CashSettlement;
+    let cashSettlements = [];
+    if (CashSettlement) {
+      cashSettlements = await CashSettlement.find({
+        $or: [
+          { shipperId: { $in: shippers.map(s => s._id) } },
+          { status: { $in: ["pending", "partially_paid", "overdue"] } },
+        ],
+      }).sort({ createdAt: -1 }).limit(20)
+        .select("orderId shipperId total amountPaid status dueAt createdAt").lean();
+    }
+    const now = new Date();
+    const cashBlockedNow = cashSettlements.filter(s =>
+      ["pending","partially_paid","overdue"].includes(s.status) && s.dueAt && new Date(s.dueAt) <= now);
+
     res.json({ success: true, counts: {
       total, byStatus, online, accepting, approvedOnline,
       withAcceptCleaning: withAcceptClean, withCleaningRegistered: withCleanReg,
       workTypeCleaning, matchFullQuery: matchFull,
-    }, shippers, recentOrders });
+    }, shippers, recentOrders, cashSettlements, cashBlockedCount: cashBlockedNow.length });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
