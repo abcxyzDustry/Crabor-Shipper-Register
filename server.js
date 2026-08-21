@@ -9292,8 +9292,9 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
         return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
       }
       order.shipperId = _claimC.shipperId;
-      // Thông báo toàn bộ shipper đang giữ modal đơn này: đã có người nhận
-      req.io.to("shipper_broadcast").emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
+      // LƯU Ý: KHÔNG phát order_taken khi claim THÀNH CÔNG — người thắng cuộc
+      // cũng đang trong room shipper_broadcast, nhận nhầm sẽ tự đóng modal của chính mình.
+      // Shipper thua cuộc sẽ nhận order_taken riêng qua 409 ở trên.
     }
     const prevStatus = order.status;
     order.status = status;
@@ -12699,12 +12700,12 @@ app.patch("/api/orders/:id/status", async (req, res) => {
         return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
       }
       order.shipperId = req.session.shipperId;
-      // Thông báo các shipper khác từng được dispatch: đơn đã có người nhận
+      // Thông báo CÁC SHIPPER KHÁC từng được dispatch: đơn đã có người nhận
+      // (KHÔNG broadcast toàn phòng — người thắng cũng đang trong room, nhận nhầm sẽ tự đóng modal)
       const _otherDispatched = (order.dispatchedTo || []).map(String).filter(id => id !== String(req.session.shipperId));
       for (const sid of _otherDispatched) {
         req.io.to(`shipper_${sid}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
       }
-      req.io.to("shipper_broadcast").emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
       const _autoMsg = {
         from: "shipper",
         text: `Bạn ơi chờ xíu nhé, CRABOR sắp tới nơi rồi (${order.orderId})`,
@@ -14637,7 +14638,7 @@ const cleaningOrderSchema = new mongoose.Schema({
   voucherCraborBear:  { type: Number, default: 0, min: 0 },
   status: {
     type: String,
-    enum: ["pending","shipper_accepted","picking_up","working","completed","cancelled"],
+    enum: ["pending","accepted","shipper_accepted","in_progress","picking_up","working","completed","cancelled"],
     default: "pending",
   },
   statusHistory: [{ status: String, by: String, time: Date }],
