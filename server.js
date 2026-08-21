@@ -5054,6 +5054,27 @@ app.get("/api/admin/cleaning-debug", adminAuth, async (req, res) => {
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// POST /api/admin/cash-settlements/:id/settle — Admin xác nhận đã nhận tiền → mở khoá shipper
+app.post("/api/admin/cash-settlements/:id/settle", adminAuth, async (req, res) => {
+  try {
+    const { note } = req.body || {};
+    const CashSettlement = mongoose.models.CashSettlement;
+    if (!CashSettlement) return res.status(500).json({ success: false, message: "Model chưa sẵn sàng" });
+    const s = await CashSettlement.findById(req.params.id);
+    if (!s) return res.status(404).json({ success: false, message: "Không tìm thấy settlement" });
+    s.amountPaid = s.total;
+    s.status = "settled";
+    s.settledAt = new Date();
+    if (note) s.note = note;
+    await s.save();
+    // Thông báo shipper được mở khoá
+    req.io?.to(`shipper_${s.shipperId}`).emit("cash_settlement_cleared", {
+      orderId: s.orderId, message: `Công nợ đơn ${s.orderId} đã được xác nhận — bạn đã có thể nhận đơn bình thường.`,
+    });
+    res.json({ success: true, data: s });
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 
 // ── VAY NHANH ────────────────────────────────────────────
 
