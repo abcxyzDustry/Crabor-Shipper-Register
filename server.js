@@ -13390,13 +13390,14 @@ app.post("/api/shipper/location", async (req, res) => {
   }
 });
 
-// GET /api/shipper/active-orders — Đơn đang active của shipper (food + laundry)
+// GET /api/shipper/active-orders — Đơn đang active của shipper (food + laundry + cleaning)
 app.get("/api/shipper/active-orders", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
     const shipperId = req.session.shipperId;
-    const [foodOrders, laundryOrders] = await Promise.all([
+    const CleaningOrderM = mongoose.models.CleaningOrder;
+    const [foodOrders, laundryOrders, cleaningOrders] = await Promise.all([
       Order.find({
         shipperId,
         status: { $in: ["shipper_accepted", "picking_up", "picked_up", "delivering"] }
@@ -13405,6 +13406,13 @@ app.get("/api/shipper/active-orders", async (req, res) => {
         shipperId,
         status: { $in: ["shipper_picking", "picked_up_by_shipper", "at_partner", "washing", "countdown", "ready_return", "shipper_returning"] }
       }).sort({ createdAt: -1 }).lean(),
+      // Đơn dọn nhà: từ lúc nhận đến khi hoàn thành — để hiển thị các bước tiếp theo
+      CleaningOrderM
+        ? CleaningOrderM.find({
+            shipperId,
+            status: { $in: ["accepted", "calling", "arrived", "in_progress", "working", "cleaned", "awaiting_payment"] }
+          }).sort({ createdAt: -1 }).lean()
+        : Promise.resolve([]),
     ]);
 
     // Lấy toạ độ cửa hàng giặt (partner) để shipper vẽ lộ trình theo workflow giặt
@@ -13460,7 +13468,35 @@ app.get("/api/shipper/active-orders", async (req, res) => {
         finalTotal: o.finalTotal ?? Math.max(0, (o.total||0) + (o.shipFee||0) + (o.serviceFee||0) - (o.discount||0)),
       };
     });
-    res.json({ success: true, orders: [...mappedLaundry, ...enrichedFood] });
+    // Map cleaning orders — workflow dọn nhà: pickup = nhà khách, KHÔNG có phí ship
+    const mappedCleaning = cleaningOrders.map(o => ({
+      ...o,
+      module: "cleaning",
+      orderId: o.orderId,
+      customerName: o.customerName,
+      customerPhone: o.customerPhone,
+      partnerName: o.serviceName || 'Dọn nhà',
+      address: o.address,
+      addressLat: o.addressLat, addressLng: o.addressLng,
+      deliveryAddress: o.address,
+      deliveryLat: o.addressLat, deliveryLng: o.addressLng,
+      pickupAddress: o.address,
+      pickupLat: o.addressLat, pickupLng: o.addressLng,
+      finalTotal: o.finalTotal ?? o.price ?? 0,
+      total: o.finalTotal ?? o.price ?? 0,
+      shipFee: 0,
+      serviceFee: 0,
+      discount: o.discount || 0,
+      voucherCode: o.voucherCode || null,
+      voucherDiscount: o.voucherDiscount || 0,
+      paymentMethod: o.paymentMethod || 'cash',
+      items: [{ name: o.serviceName || 'Dọn nhà', qty: 1, price: o.finalTotal ?? o.price ?? 0 }],
+      duration: o.duration,
+      bookingDate: o.bookingDate,
+      bookingTime: o.bookingTime,
+    }));
+
+    res.json({ success: true, orders: [...mappedLaundry, ...enrichedFood, ...mappedCleaning] });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
