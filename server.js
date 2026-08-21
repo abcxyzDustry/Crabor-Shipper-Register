@@ -9158,6 +9158,7 @@ app.post("/api/cleaning/order", async (req, res) => {
       orderId: order.orderId,
       order: {
         _id: order._id, orderId: order.orderId, serviceName: order.serviceName,
+        module: 'cleaning',
         price: order.price, discount: order.discount || 0, finalTotal: order.finalTotal ?? Math.max(0, (order.price||0) - (order.discount||0)),
         duration: order.duration, address: order.address,
         addressLat: order.addressLat, addressLng: order.addressLng,
@@ -9234,9 +9235,39 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
     const order = await CleaningOrder.findOne({ orderId: req.params.id });
     if (!order) return res.status(404).json({ success: false });
     if (order.shipperId && order.shipperId.toString() !== shipperId.toString()) {
-      // Shipper khác đã nhận trước đó
-      req.io.to(`shipper_${shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
-      return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
+      // ── 2 SHIPPER CÙNG BẤM: giữ lại người GẦN KHÁCH HÀNG hơn ──
+      // Chỉ áp dụng khi người giữ hiện tại chưa bắt đầu làm gì (pending/accepted)
+      const canSteal = ["pending", "accepted"].includes(order.status);
+      let transferred = false;
+      if (canSteal && order.addressLat != null) {
+        try {
+          const [meDoc, curDoc] = await Promise.all([
+            Shipper.findById(shipperId).select("location").lean(),
+            Shipper.findById(order.shipperId).select("location").lean(),
+          ]);
+          const distTo = (s) => (s?.location?.lat != null)
+            ? Math.hypot(s.location.lat - order.addressLat, (s.location.lng || 0) - (order.addressLng || 0))
+            : null;
+          const dMe = distTo(meDoc), dCur = distTo(curDoc);
+          if (dMe != null && (dCur == null || dMe < dCur)) {
+            await CleaningOrder.findOneAndUpdate({ _id: order._id }, { $set: { shipperId } });
+            transferred = true;
+            // Người giữ cũ mất đơn
+            req.io.to(`shipper_${order.shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn đã chuyển cho nhân viên ở gần khách hơn" });
+            req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
+              orderId: order.orderId, status: "accepted",
+              message: "CRABOR đã đổi sang nhân viên ở gần bạn hơn để phục vụ nhanh hơn.",
+            });
+            console.log(`[Cleaning] Tie-break: đơn ${order.orderId} chuyển sang shipper ${shipperId} (gần hơn: ${dMe?.toFixed(2)}km < ${dCur ?? '∞'})`);
+          }
+        } catch (_) {}
+      }
+      if (!transferred) {
+        req.io.to(`shipper_${shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
+        return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
+      }
+      // Chuyển thành công → coi như là chủ đơn mới, tiếp tục flow bên dưới
+      order.shipperId = shipperId;
     }
     if (!order.shipperId) {
       // Chặn nếu shipper nợ tiền mặt quá hạn
@@ -14289,6 +14320,7 @@ setInterval(async () => {
         orderId: order.orderId,
         order: {
           _id: order._id, orderId: order.orderId, serviceName: order.serviceName,
+          module: 'cleaning',
           price: order.price, discount: order.discount || 0,
           finalTotal: order.finalTotal ?? Math.max(0, (order.price || 0) - (order.discount || 0)),
           duration: order.duration, address: order.address,
@@ -14628,6 +14660,7 @@ const cleaningOrderSchema = new mongoose.Schema({
   orderId:       { type: String, unique: true },
   customerId:    mongoose.Schema.Types.ObjectId,
   shipperId:     mongoose.Schema.Types.ObjectId,
+  module:        { type: String, default: "cleaning" },
   customerName:  String,
   customerPhone: String,
   address:       String,
@@ -14653,7 +14686,9 @@ const cleaningOrderSchema = new mongoose.Schema({
   voucherCraborBear:  { type: Number, default: 0, min: 0 },
   status: {
     type: String,
-    enum: ["pending","accepted","shipper_accepted","in_progress","picking_up","working","completed","cancelled"],
+    // Workflow dọn nhà: pending → accepted → calling (gọi khách dặn dò) → arrived
+    // → in_progress (đang dọn) → cleaned (dọn xong) → awaiting_payment (thanh toán) → completed
+    enum: ["pending","accepted","shipper_accepted","calling","arrived","in_progress","working","cleaned","awaiting_payment","picking_up","completed","cancelled"],
     default: "pending",
   },
   statusHistory: [{ status: String, by: String, time: Date }],
