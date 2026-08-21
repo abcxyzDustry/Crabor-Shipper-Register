@@ -1077,6 +1077,8 @@ const voucherSchema = new mongoose.Schema({
   module:      { type: String, default: 'all' },           // 'all','food','laundry'...
   target:      { type: String, enum: ['order','ship'], default: 'order' }, // 'order': giảm giá trị đơn | 'ship': giảm phí giao
   weekly:      { type: String, default: '' },                // mã tuần ISO (vd 2026W34) nếu là voucher tuần tự động
+  source:      { type: String, enum: ['public','loyalty'], default: 'public' }, // 'loyalty' = đổi bằng điểm, chỉ chủ sở hữu dùng được
+  ownerId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },           // user sở hữu (voucher loyalty)
   active:      { type: Boolean, default: true },
   expiresAt:   { type: Date, required: true },
   description: { type: String, trim: true },
@@ -2904,12 +2906,20 @@ app.post("/api/orders/:id/delivery-photo", async (req, res) => {
 // GET /api/vouchers/validate — Validate mã voucher (hỗ trợ target ship: giảm phí giao)
 app.get("/api/vouchers/validate", async (req, res) => {
   try {
+    await loadSessionFromHeader(req, res);
     const { code, total, shipFee, userId, module: mod } = req.query;
     if (!code) return res.status(400).json({ success: false });
     const v = await Voucher.findOne({ code: code.toUpperCase().trim(), active: true });
     if (!v) return res.status(404).json({ success: false, message: "Mã không tồn tại hoặc đã hết hạn" });
     if (new Date() > v.expiresAt) return res.status(400).json({ success: false, message: "Mã đã hết hạn" });
     if (v.usedCount >= v.usageLimit) return res.status(400).json({ success: false, message: "Mã đã dùng hết lượt" });
+    // Voucher đổi bằng điểm: chỉ chủ sở hữu hợp lệ
+    if (v.source === 'loyalty') {
+      const uid = req.session?.userId || (userId ? String(userId) : null);
+      if (!uid || !v.ownerId || String(v.ownerId) !== String(uid)) {
+        return res.status(400).json({ success: false, message: "Mã này đổi bằng điểm tích luỹ — chỉ chủ sở hữu mới dùng được" });
+      }
+    }
     if (userId && v.usedBy.map(String).includes(String(userId))) return res.status(400).json({ success: false, message: "Bạn đã dùng mã này rồi" });
 
     // target 'ship': giảm theo phí giao; target 'order': giảm theo giá trị đơn
@@ -3029,20 +3039,30 @@ app.get("/api/admin/weekly-voucher", adminAuth, async (req, res) => {
 app.get("/api/vouchers/public", async (req, res) => {
   try {
     const now = new Date();
+    // Chỉ voucher công khai — voucher đổi bằng điểm (loyalty) không hiện ở đây
     const vs = await Voucher.find({
       active: true,
       expiresAt: { $gt: now },
+      source: { $ne: 'loyalty' },
     }).sort({ createdAt: -1 }).limit(50).select("-__v");
     res.json({ success: true, vouchers: vs });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// GET /api/vouchers/my — Customer lấy danh sách voucher (alias public)
+// GET /api/vouchers/my — Voucher công khai + voucher loyalty CỦA CHÍNH user này
 app.get("/api/vouchers/my", async (req, res) => {
   try {
+    await loadSessionFromHeader(req, res);
     const now = new Date();
-    const vs = await Voucher.find({ active: true, expiresAt: { $gt: now } })
-      .sort({ createdAt: -1 }).limit(50).select("-__v");
+    const uid = req.session?.userId || null;
+    const vs = await Voucher.find({
+      active: true,
+      expiresAt: { $gt: now },
+      $or: [
+        { source: { $ne: 'loyalty' } },
+        ...(uid ? [{ source: 'loyalty', ownerId: uid }] : []),
+      ],
+    }).sort({ createdAt: -1 }).limit(50).select("-__v");
     res.json({ success: true, vouchers: vs });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -3534,6 +3554,7 @@ app.post("/api/loyalty/redeem", async (req, res) => {
       code, type: 'fixed', value: level.discount, minOrder: 0,
       usageLimit: 1, expiresAt: expiry,
       description: level.desc || level.title, module: "all", target: "order", active: true,
+      source: 'loyalty', ownerId: req.session.userId,
     });
     await User.findByIdAndUpdate(req.session.userId, { $inc: { loyaltyPts: -level.pts } });
     await LoyaltyLog.create({
@@ -11642,6 +11663,13 @@ async function applyVoucher(code, bases, customerId, module) {
     if (!v) return { discount: 0, applied: null };
     if (v.usedCount >= v.usageLimit) return { discount: 0, applied: null };
     if (v.module !== "all" && v.module !== module) return { discount: 0, applied: null };
+    // Voucher đổi bằng điểm: CHỈ chủ sở hữu được dùng
+    if (v.source === 'loyalty') {
+      if (!customerId || !v.ownerId || String(v.ownerId) !== String(customerId)) {
+        console.log(`[applyVoucher] Chặn voucher loyalty ${v.code}: không phải chủ sở hữu`);
+        return { discount: 0, applied: null };
+      }
+    }
     // Chọn base giảm theo target
     const subtotal = v.target === "ship" ? (bases.ship || bases.order || 0) : (bases.order || 0);
     if (subtotal < (v.minOrder || 0)) return { discount: 0, applied: null };
