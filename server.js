@@ -2116,21 +2116,197 @@ app.post("/api/shipper/fee/confirm", async (req, res) => {
 // GET /api/admin/config/earlybird — lấy cấu hình early bird
 app.get("/api/admin/config/earlybird", adminAuth, async (req, res) => {
   try {
-    const ebMax  = await getConfig("earlyBirdMax", 50);
+    const ebMax   = await getConfig("earlyBirdMax", 50);
+    const ebPrice = await getConfig("earlyBirdPrice", 500000);
     const ebUsed = await Shipper.countDocuments({ plan: "early_bird" });
-    res.json({ success: true, data: { ebMax, ebUsed, slotsLeft: Math.max(0, ebMax - ebUsed) } });
+    res.json({ success: true, data: { ebMax, ebPrice, ebUsed, slotsLeft: Math.max(0, ebMax - ebUsed) } });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// PATCH /api/admin/config/earlybird — cập nhật số suất early bird
+// PATCH /api/admin/config/earlybird — cập nhật số suất + giá early bird
 app.patch("/api/admin/config/earlybird", adminAuth, async (req, res) => {
   try {
-    const { ebMax } = req.body;
-    if (typeof ebMax !== "number" || ebMax < 0) return res.status(400).json({ success: false, message: "Giá trị không hợp lệ" });
-    await setConfig("earlyBirdMax", ebMax);
-    res.json({ success: true, data: { ebMax } });
+    const { ebMax, ebPrice } = req.body;
+    if (ebMax !== undefined) {
+      if (typeof ebMax !== "number" || ebMax < 0) return res.status(400).json({ success: false, message: "Số suất không hợp lệ" });
+      await setConfig("earlyBirdMax", ebMax);
+    }
+    if (ebPrice !== undefined) {
+      if (typeof ebPrice !== "number" || ebPrice < 0) return res.status(400).json({ success: false, message: "Giá không hợp lệ" });
+      await setConfig("earlyBirdPrice", ebPrice);
+    }
+    const curMax = await getConfig("earlyBirdMax", 50);
+    const curPrice = await getConfig("earlyBirdPrice", 500000);
+    res.json({ success: true, data: { ebMax: curMax, ebPrice: curPrice } });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── STORAGE STATS: dung lượng MongoDB + Cloudinary ──────────────
+app.get("/api/admin/storage-stats", adminAuth, async (req, res) => {
+  try {
+    // ── MongoDB ──
+    const db = { configured: true };
+    try {
+      const dbo = mongoose.connection.db;
+      const stats = await dbo.command({ dbstats: 1 });
+      db.dataSize    = stats.dataSize    || 0;   // dung lượng dữ liệu (bytes)
+      db.storageSize = stats.storageSize || 0;   // dung lượng lưu trữ thực tế
+      db.indexSize   = stats.indexSize   || 0;
+      db.collections = stats.collections || 0;
+      db.objects     = stats.objects     || 0;
+    } catch(e) { db.configured = false; db.error = e.message; }
+
+    // Đếm document các collection chính
+    const counts = {};
+    const countOf = async (name) => {
+      try { return await mongoose.connection.db.collection(name).countDocuments(); }
+      catch(e) { return null; }
+    };
+    for (const name of ["orders","users","shippers","products","food_partners",
+      "giatla_partners","giupviec_partners","chinashops","laundryorders","cleaningorders",
+      "aibanners","wallettxes","bnpltxes","bnplinvoices","loans","socialcomments"]) {
+      counts[name] = await countOf(name);
+    }
+
+    // Danh sách collection + số object từng cái
+    let collections = [];
+    try {
+      const collInfos = await mongoose.connection.db.listCollections().toArray();
+      collections = await Promise.all(collInfos.map(async (c) => ({
+        name: c.name,
+        count: await countOf(c.name),
+      })));
+      collections.sort((a,b) => (b.count||0) - (a.count||0));
+    } catch(e) {}
+
+    // ── Cloudinary usage API ──
+    let cloudinary = { configured: false };
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey    = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    if (cloudName && apiKey && apiSecret) {
+      cloudinary.configured = true;
+      try {
+        const auth = Buffer.from(apiKey + ":" + apiSecret).toString("base64");
+        const r = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/usage`, {
+          headers: { Authorization: "Basic " + auth },
+        });
+        const d = await r.json();
+        if (d && !d.error) {
+          cloudinary.plan       = d.plan;
+          cloudinary.lastUpdated= d.last_updated;
+          cloudinary.resources  = d.resources;   // { count, usage, limit }
+          cloudinary.bandwidth  = d.bandwidth;   // { count/usage, limit }
+          cloudinary.storage    = d.storage;     // { usage, limit }
+          cloudinary.credits    = d.credits;     // { usage, limit }
+          cloudinary.objects    = d.objects;
+        } else {
+          cloudinary.error = d?.error?.message || "Cloudinary trả lời lỗi";
+        }
+      } catch(e) { cloudinary.error = e.message; }
+    }
+
+    res.json({ success: true, db, counts, collections, cloudinary });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── MẠNG XÃ HỘI CRABOR: banner AI → bài viết của CRABOR Official + comment với Coco AI ──
+const socialCommentSchema = new mongoose.Schema({
+  postId:     { type: mongoose.Schema.Types.ObjectId, ref: "AIBanner", required: true },
+  userId:     { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  authorName: { type: String, default: "Khách hàng CRABOR" },
+  text:       { type: String, required: true, maxlength: 1000 },
+  isAI:       { type: Boolean, default: false },
+}, { timestamps: true });
+const SocialComment = mongoose.models.SocialComment || mongoose.model("SocialComment", socialCommentSchema);
+
+// GET /api/social/posts — feed bài viết từ banner AI đang chạy
+app.get("/api/social/posts", async (req, res) => {
+  try {
+    const banners = await AIBanner.find({ active: true }).sort({ createdAt: -1 }).limit(30).lean();
+    const ids = banners.map(b => b._id);
+    let cmap = {};
+    if (ids.length) {
+      const agg = await SocialComment.aggregate([
+        { $match: { postId: { $in: ids } } },
+        { $group: { _id: "$postId", count: { $sum: 1 } } },
+      ]);
+      cmap = Object.fromEntries(agg.map(c => [String(c._id), c.count]));
+    }
+    const posts = banners.map(b => ({
+      _id: b._id,
+      imageUrl: b.imageUrl,
+      title: b.title,
+      content: b.content || b.subtitle || "",
+      badge: b.badge,
+      emoji: b.emoji,
+      gradient: b.gradient,
+      ctaLink: b.ctaLink,
+      author: { name: "CRABOR Official", verified: true },
+      createdAt: b.createdAt,
+      commentCount: cmap[String(b._id)] || 0,
+    }));
+    res.json({ success: true, posts });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/social/posts/:id/comments — danh sách bình luận
+app.get("/api/social/posts/:id/comments", async (req, res) => {
+  try {
+    const comments = await SocialComment.find({ postId: req.params.id }).sort({ createdAt: 1 }).limit(100).lean();
+    res.json({ success: true, comments });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/social/posts/:id/comment — bình luận + Coco AI đọc và trả lời
+app.post("/api/social/posts/:id/comment", async (req, res) => {
+  try {
+    if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const text = String(req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ success: false, message: "Thiếu nội dung bình luận" });
+    const banner = await AIBanner.findById(req.params.id).select("title").lean();
+    if (!banner) return res.status(404).json({ success: false, message: "Bài viết không tồn tại" });
+
+    const user = await User.findById(req.session.userId).select("fullName").lean();
+    const comment = await SocialComment.create({
+      postId: req.params.id,
+      userId: req.session.userId,
+      authorName: user?.fullName || "Khách hàng CRABOR",
+      text,
+    });
+
+    // Coco AI đọc bình luận và trả lời
+    let aiText = "";
+    try {
+      const { cocoRespondSmart } = require("./coco-engine");
+      const r = await cocoRespondSmart({
+        text: `Bài viết "${banner.title}": khách hàng bình luận: "${text}". Hãy trả lời ngắn gọn thân thiện với tư cách fanpage CRABOR.`,
+        sessionId: `social_${req.params.id}`,
+        userId: req.session.userId,
+        userCtx: {},
+      });
+      aiText = typeof r === "string" ? r : (r?.text || r?.reply || "");
+    } catch(e) { console.error("[Social] Coco AI lỗi:", e.message); }
+    if (!aiText) {
+      aiText = `Cảm ơn bạn đã quan tâm đến "${banner.title}" 🦀 Đặt ngay trong app CRABOR để nhận ưu đãi nhé!`;
+    }
+    const aiReply = await SocialComment.create({
+      postId: req.params.id,
+      authorName: "Coco AI 🤖",
+      text: String(aiText).slice(0, 800),
+      isAI: true,
+    });
+    res.json({ success: true, comment, aiReply });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -7896,8 +8072,9 @@ app.post("/api/shipper/register", async (req, res) => {
     if (exists) return res.status(409).json({ success: false, message: `SĐT đã đăng ký. Mã: ${exists.registerId}` });
 
     // Kiểm tra còn suất Early Bird
-    // Early Bird: check dynamic max from Config
-    const ebMax  = await getConfig("earlyBirdMax", 50);
+    // Early Bird: check dynamic max + price from Config
+    const ebMax    = await getConfig("earlyBirdMax", 50);
+    const ebPrice  = await getConfig("earlyBirdPrice", 500000);
     const ebCount = await Shipper.countDocuments({ plan: "early_bird" });
     const plan = ebCount < ebMax ? "early_bird" : "standard";
 
@@ -7907,7 +8084,7 @@ app.post("/api/shipper/register", async (req, res) => {
     const isCleaningAccount = req.body.cleaningRegistered === true;
     const shipper = await Shipper.create({
       phone, firstName, lastName, email, dob, address, district, vehicle,
-      plan, fee: plan === "early_bird" ? 500000 : 700000,
+      plan, fee: plan === "early_bird" ? ebPrice : 700000,
       status: "pending", documents,
       workType: isCleaningAccount ? "cleaning" : "shipper",
       preferences: isCleaningAccount
@@ -10426,6 +10603,56 @@ app.get("/api/food-partners", async (req, res) => {
   }
 });
 
+// GET /api/food-partners/search?q=... — Tìm kiếm MỌI THỨ: tên quán + TÊN MÓN trong menu
+app.get("/api/food-partners/search", async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    const limit = Math.min(50, Number(req.query.limit) || 20);
+    if (!q) return res.json({ success: true, partners: [] });
+    const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+
+    // 1) Tìm món khớp → gom theo quán
+    const matchedProducts = await Product.find({ available: true, $or: [{ name: rx }, { description: rx }] })
+      .select("name price partnerId")
+      .limit(100).lean();
+    const productMap = {}; // partnerId -> [tên món]
+    for (const p of matchedProducts) {
+      const key = String(p.partnerId);
+      (productMap[key] = productMap[key] || []).push(p.name);
+    }
+    const partnerIdsFromProducts = Object.keys(productMap);
+
+    // 2) Quán khớp theo tên/địa chỉ/mô tả/danh mục
+    const nameMatched = await FoodPartner.find({
+      status: "approved",
+      $or: [{ bizName: rx }, { address: rx }, { description: rx }, { categories: rx }],
+    }).select("_id registerId bizName address district categories openTime closeTime avatar coverImage rating totalOrders description")
+      .sort({ rating: -1, totalOrders: -1 }).limit(limit).lean();
+
+    // 3) Quán có món khớp (loại trừ những quán đã có ở trên)
+    let productMatched = [];
+    if (partnerIdsFromProducts.length) {
+      productMatched = await FoodPartner.find({
+        status: "approved",
+        _id: { $in: partnerIdsFromProducts, $nin: nameMatched.map(p => p._id) },
+      }).select("_id registerId bizName address district categories openTime closeTime avatar coverImage rating totalOrders description")
+        .sort({ rating: -1, totalOrders: -1 }).limit(limit).lean();
+    }
+
+    // Gắn danh sách món khớp vào từng quán để UI hiển thị "Món: ..."
+    const withMatches = [...nameMatched, ...productMatched].map(p => ({
+      ...p,
+      matchedProducts: (productMap[String(p._id)] || []).slice(0, 5),
+    }));
+    // Quán khớp tên ưu tiên trước, sau đó xếp theo rating
+    withMatches.sort((a, b) => (b.matchedProducts?.length ? 0 : 1) - (a.matchedProducts?.length ? 0 : 1) || (b.rating || 0) - (a.rating || 0));
+
+    res.json({ success: true, partners: withMatches.slice(0, limit), total: withMatches.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/food-partners/:id/products — Menu của một tiệm
 app.get("/api/food-partners/:id/products", async (req, res) => {
   try {
@@ -10728,8 +10955,9 @@ app.get("/api/admin/stats", adminAuth, async (req, res) => {
       todayRegistrations: todayS + todayGL + todayGV + todayCS + todayFP + todayRX,
       earlyBirdUsed: earlyBird,
       earlyBirdMax:  await getConfig("earlyBirdMax", 50),
+      earlyBirdPrice: await getConfig("earlyBirdPrice", 500000),
       earlyBirdLeft: Math.max(0, await getConfig("earlyBirdMax", 50) - earlyBird),
-      earlyBirdRevenue: earlyBird * 500000,
+      earlyBirdRevenue: earlyBird * (await getConfig("earlyBirdPrice", 500000)),
       // Đơn hàng
       totalOrders,
       todayOrders,

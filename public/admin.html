@@ -478,6 +478,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
       <div class="nav-item" onclick="showPage('training')">
         <span class="ico">🧠</span> Training Agent
       </div>
+      <div class="nav-item" onclick="showPage('storage')">
+        <span class="ico">🗄️</span> Dung lượng
+      </div>
       <div class="nav-item" onclick="showPage('settings')">
         <span class="ico">⚙️</span> Cài đặt
       </div>
@@ -644,11 +647,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
                 <div style="display:flex;gap:8px;align-items:center">
                   <input id="ebMaxInput" type="number" min="0" max="9999" value="50"
                     style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--cream);font-family:var(--font-mono);font-size:.9rem;font-weight:700;outline:none">
-                  <button onclick="saveEbMax()" style="background:var(--yellow);color:#111;border:none;border-radius:8px;padding:9px 16px;font-weight:900;font-size:.8rem;cursor:pointer;white-space:nowrap">Lưu</button>
+                  <button onclick="saveEbConfig()" style="background:var(--yellow);color:#111;border:none;border-radius:8px;padding:9px 16px;font-weight:900;font-size:.8rem;cursor:pointer;white-space:nowrap">Lưu</button>
                   <button onclick="setEbMax(0)" style="background:rgba(232,80,74,.2);color:var(--coral);border:1px solid rgba(232,80,74,.3);border-radius:8px;padding:9px 12px;font-weight:900;font-size:.8rem;cursor:pointer" title="Đặt về 0 để tắt Early Bird">Tắt EB</button>
                 </div>
+                <div style="font-size:.8rem;color:var(--muted);margin:12px 0 10px">Phí đăng ký Early Bird (hiện tại: <strong id="ebPriceCurrent" style="color:var(--yellow)">500.000đ</strong>)</div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input id="ebPriceInput" type="number" min="0" step="1000" value="500000"
+                    style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--cream);font-family:var(--font-mono);font-size:.9rem;font-weight:700;outline:none">
+                  <span style="font-size:.85rem;color:var(--muted);white-space:nowrap">VNĐ</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:10px">
+                  <button onclick="setEbPrice(300000)" style="background:rgba(240,180,41,.15);color:var(--yellow);border:1px solid rgba(240,180,41,.3);border-radius:8px;padding:7px 12px;font-weight:800;font-size:.75rem;cursor:pointer">300k</button>
+                  <button onclick="setEbPrice(400000)" style="background:rgba(240,180,41,.15);color:var(--yellow);border:1px solid rgba(240,180,41,.3);border-radius:8px;padding:7px 12px;font-weight:800;font-size:.75rem;cursor:pointer">400k</button>
+                  <button onclick="setEbPrice(500000)" style="background:rgba(240,180,41,.15);color:var(--yellow);border:1px solid rgba(240,180,41,.3);border-radius:8px;padding:7px 12px;font-weight:800;font-size:.75rem;cursor:pointer">500k</button>
+                  <button onclick="saveEbConfig()" style="background:var(--yellow);color:#111;border:none;border-radius:8px;padding:7px 16px;font-weight:900;font-size:.78rem;cursor:pointer;margin-left:auto">💾 Lưu giá</button>
+                </div>
                 <div id="ebConfigMsg" style="margin-top:8px;font-size:.75rem;color:var(--green);display:none">✅ Đã lưu cấu hình</div>
-                <div style="margin-top:8px;font-size:.72rem;color:rgba(245,240,220,.35);line-height:1.5">Khi đạt giới hạn → form đăng ký tự động chuyển sang gói Bình Thường (700k). Đặt về 0 để tắt Early Bird ngay lập tức.</div>
+                <div style="margin-top:8px;font-size:.72rem;color:rgba(245,240,220,.35);line-height:1.5">Khi đạt giới hạn → form đăng ký tự động chuyển sang gói Bình Thường (700k). Đặt về 0 để tắt Early Bird ngay lập tức. Giá mới áp dụng cho người đăng ký sau khi lưu.</div>
               </div>
             </div>
           </div>
@@ -1373,6 +1388,54 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
       </div>
     </section>
 
+    <!-- ── STORAGE (Dung lượng DB + Cloudinary) ── -->
+    <section id="pgStorage" class="page-section">
+      <div class="page-header">
+        <div class="page-title">🗄️ Dung lượng Database & Cloudinary</div>
+        <div class="header-actions">
+          <button class="filter-btn" onclick="loadStorageStats()">🔄 Làm mới</button>
+        </div>
+      </div>
+
+      <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px">
+        <div class="panel" style="padding:16px">
+          <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">📦 MongoDB — Dữ liệu</div>
+          <div id="stDbData" style="font-size:1.5rem;font-weight:900;color:var(--cream);margin-top:6px">—</div>
+          <div id="stDbStorage" style="font-size:.75rem;color:var(--muted);margin-top:4px">Lưu trữ: —</div>
+          <div id="stDbIndex" style="font-size:.75rem;color:var(--muted)">Index: —</div>
+        </div>
+        <div class="panel" style="padding:16px">
+          <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">🧾 Tổng objects / collections</div>
+          <div id="stDbObjects" style="font-size:1.5rem;font-weight:900;color:var(--cream);margin-top:6px">—</div>
+          <div id="stDbColls" style="font-size:.75rem;color:var(--muted);margin-top:4px">Collections: —</div>
+        </div>
+        <div class="panel" style="padding:16px">
+          <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">☁️ Cloudinary — Băng thông tháng này</div>
+          <div id="stClBandwidth" style="font-size:1.5rem;font-weight:900;color:var(--cream);margin-top:6px">—</div>
+          <div id="stClBandwidthLimit" style="font-size:.75rem;color:var(--muted);margin-top:4px">Giới hạn: —</div>
+        </div>
+        <div class="panel" style="padding:16px">
+          <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">🖼️ Cloudinary — Lưu trữ / Objects</div>
+          <div id="stClStorage" style="font-size:1.5rem;font-weight:900;color:var(--cream);margin-top:6px">—</div>
+          <div id="stClResources" style="font-size:.75rem;color:var(--muted);margin-top:4px">Ảnh: — · Gói: —</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="panel" style="padding:16px">
+          <div style="font-weight:900;margin-bottom:10px">📋 Số document theo collection chính</div>
+          <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+            <thead><tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Collection</th><th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)">Số dòng</th></tr></thead>
+            <tbody id="stCountsBody"><tr><td colspan="2" style="padding:12px;color:var(--muted)">⏳ Đang tải...</td></tr></tbody>
+          </table>
+        </div>
+        <div class="panel" style="padding:16px">
+          <div style="font-weight:900;margin-bottom:10px">☁️ Cloudinary chi tiết</div>
+          <div id="stClDetail" style="font-size:.85rem;line-height:1.9;color:var(--cream)">⏳ Đang tải...</div>
+        </div>
+      </div>
+    </section>
+
     <section id="pgSettings" class="page-section">
       <div class="page-header">
         <div class="page-title">Cài đặt hệ thống</div>
@@ -2072,6 +2135,10 @@ async function loadStats() {
     if(document.getElementById('mbFPSub')) document.getElementById('mbFPSub').textContent = `Hoa hồng 20%`;
     if(document.getElementById('mbRXSub')) document.getElementById('mbRXSub').textContent = `Đang tuyển dụng`;
     const ebMax = d.earlyBirdMax ?? 50, ebLeft = d.earlyBirdLeft ?? ebMax, ebUsed = d.earlyBirdUsed ?? 0;
+    const ebPriceCur = document.getElementById('ebPriceCurrent');
+    const ebPriceInp = document.getElementById('ebPriceInput');
+    if (ebPriceCur && d.earlyBirdPrice != null) ebPriceCur.textContent = fmtMoney(d.earlyBirdPrice);
+    if (ebPriceInp && d.earlyBirdPrice != null && document.activeElement !== ebPriceInp) ebPriceInp.value = d.earlyBirdPrice;
     setText('ebLeft', ebLeft); setW('ebBar', ebMax > 0 ? (ebLeft/ebMax)*100 : 0);
     if(document.getElementById('ebNote')) document.getElementById('ebNote').textContent = `${ebUsed}/${ebMax} suất đã dùng · Doanh thu: ${fmtMoney(d.earlyBirdRevenue||0)}`;
     const ebMaxCurrent = document.getElementById('ebMaxCurrent');
@@ -2387,20 +2454,24 @@ async function adminUploadDoc(field, input) {
 
 function closeModal() { document.getElementById('overlay').classList.remove('show'); selectedRecord = { id: null, type: null }; }
 
-async function saveEbMax() {
-  const val = parseInt(document.getElementById('ebMaxInput').value);
-  if (isNaN(val) || val < 0) { showNotif('❌ Lỗi', 'Giá trị không hợp lệ', 'coral'); return; }
+async function saveEbConfig() {
+  const maxVal = parseInt(document.getElementById('ebMaxInput').value);
+  const priceVal = parseInt(document.getElementById('ebPriceInput').value);
+  if (isNaN(maxVal) || maxVal < 0) { showNotif('❌ Lỗi', 'Số suất không hợp lệ', 'coral'); return; }
+  if (isNaN(priceVal) || priceVal < 0) { showNotif('❌ Lỗi', 'Giá không hợp lệ', 'coral'); return; }
   try {
-    const r = await apiFetch('/api/admin/config/earlybird', 'PATCH', { ebMax: val });
+    const r = await apiFetch('/api/admin/config/earlybird', 'PATCH', { ebMax: maxVal, ebPrice: priceVal });
     if (r.success) {
       const msg = document.getElementById('ebConfigMsg');
       if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display='none', 3000); }
-      if(document.getElementById('ebMaxCurrent')) document.getElementById('ebMaxCurrent').textContent = val;
-      showNotif('✅ Đã cập nhật', 'Early Bird: ' + val + ' suất', 'green'); loadStats();
+      if(document.getElementById('ebMaxCurrent')) document.getElementById('ebMaxCurrent').textContent = maxVal;
+      if(document.getElementById('ebPriceCurrent')) document.getElementById('ebPriceCurrent').textContent = fmtMoney(priceVal);
+      showNotif('✅ Đã cập nhật', `Early Bird: ${maxVal} suất · ${fmtMoney(priceVal)}`, 'green'); loadStats();
     }
   } catch(e) { showNotif('❌ Lỗi', 'Không lưu được', 'coral'); }
 }
-function setEbMax(v) { document.getElementById('ebMaxInput').value = v; saveEbMax(); }
+function setEbMax(v) { document.getElementById('ebMaxInput').value = v; saveEbConfig(); }
+function setEbPrice(v) { document.getElementById('ebPriceInput').value = v; saveEbConfig(); }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //   VOUCHER MANAGEMENT
@@ -2962,9 +3033,71 @@ async function toggleBannerActive(id, active) { try { await apiFetch('/api/admin
 async function deleteBannerAdmin(id) { if (!confirm('Xóa banner này?')) return; try { await apiFetch('/api/admin/banners/'+id, 'DELETE'); showNotif('🗑️ Đã xóa', 'Banner đã bị xóa và gỡ khỏi app'); loadActiveBanners(); } catch(e) {} }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//   STORAGE STATS (Dung lượng DB + Cloudinary)
+// ─────────────────────────────────────────────────────────────────────────────
+function fmtBytes(b) {
+  if (b == null || isNaN(b)) return '—';
+  const u = ['B','KB','MB','GB','TB']; let i = 0, n = Number(b);
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(n >= 100 || i === 0 ? 0 : 1) + ' ' + u[i];
+}
+async function loadStorageStats() {
+  try {
+    const r = await apiFetch('/api/admin/storage-stats');
+    if (!r || !r.success) throw new Error(r?.message || 'Lỗi');
+    // ── MongoDB ──
+    setText('stDbData', fmtBytes(r.db?.dataSize));
+    setText('stDbStorage', 'Lưu trữ: ' + fmtBytes(r.db?.storageSize));
+    setText('stDbIndex', 'Index: ' + fmtBytes(r.db?.indexSize));
+    setText('stDbObjects', (r.db?.objects ?? 0).toLocaleString('vi-VN'));
+    setText('stDbColls', 'Collections: ' + (r.collections?.length ?? r.db?.collections ?? 0));
+    // Counts bảng
+    const countsBody = document.getElementById('stCountsBody');
+    if (countsBody) {
+      const rows = Object.entries(r.counts || {}).map(([k,v]) =>
+        `<tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)">${k}</td><td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;font-weight:800">${v==null?'—':v.toLocaleString('vi-VN')}</td></tr>`).join('');
+      countsBody.innerHTML = rows || '<tr><td colspan="2" style="padding:12px;color:var(--muted)">Không có dữ liệu</td></tr>';
+    }
+    // ── Cloudinary ──
+    const cl = r.cloudinary || {};
+    if (!cl.configured) {
+      setText('stClBandwidth', 'Chưa cấu hình');
+      setText('stClBandwidthLimit', 'Thêm CLOUDINARY_* vào .env để bật');
+      setText('stClStorage', '—');
+      setText('stClResources', 'Ảnh: — · Gói: —');
+      const d = document.getElementById('stClDetail');
+      if (d) d.innerHTML = '<span style="color:var(--yellow)">⚠️ Chưa cấu hình Cloudinary.</span><br>Thêm CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET vào .env rồi khởi động lại server.';
+      return;
+    }
+    const bw = cl.bandwidth || {};
+    const st = cl.storage || {};
+    const rs = cl.resources || {};
+    const cr = cl.credits || {};
+    setText('stClBandwidth', fmtBytes(bw.usage ?? bw.count));
+    setText('stClBandwidthLimit', 'Giới hạn: ' + (bw.limit ? fmtBytes(bw.limit) : '—'));
+    setText('stClStorage', fmtBytes(st.usage));
+    setText('stClResources', `Ảnh: ${(rs.usage ?? rs.count ?? 0).toLocaleString('vi-VN')} · Gói: ${cl.plan || '—'}`);
+    const detail = document.getElementById('stClDetail');
+    if (detail) {
+      detail.innerHTML = `
+        <b>Gói:</b> ${cl.plan || '—'}<br>
+        <b>Băng thông:</b> ${fmtBytes(bw.usage ?? bw.count)} / ${bw.limit ? fmtBytes(bw.limit) : '∞'}<br>
+        <b>Lưu trữ:</b> ${fmtBytes(st.usage)} / ${st.limit ? fmtBytes(st.limit) : '∞'}<br>
+        <b>Số ảnh:</b> ${(rs.usage ?? rs.count ?? 0).toLocaleString('vi-VN')} / ${(rs.limit ?? '∞').toLocaleString ? (rs.limit!=null?rs.limit.toLocaleString('vi-VN'):'∞') : '∞'}<br>
+        <b>Credits:</b> ${cr.usage != null ? cr.usage.toLocaleString('vi-VN') : '—'}${cr.limit != null ? ' / ' + cr.limit.toLocaleString('vi-VN') : ''}<br>
+        <b>Cập nhật:</b> ${cl.lastUpdated ? new Date(cl.lastUpdated).toLocaleString('vi-VN') : '—'}
+        ${cl.error ? `<br><span style="color:var(--coral)">⚠️ ${cl.error}</span>` : ''}`;
+    }
+  } catch(e) {
+    ['stDbData','stDbObjects','stClBandwidth','stClStorage'].forEach(id => setText(id, '❌ Lỗi'));
+    showNotif('❌ Lỗi', e.message || 'Không tải được dung lượng', 'coral');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', settings:'pgSettings', training:'pgTraining' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', storage:'pgStorage', settings:'pgSettings', training:'pgTraining' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -2982,6 +3115,7 @@ function showPage(key, ev) {
   if (key === 'leaderboard') loadLeaderboard();
   if (key === 'banners') loadActiveBanners();
   if (key === 'users') loadCustomers();
+  if (key === 'storage') loadStorageStats();
   if (key === 'dashboard') loadStats();
   if (key === 'finance') loadFinance();
   if (key === 'withdraws') loadWithdraws();
