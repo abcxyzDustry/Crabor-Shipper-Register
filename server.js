@@ -5206,6 +5206,37 @@ async function processSePayPayment(payload, ioRef, force = false) {
     }
   }
 
+  // ── 2b. HỌC HỘ (hocho) — thanh toán đơn học hộ, TỰ ĐỘNG xác nhận ──
+  // Nội dung CK chứa mã đơn dạng HC-<timestamp>-<XXXX> (VD: HC-1755-AB3D)
+  if (!handled && /HC-\d{10,}-/i.test(rawRef)) {
+    try {
+      const { default: HCOrder } = await import('./hocho/models/Order.js');
+      const code = (rawRef.match(/HC-\d{10,}-[A-Z0-9]{4,8}/i) || [])[0];
+      if (code) {
+        const hcOrder = await HCOrder.findOne({ order_code: code.toUpperCase() });
+        if (!hcOrder) {
+          console.log(`[SEPAY][Hocho] Không tìm thấy đơn ${code}`);
+        } else if (['matching','accepted','heading','arrived','in_progress','completed','rated'].includes(hcOrder.status)) {
+          handled = true; // đơn đã xử lý trước đó
+        } else {
+          const needed = Math.max(0, (hcOrder.price || 0) - (hcOrder.wallet_applied || 0));
+          if (amount + 1000 >= needed) {
+            hcOrder.payment_status = 'paid';
+            hcOrder.paid_at = new Date();
+            hcOrder.sepay_paid_amount = amount;
+            hcOrder.status = 'matching'; // mở khoá cho đối tác thấy ngay
+            await hcOrder.save();
+            handled = true;
+            console.log(`[SEPAY][Hocho] ✅ Tự động xác nhận đơn ${code} — ${amount.toLocaleString('vi-VN')}đ → matching`);
+          } else {
+            console.log(`[SEPAY][Hocho] ${code}: thiếu tiền (nhận ${amount.toLocaleString('vi-VN')}đ < cần ${needed.toLocaleString('vi-VN')}đ)`);
+            handled = true; // đánh dấu để không retry spam
+          }
+        }
+      }
+    } catch (e) { console.error('[SEPAY][Hocho] lỗi:', e.message); }
+  }
+
   // ── 3. Partner registration fee ─────────────────────────
   const partnerMatch = rawRef.match(/CRPART([A-Z0-9]+)/);
   if (partnerMatch && !handled) {
@@ -15564,5 +15595,37 @@ try {
 } catch(e) {
   console.error('[Server] ⚠️  Coco AI Patch failed:', e.message);
 }
+
+// ══════════════════════════════════════════════════════════════
+//  HỌC HỘ (hocho) — mount toàn bộ API vào CRABOR tại /api/hocho/*
+//  (ESM module, load bằng dynamic import; models HC* + collection hocho_*)
+// ══════════════════════════════════════════════════════════════
+(async () => {
+  try {
+    const [c, p, o, ch, ad, up, cb, cr, di] = await Promise.all([
+      import('./hocho/routes/api/customer.js'),
+      import('./hocho/routes/api/partner.js'),
+      import('./hocho/routes/api/order.js'),
+      import('./hocho/routes/api/chat.js'),
+      import('./hocho/routes/api/admin.js'),
+      import('./hocho/routes/api/upload.js'),
+      import('./hocho/routes/api/chatbot.js'),
+      import('./hocho/routes/api/cron.js'),
+      import('./hocho/routes/api/discord.js'),
+    ]);
+    app.use('/api/hocho/customer', c.default);
+    app.use('/api/hocho/partner',  p.default);
+    app.use('/api/hocho/order',    o.default);
+    app.use('/api/hocho/chat',     ch.default);
+    app.use('/api/hocho/admin',    ad.default);
+    app.use('/api/hocho/upload',   up.default);
+    app.use('/api/hocho/chatbot',  cb.default);
+    app.use('/api/hocho/cron',     cr.default);
+    app.use('/api/hocho/discord',  di.default);
+    console.log('[Hocho] ✅ API mounted tại /api/hocho/* (customer/partner/order/chat/admin/upload/chatbot)');
+  } catch (e) {
+    console.error('[Hocho] ❌ mount lỗi:', e.message);
+  }
+})();
 
 module.exports = { app, server, io };
