@@ -2792,17 +2792,39 @@ async function sendAiBannerMsg() {
   _aiBannerHistory.push({ role:'user', content: text });
   _showAiTyping();
   try {
-    const resp = await fetch('https://arlo-42e4f935.base44.app/functions/bannerAi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ max_tokens: 1000, system: AI_BANNER_SYSTEM, style: _bannerStyle, messages: _aiBannerHistory.slice(-8) }) });
-    const data = await resp.json();
+    let reply = '';
+    try {
+      const resp = await fetch('https://arlo-42e4f935.base44.app/functions/bannerAi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ max_tokens: 1000, system: AI_BANNER_SYSTEM, style: _bannerStyle, messages: _aiBannerHistory.slice(-8) }) });
+      if (resp.ok) {
+        const data = await resp.json();
+        reply = data.content?.[0]?.text || '';
+      } else { console.warn('[bannerAi] endpoint HTTP', resp.status); }
+    } catch (epErr) { console.warn('[bannerAi] endpoint lỗi:', epErr?.message || epErr); }
+    // Fallback: endpoint ngoài lỗi (vd model Groq 404) → sinh ý tưởng bằng Puter AI chat
+    if (!reply.includes('BANNER_JSON')) {
+      try {
+        await ensurePuterLoaded();
+        const FALLBACK_SYS = AI_BANNER_SYSTEM + '\n\nQUAN TRỌNG: ngay sau dòng BANNER_JSON, bắt buộc xuất thêm đúng một dòng theo format:\nIMAGE_PROMPT:<mô tả ảnh banner bằng tiếng Anh: màu nền gradient, bố cục, chữ chính hiển thị trên ảnh>';
+        const msgs = [{ role: 'system', content: FALLBACK_SYS }].concat(_aiBannerHistory.slice(-8));
+        const cr = await puter.ai.chat(msgs);
+        reply = (typeof cr === 'string' ? cr : (cr?.message?.content ?? cr?.text ?? '')) || '';
+        console.warn('[bannerAi] đã dùng Puter AI chat fallback');
+      } catch (pcErr) { console.warn('[bannerAi] Puter chat fallback lỗi:', pcErr?.message || pcErr); }
+    }
     _hideAiTyping();
-    const reply = data.content?.[0]?.text || 'Xin lỗi, tôi không thể tạo banner lúc này.';
+    if (!reply) reply = 'Xin lỗi, tôi không thể tạo banner lúc này.';
     _aiBannerHistory.push({ role:'assistant', content: reply });
     const jsonMatch = reply.match(/BANNER_JSON:\s*(\{[\s\S]+?\})/) || reply.match(/BANNER_JSON:\s*(\{.+?\})/);
-    const imagePromptMatch = reply.match(/IMAGE_PROMPT:\s*([\s\S]+)/);
+    let imagePromptMatch = reply.match(/IMAGE_PROMPT:\s*([\s\S]+)/);
     let displayReply = reply.replace(/BANNER_JSON:\s*\{[\s\S]+?\}/, '').replace(/IMAGE_PROMPT:[\s\S]+/, '').trim();
-    if (jsonMatch && imagePromptMatch) {
+    let bannerData = null;
+    if (jsonMatch) { try { bannerData = JSON.parse(jsonMatch[1]); } catch (pjErr) { console.warn('[bannerAi] parse JSON lỗi:', pjErr?.message || pjErr); } }
+    // LLM quên IMAGE_PROMPT → tự tổng hợp từ dữ liệu banner
+    if (bannerData && !imagePromptMatch) {
+      imagePromptMatch = [null, 'Vertical promotional banner for a food delivery mobile app. Background gradient ' + (bannerData.gradient || 'coral red #E8504A to dark red') + '. Large bold headline text "' + (bannerData.title || 'CRABOR') + '"' + (bannerData.subtitle ? ', smaller subtitle "' + bannerData.subtitle + '"' : '') + (bannerData.badge ? ', small corner badge label "' + bannerData.badge + '"' : '') + '. Modern clean advertising layout, appetizing, high contrast, no watermark.'];
+    }
+    if (bannerData && imagePromptMatch) {
       try {
-        const bannerData = JSON.parse(jsonMatch[1]);
         _pendingBanner = bannerData;
         const imgPrompt = imagePromptMatch[1].trim().slice(0, 500);
         displayReply += '<br><br>🎨 Đang sinh ảnh banner bằng GPT Image...';
