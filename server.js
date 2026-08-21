@@ -6859,7 +6859,17 @@ app.get("/api/partner/me", async (req, res) => {
         if (!pObj.coverImage || pObj.coverImage === 'pending_upload' || pObj.coverImage.startsWith('data:')) {
           pObj.coverImage = null;
         }
-        return res.json({ success: true, partner: pObj, module, moduleName: name });
+        // Danh sách MỌI loại đối tác cùng SĐT đã đăng ký — app dùng để khoá/mở mode:
+        // chỉ Đồ ăn → khoá food; chỉ Giặt là → khoá laundry; cả hai → được chuyển qua lại
+        const mods = [];
+        try {
+          if (await FoodPartner.exists({ phone })) mods.push('food_partner');
+          if (await GiatLa.exists({ phone })) mods.push('giat_la');
+          if (await GiupViec.exists({ phone })) mods.push('giup_viec');
+          if (await ChinaShop.exists({ phone })) mods.push('china_shop');
+        } catch (e) { console.error('[partner/me] liệt kê modules lỗi:', e.message); }
+        if (!mods.length) mods.push(module);
+        return res.json({ success: true, partner: pObj, module, moduleName: name, modules: mods });
       }
     }
     return res.status(404).json({ success: false, notRegistered: true });
