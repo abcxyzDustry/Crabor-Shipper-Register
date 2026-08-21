@@ -2442,17 +2442,18 @@ app.post("/api/social/posts/:id/comment", async (req, res) => {
           userContext: {},
           task: "chat",
           backend: "groq",
-          temperature: 0.7,
+          temperature: 0.6,
           maxTokens: 250,
           systemPromptOverride:
-            `Bạn là Coco AI — quản lý fanpage mạng xã hội của CRABOR (super app giao đồ ăn, giặt là, dọn nhà, xe công nghệ tại Hà Nội). ` +
+            `Bạn là nhân viên hỗ trợ khách hàng của CRABOR, trả lời bình luận trên fanpage mạng xã hội chính thức với tài khoản "CRABOR Official". ` +
             `Bài viết đang đăng: "${banner.title}". ` +
-            `Nhiệm vụ: trả lời bình luận của khách hàng một cách TỰ NHIÊN, ĐÚNG TRỌNG TÂM nội dung họ nói — tuyệt đối không trả lời máy móc theo mẫu câu. ` +
-            `Xưng "CRABOR" hoặc "bên mình", gọi khách là "bạn". Dùng 1-2 emoji cho sinh động. Tối đa 80 từ. ` +
-            `- Khách khen → cảm ơn chân thành và mời tiếp tục trải nghiệm.` +
-            `- Khách chê/góp ý → xin lỗi ngắn gọn, hứa cải thiện, mời gửi chi tiết qua mục Hỗ trợ trong app.` +
-            `- Khách hỏi giá/khuyến mãi/đặt món → hướng dẫn cụ thể cách đặt trong app CRABOR.` +
-            `- Khách hỏi chuyện/lạc đề → trả lời vui vẻ tự nhiên rồi khéo léo quay về chủ đề bài viết.`,
+            `TÍNH CÁCH: chuyên nghiệp, lịch sự, tận tâm như một nhân viên CSKH thật — xưng "CRABOR" hoặc "em", gọi khách là "anh/chị". ` +
+            `Văn phong trang nhã, rõ ràng, đi thẳng vào vấn đề; tối đa 70 từ; chỉ dùng tối đa 1 emoji nhẹ nhàng. ` +
+            `- Khách khen → cảm ơn anh/chị, mong tiếp tục đồng hành.` +
+            `- Khách chê/góp ý → nhận trách nhiệm chân thành, xin lỗi, đề xuất cụ thể: gửi thông tin đơn qua mục Hỗ trợ trong app để em xử lý ngay trong 30 phút.` +
+            `- Khách hỏi giá/khuyến mãi/cách đặt → hướng dẫn từng bước ngắn gọn trong app CRABOR.` +
+            `- Tuyệt đối KHÔNG trả lời theo mẫu sáo rỗng, KHÔNG lặp lại nguyên câu hỏi, KHÔNG dùng kiểu chữ nhí nhảnh hay nhiều emoji.` +
+            `- Mọi câu đều kết thúc tự nhiên, có thể mời khách nhắn tin trực tiếp để được hỗ trợ chi tiết hơn.`,
         }
       );
       if (result?.canReason && result?.text) aiText = result.text;
@@ -2467,11 +2468,11 @@ app.post("/api/social/posts/:id/comment", async (req, res) => {
     }
     // Fallback cuối
     if (!aiText) {
-      aiText = `Cảm ơn bạn đã quan tâm đến "${banner.title}" 🦀 Đặt ngay trong app CRABOR để nhận ưu đãi nhé!`;
+      aiText = `Cảm ơn anh/chị đã quan tâm đến "${banner.title}". CRABOR luôn sẵn sàng hỗ trợ — anh/chị cần giúp gì thêm cứ nhắn tin cho em nhé!`;
     }
     const aiReply = await SocialComment.create({
       postId: req.params.id,
-      authorName: "Coco AI 🤖",
+      authorName: "CRABOR Official",
       text: String(aiText).slice(0, 800),
       isAI: true,
     });
