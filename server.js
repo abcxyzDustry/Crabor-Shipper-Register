@@ -4545,6 +4545,47 @@ setInterval(async () => {
   } catch (e) { console.error('[AutoCancel] cron lỗi:', e.message); }
 }, 60 * 1000);
 
+// ── RE-DISPATCH DỌN NHÀ: đơn pending chưa có shipper nhận → phát lại mỗi ~90s ──
+// (lúc đặt đơn có thể không có shipper online; khi shipper bật online sau sẽ nhận được)
+const _cleaningRedispatchAt = new Map(); // orderId -> timestamp lần phát gần nhất
+setInterval(async () => {
+  try {
+    const since = new Date(Date.now() - 30 * 60 * 1000);
+    const pending = await CleaningOrder.find({
+      status: 'pending',
+      shipperId: null,
+      createdAt: { $gte: since },
+    }).limit(10);
+    for (const o of pending) {
+      const key = String(o._id);
+      const last = _cleaningRedispatchAt.get(key) || 0;
+      if (Date.now() - last < 90 * 1000) continue;
+      _cleaningRedispatchAt.set(key, Date.now());
+      const shippers = await findCleaningShippers(o.addressLat, o.addressLng, 5, 5);
+      if (!shippers.length) continue;
+      const payload = {
+        type: 'cleaning_request',
+        orderId: o.orderId,
+        order: {
+          _id: o._id, orderId: o.orderId, serviceName: o.serviceName,
+          price: o.price, discount: o.discount || 0,
+          finalTotal: o.finalTotal ?? Math.max(0, (o.price||0) - (o.discount||0)),
+          duration: o.duration, address: o.address,
+          addressLat: o.addressLat, addressLng: o.addressLng,
+          bookingDate: o.bookingDate, bookingTime: o.bookingTime,
+          note: o.note, customerName: o.customerName,
+          customerPhone: o.customerPhone || '',
+        },
+        timeout: 30,
+      };
+      for (const s of shippers) {
+        global._io?.to(`shipper_${s._id}`).emit('order_request', payload);
+      }
+      console.log(`[Cleaning][Re-dispatch] ${o.orderId} → ${shippers.length} shipper`);
+    }
+  } catch (e) { console.error('[Cleaning][Re-dispatch] lỗi:', e.message); }
+}, 60 * 1000);
+
 
 // ── VAY NHANH ────────────────────────────────────────────
 
