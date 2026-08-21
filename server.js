@@ -2362,12 +2362,57 @@ app.get("/api/social/posts/:id/comments", async (req, res) => {
   }
 });
 
+// ── BỘ LỌC TỪ NGỮ XÚC PHẠM cho bình luận mạng xã hội ──
+// Chuẩn hoá: bỏ dấu tiếng Việt, teencode (0→o, 3→e...), chỉ giữ a-z + khoảng trắng
+function _normalizeAbuseText(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d")
+    .replace(/0/g, "o").replace(/1/g, "i").replace(/3/g, "e")
+    .replace(/4/g, "a").replace(/5/g, "s").replace(/7/g, "t")
+    .replace(/8/g, "ate").replace(/\$/g, "s").replace(/@/g, "a")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+const _ABUSE_WORDS = new Set([
+  // Việt Nam (teencode + viết thường không dấu sau chuẩn hoá)
+  "dit", "ditme", "ditcu", "dime", "dmm", "dkm", "dkme", "dme", "dm",
+  "cl", "clmm", "clgt", "vcl", "vl", "cc", "ccc", "cacthi", "catmo", "cuctmo", "cucatmo",
+  "buoi", "lon", "loz", "lozz", "occho", "memay", "chamang", "ngu", "ngok", "dotdot",
+  "xamlon", "sanmat", "daitruong",
+  // Tiếng Anh
+  "fuck", "fuk", "shit", "bitch", "asshole", "bastard", "dick", "pussy", "cunt", "motherfucker",
+]);
+const _ABUSE_PHRASES = [
+  "dit me", "dit me may", "me may", "me m", "cha may", "cha mang",
+  "con cho", "thang cho", "do cho", "suc vat", "do ngu", "ngu nhu",
+  "cat mo", "cu cat mo", "quan cho", "app cho", "khanh cho",
+];
+function containsAbuse(text) {
+  const norm = _normalizeAbuseText(text);
+  if (!norm) return false;
+  const tokens = norm.split(" ");
+  for (const t of tokens) if (_ABUSE_WORDS.has(t)) return true;
+  for (const p of _ABUSE_PHRASES) if (norm.includes(p)) return true;
+  return false;
+}
+
 // POST /api/social/posts/:id/comment — bình luận + Coco AI đọc và trả lời
 app.post("/api/social/posts/:id/comment", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
     const text = String(req.body?.text || "").trim();
     if (!text) return res.status(400).json({ success: false, message: "Thiếu nội dung bình luận" });
+
+    // ── LỌC TỪ NGỮ: phát hiện lăng mạ → xoá/từ chối ngay, không lưu, không AI trả lời ──
+    if (containsAbuse(text)) {
+      return res.status(400).json({
+        success: false,
+        deleted: true,
+        message: "🚫 Bình luận chứa từ ngữ không phù hợp đã bị gỡ. Vui lòng bình luận văn minh bạn nhé!",
+      });
+    }
+
     const banner = await AIBanner.findById(req.params.id).select("title").lean();
     if (!banner) return res.status(404).json({ success: false, message: "Bài viết không tồn tại" });
 
