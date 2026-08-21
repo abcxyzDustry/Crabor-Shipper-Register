@@ -1114,6 +1114,10 @@ const aiBannerSchema = new mongoose.Schema({
   order:       { type: Number, default: 0 },
   clicks:      { type: Number, default: 0 },
   impressions: { type: Number, default: 0 },
+  // Mạng xã hội: tym (bot + user)
+  likes:         { type: Number, default: 0 },
+  likedBy:       { type: [mongoose.Schema.Types.ObjectId], default: [] }, // user đã tym (chống spam)
+  botLikesTarget:{ type: Number },  // mục tiêu tym bot ngẫu nhiên [min,max]
   expiresAt:   Date,
 }, { timestamps: true });
 const AIBanner = mongoose.model("AIBanner", aiBannerSchema);
@@ -2239,6 +2243,7 @@ app.get("/api/social/posts", async (req, res) => {
       ]);
       cmap = Object.fromEntries(agg.map(c => [String(c._id), c.count]));
     }
+    const uid = req.session?.userId ? String(req.session.userId) : null;
     const posts = banners.map(b => ({
       _id: b._id,
       imageUrl: b.imageUrl,
@@ -2251,12 +2256,101 @@ app.get("/api/social/posts", async (req, res) => {
       author: { name: "CRABOR Official", verified: true },
       createdAt: b.createdAt,
       commentCount: cmap[String(b._id)] || 0,
+      likes: b.likes || 0,
+      liked: uid ? (b.likedBy || []).map(String).includes(uid) : false,
     }));
     res.json({ success: true, posts });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// POST /api/social/posts/:id/like — tym / bỏ tym (1 user 1 tym)
+app.post("/api/social/posts/:id/like", async (req, res) => {
+  try {
+    if (!req.session.userId) return res.status(401).json({ success: false, needLogin: true, message: "Đăng nhập để thả tym" });
+    const banner = await AIBanner.findById(req.params.id).select("likes likedBy");
+    if (!banner) return res.status(404).json({ success: false, message: "Bài viết không tồn tại" });
+    const uid = req.session.userId;
+    const already = (banner.likedBy || []).map(String).includes(String(uid));
+    if (already) {
+      await AIBanner.findByIdAndUpdate(banner._id, { $pull: { likedBy: uid }, $inc: { likes: -1 } });
+    } else {
+      await AIBanner.findByIdAndUpdate(banner._id, { $addToSet: { likedBy: uid }, $inc: { likes: 1 } });
+    }
+    const updated = await AIBanner.findById(banner._id).select("likes likedBy").lean();
+    res.json({
+      success: true,
+      liked: !already,
+      likes: Math.max(0, updated.likes || 0),
+      message: already ? "Đã bỏ tym" : "❤️ Đã thả tym",
+    });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── ADMIN: BOT TƯƠNG TÁC — ngẫu nhiên số tym cho bài viết ──────────────
+// GET /api/admin/social/bot — trạng thái bot
+app.get("/api/admin/social/bot", adminAuth, async (req, res) => {
+  try {
+    const enabled = await getConfig("socialBotEnabled", true);
+    const min     = await getConfig("socialBotMinLikes", 50);
+    const max     = await getConfig("socialBotMaxLikes", 500);
+    const [posts, totalAgg] = await Promise.all([
+      AIBanner.countDocuments({ active: true }),
+      AIBanner.aggregate([{ $match: { active: true } }, { $group: { _id: null, total: { $sum: "$likes" } } }]),
+    ]);
+    res.json({ success: true, data: { enabled, min, max, posts, totalLikes: totalAgg[0]?.total || 0 } });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PATCH /api/admin/social/bot — lưu cấu hình + random lại mục tiêu tym cho các bài
+app.patch("/api/admin/social/bot", adminAuth, async (req, res) => {
+  try {
+    const { enabled, min, max } = req.body;
+    if (enabled !== undefined) await setConfig("socialBotEnabled", !!enabled);
+    const curMin = min  !== undefined ? Number(min)  : await getConfig("socialBotMinLikes", 50);
+    const curMax = max  !== undefined ? Number(max)  : await getConfig("socialBotMaxLikes", 500);
+    if (isNaN(curMin) || isNaN(curMax) || curMin < 0 || curMax < curMin)
+      return res.status(400).json({ success: false, message: "Khoảng tym không hợp lệ (cần 0 ≤ min ≤ max)" });
+    await setConfig("socialBotMinLikes", curMin);
+    await setConfig("socialBotMaxLikes", curMax);
+    // Random mục tiêu mới cho từng bài đang chạy
+    const actives = await AIBanner.find({ active: true }).select("_id");
+    for (const b of actives) {
+      const target = curMin + Math.floor(Math.random() * (curMax - curMin + 1));
+      await AIBanner.findByIdAndUpdate(b._id, { botLikesTarget: target });
+    }
+    res.json({ success: true, data: { enabled: await getConfig("socialBotEnabled", true), min: curMin, max: curMax, randomized: actives.length } });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// CRON bot tym: mỗi 3 phút tăng dần về mục tiêu ngẫu nhiên (tự nhiên như người thật)
+setInterval(async () => {
+  try {
+    if (!(await getConfig("socialBotEnabled", true))) return;
+    const min = await getConfig("socialBotMinLikes", 50);
+    const max = await getConfig("socialBotMaxLikes", 500);
+    const actives = await AIBanner.find({ active: true }).select("_id likes botLikesTarget");
+    for (const b of actives) {
+      let target = b.botLikesTarget;
+      if (!target || target < min || target > max) {
+        target = min + Math.floor(Math.random() * (max - min + 1));
+        await AIBanner.findByIdAndUpdate(b._id, { botLikesTarget: target });
+      }
+      if ((b.likes || 0) >= target) continue;
+      // Tăng nhỏ giọt: 1-5 tym mỗi lần quét, không vượt mục tiêu
+      const step = 1 + Math.floor(Math.random() * 5);
+      const newLikes = Math.min(target, (b.likes || 0) + step);
+      await AIBanner.findByIdAndUpdate(b._id, { likes: newLikes });
+    }
+  } catch(e) { console.error("[SocialBot] lỗi:", e.message); }
+}, 3 * 60 * 1000);
 
 // GET /api/social/posts/:id/comments — danh sách bình luận
 app.get("/api/social/posts/:id/comments", async (req, res) => {

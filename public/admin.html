@@ -481,6 +481,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
       <div class="nav-item" onclick="showPage('storage')">
         <span class="ico">🗄️</span> Dung lượng
       </div>
+      <div class="nav-item" onclick="showPage('social')">
+        <span class="ico">🌐</span> Mạng xã hội
+      </div>
       <div class="nav-item" onclick="showPage('settings')">
         <span class="ico">⚙️</span> Cài đặt
       </div>
@@ -1433,6 +1436,62 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           <div style="font-weight:900;margin-bottom:10px">☁️ Cloudinary chi tiết</div>
           <div id="stClDetail" style="font-size:.85rem;line-height:1.9;color:var(--cream)">⏳ Đang tải...</div>
         </div>
+      </div>
+    </section>
+
+    <!-- ── SOCIAL (Mạng xã hội + Bot tương tác) ── -->
+    <section id="pgSocial" class="page-section">
+      <div class="page-header">
+        <div class="page-title">🌐 Mạng xã hội CRABOR</div>
+        <div class="header-actions">
+          <button class="filter-btn" onclick="loadSocialBot()">🔄 Làm mới</button>
+        </div>
+      </div>
+
+      <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px">
+        <div class="panel" style="padding:16px">
+          <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">📰 Bài viết đang chạy</div>
+          <div id="soPosts" style="font-size:1.5rem;font-weight:900;color:var(--cream);margin-top:6px">—</div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:4px">Banner AI active → bài viết trên app customer</div>
+        </div>
+        <div class="panel" style="padding:16px">
+          <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">❤️ Tổng tym hiện tại</div>
+          <div id="soTotalLikes" style="font-size:1.5rem;font-weight:900;color:var(--coral);margin-top:6px">—</div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:4px">Gồm tym bot + tym người dùng thật</div>
+        </div>
+      </div>
+
+      <div class="panel" style="padding:20px;max-width:560px">
+        <div style="font-weight:900;margin-bottom:4px">🤖 Bot tương tác — Tym ngẫu nhiên</div>
+        <div style="font-size:.78rem;color:var(--muted);line-height:1.6;margin-bottom:14px">
+          Bot tự thả tym cho mỗi bài viết, tăng dần nhỏ giọt mỗi 3 phút đến một mức ngẫu nhiên trong khoảng
+          <strong>[min → max]</strong> — nhìn tự nhiên như người thật. Bật/tắt hoặc đổi khoảng sẽ random lại mục tiêu cho toàn bộ bài viết.
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <span style="font-size:.85rem;font-weight:800;color:var(--cream)">Trạng thái bot:</span>
+          <button id="soBotToggle" onclick="toggleSocialBot()" style="border:none;border-radius:50px;padding:8px 18px;font-weight:900;font-size:.8rem;cursor:pointer">—</button>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:140px">
+            <label style="font-size:.75rem;color:var(--muted);display:block;margin-bottom:6px">Tym tối thiểu (min)</label>
+            <input id="soBotMin" type="number" min="0" value="50"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--cream);font-family:var(--font-mono);font-size:.9rem;font-weight:700;outline:none">
+          </div>
+          <div style="flex:1;min-width:140px">
+            <label style="font-size:.75rem;color:var(--muted);display:block;margin-bottom:6px">Tym tối đa (max)</label>
+            <input id="soBotMax" type="number" min="0" value="500"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--cream);font-family:var(--font-mono);font-size:.9rem;font-weight:700;outline:none">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button onclick="saveSocialBot()" style="background:var(--yellow);color:#111;border:none;border-radius:8px;padding:10px 20px;font-weight:900;font-size:.82rem;cursor:pointer">💾 Lưu & Random lại</button>
+          <button onclick="setSocialBotRange(100,1000)" style="background:rgba(240,180,41,.15);color:var(--yellow);border:1px solid rgba(240,180,41,.3);border-radius:8px;padding:10px 14px;font-weight:800;font-size:.78rem;cursor:pointer">Preset 100–1000</button>
+          <button onclick="setSocialBotRange(500,5000)" style="background:rgba(240,180,41,.15);color:var(--yellow);border:1px solid rgba(240,180,41,.3);border-radius:8px;padding:10px 14px;font-weight:800;font-size:.78rem;cursor:pointer">Preset 500–5000</button>
+        </div>
+        <div id="soBotMsg" style="margin-top:10px;font-size:.75rem;color:var(--green);display:none">✅ Đã lưu cấu hình bot</div>
       </div>
     </section>
 
@@ -3095,9 +3154,60 @@ async function loadStorageStats() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//   SOCIAL BOT (Mạng xã hội — bot tym ngẫu nhiên)
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadSocialBot() {
+  try {
+    const r = await apiFetch('/api/admin/social/bot');
+    if (!r || !r.success) throw new Error(r?.message || 'Lỗi');
+    const d = r.data;
+    setText('soPosts', (d.posts ?? 0).toLocaleString('vi-VN'));
+    setText('soTotalLikes', (d.totalLikes ?? 0).toLocaleString('vi-VN'));
+    const minInp = document.getElementById('soBotMin');
+    const maxInp = document.getElementById('soBotMax');
+    if (minInp && document.activeElement !== minInp) minInp.value = d.min ?? 50;
+    if (maxInp && document.activeElement !== maxInp) maxInp.value = d.max ?? 500;
+    const tgl = document.getElementById('soBotToggle');
+    if (tgl) {
+      const on = !!d.enabled;
+      tgl.textContent = on ? '🟢 Đang bật' : '🔴 Đang tắt';
+      tgl.style.background = on ? 'rgba(58,170,92,.2)' : 'rgba(232,80,74,.15)';
+      tgl.style.color = on ? '#3aaa5c' : 'var(--coral)';
+      tgl.style.border = on ? '1px solid rgba(58,170,92,.4)' : '1px solid rgba(232,80,74,.3)';
+    }
+  } catch(e) { showNotif('❌ Lỗi', e.message || 'Không tải được bot', 'coral'); }
+}
+async function saveSocialBot() {
+  const min = parseInt(document.getElementById('soBotMin').value);
+  const max = parseInt(document.getElementById('soBotMax').value);
+  if (isNaN(min) || isNaN(max) || min < 0 || max < min) { showNotif('❌ Lỗi', 'Khoảng tym không hợp lệ', 'coral'); return; }
+  try {
+    const r = await apiFetch('/api/admin/social/bot', 'PATCH', { min, max });
+    if (r.success) {
+      const msg = document.getElementById('soBotMsg');
+      if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display='none', 3000); }
+      showNotif('✅ Đã lưu', `Bot tym: ${min}–${max} · random ${r.data.randomized} bài viết`, 'green');
+      loadSocialBot();
+    }
+  } catch(e) { showNotif('❌ Lỗi', 'Không lưu được', 'coral'); }
+}
+async function toggleSocialBot() {
+  const cur = document.getElementById('soBotToggle')?.textContent.includes('bật');
+  try {
+    const r = await apiFetch('/api/admin/social/bot', 'PATCH', { enabled: !cur });
+    if (r.success) { showNotif(r.data.enabled ? '🟢 Bot đã bật' : '🔴 Bot đã tắt', '', 'green'); loadSocialBot(); }
+  } catch(e) { showNotif('❌ Lỗi', 'Không đổi được trạng thái', 'coral'); }
+}
+function setSocialBotRange(min, max) {
+  document.getElementById('soBotMin').value = min;
+  document.getElementById('soBotMax').value = max;
+  saveSocialBot();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', storage:'pgStorage', settings:'pgSettings', training:'pgTraining' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', featured:'pgFeatured', storage:'pgStorage', social:'pgSocial', settings:'pgSettings', training:'pgTraining' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -3116,6 +3226,7 @@ function showPage(key, ev) {
   if (key === 'banners') loadActiveBanners();
   if (key === 'users') loadCustomers();
   if (key === 'storage') loadStorageStats();
+  if (key === 'social') loadSocialBot();
   if (key === 'dashboard') loadStats();
   if (key === 'finance') loadFinance();
   if (key === 'withdraws') loadWithdraws();
