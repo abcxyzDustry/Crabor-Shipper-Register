@@ -4953,54 +4953,7 @@ setInterval(async () => {
   } catch (e) { console.error('[AutoCancel] cron lỗi:', e.message); }
 }, 60 * 1000);
 
-// ── RE-DISPATCH DỌN NHÀ: đơn pending chưa có shipper nhận → phát lại mỗi ~90s ──
-// (lúc đặt đơn có thể không có shipper online; khi shipper bật online sau sẽ nhận được)
-const _cleaningRedispatchAt = new Map(); // orderId -> timestamp lần phát gần nhất
-setInterval(async () => {
-  try {
-    const since = new Date(Date.now() - 30 * 60 * 1000);
-    const pending = await CleaningOrder.find({
-      status: 'pending',
-      shipperId: null,
-      createdAt: { $gte: since },
-    }).limit(10);
-    for (const o of pending) {
-      const key = String(o._id);
-      const last = _cleaningRedispatchAt.get(key) || 0;
-      if (Date.now() - last < 90 * 1000) continue;
-      _cleaningRedispatchAt.set(key, Date.now());
-      let shippers = await findCleaningShippers(o.addressLat, o.addressLng, 5, 5);
-      // Fallback: không có shipper dọn nhà online → phát cho MỌI shipper online (như lúc đặt đơn)
-      if (!shippers.length) {
-        shippers = await findNearbyShippers(o.addressLat || 21.0285, o.addressLng || 105.8542, 25, 10);
-        console.log(`[Cleaning][Re-dispatch] ${o.orderId}: 0 shipper cleaning-pref → fallback ${shippers.length} shipper online`);
-      }
-      if (!shippers.length) {
-        console.log(`[Cleaning][Re-dispatch] ${o.orderId}: KHÔNG có shipper nào online — bỏ lượt`);
-        continue;
-      }
-      const payload = {
-        type: 'cleaning_request',
-        orderId: o.orderId,
-        order: {
-          _id: o._id, orderId: o.orderId, serviceName: o.serviceName,
-          price: o.price, discount: o.discount || 0,
-          finalTotal: o.finalTotal ?? Math.max(0, (o.price||0) - (o.discount||0)),
-          duration: o.duration, address: o.address,
-          addressLat: o.addressLat, addressLng: o.addressLng,
-          bookingDate: o.bookingDate, bookingTime: o.bookingTime,
-          note: o.note, customerName: o.customerName,
-          customerPhone: o.customerPhone || '',
-        },
-        timeout: 30,
-      };
-      for (const s of shippers) {
-        global._io?.to(`shipper_${s._id}`).emit('order_request', payload);
-      }
-      console.log(`[Cleaning][Re-dispatch] ${o.orderId} → ${shippers.length} shipper`);
-    }
-  } catch (e) { console.error('[Cleaning][Re-dispatch] lỗi:', e.message); }
-}, 60 * 1000);
+// ── RE-DISPATCH DỌN NHÀ đã gộp vào cron AutoDispatch (ping 30s, phía dưới file) ──
 
 // GET /api/admin/cleaning-debug — chẩn đoán vì sao đơn dọn nhà không ghép được shipper
 app.get("/api/admin/cleaning-debug", adminAuth, async (req, res) => {
@@ -5189,7 +5142,10 @@ async function processSePayPayment(payload, ioRef, force = false) {
     }
   }
 
-  console.log(`[SEPAY] Tx: ${rawRef} · ${amount.toLocaleString('vi-VN')}đ`);
+  // Log chi tiết từng giao dịch chỉ khi bật SEPAY_DEBUG=1 (tránh spam log)
+  if (process.env.SEPAY_DEBUG === '1') {
+    console.log(`[SEPAY] Tx: ${rawRef} · ${amount.toLocaleString('vi-VN')}đ`);
+  }
 
   let handled = false;
 
@@ -5503,7 +5459,7 @@ async function processSePayPayment(payload, ioRef, force = false) {
   // Đánh dấu đã xử lý
   if (txId) await SePayTx.updateOne({ txId }, { handled: true, note: handled ? 'matched' : 'unmatched' }).catch(() => {});
 
-  if (!handled) {
+  if (!handled && process.env.SEPAY_DEBUG === '1') {
     console.log(`[SEPAY] Unmatched: ${rawRef} ${amount}đ — logged only`);
   }
 
@@ -5578,12 +5534,14 @@ async function pollSePayTransactions() {
     });
     const list = res?.data?.data;
     if (!Array.isArray(list) || !list.length) return;
+    let fresh = 0, matched = 0;
     for (const tx of list) {
       if (tx.transfer_type !== 'in') continue;
       // Giao dịch đã matched thành công → bỏ qua. Chưa matched → retry (force=true)
       const existing = await SePayTx.findOne({ txId: String(tx.id) }).catch(() => null);
       if (existing && existing.handled && existing.note === 'matched') continue;
-      await processSePayPayment({
+      if (!existing) fresh++;
+      const r = await processSePayPayment({
         id: tx.id,
         content: tx.transaction_content,
         transferAmount: tx.amount_in,
@@ -5591,8 +5549,12 @@ async function pollSePayTransactions() {
         referenceCode: tx.reference_number,
         transactionDate: tx.transaction_date,
       }, null, existing ? true : false);
+      if (r?.handled) matched++;
     }
-    console.log(`[SEPAY] Polled ${list.length} transactions`);
+    // Chỉ log khi có giao dịch mới hoặc có giao dịch được khớp — không spam log
+    if (fresh > 0 || matched > 0) {
+      console.log(`[SEPAY] Poll: ${list.length} tx · ${fresh} mới · ${matched} khớp`);
+    }
   } catch (err) {
     console.error('[SEPAY Poll]', err.message);
   }
@@ -14172,11 +14134,24 @@ setInterval(async () => {
       }).limit(10).lean();
     }
 
-    if (pendingOrders.length === 0 && pendingLaundry.length === 0) return;
+    // ── Cleaning orders (pending, chưa có shipper nhận) ──
+    let pendingCleaning = [];
+    if (mongoose.models.CleaningOrder) {
+      pendingCleaning = await mongoose.models.CleaningOrder.find({
+        status: "pending",
+        shipperId: null,
+        $or: [
+          { dispatchedAt: { $exists: false } },
+          { dispatchedAt: { $lt: retryThreshold } }
+        ]
+      }).limit(10).lean();
+    }
+
+    if (pendingOrders.length === 0 && pendingLaundry.length === 0 && pendingCleaning.length === 0) return;
 
     // Log tổng số socket đang kết nối để debug
     const totalSockets = global._io?.sockets?.sockets?.size || 0;
-    console.log(`[AutoDispatch] Found ${pendingOrders.length} orders + ${pendingLaundry.length} laundry | Total connected sockets: ${totalSockets}`);
+    console.log(`[AutoDispatch] Found ${pendingOrders.length} orders + ${pendingLaundry.length} laundry + ${pendingCleaning.length} cleaning | Total connected sockets: ${totalSockets}`);
 
     for (const order of pendingOrders) {
       // dispatchedAt check handled in query (retry after 35s)
@@ -14297,6 +14272,46 @@ setInterval(async () => {
       } else {
         console.log(`[AutoDispatch] No nearby shipper for laundry order ${order.orderId}`);
       }
+    }
+
+    // ── Cleaning: re-dispatch đơn dọn nhà (ping liên tục như food) ──
+    for (const order of pendingCleaning) {
+      const dispatchLat = order.addressLat || 21.0285;
+      const dispatchLng = order.addressLng || 105.8542;
+      let nearby = await findCleaningShippers(dispatchLat, dispatchLng, 5, 5);
+      if (!nearby.length) nearby = await findNearbyShippers(dispatchLat, dispatchLng, 25, 10);
+      if (nearby.length === 0) {
+        console.log(`[AutoDispatch] No shipper online for cleaning order ${order.orderId}`);
+        continue;
+      }
+      const payload = {
+        type: "cleaning_request",
+        orderId: order.orderId,
+        order: {
+          _id: order._id, orderId: order.orderId, serviceName: order.serviceName,
+          price: order.price, discount: order.discount || 0,
+          finalTotal: order.finalTotal ?? Math.max(0, (order.price || 0) - (order.discount || 0)),
+          duration: order.duration, address: order.address,
+          addressLat: order.addressLat, addressLng: order.addressLng,
+          bookingDate: order.bookingDate, bookingTime: order.bookingTime,
+          note: order.note, customerName: order.customerName,
+          customerPhone: order.customerPhone || "",
+        },
+        timeout: 30,
+      };
+      for (const s of nearby) {
+        const room = `shipper_${s._id}`;
+        global._io?.to(room).emit("order_request", payload);
+        await notifyUser('shipper', s._id, {
+          type: 'new_order', title: '🧹 Đơn dọn nhà mới!',
+          body: `Đơn #${order.orderId?.slice(-6)}`,
+          ref: String(order._id), refModule: 'cleaning',
+        });
+      }
+      await mongoose.models.CleaningOrder.findByIdAndUpdate(order._id, {
+        $set: { dispatchedAt: new Date() }
+      });
+      console.log(`[AutoDispatch] Cleaning emit → ${nearby.length} shipper · order=${order.orderId}`);
     }
   } catch (error) {
     console.error('[AutoDispatch] Error:', error);
@@ -14643,6 +14658,7 @@ const cleaningOrderSchema = new mongoose.Schema({
   },
   statusHistory: [{ status: String, by: String, time: Date }],
   completedAt:   Date,
+  dispatchedAt:  Date,   // lần phát đơn gần nhất (cron AutoDispatch ping lại mỗi 35s)
   rating:        { type: Number, min: 1, max: 5 },
   ratingComment: String,
 }, { timestamps: true });
