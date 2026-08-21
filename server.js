@@ -772,6 +772,9 @@ const shipperSchema = new mongoose.Schema({
   fcmToken:    { type: String },
   tier:        { type: String, default: 'bronze' },
   preferences: { type: mongoose.Schema.Types.Mixed, default: {} },
+  // Loại tài khoản: 'shipper' = nhận giao hàng + xe công nghệ + giặt là;
+  // 'cleaning' = chỉ nhận dọn nhà (đăng ký qua form dọn nhà)
+  workType:    { type: String, enum: ['shipper', 'cleaning'], default: 'shipper' },
   // Theo dõi thời gian online (real-time) — cho nhiệm vụ, cấp bậc, chính sách đảm bảo thu nhập
   onlineAt:           { type: Date },            // thời điểm bật online gần nhất
   onlineSecondsToday: { type: Number, default: 0 },
@@ -7848,13 +7851,17 @@ app.post("/api/shipper/register", async (req, res) => {
     const plan = ebCount < ebMax ? "early_bird" : "standard";
 
     const documents = await uploadImageFields(req.body.documents || {}, "docs");
+    // workType: tick "đăng ký dọn nhà" lúc đăng ký → tài khoản CHỈ NHẬN DỌN NHÀ;
+    // đăng ký shipper thường → tự động bật cả 3 module (đồ ăn, giặt là, xe công nghệ)
+    const isCleaningAccount = req.body.cleaningRegistered === true;
     const shipper = await Shipper.create({
       phone, firstName, lastName, email, dob, address, district, vehicle,
       plan, fee: plan === "early_bird" ? 500000 : 700000,
       status: "pending", documents,
-      preferences: req.body.cleaningRegistered
-        ? { acceptFood: true, acceptLaundry: true, acceptRide: true, acceptCleaning: true, cleaningRegistered: true }
-        : undefined,
+      workType: isCleaningAccount ? "cleaning" : "shipper",
+      preferences: isCleaningAccount
+        ? { acceptFood: false, acceptLaundry: false, acceptRide: false, acceptCleaning: true, cleaningRegistered: true }
+        : { acceptFood: true, acceptLaundry: true, acceptRide: true, acceptCleaning: false },
     });
 
     // SMS xác nhận
@@ -11467,7 +11474,14 @@ async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5, requireLaun
     online: true,
     isAccepting: true,
   };
-  if (requireLaundry) query["preferences.acceptLaundry"] = true;
+  if (requireLaundry) {
+    query["preferences.acceptLaundry"] = true;
+    // Tài khoản chỉ đăng ký Dọn nhà → không nhận giặt là
+    query.workType = { $ne: "cleaning" };
+  } else if (!requireCleaning) {
+    // Food / Ride / mặc định: loại tài khoản chỉ đăng ký Dọn nhà
+    query.workType = { $ne: "cleaning" };
+  }
   if (requireCleaning) query["$or"] = [
     { "preferences.acceptCleaning": true },
     { "preferences.cleaningRegistered": true },
@@ -12580,21 +12594,31 @@ app.post("/api/shipper/preferences", async (req, res) => {
     await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập shipper' });
     const { acceptFood, acceptLaundry, acceptRide, acceptCleaning } = req.body;
-    
+
+    const me = await Shipper.findById(req.session.shipperId).select('workType').lean();
+    const isCleaning = me?.workType === 'cleaning';
+
     const shipper = await Shipper.findByIdAndUpdate(
       req.session.shipperId,
-      { $set: { 
-        'preferences.acceptFood': acceptFood !== false, 
-        'preferences.acceptLaundry': acceptLaundry !== false, 
-        'preferences.acceptRide': acceptRide !== false, 
-        'preferences.acceptCleaning': acceptCleaning === true 
+      { $set: isCleaning ? {
+        // Tài khoản Dọn nhà: khoá cứng chỉ nhận dọn nhà
+        'preferences.acceptFood': false,
+        'preferences.acceptLaundry': false,
+        'preferences.acceptRide': false,
+        'preferences.acceptCleaning': true,
+      } : {
+        'preferences.acceptFood': acceptFood !== false,
+        'preferences.acceptLaundry': acceptLaundry !== false,
+        'preferences.acceptRide': acceptRide !== false,
+        'preferences.acceptCleaning': acceptCleaning === true,
       }},
       { new: true }
-    ).select('preferences');
-    
+    ).select('preferences workType');
+
     const prefs = shipper?.preferences || {};
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
+      workType: shipper?.workType || 'shipper',
       preferences: {
         acceptFood: prefs.acceptFood !== false,
         acceptLaundry: prefs.acceptLaundry !== false,
@@ -12611,16 +12635,18 @@ app.get("/api/shipper/preferences", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập shipper' });
-    const shipper = await Shipper.findById(req.session.shipperId).select('preferences');
+    const shipper = await Shipper.findById(req.session.shipperId).select('preferences workType');
     const prefs = shipper?.preferences || {};
-    res.json({ 
-      success: true, 
+    const isCleaning = shipper?.workType === 'cleaning';
+    res.json({
+      success: true,
+      workType: shipper?.workType || 'shipper',
       preferences: {
-        acceptFood: prefs.acceptFood !== false,
-        acceptLaundry: prefs.acceptLaundry !== false,
-        acceptRide: prefs.acceptRide !== false,
-        acceptCleaning: prefs.acceptCleaning === true,
-        cleaningRegistered: !!prefs.cleaningRegistered,
+        acceptFood:  isCleaning ? false : prefs.acceptFood !== false,
+        acceptLaundry: isCleaning ? false : prefs.acceptLaundry !== false,
+        acceptRide:  isCleaning ? false : prefs.acceptRide !== false,
+        acceptCleaning: isCleaning ? true : prefs.acceptCleaning === true,
+        cleaningRegistered: isCleaning || !!prefs.cleaningRegistered,
       }
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
