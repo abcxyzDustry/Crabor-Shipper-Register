@@ -66,9 +66,17 @@ export const authEither = (req, res, next) => {
   }
 };
 
-// Middleware xác thực ADMIN — JWT thật (thay cho kiểu secret tĩnh cũ)
+// Middleware xác thực ADMIN — JWT hoặc x-admin-key từ CRABOR admin
 export const authAdmin = (req, res, next) => {
   try {
+    // Nhận x-admin-key từ CRABOR admin (iframe nhúng)
+    const craborKey = req.headers['x-admin-key'];
+    const validKey = process.env.ADMIN_SECRET_KEY || 'crabor-admin-secret-2025';
+    if (craborKey === validKey) {
+      req.adminId = 'crabor_admin';
+      return next();
+    }
+
     const header = req.headers.authorization || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });

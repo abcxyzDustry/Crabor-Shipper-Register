@@ -137,8 +137,8 @@ tr:hover td{background:rgba(22,163,74,.04)}
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="loginScreen">
+<!-- LOGIN (bỏ qua — tự động xác thực qua CRABOR x-admin-key) -->
+<div id="loginScreen" style="display:none">
   <div class="login-card">
     <div class="login-logo">hocho<span>.com</span></div>
     <div class="login-sub">🔐 Admin Dashboard · Đăng nhập</div>
@@ -149,8 +149,8 @@ tr:hover td{background:rgba(22,163,74,.04)}
   </div>
 </div>
 
-<!-- APP (hidden until login) -->
-<div id="appWrap" style="display:none;flex-direction:column;min-height:100vh">
+<!-- APP (auto-show — không cần login) -->
+<div id="appWrap" style="flex-direction:column;min-height:100vh">
 
   <!-- TOPBAR -->
   <div class="topbar">
@@ -284,7 +284,8 @@ tr:hover td{background:rgba(22,163,74,.04)}
 
 <script>
 const API_BASE = '';
-let ADMIN_TOKEN = localStorage.getItem('hocho_admin_token') || null;
+const ADMIN_KEY = 'crabor-admin-secret-2025';
+let ADMIN_TOKEN = 'crabor-admin-key'; // tự động xác thực qua key
 let allPartners = [], allOrders = [];
 
 // ── LOGIN ──
@@ -325,6 +326,13 @@ function enterApp() {
   loadDashboard();
 }
 
+// Bỏ login — tự động vào dashboard
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appWrap').style.display = 'flex';
+  loadDashboard();
+});
+
 function logout() {
   ADMIN_TOKEN = null;
   localStorage.removeItem('hocho_admin_token');
@@ -346,25 +354,11 @@ async function changePassword() {
   } catch (e) {}
 }
 
-// Tự vào thẳng dashboard nếu trình duyệt còn lưu token hợp lệ từ trước
-window.addEventListener('DOMContentLoaded', async () => {
-  if (!ADMIN_TOKEN) return;
-  try {
-    const res = await fetch(`${API_BASE}/api/hocho/admin/dashboard`, { headers: { Authorization: 'Bearer ' + ADMIN_TOKEN } });
-    if (res.ok) enterApp();
-    else { ADMIN_TOKEN = null; localStorage.removeItem('hocho_admin_token'); }
-  } catch (e) {}
-});
-
 async function adminFetch(url, opts={}) {
   const res = await fetch(url, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_TOKEN, ...(opts.headers||{}) }
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY, ...(opts.headers||{}) }
   });
-  if (res.status === 401 || res.status === 403) {
-    logout();
-    throw new Error('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
-  }
   return res.json();
 }
 
