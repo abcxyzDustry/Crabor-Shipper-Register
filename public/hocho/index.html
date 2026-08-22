@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HoCho.com — Hỗ trợ sinh viên ốm đau #1 Việt Nam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#16a34a;--green2:#15803d;--lime:#4d7c0f;--bg:#fafaf9;--card:#ffffff;--border:rgba(15,23,42,.08);--cream:#0f172a;--muted:rgba(15,23,42,.56);--coral:#E8504A;--gold:#F0B429;--font:'Plus Jakarta Sans',sans-serif;--mono:'JetBrains Mono',monospace}
+body{font-family:var(--font);background:var(--bg);color:var(--cream);overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(21,128,61,.05) 0%,transparent 70%),radial-gradient(ellipse 50% 35% at 90% 90%,rgba(21,128,61,.04) 0%,transparent 70%);pointer-events:none;z-index:0}
+section{position:relative;z-index:1}
+nav{position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);background:rgba(250,250,249,.85);border-bottom:1px solid var(--border);padding:0 24px}
+.nav-inner{max-width:1100px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-icon{width:38px;height:38px;background:linear-gradient(135deg,var(--green),var(--lime));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900;color:#fff;font-family:var(--mono)}
+.logo-text{font-weight:800;font-size:1.4rem;color:var(--cream)}.logo-dot{color:var(--lime)}
+.nav-links{display:flex;gap:24px;align-items:center}
+.nav-links a{color:var(--muted);text-decoration:none;font-weight:700;font-size:.9rem;transition:.2s}
+.nav-links a:hover{color:var(--cream)}
+.btn-nav{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;border:none;border-radius:50px;padding:9px 22px;font-family:var(--font);font-weight:800;font-size:.88rem;cursor:pointer;text-decoration:none;transition:.2s}
+.btn-nav:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(22,163,74,.4)}
+.hero{padding:72px 24px 40px}
+.hero-inner{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;text-align:left}
+@media(max-width:860px){.hero-inner{grid-template-columns:1fr;text-align:center}}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(22,163,74,.1);border:1px solid rgba(22,163,74,.25);border-radius:50px;padding:8px 18px;font-size:.78rem;font-weight:700;color:var(--lime);margin-bottom:24px;letter-spacing:.3px}
+.hero h1{font-weight:800;font-size:clamp(2.3rem,4.6vw,3.4rem);line-height:1.15;margin-bottom:20px;letter-spacing:-.02em}
+.hero h1 span{color:var(--green)}
+.hero p{font-size:1.05rem;color:var(--muted);line-height:1.7;margin-bottom:28px;font-weight:500;max-width:520px}
+@media(max-width:860px){.hero p{margin-left:auto;margin-right:auto}}
+.hero-btns{display:flex;gap:14px;flex-wrap:wrap}
+@media(max-width:860px){.hero-btns{justify-content:center}}
+.hero-checks{display:flex;gap:20px;flex-wrap:wrap;margin-top:28px}
+@media(max-width:860px){.hero-checks{justify-content:center}}
+.hero-checks span{font-size:.85rem;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.hero-checks span::before{content:'✓';color:var(--green);font-weight:800}
+.hero-visual{position:relative}
+.hero-visual img{width:100%;height:auto;border-radius:24px;box-shadow:0 30px 60px -20px rgba(15,23,42,.25);display:block}
+.hero-visual::after{content:'';position:absolute;inset:16px -16px -16px 16px;border:1px solid var(--border);border-radius:24px;z-index:-1}
+.btn-primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;border:none;border-radius:16px;padding:16px 36px;font-size:1.05rem;font-weight:900;cursor:pointer;text-decoration:none;display:inline-block;transition:.2s;box-shadow:0 4px 24px rgba(22,163,74,.35)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(22,163,74,.5)}
+.btn-outline{background:transparent;color:var(--cream);border:1.5px solid rgba(15,23,42,.22);border-radius:16px;padding:16px 36px;font-size:1.05rem;font-weight:800;cursor:pointer;text-decoration:none;display:inline-block;transition:.2s}
+.btn-outline:hover{border-color:var(--lime);color:var(--lime)}
+.section-title{text-align:center;font-weight:800;font-size:clamp(1.8rem,4vw,2.6rem);margin-bottom:12px}
+.section-sub{text-align:center;color:var(--muted);font-size:1rem;font-weight:600;margin-bottom:48px}
+.how-section{padding:80px 24px}
+.how-inner{max-width:1000px;margin:0 auto}
+.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px}
+.step-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 24px;position:relative;overflow:hidden;transition:.3s}
+.step-card:hover{transform:translateY(-4px);border-color:rgba(132,204,22,.3)}
+.step-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--green),var(--lime))}
+.step-num{font-weight:800;font-size:2.5rem;color:rgba(132,204,22,.2);margin-bottom:12px}
+.step-icon{font-size:2rem;margin-bottom:12px;display:block}
+.step-title{font-weight:900;font-size:1rem;margin-bottom:8px}
+.step-desc{font-size:.85rem;color:var(--muted);line-height:1.6}
+.pricing-section{padding:80px 24px;background:rgba(22,163,74,.04)}
+.pricing-inner{max-width:800px;margin:0 auto}
+.price-card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:36px;text-align:center;position:relative;overflow:hidden}
+.price-tag{font-weight:800;font-size:3.5rem;color:var(--green)}
+.price-desc{font-size:1rem;color:var(--muted);font-weight:700;margin:8px 0 24px}
+.fee-breakdown{background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.2);border-radius:14px;padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+.fee-item{text-align:center}
+.fee-item .fee-val{font-weight:800;font-size:1.5rem;color:var(--green)}
+.fee-item .fee-lbl{font-size:.75rem;color:var(--muted);font-weight:700;margin-top:2px}
+.why-section{padding:80px 24px}
+.why-inner{max-width:1000px;margin:0 auto}
+.why-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+.why-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;display:flex;gap:16px;align-items:flex-start;transition:.3s}
+.why-card:hover{border-color:rgba(132,204,22,.25);transform:translateY(-2px)}
+.why-icon{font-size:1.8rem;flex-shrink:0;width:48px;height:48px;background:rgba(22,163,74,.12);border-radius:12px;display:flex;align-items:center;justify-content:center}
+.why-title{font-weight:900;margin-bottom:6px;font-size:.95rem}
+.why-desc{font-size:.83rem;color:var(--muted);line-height:1.6}
+.terms-section{padding:80px 24px;background:rgba(22,163,74,.02)}
+.terms-inner{max-width:900px;margin:0 auto}
+.terms-card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:36px}
+.terms-card h3{font-weight:800;font-size:1.4rem;color:var(--lime);margin:24px 0 12px}
+.terms-card h3:first-child{margin-top:0}
+.terms-card p{color:var(--muted);font-size:.92rem;line-height:1.8;font-weight:600}
+.terms-card ul{list-style:none;padding:0}
+.terms-card ul li{color:var(--muted);font-size:.9rem;line-height:1.7;padding:6px 0;padding-left:24px;position:relative;font-weight:600}
+.terms-card ul li::before{content:'✓';position:absolute;left:0;color:var(--lime);font-weight:900}
+.download-section{padding:80px 24px;background:rgba(22,163,74,.04)}
+.download-inner{max-width:800px;margin:0 auto;text-align:center}
+.download-grid{display:grid;grid-template-columns:1fr;gap:24px;max-width:400px;margin:0 auto}
+.download-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;text-align:center;transition:.3s}
+.download-card:hover{transform:translateY(-4px);border-color:rgba(132,204,22,.3)}
+.download-icon{font-size:3rem;margin-bottom:12px;display:block}
+.download-title{font-weight:900;font-size:1.2rem;margin-bottom:8px}
+.download-desc{font-size:.88rem;color:var(--muted);font-weight:600;line-height:1.5;margin-bottom:20px}
+.cta-section{padding:100px 24px;text-align:center}
+.cta-inner{max-width:600px;margin:0 auto}
+.cta-section h2{font-weight:800;font-size:clamp(1.8rem,4vw,2.6rem);margin-bottom:16px}
+.cta-section p{color:var(--muted);font-size:1rem;font-weight:600;line-height:1.7;margin-bottom:32px}
+footer{padding:48px 24px;border-top:1px solid var(--border);text-align:center}
+.footer-logo{font-weight:800;font-size:1.6rem;margin-bottom:8px}
+.footer-links{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin:16px 0}
+.footer-links a{color:var(--muted);text-decoration:none;font-size:.85rem;font-weight:700;transition:.2s}
+.footer-links a:hover{color:var(--lime)}
+.footer-copy{font-size:.8rem;color:var(--muted);font-weight:600;margin-top:12px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="/" class="logo"><span class="logo-icon">HC</span><span class="logo-text">hocho<span class="logo-dot">.</span>com</span></a>
+    <div class="nav-links">
+      <a href="#how">Cách hoạt động</a>
+      <a href="#pricing">Giá</a>
+      <a href="#terms">Điều khoản</a>
+      <a href="partner.html">Trở thành đối tác</a>
+      <a href="https://play.google.com/store/apps/details?id=com.hocho.customer" class="btn-nav" target="_blank">Tải app</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-badge">🎓 Dịch vụ hỗ trợ sinh viên ốm đau #1</div>
+      <h1>Bạn ốm? <span>Chúng tôi đến lớp thay bạn.</span></h1>
+      <p>Không bỏ lỡ bài giảng dù bạn đang nằm viện hay gặp lý do bất khả kháng. Đặt dịch vụ ghi chép và hỗ trợ học tập trong 30 giây — có người giúp bạn trong 5 phút.</p>
+      <div class="hero-btns">
+        <a href="https://play.google.com/store/apps/details?id=com.hocho.customer" class="btn-primary" target="_blank">📲 Tải app trên Google Play</a>
+        <a href="#how" class="btn-outline">Tìm hiểu thêm</a>
+      </div>
+      <div class="hero-checks">
+        <span>Hoàn tiền 100% nếu không có đối tác</span>
+        <span>50+ trường đại học</span>
+        <span>Hỗ trợ 24/7</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <img src="hero-photo.png" alt="HoCho - Hỗ trợ sinh viên" onerror="this.style.display='none'">
+    </div>
+  </div>
+</section>
+
+<section class="how-section" id="how">
+  <div class="how-inner">
+    <div class="section-title">Cách hoạt động</div>
+    <div class="section-sub">Chỉ 3 bước — nhanh hơn pha mì</div>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <span class="step-icon">🤧</span>
+        <div class="step-title">Bạn bị ốm / gặp lý do bất khả kháng</div>
+        <div class="step-desc">Nhập thông tin: trường, toà nhà, tầng, số phòng. Mô tả lý do (ốm, tai nạn, việc gia đình đột xuất) để chúng tôi hiểu và hỗ trợ.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <span class="step-icon">💳</span>
+        <div class="step-title">Thanh toán 200.000đ qua QR</div>
+        <div class="step-desc">Quét mã SePay, chuyển khoản nhanh chóng. Bấm "Đã thanh toán" và admin sẽ xác nhận trong vài phút.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <span class="step-icon">🎓</span>
+        <div class="step-title">Đối tác đến lớp thay bạn</div>
+        <div class="step-desc">Hệ thống tự tìm đối tác gần bạn nhất trong 5 phút. Đối tác ghi chép bài, chụp ảnh bảng, gửi bạn qua chat trong app.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pricing-section" id="pricing">
+  <div class="pricing-inner">
+    <div class="section-title">Giá dịch vụ</div>
+    <div class="section-sub">Cố định, minh bạch — không phí ẩn</div>
+    <div class="price-card">
+      <div class="price-tag">200.000đ</div>
+      <div class="price-desc">mỗi buổi hỗ trợ (tối đa 2 giờ)</div>
+      <div class="fee-breakdown">
+        <div class="fee-item"><div class="fee-val">140.000đ</div><div class="fee-lbl">Đối tác nhận (70%)</div></div>
+        <div class="fee-item"><div class="fee-val">60.000đ</div><div class="fee-lbl">Nền tảng giữ lại (30%)</div></div>
+      </div>
+      <a href="https://play.google.com/store/apps/details?id=com.hocho.customer" class="btn-primary" target="_blank">📲 Tải app để đặt ngay</a>
+    </div>
+  </div>
+</section>
+
+<section class="why-section">
+  <div class="why-inner">
+    <div class="section-title">Tại sao chọn hocho?</div>
+    <div class="section-sub">Dịch vụ nhân văn đầu tiên cho sinh viên Việt Nam</div>
+    <div class="why-grid">
+      <div class="why-card"><div class="why-icon">⚡</div><div><div class="why-title">Nhanh 5 phút</div><div class="why-desc">Đối tác gần bạn nhất được ghép tự động theo vị trí GPS trong bán kính 5km.</div></div></div>
+      <div class="why-card"><div class="why-icon">🔒</div><div><div class="why-title">Xác minh sinh viên</div><div class="why-desc">Yêu cầu ảnh thẻ sinh viên khi đặt đơn, đảm bảo dịch vụ chỉ dành cho sinh viên thật.</div></div></div>
+      <div class="why-card"><div class="why-icon">💬</div><div><div class="why-title">Chat trực tiếp</div><div class="why-desc">Nhắn tin với đối tác ngay trong app — gửi ảnh bài giảng, ghi chép, trao đổi trực tiếp.</div></div></div>
+      <div class="why-card"><div class="why-icon">⭐</div><div><div class="why-title">Hệ thống đánh giá</div><div class="why-desc">Cả khách và đối tác đều đánh giá sau mỗi đơn, đảm bảo chất lượng dịch vụ.</div></div></div>
+      <div class="why-card"><div class="why-icon">🔄</div><div><div class="why-title">Hoàn tiền dễ dàng</div><div class="why-desc">Huỷ đơn trước khi đối tác nhận? Tiền hoàn vào ví hocho dùng cho lần sau.</div></div></div>
+      <div class="why-card"><div class="why-icon">🤖</div><div><div class="why-title">Chatbot AI hỗ trợ</div><div class="why-desc">Trợ lý AI tích hợp trả lời mọi câu hỏi về dịch vụ 24/7 ngay trong app.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="terms-section" id="terms">
+  <div class="terms-inner">
+    <div class="section-title">Điều khoản dịch vụ</div>
+    <div class="section-sub">Minh bạch, rõ ràng — bảo vệ cả khách và đối tác</div>
+    <div class="terms-card">
+      <h3>1. Dịch vụ cung cấp</h3>
+      <p>hocho là nền tảng kết nối sinh viên cần hỗ trợ học tập với đối tác. Dịch vụ bao gồm: ghi chép bài giảng, chụp ảnh bảng, tổng hợp tài liệu lớp học cho sinh viên không thể đến trường.</p>
+      <h3>2. Điều kiện sử dụng</h3>
+      <ul>
+        <li>Chỉ sử dụng khi có lý do chính đáng: ốm đau, tai nạn, việc gia đình, bất khả kháng</li>
+        <li>Cung cấp ảnh thẻ sinh viên để xác minh</li>
+        <li>Thanh toán đầy đủ trước khi được ghép đối tác</li>
+      </ul>
+      <h3>3. Giá và thanh toán</h3>
+      <ul>
+        <li>Phí dịch vụ: 200.000đ/buổi (tối đa 2 giờ)</li>
+        <li>Thanh toán qua SePay QR — chuyển khoản nhanh</li>
+        <li>Hoàn tiền 100% vào ví nếu không tìm được đối tác</li>
+      </ul>
+      <h3>4. Lưu ý quan trọng</h3>
+      <p>hocho <strong>không</strong> cung cấp dịch vụ làm bài tập hộ hoặc thi hộ. Đây là vi phạm quy chế đào tạo. Nền tảng chỉ hỗ trợ sinh viên gặp khó khăn tiếp cận bài giảng.</p>
+      <h3>5. Hoàn tiền</h3>
+      <ul>
+        <li>Hoàn 100% nếu đối tác không thể thực hiện</li>
+        <li>Hoàn 50% nếu huỷ sau khi đối tác đã nhận</li>
+        <li>Không hoàn nếu đã nhận tài liệu</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="download-section" id="download">
+  <div class="download-inner">
+    <div class="section-title">📲 Tải ứng dụng hocho</div>
+    <div class="section-sub">Có mặt trên Google Play — cài đặt chỉ trong 30 giây</div>
+    <div class="download-grid">
+      <div class="download-card">
+        <span class="download-icon">🎓</span>
+        <div class="download-title">App Khách hàng</div>
+        <div class="download-desc">Đặt dịch vụ hỗ trợ khi ốm đau, theo dõi đơn, chat với đối tác, đánh giá sau mỗi lần.</div>
+        <a href="https://play.google.com/store/apps/details?id=com.hocho.customer" target="_blank">
+          <img src="https://play.google.com/intl/en_us/badges/static/images/badges/vi_badge_web_generic.png" alt="Tải trên Google Play" style="height:54px;display:block;margin:0 auto">
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <div class="cta-inner">
+    <h2>Sẵn sàng được giúp đỡ?</h2>
+    <p>Dù bạn ốm đau hay gặp khó khăn — hocho có mặt tại hơn 50 trường đại học trên cả nước.</p>
+    <div class="hero-btns" style="justify-content:center">
+      <a href="https://play.google.com/store/apps/details?id=com.hocho.customer" class="btn-primary" target="_blank">📲 Tải app ngay</a>
+      <a href="partner.html" class="btn-outline">💼 Trở thành đối tác</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">hocho<span class="logo-dot">.</span>com</div>
+  <div style="font-size:.85rem;color:var(--muted);font-weight:600;margin-bottom:12px">Dịch vụ hỗ trợ sinh viên ốm đau #1 Việt Nam</div>
+  <div class="footer-links">
+    <a href="/">Trang chủ</a>
+    <a href="partner.html">Trở thành đối tác</a>
+    <a href="admin.html">Quản trị</a>
+    <a href="#terms">Điều khoản</a>
+  </div>
+  <div class="footer-copy">© 2026 hocho · Hỗ trợ sinh viên — Nhân văn và trách nhiệm 💚</div>
+</footer>
+
+</body>
+</html>

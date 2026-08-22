@@ -199,7 +199,7 @@ router.get('/status', authCustomer, async (req, res) => {
     const { order_id } = req.query;
     if (!order_id) return res.status(400).json({ success: false, message: 'Thiếu order_id' });
 
-    const order = await Order.findById(order_id).populate('partner_id', 'full_name phone rating completed_orders personality_tags avatar_url');
+    const order = await Order.findById(order_id).populate('partner_id', 'full_name phone rating completed_orders personality_tags avatar_url latitude longitude');
     if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn' });
 
     res.json({
@@ -207,13 +207,16 @@ router.get('/status', authCustomer, async (req, res) => {
       data: {
         id: order._id, order_code: order.order_code, status: order.status,
         payment_status: order.payment_status,
-        university: order.university, building: order.building, floor: order.floor, room_number: order.room_number,
+        university: order.university, class_name: order.class_name,
+        building: order.building, floor: order.floor, room_number: order.room_number,
         requirements: order.requirements, gender_needed: order.gender_needed,
         price: order.price, chat_active: order.chat_active,
+        location: order.location || null,
         partner: order.partner_id ? {
           id: order.partner_id._id, full_name: order.partner_id.full_name, phone: order.partner_id.phone,
           rating: order.partner_id.rating, completed_orders: order.partner_id.completed_orders,
-          personality_tags: order.partner_id.personality_tags, avatar_url: order.partner_id.avatar_url
+          personality_tags: order.partner_id.personality_tags, avatar_url: order.partner_id.avatar_url,
+          latitude: order.partner_id.latitude ?? null, longitude: order.partner_id.longitude ?? null
         } : null,
         matched_at: order.matched_at, heading_at: order.heading_at, arrived_at: order.arrived_at,
         started_at: order.started_at, completed_at: order.completed_at
