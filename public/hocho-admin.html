@@ -173,7 +173,6 @@ tr:hover td{background:rgba(22,163,74,.04)}
       <div class="nav-item" onclick="showPage('partners')" id="nav-partners"><span class="nav-icon">👥</span> Đối tác</div>
       <div class="nav-item" onclick="showPage('customers')" id="nav-customers"><span class="nav-icon">🎓</span> Khách hàng</div>
       <div class="nav-item" onclick="showPage('orders')" id="nav-orders"><span class="nav-icon">📚</span> Đơn hàng</div>
-      <div class="nav-item" onclick="showPage('order-payments')" id="nav-order-payments"><span class="nav-icon">🏦</span> Xác nhận CK đơn <span class="nav-badge" id="orderPayBadge" style="display:none">0</span></div>
       <div class="nav-item" onclick="showPage('payments')" id="nav-payments"><span class="nav-icon">💰</span> Thanh toán ĐK</div>
       <div class="nav-item" onclick="showPage('earnings')" id="nav-earnings"><span class="nav-icon">💵</span> Thu nhập chờ duyệt</div>
       <div class="nav-item" onclick="showPage('withdrawals')" id="nav-withdrawals"><span class="nav-icon">🏧</span> Rút tiền <span class="nav-badge" id="withdrawBadge" style="display:none">0</span></div>
@@ -251,14 +250,6 @@ tr:hover td{background:rgba(22,163,74,.04)}
         <div class="page-title" style="font-size:1.2rem;margin-top:8px">Số dư đối tác</div>
         <div class="page-sub">Số dư chưa rút của từng đối tác active</div>
         <div id="balanceList"><div class="loading"><div class="spinner"></div>Đang tải...</div></div>
-      </div>
-
-      <!-- ORDER PAYMENTS -->
-      <div class="page" id="page-order-payments">
-        <div class="page-title">Xác nhận chuyển khoản đơn hàng</div>
-        <div class="page-sub">Khách đã bấm "Đã thanh toán" — kiểm tra đúng đã nhận tiền trong tài khoản ngân hàng SePay rồi mới xác nhận. Đơn CHỈ hiện cho đối tác sau khi bạn xác nhận ở đây.</div>
-        <div id="orderPaymentsActions" style="margin-bottom:14px"></div>
-        <div id="orderPaymentsList"><div class="loading"><div class="spinner"></div>Đang tải...</div></div>
       </div>
 
       <!-- PAYMENTS -->
@@ -380,7 +371,6 @@ function loadCurrentPage() {
     partners: () => loadPartners(''),
     customers: loadCustomers,
     orders: () => loadOrders(''),
-    'order-payments': loadOrderPayments,
     payments: loadPayments,
     earnings: loadEarnings,
     withdrawals: () => loadWithdrawals(''),
@@ -401,10 +391,6 @@ async function loadDashboard() {
     if (withdrawals.pending_count > 0) {
       document.getElementById('withdrawBadge').textContent = withdrawals.pending_count;
       document.getElementById('withdrawBadge').style.display = 'inline';
-    }
-    if (orders.waiting > 0) {
-      document.getElementById('orderPayBadge').textContent = orders.waiting;
-      document.getElementById('orderPayBadge').style.display = 'inline';
     }
 
     document.getElementById('statsGrid').innerHTML = `
@@ -647,61 +633,6 @@ async function loadPayments() {
       </div>
     </div>`;
   } catch(e) { document.getElementById('paymentsList').innerHTML = '<div class="loading">❌ Lỗi</div>'; }
-}
-
-// ── XÁC NHẬN CK ĐƠN HÀNG ──
-async function loadOrderPayments() {
-  document.getElementById('orderPaymentsList').innerHTML = '<div class="loading"><div class="spinner"></div>Đang tải...</div>';
-  document.getElementById('orderPaymentsActions').innerHTML = '';
-  try {
-    const d = await adminFetch(`${API_BASE}/api/hocho/admin/pending-order-payments`);
-    if (!d.success) return;
-    if (!d.data.length) { document.getElementById('orderPaymentsList').innerHTML = '<div class="loading">✅ Không có đơn nào chờ xác nhận CK</div>'; return; }
-
-    document.getElementById('orderPaymentsActions').innerHTML = `<button class="btn-confirm" onclick="confirmAllOrderPayments()">✓ Xác nhận tất cả (${d.data.length} đơn)</button>`;
-
-    document.getElementById('orderPaymentsList').innerHTML = `
-    <div class="table-wrap">
-      <div class="table-header">
-        <div class="table-title">🏦 Đơn chờ xác nhận chuyển khoản</div>
-        <div class="table-count">${d.data.length} đơn</div>
-      </div>
-      <div style="overflow-x:auto">
-      <table>
-        <thead><tr><th>Mã đơn</th><th>Khách</th><th>SĐT</th><th>Trường/Phòng</th><th>Số tiền CK</th><th>Khách bấm lúc</th><th>Hành động</th></tr></thead>
-        <tbody>
-          ${d.data.map(o => `
-            <tr>
-              <td class="mono">${o.order_code||''}</td>
-              <td style="font-weight:900">${o.customer_name||''}</td>
-              <td class="mono">${o.customer_phone||''}</td>
-              <td style="font-size:.8rem">${o.university||''} · P${o.room_number||''}</td>
-              <td style="color:var(--lime);font-weight:900">${fmtMoney((o.price||200000)-(o.wallet_applied||0))}</td>
-              <td style="font-size:.78rem;color:var(--muted)">${fmtDate(o.payment_claimed_at)}</td>
-              <td><button class="btn-approve" onclick="confirmOrderPayment('${o._id}')">✓ Đã nhận tiền</button></td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-      </div>
-    </div>`;
-  } catch(e) { document.getElementById('orderPaymentsList').innerHTML = '<div class="loading">❌ Lỗi tải dữ liệu</div>'; }
-}
-
-async function confirmOrderPayment(orderId) {
-  try {
-    const d = await adminFetch(`${API_BASE}/api/hocho/admin/confirm-order-payment`, { method:'POST', body: JSON.stringify({ order_id: orderId }) });
-    showToast(d.success ? '✅ ' + d.message : '❌ ' + d.message);
-    if (d.success) { loadOrderPayments(); loadDashboard(); }
-  } catch(e) {}
-}
-
-async function confirmAllOrderPayments() {
-  if (!confirm('Xác nhận đã nhận tiền cho TẤT CẢ đơn đang chờ?')) return;
-  try {
-    const d = await adminFetch(`${API_BASE}/api/hocho/admin/confirm-all-order-payments`, { method:'POST' });
-    showToast(d.success ? '✅ ' + d.message : '❌ ' + d.message);
-    if (d.success) { loadOrderPayments(); loadDashboard(); }
-  } catch(e) {}
 }
 
 // ── PENDING EARNINGS ──
