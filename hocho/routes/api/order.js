@@ -401,12 +401,12 @@ router.post('/complete', authPartner, async (req, res) => {
     );
     if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn' });
 
-    // Tiền vào HÀNG CHỜ DUYỆT (pending_balance), admin duyệt mới sang balance rút được
+    // Tự động cộng 140k vào balance (không cần admin duyệt)
     await Partner.findByIdAndUpdate(req.partnerId, {
       $inc: {
         completed_orders: 1,
         earnings_total:   order.partner_earning,
-        pending_balance:  order.partner_earning
+        balance:          order.partner_earning
       }
     });
 

@@ -37,6 +37,8 @@ const partnerSchema = new mongoose.Schema({
   avatar_url:   { type: String },
   device_token: { type: String },
 
+  sepay_ref:    { type: String },  // mã CK SePay cho phí kích hoạt (HCP+id)
+
   rating:           { type: Number, default: 5, min: 1, max: 5 },
   total_orders:     { type: Number, default: 0 },
   completed_orders: { type: Number, default: 0 },

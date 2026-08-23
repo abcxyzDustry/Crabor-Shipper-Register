@@ -184,21 +184,45 @@ router.post('/payment-confirm', authPartner, async (req, res) => {
   }
 });
 
-// ── BẬT / TẮT ONLINE + CẬP NHẬT VỊ TRÍ ──
+// ── BẬT / TẮT ONLINE — chặn nếu chưa thanh toán phí ──
 router.post('/toggle-status', authPartner, async (req, res) => {
   try {
     const { is_online, latitude, longitude } = req.body;
-    const partner = await Partner.findByIdAndUpdate(
+    const partner = await Partner.findById(req.partnerId);
+    if (!partner) return res.status(404).json({ success: false, message: 'Không tìm thấy đối tác' });
+    if (is_online && partner.payment_status !== 'paid') {
+      return res.status(403).json({ success: false, needPayment: true, message: 'Bạn cần thanh toán phí kích hoạt 200.000đ qua SePay trước khi nhận đơn.' });
+    }
+    const updated = await Partner.findByIdAndUpdate(
       req.partnerId,
       { is_online, last_online_at: is_online ? new Date() : null, latitude, longitude },
       { new: true }
     );
-    if (!partner) return res.status(404).json({ success: false, message: 'Không tìm thấy đối tác' });
-    res.json({ success: true, data: { is_online: partner.is_online } });
+    if (!updated) return res.status(404).json({ success: false, message: 'Không tìm thấy đối tác' });
+    res.json({ success: true, data: { is_online: updated.is_online } });
   } catch (err) {
     console.error('❌ [routes/api/partner.js]', err);
     res.status(500).json({ success: false, message: 'Lỗi server: ' + err.message });
   }
+});
+
+// ── GET /payment-qr — SePay QR phí kích hoạt (tự động xác nhận) ──
+router.get('/payment-qr', authPartner, async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partnerId);
+    if (!partner) return res.status(404).json({ success: false });
+    if (partner.payment_status === 'paid')
+      return res.json({ success: true, paid: true });
+
+    const fee = 200000;
+    const ref = 'HCP' + partner._id.toString().slice(-8).toUpperCase();
+    await Partner.findByIdAndUpdate(partner._id, { sepay_ref: ref });
+    const cfg = { bankCode: 'KLB', accountNo: '101499100004630283', accountName: 'KIEU THANH HAI' };
+    const qrUrl = `https://img.vietqr.io/image/${cfg.bankCode}-${cfg.accountNo}-compact2.png?amount=${fee}&addInfo=${encodeURIComponent(ref)}&accountName=${encodeURIComponent(cfg.accountName)}`;
+    res.json({ success: true, paid: false, fee, ref, qrUrl,
+      bankName: cfg.bankName || 'KienLongBank', accountNo: cfg.accountNo, accountName: cfg.accountName,
+      note: `Chuyển khoản ${fee.toLocaleString('vi-VN')}đ · Nội dung: ${ref} · Tự động xác nhận trong 1–2 phút` });
+  } catch(err) { res.status(500).json({ success:false,message:err.message }); }
 });
 
 // ── LƯU PUSH TOKEN ──

@@ -5227,7 +5227,12 @@ async function processSePayPayment(payload, ioRef, force = false) {
             hcOrder.status = 'matching'; // mở khoá cho đối tác thấy ngay
             await hcOrder.save();
             handled = true;
-            console.log(`[SEPAY][Hocho] ✅ Tự động xác nhận đơn ${code} — ${amount.toLocaleString('vi-VN')}đ → matching`);
+            // Tự cộng 140k phí đối tác vào balance (không cần admin duyệt)
+            if (hcOrder.partner_id) {
+              const { default: HCPartner } = await import('./hocho/models/Partner.js');
+              await HCPartner.findByIdAndUpdate(hcOrder.partner_id, { $inc: { earnings_total: 140000, pending_balance: 140000 } });
+            }
+            console.log(`[SEPAY][Hocho] ✅ Tự động xác nhận đơn ${code} — ${amount.toLocaleString('vi-VN')}đ → matching + tự duyệt 140k earning`);
           } else {
             console.log(`[SEPAY][Hocho] ${code}: thiếu tiền (nhận ${amount.toLocaleString('vi-VN')}đ < cần ${needed.toLocaleString('vi-VN')}đ)`);
             handled = true; // đánh dấu để không retry spam
@@ -5235,6 +5240,22 @@ async function processSePayPayment(payload, ioRef, force = false) {
         }
       }
     } catch (e) { console.error('[SEPAY][Hocho] lỗi:', e.message); }
+  }
+
+  // ── 2c. HỌC HỘ PARTNER — phí kích hoạt đối tác học hộ ──
+  if (!handled && /^HCP[A-Z0-9]{8}$/i.test(rawRef.trim())) {
+    try {
+      const { default: HCPartner } = await import('./hocho/models/Partner.js');
+      const ref = rawRef.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const hcP = await HCPartner.findOne({ sepay_ref: ref });
+      if (hcP && hcP.payment_status !== 'paid') {
+        await HCPartner.findByIdAndUpdate(hcP._id, {
+          payment_status: 'paid', status: 'active', payment_confirmed_at: new Date()
+        });
+        handled = true;
+        console.log(`[SEPAY][Hocho] ✅ Phí kích hoạt đối tác ${hcP.register_id || ref} — ${amount.toLocaleString('vi-VN')}đ → active`);
+      } else if (hcP) { handled = true; }
+    } catch (e) { console.error('[SEPAY][Hocho-fee] lỗi:', e.message); }
   }
 
   // ── 3. Partner registration fee ─────────────────────────
