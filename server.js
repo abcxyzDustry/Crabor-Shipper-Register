@@ -627,6 +627,7 @@ const Product = mongoose.model("Product", productSchema);
 // ── ORDER ─────────────────────────────────
 const orderSchema = new mongoose.Schema({
   orderId:      { type: String, unique: true },
+  clientRequestId: { type: String, index: true, sparse: true },   // chống tạo đơn trùng
   module:       { type: String, enum: ["food","laundry","cleaning","china_shop","ride"], required: true },
   customerId:   { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   shipperId:    { type: mongoose.Schema.Types.ObjectId, ref: "Shipper" },
@@ -12421,8 +12422,28 @@ app.post("/api/order", async (req, res) => {
     if (!req.session.userId)
       return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
 
-    const { partnerId, items, address, note, paymentMethod, voucherCode, shipFee, fromAddress, fromLat, fromLng, toAddress, toLat, toLng, vehicleType } = req.body;
-    
+    const { partnerId, items, address, note, paymentMethod, voucherCode, shipFee, fromAddress, fromLat, fromLng, toAddress, toLat, toLng, vehicleType, clientRequestId } = req.body;
+
+    // ── IDEMPOTENCY: chặn tạo đơn trùng khi app gửi lặp (double-tap / retry) ──
+    const dedupeKey = clientRequestId || null;
+    if (dedupeKey) {
+      const existed = await Order.findOne({ clientRequestId: dedupeKey }).lean();
+      if (existed) {
+        return res.json({ success: true, orderId: existed.orderId, order: existed, duplicated: true });
+      }
+    } else {
+      // Fallback: trùng khách + quán + tổng tiền trong vòng 15 giây → trả lại đơn cũ
+      const window = new Date(Date.now() - 15000);
+      const dup = await Order.findOne({
+        customerId: req.session.userId,
+        partnerId: partnerId || { $exists: false },
+        createdAt: { $gte: window },
+      }).sort({ createdAt: -1 }).lean();
+      if (dup && !['ride'].includes(dup.module || 'food')) {
+        return res.json({ success: true, orderId: dup.orderId, order: dup, duplicated: true });
+      }
+    }
+
     if (!items?.length && !fromAddress) 
       return res.status(400).json({ success: false, message: "Thiếu thông tin đơn hàng" });
 
@@ -12440,6 +12461,7 @@ app.post("/api/order", async (req, res) => {
     if (fromAddress && toAddress) {
       const total = shipFee || 30000;
       order = new Order({
+        clientRequestId: dedupeKey || undefined,
         module: "ride",
         customerId: req.session.userId,
         items: [{ name: `Xe ${vehicleType || 'bike'} — ${fromAddress} → ${toAddress}`, qty: 1, price: total }],
@@ -12482,6 +12504,7 @@ app.post("/api/order", async (req, res) => {
       }
 
       order = new Order({
+        clientRequestId: dedupeKey || undefined,
         module: "food",
         customerId: req.session.userId,
         partnerId,
