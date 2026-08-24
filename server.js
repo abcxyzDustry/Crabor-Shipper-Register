@@ -3020,7 +3020,8 @@ app.get("/api/vouchers/validate", async (req, res) => {
 
     // target 'ship': giảm theo phí giao; target 'order': giảm theo giá trị đơn
     const base = v.target === "ship" ? (Number(shipFee) || Number(total) || 0) : (Number(total) || 0);
-    if (base < v.minOrder) return res.status(400).json({ success: false, message: `Đơn tối thiểu ${v.minOrder.toLocaleString()}đ` });
+    // FIX: minOrder so với GIÁ TRỊ ĐƠN HÀNG (đồng bộ với applyVoucher)
+    if ((Number(total) || 0) < v.minOrder) return res.status(400).json({ success: false, message: `Đơn tối thiểu ${v.minOrder.toLocaleString()}đ` });
     if (v.module !== "all" && v.module !== mod) return res.status(400).json({ success: false, message: "Mã không áp dụng cho đơn này" });
     const discount = base > 0 && v.type === "percent"
       ? Math.min(Math.round(base * v.value / 100), v.maxDiscount || Infinity)
@@ -11910,7 +11911,9 @@ async function applyVoucher(code, bases, customerId, module) {
     }
     // Chọn base giảm theo target
     const subtotal = v.target === "ship" ? (bases.ship || bases.order || 0) : (bases.order || 0);
-    if (subtotal < (v.minOrder || 0)) return { discount: 0, applied: null };
+    // FIX: minOrder so sánh với GIÁ TRỊ ĐƠN HÀNG (không phải phí giao!)
+    // Trước đây ship-voucher bị so minOrder với phí giao (~20k) nên mã minOrder 50k+ không bao giờ áp dụng được
+    if ((bases.order || 0) < (v.minOrder || 0)) return { discount: 0, applied: null };
     const discount = subtotal > 0 && v.type === "percent"
       ? Math.min(Math.round(subtotal * v.value / 100), v.maxDiscount || Infinity)
       : (subtotal > 0 ? Math.min(v.value, subtotal) : 0);
