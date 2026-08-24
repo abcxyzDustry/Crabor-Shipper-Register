@@ -2119,6 +2119,60 @@ app.post("/api/shipper/fee/confirm", async (req, res) => {
   }
 });
 
+// POST /api/shipper/fee/payos/create — tạo link PayOS thanh toán phí đăng ký
+// Hỗ trợ thẻ quốc tế Visa/Master ngay trên trang checkout PayOS
+app.post("/api/shipper/fee/payos/create", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    if (!payOS) return res.status(500).json({ success: false, message: "PayOS chưa sẵn sàng" });
+    const shipper = await Shipper.findById(req.session.shipperId).select("registerId fee");
+    if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy hồ sơ Shipper" });
+    const amount = Math.round(Number(shipper.fee) || 0);
+    if (!amount || amount <= 0) return res.status(400).json({ success: false, message: "Phí đăng ký không hợp lệ" });
+
+    const orderCode = parseInt(Date.now().toString().slice(-9));
+    const desc = (`Phí CRABOR ${String(shipper.registerId || "").slice(-8)}`).trim().slice(0, 25);
+    const paymentData = {
+      orderCode,
+      amount,
+      description: desc,
+      returnUrl: process.env.PAYOS_RETURN_URL || "https://crabor-shipper-register.onrender.com/payment-success",
+      cancelUrl: process.env.PAYOS_CANCEL_URL || "https://crabor-shipper-register.onrender.com/payment-cancel",
+    };
+    let link;
+    if (typeof payOS.paymentRequests?.create === 'function') link = await payOS.paymentRequests.create(paymentData);
+    else link = await payOS.createPaymentLink(paymentData);
+    res.json({ success: true, checkoutUrl: link.checkoutUrl, orderCode, amount, description: desc });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/shipper/fee/payos/confirm — kiểm tra trạng thái link & ghi nhận đã trả
+app.post("/api/shipper/fee/payos/confirm", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
+    const { orderCode } = req.body;
+    if (!orderCode || !payOS) return res.status(400).json({ success: false, message: "Thiếu orderCode hoặc PayOS chưa sẵn sàng" });
+    let info = null;
+    if (typeof payOS.paymentRequests?.get === 'function') info = await payOS.paymentRequests.get(String(orderCode));
+    const paid = info?.status === "PAID";
+    if (paid) {
+      await Shipper.findByIdAndUpdate(req.session.shipperId, {
+        feeStatus: "paid",
+        paidAt: new Date(),
+        feePaid: Math.round(Number(info.amountPaid ?? info.amount ?? 0)) || undefined,
+      });
+      req.io.to("admin").emit("shipperFeePaid", { shipperId: req.session.shipperId, via: "payos_card" });
+    }
+    res.json({ success: true, paid });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/admin/config/earlybird — lấy cấu hình early bird
 app.get("/api/admin/config/earlybird", adminAuth, async (req, res) => {
   try {
