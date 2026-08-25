@@ -574,6 +574,16 @@ const userSchema = new mongoose.Schema({
   authMethod:      { type: String, enum: ["otp","google","form"], default: "otp" },
   password:        { type: String },            // bcrypt hash — form auth
   emailVerified:   { type: Boolean, default: false },
+  phoneVerified:   { type: Boolean, default: false },
+  kycStatus:       { type: String, enum: ["none","pending","verified","rejected"], default: "none" },
+  kyc:             {
+    selfie:      String,
+    cccdFront:   String,
+    cccdBack:    String,
+    submittedAt: Date,
+    reviewedAt:  Date,
+    rejectReason:String,
+  },
   walletEarned:    { type: Number, default: 0, min: 0 },   // tổng tiền đã nhận vào ví
   fcmToken:        String,
   pushToken:       { type: String, default: null },
@@ -4743,9 +4753,17 @@ function getCreditLimit(totalSpent=0){if(totalSpent>=20000000)return 10000000;if
 app.get("/api/bnpl/eligibility", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success:false });
-    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin');
+    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified');
     if (!user) return res.status(404).json({ success:false });
-    // Admin luôn đủ điều kiện; điều kiện mở khoá: tổng chi tiêu ≥ 5.000.000đ
+    const idn = identitySummary(user);
+    // BẮT BUỘC xác thực Google trước khi mở Ví Trả Sau
+    if (!idn.googleVerified) {
+      return res.json({ success:true, eligible:false, limit:0, spent: user.totalSpent||0,
+        orderCount: user.totalOrders || 0, usedThisMonth:0, available:0,
+        requireGoogleVerify: true, ...idn,
+        message: "Xác thực danh tính qua Google để mở Ví Trả Sau (đảm bảo email/SĐT thật)." });
+    }
+    // Admin lu�n �? �i?u ki?n; �i?u ki?n m? kho�: t?ng chi ti�u ? 5.000.000�
     const spent      = user.totalSpent || 0;
     const eligible   = user.isAdmin || spent >= 5000000;
     const limit      = eligible ? getBnplLimit(spent) : 0;
@@ -4766,6 +4784,10 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
 app.post("/api/bnpl/use", async (req,res) => {
   try {
     if (!req.session.userId) return res.status(401).json({success:false});
+    // HARD GATE: phải đã xác thực Google
+    const _me = await User.findById(req.session.userId).select('googleId emailVerified');
+    if (!identitySummary(_me).googleVerified)
+      return res.status(403).json({ success:false, requireGoogleVerify:true, message:'Cần xác thực danh tính qua Google trước khi dùng Ví Trả Sau' });
     const {orderId, amount, serviceType='food'} = req.body;
     const amt = Number(amount);
     if (!amt||amt<=0) return res.status(400).json({success:false,message:'Số tiền không hợp lệ'});
@@ -5106,8 +5128,15 @@ app.post("/api/admin/cash-settlements/:id/settle", adminAuth, async (req, res) =
 app.get("/api/loan/eligibility", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success:false });
-    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin');
+    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified');
     const orderCount = user?.totalOrders || 0;
+    const idn = identitySummary(user);
+    // BẮT BUỘC xác thực Google trước khi mở Vay Nhanh
+    if (!idn.googleVerified) {
+      return res.json({ success:true, eligible:false, orderCount, totalSpent: user?.totalSpent||0,
+        hasActiveLoan: false, requireGoogleVerify: true, ...idn,
+        message: "Xác thực danh tính qua Google để mở Vay Nhanh (đảm bảo email/SĐT thật)." });
+    }
     const eligible   = user?.isAdmin || orderCount >= 10;
     const activeLoan = await Loan.findOne({ userId: req.session.userId, status:{$in:['approved','active']} });
     res.json({ success:true, eligible, orderCount, totalSpent: user?.totalSpent||0,
@@ -5122,6 +5151,10 @@ app.get("/api/loan/eligibility", async (req, res) => {
 app.post("/api/loan/apply", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success:false });
+    // HARD GATE: phải đã xác thực Google
+    const _me = await User.findById(req.session.userId).select('googleId emailVerified');
+    if (!identitySummary(_me).googleVerified)
+      return res.status(403).json({ success:false, requireGoogleVerify:true, message:'Cần xác thực danh tính qua Google trước khi vay' });
     const user = await User.findById(req.session.userId).select('totalSpent fullName');
     if (!user || (user.totalSpent||0) < 2000000)
       return res.status(403).json({ success:false, message:'Chưa đủ điều kiện (cần giao dịch từ 2.000.000đ)' });
@@ -6518,12 +6551,13 @@ app.post("/api/auth/google", async (req, res) => {
         avatar:       picture,
         authMethod:   "google",
         emailVerified: true,
+        phoneVerified: true,   // danh tính đã được Google xác thực
         phone:        "google_" + googleId.slice(-8),
         status:       "active",
       });
-    } else if (!user.googleId) {
-      // Merge existing account với Google
-      await User.findByIdAndUpdate(user._id, { googleId, avatar: picture, emailVerified: true, authMethod: "google" });
+    } else {
+      // Merge / refresh — mỗi lần đăng nhập Google đều làm mới trạng thái xác thực
+      await User.findByIdAndUpdate(user._id, { googleId, avatar: picture, emailVerified: true, phoneVerified: true, authMethod: "google" });
     }
 
     req.session.userId    = user._id;
@@ -6547,6 +6581,30 @@ app.post("/api/auth/google", async (req, res) => {
     res.status(401).json({ success:false, message:"Xác thực Google thất bại. Thử lại nhé!" });
   }
 });
+
+// ── Identity verification (Google = chuẩn xác thực danh tính) ──────────
+// googleVerified: user đã liên kết & đăng nhập Google ít nhất 1 lần
+function identitySummary(u) {
+  const googleVerified = !!(u?.googleId && u.emailVerified);
+  return {
+    googleVerified,
+    emailVerified: !!u?.emailVerified || googleVerified,
+    phoneVerified: !!(u?.phoneVerified || googleVerified),
+    email: u?.email || null,
+  };
+}
+
+// GET /api/auth/google/status — app hỏi xem user đã xác thực Google chưa
+app.get("/api/auth/google/status", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session.userId) return res.json({ success: true, loggedIn: false, googleVerified: false });
+    const user = await User.findById(req.session.userId).select("googleId emailVerified phoneVerified email");
+    if (!user) return res.json({ success: true, loggedIn: false, googleVerified: false });
+    res.json({ success: true, loggedIn: true, ...identitySummary(user) });
+  } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
 
 // POST /api/auth/register — đăng ký chuẩn (từ register_route.js)
 // Hỗ trợ: name/fullName, phone hoặc email, password
