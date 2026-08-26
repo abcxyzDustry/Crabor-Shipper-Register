@@ -1229,6 +1229,17 @@ const sePayTxSchema = new mongoose.Schema({
 }, { timestamps: true });
 const SePayTx = mongoose.model('SePayTx', sePayTxSchema);
 
+// ── TEST PAYMENT (trang test chuyển khoản SePay) ──────────────────────
+const testPaySchema = new mongoose.Schema({
+  ref:      { type: String, unique: true, required: true },
+  amount:   { type: Number, required: true, min: 1000 },
+  status:   { type: String, enum: ['pending','paid'], default: 'pending' },
+  paidAmount: { type: Number, default: 0 },
+  paidAt:   Date,
+}, { timestamps: true });
+testPaySchema.index({ createdAt: 1 }, { expireAfterSeconds: 86400 }); // tự xoá sau 24h
+const TestPayment = mongoose.model('TestPayment', testPaySchema);
+
 // ── LOAN (Vay nhanh) ──────────────────────────────────────
 const loanSchema = new mongoose.Schema({
   userId:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -5253,6 +5264,19 @@ async function processSePayPayment(payload, ioRef, force = false) {
 
   let handled = false;
 
+  // ── 0. TEST PAYMENT (trang test chuyển khoản SePay) ──
+  const tstMatch = rawRef.match(/TST([A-Z0-9]{4,10})/);
+  if (tstMatch) {
+    const tref = "TST" + tstMatch[1];
+    const tp = await TestPayment.findOne({ ref: tref });
+    if (tp && tp.status === "pending" && amount >= tp.amount) {
+      await TestPayment.findByIdAndUpdate(tp._id, { status: "paid", paidAmount: amount, paidAt: new Date() });
+      ioInstance?.to("admin").emit("testpayPaid", { ref: tref, amount });
+      console.log(`[SEPAY] TestPayment paid: ${tref} — ${amount.toLocaleString("vi-VN")}đ`);
+      handled = true;
+    }
+  }
+
   // ── 1. BNPL Invoice payment ──────────────────────────────
   const bnplMatch = rawRef.match(/BNPL([A-Z0-9]{6,8})/);
   if (bnplMatch) {
@@ -5739,6 +5763,28 @@ app.post("/api/sepay/test", async (req, res) => {
     const result = await processSePayPayment({ ...req.body, transferType: 'in' }, req.io);
     res.json({ success: true, ...result });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ── TEST PAYMENT PAGE (/payment-test.html) — tạo & theo dõi giao dịch test SePay ──
+app.post("/api/sepay/testpay/create", async (req, res) => {
+  try {
+    const amount = Math.round(Number(req.body?.amount));
+    if (!amount || amount < 1000) return res.status(400).json({ success:false, message:"Số tiền tối thiểu 1.000đ" });
+    if (amount > 50000000) return res.status(400).json({ success:false, message:"Số tiền tối đa 50.000.000đ" });
+    const ref = "TST" + Date.now().toString(36).toUpperCase().slice(-6) + Math.random().toString(36).toUpperCase().slice(2,4);
+    await TestPayment.create({ ref, amount });
+    res.json({ success:true, ref, amount,
+      qrUrl: sepayQrUrl(amount, ref),
+      bank: { bankName: SEPAY_CONFIG.bankName, accountNo: SEPAY_CONFIG.accountNo, accountName: SEPAY_CONFIG.accountName } });
+  } catch(err){ res.status(500).json({ success:false, message:err.message }); }
+});
+
+app.get("/api/sepay/testpay/status/:ref", async (req, res) => {
+  try {
+    const tp = await TestPayment.findOne({ ref: String(req.params.ref).toUpperCase() }).lean();
+    if (!tp) return res.status(404).json({ success:false, message:"Không tìm thấy giao dịch test" });
+    res.json({ success:true, status: tp.status, amount: tp.amount, paidAmount: tp.paidAmount, paidAt: tp.paidAt });
+  } catch(err){ res.status(500).json({ success:false, message:err.message }); }
 });
 
 // ── PAYMENT 1 CHẠM — chuẩn bị (khi có tài khoản DN) ─────────
@@ -6603,6 +6649,36 @@ app.get("/api/auth/google/status", async (req, res) => {
     if (!user) return res.json({ success: true, loggedIn: false, googleVerified: false });
     res.json({ success: true, loggedIn: true, ...identitySummary(user) });
   } catch(e) { res.status(500).json({ success:false, message:e.message }); }
+});
+
+// POST /api/auth/google/link — user ĐÃ ĐĂNG NHẬP liên kết Google để xác thực danh tính
+// (giữ nguyên tài khoản hiện tại, chỉ gắn googleId + đánh dấu đã xác thực)
+app.post("/api/auth/google/link", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session.userId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ success:false, message:"Thiếu idToken" });
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+    const { sub: googleId, email } = payload;
+
+    // GoogleId này không được thuộc về tài khoản khác
+    const clash = await User.findOne({ googleId, _id: { $ne: req.session.userId } });
+    if (clash) return res.status(409).json({ success:false, message:"Tài khoản Google này đã liên kết với người dùng khác" });
+
+    await User.findByIdAndUpdate(req.session.userId, {
+      googleId,
+      email: email.toLowerCase(),
+      emailVerified: true,
+      phoneVerified: true,
+    });
+    const user = await User.findById(req.session.userId).select("googleId emailVerified phoneVerified email");
+    res.json({ success:true, message:"Đã xác thực danh tính qua Google!", ...identitySummary(user) });
+  } catch(err) {
+    console.error("[Google Link]", err.message);
+    res.status(401).json({ success:false, message:"Xác thực Google thất bại" });
+  }
 });
 
 
