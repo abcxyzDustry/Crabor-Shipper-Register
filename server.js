@@ -1876,6 +1876,9 @@ async function sendEmailOtp(email) {
 
   const transporter = createEmailTransporter();
   if (!transporter) {
+    console.log(` [DEV-EMAIL-OTP] ${email}: ${code} (no transporter)`);
+    // Vẫn trả success để dev/test không bị chặn
+    if (process.env.NODE_ENV !== 'production') return { success: true, dev: true, code };
     throw new Error("Email chưa được cấu hình. Vui lòng liên hệ admin.");
   }
   const html = '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px">'
@@ -1889,14 +1892,23 @@ async function sendEmailOtp(email) {
     + '<div style="color:#999;font-size:.75rem;margin-top:10px">Hết hạn sau 5 phút</div></div>'
     + '<div style="color:#aaa;font-size:.75rem;text-align:center">Không chia sẻ mã này với bất kỳ ai.</div></div>';
 
-  await transporter.sendMail({
-    from: '"CRABOR 🦀" <' + process.env.EMAIL_USER + '>',
-    to: email,
-    subject: "[CRABOR] Mã OTP: " + code,
-    html,
-    text: "Ma OTP CRABOR: " + code + ". Het han sau 5 phut.",
-  });
-  console.log(" [EMAIL-OTP] Sent to " + email);
+  try {
+    await transporter.sendMail({
+      from: '"CRABOR 🦀" <' + process.env.EMAIL_USER + '>',
+      to: email,
+      subject: "[CRABOR] Mã OTP: " + code,
+      html,
+      text: "Ma OTP CRABOR: " + code + ". Het han sau 5 phut.",
+    });
+    console.log(" [EMAIL-OTP] Sent to " + email);
+  } catch (e) {
+    // Render/Gmail chặn hoặc sai App Password → fallback log để không chặn luồng
+    console.error(" [EMAIL-OTP] send failed:", e.message, "— fallback code:", code);
+    console.log(` [DEV-EMAIL-OTP] ${email}: ${code}`);
+    // Ở production vẫn ném lỗi để client biết, kèm dev code khi DEBUG_OTP=true
+    if (process.env.DEBUG_OTP === 'true') return { success: true, dev: true, code, warning: e.message };
+    throw new Error("Không gửi được email (" + e.message + "). Vui lòng dùng đăng nhập Google (đã xác minh email) hoặc liên hệ admin để cấu hình App Password.");
+  }
   return { success: true };
 }
 
