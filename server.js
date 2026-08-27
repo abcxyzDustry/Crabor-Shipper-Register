@@ -1233,7 +1233,7 @@ const bnplInvoiceSchema = new mongoose.Schema({
   payosOrderCode: { type: String },   // mã PayOS khi trả hoá đơn bằng PayOS
   paymentMethod:  { type: String },   // wallet | sepay | payos
 }, { timestamps: true });
-bnplInvoiceSchema.index({ userId: 1, billingMonth: 1 }, { unique: true });
+bnplInvoiceSchema.index({ userId: 1, billingMonth: 1 }); // cho phép nhiều hóa đơn/tháng nếu có pending mới sau khi đã chốt
 const BNPLInvoice = mongoose.model('BNPLInvoice', bnplInvoiceSchema);
 
 // ── BNPL CREDIT LIMIT ─────────────────────────────────────
@@ -4884,8 +4884,14 @@ async function createBNPLInvoicesForMonth(billingMonth){
     for(const g of pendingByUser){
       const userId=g._id;
       const total=g.total;
-      const exists=await BNPLInvoice.findOne({userId, billingMonth:month});
-      if(exists) continue;
+      const exists=await BNPLInvoice.findOne({userId, billingMonth:month, status:{$in:['issued','overdue','installment']}});
+      if(exists) {
+        // Nếu đã có hóa đơn chưa trả cho tháng này, cộng dồn vào hóa đơn đó
+        await BNPLInvoice.updateOne({_id: exists._id}, {$inc:{totalAmount: total, finalAmount: total}});
+        await BNPLTx.updateMany({_id:{$in:g.txIds}}, {$set:{status:'billed', invoiceId:exists._id}});
+        console.log(`[BNPL] Added ${total} to existing invoice ${exists._id} for ${userId} month ${month}`);
+        continue;
+      }
       const {issuedAt, dueDate}=getNextBillingDates();
       const inv=await BNPLInvoice.create({
         userId, billingMonth:month, totalAmount:total, finalAmount:total,
