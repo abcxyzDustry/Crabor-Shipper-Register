@@ -4849,21 +4849,22 @@ app.post("/api/bnpl/invoice/:id/prepare-pay", async (req,res) => {
   } catch(e){res.status(500).json({success:false,message:e.message});}
 });
 
-// POST /api/bnpl/invoice/:id/installment — chuyển trả góp (+10%)
+// POST /api/bnpl/invoice/:id/installment — chuyển trả góp (phí 10%/tháng của chi phí gốc)
 app.post("/api/bnpl/invoice/:id/installment", async (req,res) => {
   try {
     if (!req.session.userId) return res.status(401).json({success:false});
     const {terms=3} = req.body;
-    if (![2,3,6,12].includes(Number(terms)))
-      return res.status(400).json({success:false,message:'Kỳ hạn: 2, 3, 6 hoặc 12 tháng'});
+    if (![3,6,12].includes(Number(terms)))
+      return res.status(400).json({success:false,message:'Kỳ hạn: 3, 6 hoặc 12 tháng'});
     const inv = await BNPLInvoice.findOne({_id:req.params.id, userId:req.session.userId, status:{$in:['issued','overdue']}});
     if (!inv) return res.status(404).json({success:false,message:'Không tìm thấy hoặc không đủ điều kiện'});
-    const installFee = Math.round(inv.totalAmount*0.10);
+    // Phí trả góp = 10% chi phí gốc cho MỖI tháng (không phải 10% một lần)
+    const installFee = Math.round(inv.totalAmount * 0.10 * Number(terms));
     const finalAmount = inv.totalAmount+installFee;
     const perTerm = Math.ceil(finalAmount/Number(terms));
     await BNPLInvoice.findByIdAndUpdate(inv._id,{isInstallment:true,installTerms:Number(terms),installFee,finalAmount,status:'installment'});
     res.json({success:true, installFee, finalAmount, perTerm, terms:Number(terms),
-      message:`Trả góp ${terms} kỳ. Phí 10%: ${installFee.toLocaleString('vi-VN')}đ. Mỗi kỳ: ${perTerm.toLocaleString('vi-VN')}đ`});
+      message:`Trả góp ${terms} kỳ. Phí 10%/tháng: ${installFee.toLocaleString('vi-VN')}đ. Mỗi kỳ: ${perTerm.toLocaleString('vi-VN')}đ`});
   } catch(e){res.status(500).json({success:false,message:e.message});}
 });
 
