@@ -6576,8 +6576,9 @@ app.get("/api/nova/decisions", adminAuth, async (req,res) => {
 // POST /api/auth/google — xác thực Google ID token từ client
 app.post("/api/auth/google", async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const idToken = req.body.idToken || req.body.id_token || req.body.accessToken || req.body.token;
     if (!idToken) return res.status(400).json({ success:false, message:"Thiếu idToken" });
+    if (!process.env.GOOGLE_CLIENT_ID) return res.status(500).json({ success:false, message:"Server chưa cấu hình GOOGLE_CLIENT_ID" });
 
     // Verify token với Google
     const ticket = await googleClient.verifyIdToken({
@@ -6608,15 +6609,23 @@ app.post("/api/auth/google", async (req, res) => {
 
     req.session.userId    = user._id;
     req.session.userPhone = user.phone;
+    req.session.role      = user.role || "customer";
+    pruneSessionRoles(req, 'user');
     await new Promise((res, rej) => req.session.save(e => e ? rej(e) : res()));
+    const cookieStr = buildSignedSessionCookie(req.session.id);
 
     res.json({
       success: true,
+      cookie: cookieStr,
+      sessionId: req.session.id,
       user: {
         _id:      user._id,
         fullName: user.fullName || name,
+        phone:    user.phone || "",
         email:    user.email,
         avatar:   user.avatar || picture,
+        role:     user.role || "customer",
+        isAdmin:  user.isAdmin || user.role === "admin",
         loyaltyPts: user.loyaltyPts || 0,
         walletBalance: user.walletBalance || 0,
         isNew:    !user.totalSpent,
@@ -6657,8 +6666,9 @@ app.post("/api/auth/google/link", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session.userId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
-    const { idToken } = req.body;
+    const idToken = req.body.idToken || req.body.id_token || req.body.accessToken || req.body.token;
     if (!idToken) return res.status(400).json({ success:false, message:"Thiếu idToken" });
+    if (!process.env.GOOGLE_CLIENT_ID) return res.status(500).json({ success:false, message:"Server chưa cấu hình GOOGLE_CLIENT_ID" });
     const ticket = await googleClient.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
     const payload = ticket.getPayload();
     const { sub: googleId, email } = payload;
