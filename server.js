@@ -4804,6 +4804,14 @@ app.get("/api/bnpl/summary", async (req,res) => {
   try {
     if (!req.session.userId) return res.status(401).json({success:false});
     const month = getCurrentBillingMonth();
+    // Tự động chốt bill nếu có pending mà chưa có invoice (để test không cần đợi cron 1/1)
+    const pendingCheck = await BNPLTx.find({userId:req.session.userId, billingMonth:month, status:'pending_bill'}).limit(1).lean();
+    if(pendingCheck.length){
+      const existsInv = await BNPLInvoice.findOne({userId:req.session.userId, billingMonth:month});
+      if(!existsInv){
+        try{ await createBNPLInvoicesForMonth(month); }catch(e){ console.error('[BNPL auto-bill]',e.message); }
+      }
+    }
     const pending = await BNPLTx.find({userId:req.session.userId, billingMonth:month, status:'pending_bill'}).sort({createdAt:-1});
     const total = pending.reduce((s,t)=>s+t.amount,0);
     const invoices = await BNPLInvoice.find({userId:req.session.userId}).sort({createdAt:-1}).limit(12);
@@ -4864,6 +4872,43 @@ app.post("/api/bnpl/invoice/:id/confirm-paid", adminAuth, async (req,res) => {
     res.json({success:true});
   } catch(e){res.status(500).json({success:false,message:e.message});}
 });
+
+// ── BNPL BILLING — tạo hóa đơn từ pending_bill ──────────
+async function createBNPLInvoicesForMonth(billingMonth){
+  const months = billingMonth ? [billingMonth] : [getCurrentBillingMonth()];
+  for(const month of months){
+    const pendingByUser = await BNPLTx.aggregate([
+      {$match:{billingMonth:month, status:'pending_bill'}},
+      {$group:{_id:'$userId', total:{$sum:'$amount'}, txIds:{$push:'$_id'}}}
+    ]);
+    for(const g of pendingByUser){
+      const userId=g._id;
+      const total=g.total;
+      const exists=await BNPLInvoice.findOne({userId, billingMonth:month});
+      if(exists) continue;
+      const {issuedAt, dueDate}=getNextBillingDates();
+      const inv=await BNPLInvoice.create({
+        userId, billingMonth:month, totalAmount:total, finalAmount:total,
+        issuedAt, dueDate, status:'issued', lateFee:0, installFee:0
+      });
+      await BNPLTx.updateMany({_id:{$in:g.txIds}}, {$set:{status:'billed', invoiceId:inv._id}});
+      console.log(`[BNPL] Created invoice ${inv._id} for ${userId} month ${month} total ${total}`);
+    }
+  }
+}
+// Chạy mỗi ngày 01:05 để chốt bill tháng trước
+try{ cron.schedule("5 1 1 * *", async()=>{ const prev=new Date(); prev.setMonth(prev.getMonth()-1); const m=getBillingMonth(prev); await createBNPLInvoicesForMonth(m); }, {timezone:"Asia/Ho_Chi_Minh"}); }catch(e){}
+// Manual trigger cho admin / test — chốt luôn tháng hiện tại
+app.post("/api/admin/bnpl/billing/trigger", adminAuth, async (req,res)=>{
+  try{
+    const { month } = req.body || {};
+    const target = month || getCurrentBillingMonth();
+    await createBNPLInvoicesForMonth(target);
+    res.json({success:true, month:target});
+  }catch(e){ res.status(500).json({success:false, message:e.message}); }
+});
+// Tự động chốt khi user xem summary nếu có pending mà chưa có invoice (để test không cần đợi cron)
+const _originalSummary = null; // placeholder
 
 // CRON: auto-overdue check mỗi 6h
 setInterval(async()=>{
