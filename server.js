@@ -6586,7 +6586,8 @@ app.post("/api/auth/google", async (req, res) => {
       audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
-    const { sub: googleId, email, name, picture } = payload;
+    const { sub: googleId, email, name, picture, email_verified } = payload;
+    const isEmailVerified = email_verified === true || email_verified === 'true';
 
     // Tìm hoặc tạo user
     let user = await User.findOne({ $or: [{ googleId }, { email: email.toLowerCase() }] });
@@ -6597,14 +6598,16 @@ app.post("/api/auth/google", async (req, res) => {
         fullName:     name,
         avatar:       picture,
         authMethod:   "google",
-        emailVerified: true,
-        phoneVerified: true,   // danh tính đã được Google xác thực
+        emailVerified: isEmailVerified,
+        // Google không xác minh SĐT -> phoneVerified giữ false, yêu cầu OTP SĐT riêng
+        phoneVerified: false,
         phone:        "google_" + googleId.slice(-8),
         status:       "active",
       });
     } else {
-      // Merge / refresh — mỗi lần đăng nhập Google đều làm mới trạng thái xác thực
-      await User.findByIdAndUpdate(user._id, { googleId, avatar: picture, emailVerified: true, phoneVerified: true, authMethod: "google" });
+      // Merge / refresh — chỉ cập nhật emailVerified theo Google, không tự phoneVerified
+      await User.findByIdAndUpdate(user._id, { googleId, avatar: picture, emailVerified: isEmailVerified, authMethod: "google" });
+      user = await User.findById(user._id);
     }
 
     req.session.userId    = user._id;
@@ -6628,6 +6631,9 @@ app.post("/api/auth/google", async (req, res) => {
         isAdmin:  user.isAdmin || user.role === "admin",
         loyaltyPts: user.loyaltyPts || 0,
         walletBalance: user.walletBalance || 0,
+        emailVerified: !!user.emailVerified,
+        phoneVerified: !!user.phoneVerified,
+        googleVerified: !!(user.googleId && user.emailVerified),
         isNew:    !user.totalSpent,
       },
     });
@@ -6637,14 +6643,15 @@ app.post("/api/auth/google", async (req, res) => {
   }
 });
 
-// ── Identity verification (Google = chuẩn xác thực danh tính) ──────────
-// googleVerified: user đã liên kết & đăng nhập Google ít nhất 1 lần
+// ── Identity verification ──────────
+// googleVerified: Google đã xác minh email (email_verified=true)
+// phoneVerified: chỉ khi user đã OTP SĐT riêng, không tự theo Google
 function identitySummary(u) {
   const googleVerified = !!(u?.googleId && u.emailVerified);
   return {
     googleVerified,
-    emailVerified: !!u?.emailVerified || googleVerified,
-    phoneVerified: !!(u?.phoneVerified || googleVerified),
+    emailVerified: !!u?.emailVerified,
+    phoneVerified: !!u?.phoneVerified,
     email: u?.email || null,
   };
 }
@@ -6677,11 +6684,11 @@ app.post("/api/auth/google/link", async (req, res) => {
     const clash = await User.findOne({ googleId, _id: { $ne: req.session.userId } });
     if (clash) return res.status(409).json({ success:false, message:"Tài khoản Google này đã liên kết với người dùng khác" });
 
+    const isFreshEmailVerified = payload.email_verified === true || payload.email_verified === 'true';
     await User.findByIdAndUpdate(req.session.userId, {
       googleId,
       email: email.toLowerCase(),
-      emailVerified: true,
-      phoneVerified: true,
+      emailVerified: isFreshEmailVerified,
     });
     const user = await User.findById(req.session.userId).select("googleId emailVerified phoneVerified email");
     res.json({ success:true, message:"Đã xác thực danh tính qua Google!", ...identitySummary(user) });
