@@ -4804,7 +4804,7 @@ function getCreditLimit(totalSpent=0){if(totalSpent>=20000000)return 10000000;if
 app.get("/api/bnpl/eligibility", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success:false });
-    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified');
+    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified creditBnplEnabled creditLoanEnabled');
     if (!user) return res.status(404).json({ success:false });
     const idn = identitySummary(user);
     // BẮT BUỘC xác thực Google trước khi mở Ví Trả Sau
@@ -5179,7 +5179,7 @@ app.post("/api/admin/cash-settlements/:id/settle", adminAuth, async (req, res) =
 app.get("/api/loan/eligibility", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success:false });
-    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified');
+    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified creditBnplEnabled creditLoanEnabled');
     const orderCount = user?.totalOrders || 0;
     const idn = identitySummary(user);
     // BẮT BUỘC xác thực Google trước khi mở Vay Nhanh
