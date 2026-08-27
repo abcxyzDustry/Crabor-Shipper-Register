@@ -575,6 +575,8 @@ const userSchema = new mongoose.Schema({
   password:        { type: String },            // bcrypt hash — form auth
   emailVerified:   { type: Boolean, default: false },
   phoneVerified:   { type: Boolean, default: false },
+  creditBnplEnabled: { type: Boolean, default: false },
+  creditLoanEnabled: { type: Boolean, default: false },
   kycStatus:       { type: String, enum: ["none","pending","verified","rejected"], default: "none" },
   kyc:             {
     selfie:      String,
@@ -4814,7 +4816,7 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     }
     // Admin lu�n �? �i?u ki?n; �i?u ki?n m? kho�: t?ng chi ti�u ? 5.000.000�
     const spent      = user.totalSpent || 0;
-    const eligible   = user.isAdmin || spent >= 5000000;
+    const eligible   = user.isAdmin || user.creditBnplEnabled || spent >= 5000000;
     const limit      = eligible ? getBnplLimit(spent) : 0;
     const month      = getCurrentBillingMonth();
     const txs        = await BNPLTx.find({ userId:req.session.userId, billingMonth:month, status:{$in:['pending_bill','billed']} });
@@ -5186,7 +5188,7 @@ app.get("/api/loan/eligibility", async (req, res) => {
         hasActiveLoan: false, requireGoogleVerify: true, ...idn,
         message: "Xác thực danh tính qua Google để mở Vay Nhanh (đảm bảo email/SĐT thật)." });
     }
-    const eligible   = user?.isAdmin || orderCount >= 10;
+    const eligible   = user?.isAdmin || user?.creditLoanEnabled || orderCount >= 10;
     const activeLoan = await Loan.findOne({ userId: req.session.userId, status:{$in:['approved','active']} });
     res.json({ success:true, eligible, orderCount, totalSpent: user?.totalSpent||0,
       hasActiveLoan: !!activeLoan, activeLoan,
@@ -5248,6 +5250,69 @@ app.patch("/api/admin/loan/:id", adminAuth, async (req, res) => {
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
+
+// ── ADMIN CREDIT — quản lý Ví trả sau & Vay nhanh ──────────
+app.get("/api/admin/credit/stats", adminAuth, async (req,res)=>{
+  try{
+    const totalUsers = await User.countDocuments({});
+    const bnplEnabled = await User.countDocuments({creditBnplEnabled:true});
+    const loanEnabled = await User.countDocuments({creditLoanEnabled:true});
+    const pendingLoans = await Loan.countDocuments({status:'pending'});
+    const activeLoans = await Loan.countDocuments({status:{$in:['approved','active']}});
+    const totalLoanAmt = await Loan.aggregate([{$match:{status:{$in:['approved','active']}}},{$group:{_id:null, sum:{$sum:'$amount'}}}]);
+    const pendingInvoices = await BNPLInvoice.countDocuments({status:{$in:['issued','overdue']}});
+    const totalBnplDebt = await BNPLInvoice.aggregate([{$match:{status:{$in:['issued','overdue','installment']}}},{$group:{_id:null, sum:{$sum:'$finalAmount'}}}]);
+    res.json({success:true, totalUsers, bnplEnabled, loanEnabled, pendingLoans, activeLoans, totalLoanAmt: totalLoanAmt[0]?.sum||0, pendingInvoices, totalBnplDebt: totalBnplDebt[0]?.sum||0});
+  }catch(e){ res.status(500).json({success:false, message:e.message}); }
+});
+
+app.get("/api/admin/bnpl/invoices", adminAuth, async (req,res)=>{
+  try{
+    const { page=1, limit=20, status, q } = req.query;
+    const filter={};
+    if(status && status!=='all') filter.status=status;
+    if(q) {
+      const users = await User.find({$or:[{phone:{$regex:q,$options:'i'}},{email:{$regex:q,$options:'i'}},{fullName:{$regex:q,$options:'i'}}]}).select('_id');
+      filter.userId={$in: users.map(u=>u._id)};
+    }
+    const total = await BNPLInvoice.countDocuments(filter);
+    const invoices = await BNPLInvoice.find(filter).sort({createdAt:-1}).skip((page-1)*limit).limit(Number(limit)).lean();
+    const uids=[...new Set(invoices.map(x=>String(x.userId)))];
+    const users = await User.find({_id:{$in:uids}}).select('phone email fullName creditBnplEnabled').lean();
+    const umap={}; users.forEach(u=>umap[String(u._id)]=u);
+    const data=invoices.map(inv=>({ ...inv, user: umap[String(inv.userId)]||null }));
+    res.json({success:true, invoices:data, total});
+  }catch(e){ res.status(500).json({success:false, message:e.message}); }
+});
+
+app.get("/api/admin/loans", adminAuth, async (req,res)=>{
+  try{
+    const { page=1, limit=20, status, q } = req.query;
+    const filter={};
+    if(status && status!=='all') filter.status=status;
+    if(q) {
+      const users = await User.find({$or:[{phone:{$regex:q,$options:'i'}},{email:{$regex:q,$options:'i'}},{fullName:{$regex:q,$options:'i'}}]}).select('_id');
+      filter.userId={$in: users.map(u=>u._id)};
+    }
+    const total = await Loan.countDocuments(filter);
+    const loans = await Loan.find(filter).sort({createdAt:-1}).skip((page-1)*limit).limit(Number(limit)).lean();
+    const uids=[...new Set(loans.map(x=>String(x.userId)))];
+    const users = await User.find({_id:{$in:uids}}).select('phone email fullName totalSpent totalOrders creditLoanEnabled').lean();
+    const umap={}; users.forEach(u=>umap[String(u._id)]=u);
+    const data=loans.map(l=>({ ...l, user: umap[String(l.userId)]||null }));
+    res.json({success:true, loans:data, total});
+  }catch(e){ res.status(500).json({success:false, message:e.message}); }
+});
+
+app.post("/api/admin/credit/toggle", adminAuth, async (req,res)=>{
+  try{
+    const { userId, field, enabled } = req.body;
+    if(!userId || !['creditBnplEnabled','creditLoanEnabled'].includes(field)) return res.status(400).json({success:false, message:'Thiếu field'});
+    const user = await User.findByIdAndUpdate(userId, {[field]: !!enabled}, {new:true}).select('phone email fullName creditBnplEnabled creditLoanEnabled');
+    if(!user) return res.status(404).json({success:false, message:'Không tìm thấy user'});
+    res.json({success:true, user});
+  }catch(e){ res.status(500).json({success:false, message:e.message}); }
+});
 
 // ══════════════════════════════════════════════════════════════
 //  SEPAY — Xử lý giao dịch vào TK (webhook + API polling)
