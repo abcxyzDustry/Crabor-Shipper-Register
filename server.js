@@ -4804,11 +4804,13 @@ app.get("/api/bnpl/summary", async (req,res) => {
   try {
     if (!req.session.userId) return res.status(401).json({success:false});
     const month = getCurrentBillingMonth();
-    // Tự động chốt bill nếu có pending mà chưa có invoice (để test không cần đợi cron 1/1)
+    // Tự động chốt bill nếu có pending mà chưa có invoice CHƯA TRẢ (issued/overdue/installment)
+    // FIX: trước đây tìm bất kỳ invoice (kể cả đã paid) nên khi tháng đã có invoice paid,
+    // các giao dịch bnpl mới bị kẹt pending_bill mãi không lên bill.
     const pendingCheck = await BNPLTx.find({userId:req.session.userId, billingMonth:month, status:'pending_bill'}).limit(1).lean();
     if(pendingCheck.length){
-      const existsInv = await BNPLInvoice.findOne({userId:req.session.userId, billingMonth:month});
-      if(!existsInv){
+      const openInv = await BNPLInvoice.findOne({userId:req.session.userId, billingMonth:month, status:{$in:['issued','overdue','installment']}}).lean();
+      if(!openInv){
         try{ await createBNPLInvoicesForMonth(month); }catch(e){ console.error('[BNPL auto-bill]',e.message); }
       }
     }
@@ -4884,7 +4886,7 @@ async function createBNPLInvoicesForMonth(billingMonth){
     for(const g of pendingByUser){
       const userId=g._id;
       const total=g.total;
-      const exists=await BNPLInvoice.findOne({userId, billingMonth:month, status:{$in:['issued','overdue','installment']}});
+      const exists=await BNPLInvoice.findOne({userId, billingMonth:month, status:{$in:['issued','overdue','installment']}}).lean();
       if(exists) {
         // Nếu đã có hóa đơn chưa trả cho tháng này, cộng dồn vào hóa đơn đó
         await BNPLInvoice.updateOne({_id: exists._id}, {$inc:{totalAmount: total, finalAmount: total}});
