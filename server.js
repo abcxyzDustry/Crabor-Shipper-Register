@@ -1854,8 +1854,24 @@ async function sendPushToUser(userId, title, body, data = {}) {
 
 
 // ══════════════════════════════════════════════════════════════
-//  EMAIL OTP — Phương án 2 (fallback khi SMS chưa dùng được)
+//  EMAIL OTP — Resend (ưu tiên) + SMTP fallback
+//  Resend: https://resend.com — HTTP API, không bị Render chặn
+//  ENV: RESEND_API_KEY=re_xxx , EMAIL_FROM=CRABOR <otp@crabor.vn> hoặc onboarding@resend.dev
 // ══════════════════════════════════════════════════════════════
+async function sendViaResend(email, subject, html, text) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return null;
+  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER || "CRABOR <onboarding@resend.dev>";
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [email], subject, html, text }),
+  });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) throw new Error(data.message || `Resend ${res.status}`);
+  return data;
+}
+
 function createEmailTransporter() {
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
@@ -1892,6 +1908,18 @@ async function sendEmailOtp(email) {
     + '<div style="color:#999;font-size:.75rem;margin-top:10px">Hết hạn sau 5 phút</div></div>'
     + '<div style="color:#aaa;font-size:.75rem;text-align:center">Không chia sẻ mã này với bất kỳ ai.</div></div>';
 
+  // Ưu tiên Resend (HTTP) — không bị Render/Gmail chặn
+  if (process.env.RESEND_API_KEY) {
+    try {
+      await sendViaResend(email, "[CRABOR] Mã OTP: " + code, html, "Ma OTP CRABOR: " + code + ". Het han sau 5 phut.");
+      console.log(" [EMAIL-OTP] Sent via Resend to " + email);
+      return { success: true };
+    } catch (e) {
+      console.error(" [EMAIL-OTP] Resend failed:", e.message, "— fallback SMTP, code:", code);
+      // rơi xuống SMTP fallback
+    }
+  }
+
   try {
     await transporter.sendMail({
       from: '"CRABOR 🦀" <' + process.env.EMAIL_USER + '>',
@@ -1900,14 +1928,12 @@ async function sendEmailOtp(email) {
       html,
       text: "Ma OTP CRABOR: " + code + ". Het han sau 5 phut.",
     });
-    console.log(" [EMAIL-OTP] Sent to " + email);
+    console.log(" [EMAIL-OTP] Sent via SMTP to " + email);
   } catch (e) {
-    // Render/Gmail chặn hoặc sai App Password → fallback log để không chặn luồng
-    console.error(" [EMAIL-OTP] send failed:", e.message, "— fallback code:", code);
+    console.error(" [EMAIL-OTP] SMTP send failed:", e.message, "— fallback code:", code);
     console.log(` [DEV-EMAIL-OTP] ${email}: ${code}`);
-    // Ở production vẫn ném lỗi để client biết, kèm dev code khi DEBUG_OTP=true
     if (process.env.DEBUG_OTP === 'true') return { success: true, dev: true, code, warning: e.message };
-    throw new Error("Không gửi được email (" + e.message + "). Vui lòng dùng đăng nhập Google (đã xác minh email) hoặc liên hệ admin để cấu hình App Password.");
+    throw new Error("Không gửi được email (" + e.message + "). Đã thử Resend+SMTP, vui lòng cấu hình RESEND_API_KEY.");
   }
   return { success: true };
 }
