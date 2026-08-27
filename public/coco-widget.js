@@ -61,7 +61,7 @@
     #cocoFab{
       position:fixed;bottom:80px;right:16px;z-index:8500;
       width:52px;height:52px;border-radius:50%;
-      background:linear-gradient(135deg,#E8504A,#c93d37);
+      background:url(/crabor-logo.png) center/cover no-repeat, linear-gradient(135deg,#E8504A,#c93d37);
       border:none;color:#fff;font-size:1.4rem;cursor:pointer;
       box-shadow:0 4px 18px rgba(232,80,74,.55);
       display:flex;align-items:center;justify-content:center;
@@ -89,8 +89,8 @@
       padding:12px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;
     }
     .coco-avatar{
-      width:34px;height:34px;border-radius:50%;
-      background:rgba(255,255,255,.2);
+      width:34px;height:34px;border-radius:8px;
+      background:url(/crabor-logo.png) center/cover no-repeat, rgba(255,255,255,.2);
       display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;
     }
     .coco-head-name{color:#fff;font-weight:900;font-size:.88rem;}
