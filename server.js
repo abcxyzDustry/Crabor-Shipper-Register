@@ -170,64 +170,9 @@ mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true 
     printBrainSetupGuide();
     startCronJobs();
     setTimeout(() => startOpsCrons(io), 3000); // delay 3s để DB ổn định
-    // Auto-seed admin nếu chưa có
-    try {
-      const existingAdmin = await Admin.findOne({ username: "admin" });
-      if (!existingAdmin) {
-        const bcrypt = require("bcryptjs");
-        const defaultPass = process.env.ADMIN_DEFAULT_PASS || "admin123";
-        const hash = await bcrypt.hash(defaultPass, 10);
-        await Admin.create({ username: "admin", password: hash, role: "admin", name: "CRABOR Admin" });
-        console.log("[OK] Admin mặc định đã được tạo: admin / " + defaultPass);
-      }
-    } catch(e) { console.error("[WARN] Không thể tạo admin seed:", e.message); }
+    // Admin seed disabled — tạo thủ công nếu cần
 
-    // ── Seed test accounts cho 3 apps ─────────────────────────
-    try {
-      const bcrypt = require("bcryptjs");
-      const hash   = await bcrypt.hash("Crabor@2025", 10);
-
-      // 1. Customer admin test account
-      const existCust = await User.findOne({ phone: "0999999999" });
-      if (!existCust) {
-        await User.create({
-          phone: "0999999999", email: "admin@crabor.vn",
-          fullName: "CRABOR Admin", password: hash,
-          role: "admin", isAdmin: true, status: "active",
-          totalOrders: 999, totalSpent: 99000000,
-          walletBalance: 10000000,
-          profileComplete: true,
-        });
-        console.log("[OK] Customer test account: 0999999999 / Crabor@2025");
-      }
-
-      // 2. Shipper admin test account
-      const existShipper = await Shipper.findOne({ phone: "0888888888" });
-      if (!existShipper) {
-        await Shipper.create({
-          phone: "0888888888", fullName: "CRABOR Shipper Test",
-          email: "shipper@crabor.vn", password: hash,
-          idCard: "079099999999", vehicleType: "bike", vehiclePlate: "51G-999.99",
-          status: "approved", online: true, isAccepting: true,
-          walletBalance: 5000000, totalEarnings: 50000000,
-          district: "Quận 1",
-        });
-        console.log("[OK] Shipper test account: 0888888888 / Crabor@2025");
-      }
-
-      // 3. Partner (FoodPartner) admin test account
-      const existPartner = await FoodPartner.findOne({ phone: "0777777777" });
-      if (!existPartner) {
-        await FoodPartner.create({
-          phone: "0777777777", bizName: "CRABOR Test Restaurant",
-          email: "partner@crabor.vn", password: hash,
-          address: "123 Nguyễn Huệ, Q1, TP.HCM",
-          district: "Quận 1", status: "approved",
-          isAccepting: true, walletBalance: 5000000,
-        });
-        console.log("[OK] Partner test account: 0777777777 / Crabor@2025");
-      }
-    } catch(e) { console.error("[WARN] Seed test accounts:", e.message); }
+    // Test seed disabled — không tạo 0999999999 / 0888888888 / 0777777777
   })
   .catch(err => { console.error("[ERR] MongoDB error:", err.message); process.exit(1); });
 
