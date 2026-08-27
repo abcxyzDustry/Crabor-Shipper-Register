@@ -37,12 +37,12 @@
   };
 
   const WELCOME_MSG = {
-    customer: '👋 Xin chào! Em là **Coco** — trợ lý AI của CRABOR 🦀\nAnh/chị cần hỗ trợ gì ạ?',
-    shipper:  '🛵 Xin chào! Em là **Coco** — trợ lý CRABOR 🦀\nAnh/chị cần hỗ trợ gì về Shipper không ạ?',
-    partner:  '🤝 Xin chào! Em là **Coco** — trợ lý CRABOR 🦀\nAnh/chị đối tác cần hỗ trợ gì ạ?',
-    register: '🦀 Xin chào! Em là **Coco** — AI của CRABOR!\nAnh/chị đang đăng ký dịch vụ gì? Em có thể giải đáp ngay!',
+    customer: '👋 Xin chào! Em là **Coco** — trợ lý AI của CRABOR\nAnh/chị cần hỗ trợ gì ạ?',
+    shipper:  '🛵 Xin chào! Em là **Coco** — trợ lý CRABOR\nAnh/chị cần hỗ trợ gì về Shipper không ạ?',
+    partner:  '🤝 Xin chào! Em là **Coco** — trợ lý CRABOR\nAnh/chị đối tác cần hỗ trợ gì ạ?',
+    register: 'Xin chào! Em là **Coco** — AI của CRABOR!\nAnh/chị đang đăng ký dịch vụ gì? Em có thể giải đáp ngay!',
     admin:    '👋 Xin chào Admin! Em là **Coco AI** — sẵn sàng hỗ trợ ạ.',
-    default:  '🦀 Xin chào! Em là **Coco** — trợ lý AI của CRABOR!\nAnh/chị cần hỗ trợ gì ạ?',
+    default:  'Xin chào! Em là **Coco** — trợ lý AI của CRABOR!\nAnh/chị cần hỗ trợ gì ạ?',
   };
 
   // ── Session ────────────────────────────────────────────
@@ -175,11 +175,11 @@
   const wrapper = document.createElement('div');
   wrapper.innerHTML = `
     <button id="cocoFab" aria-label="Chat với Coco AI">
-      🦀<div id="cocoBadge"></div>
+      <img src="/favicon.png" style="width:30px;height:30px;border-radius:8px"><div id="cocoBadge"></div>
     </button>
     <div id="cocoWin" role="dialog" aria-label="Coco AI Chat">
       <div class="coco-head">
-        <div class="coco-avatar">🦀</div>
+        <div class="coco-avatar"><img src="/favicon.png" style="width:26px;height:26px;border-radius:7px"></div>
         <div>
           <div class="coco-head-name">Coco — CRABOR AI</div>
           <div class="coco-head-status">
