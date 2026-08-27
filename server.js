@@ -4817,7 +4817,7 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     // Admin lu�n �? �i?u ki?n; �i?u ki?n m? kho�: t?ng chi ti�u ? 5.000.000�
     const spent      = user.totalSpent || 0;
     const eligible   = user.isAdmin || user.creditBnplEnabled || spent >= 5000000;
-    const limit      = eligible ? getBnplLimit(spent) : 0;
+    const limit      = eligible ? (user.creditBnplEnabled ? Math.max(2000000, getBnplLimit(spent)) : getBnplLimit(spent)) : 0;
     const month      = getCurrentBillingMonth();
     const txs        = await BNPLTx.find({ userId:req.session.userId, billingMonth:month, status:{$in:['pending_bill','billed']} });
     const usedThisMonth = txs.reduce((s,t)=>s+t.amount,0);
@@ -4842,8 +4842,8 @@ app.post("/api/bnpl/use", async (req,res) => {
     const {orderId, amount, serviceType='food'} = req.body;
     const amt = Number(amount);
     if (!amt||amt<=0) return res.status(400).json({success:false,message:'Số tiền không hợp lệ'});
-    const user = await User.findById(req.session.userId).select('totalSpent');
-    const limit = getBnplLimit(user?.totalSpent||0);
+    const user = await User.findById(req.session.userId).select('totalSpent creditBnplEnabled');
+    const limit = user?.creditBnplEnabled ? Math.max(2000000, getBnplLimit(user?.totalSpent||0)) : getBnplLimit(user?.totalSpent||0);
     if (!limit) return res.status(403).json({success:false,message:'Chưa đủ điều kiện (cần giao dịch từ 2.000.000đ)'});
     const month = getCurrentBillingMonth();
     const txs = await BNPLTx.find({userId:req.session.userId, billingMonth:month, status:{$in:['pending_bill','billed']}});
@@ -5207,7 +5207,7 @@ app.post("/api/loan/apply", async (req, res) => {
     if (!identitySummary(_me).googleVerified)
       return res.status(403).json({ success:false, requireGoogleVerify:true, message:'Cần xác thực danh tính qua Google trước khi vay' });
     const user = await User.findById(req.session.userId).select('totalSpent fullName');
-    if (!user || (user.totalSpent||0) < 2000000)
+    if (!user || (!user.creditLoanEnabled && (user.totalSpent||0) < 2000000))
       return res.status(403).json({ success:false, message:'Chưa đủ điều kiện (cần giao dịch từ 2.000.000đ)' });
     const existing = await Loan.findOne({ userId: req.session.userId, status:{$in:['pending','approved','active']} });
     if (existing) return res.status(400).json({ success:false, message:'Bạn đang có khoản vay chưa tất toán' });
