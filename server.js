@@ -522,6 +522,7 @@ const userSchema = new mongoose.Schema({
   phoneVerified:   { type: Boolean, default: false },
   creditBnplEnabled: { type: Boolean, default: false },
   creditLoanEnabled: { type: Boolean, default: false },
+  transactionPassword: { type: String },   // bcrypt hash — mật khẩu giao dịch (xác nhận vay/thanh toán)
   kycStatus:       { type: String, enum: ["none","pending","verified","rejected"], default: "none" },
   kyc:             {
     selfie:      String,
@@ -5286,10 +5287,20 @@ app.post("/api/loan/apply", async (req, res) => {
       return res.status(403).json({ success:false, message:'Chưa đủ điều kiện (cần giao dịch từ 2.000.000đ)' });
     const existing = await Loan.findOne({ userId: req.session.userId, status:{$in:['pending','approved','active']} });
     if (existing) return res.status(400).json({ success:false, message:'Bạn đang có khoản vay chưa tất toán' });
-    const { amount, termMonths=3 } = req.body;
+    const { amount, termMonths=3, transactionPassword } = req.body;
     const amt = Number(amount);
     if (amt < 1000000)  return res.status(400).json({ success:false, message:'Tối thiểu 1.000.000đ' });
-    if (amt > 50000000) return res.status(400).json({ success:false, message:'Tối đa 50.000.000đ' });
+    if (amt > 10000000) return res.status(400).json({ success:false, message:'Tối đa 10.000.000đ' });
+    // Xác thực mật khẩu giao dịch CRABOR
+    const _fullUser = await User.findById(req.session.userId).select('transactionPassword');
+    if (!_fullUser?.transactionPassword)
+      return res.status(400).json({ success:false, requireTransactionPassword:true, message:'Bạn chưa đặt mật khẩu giao dịch. Vui lòng đặt mật khẩu giao dịch trước khi vay.' });
+    if (!transactionPassword)
+      return res.status(400).json({ success:false, message:'Nhập mật khẩu giao dịch' });
+    const bcrypt = require("bcryptjs");
+    const pwOk = await bcrypt.compare(transactionPassword, _fullUser.transactionPassword);
+    if (!pwOk)
+      return res.status(400).json({ success:false, message:'Mật khẩu giao dịch không đúng' });
     const rate = 1.5; // %/tháng
     const totalRepay = Math.round(amt * (1 + rate/100 * termMonths));
     const loan = await Loan.create({ userId: req.session.userId, amount:amt, termMonths, interestRate:rate, totalRepay, status:'pending' });
@@ -7073,7 +7084,32 @@ app.post("/api/auth/check-account", async (req, res) => {
   }
 });
 
-// POST /api/auth/forgot-password — gửi email reset
+// POST /api/auth/set-transaction-password — đặt/đổi mật khẩu giao dịch (xác nhận vay)
+app.post("/api/auth/set-transaction-password", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.userId) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    const { password } = req.body;
+    if (!password || password.length < 6)
+      return res.status(400).json({ success:false, message:"Mật khẩu giao dịch tối thiểu 6 ký tự" });
+    const user = await User.findById(req.session.userId);
+    if (!user) return res.status(404).json({ success:false, message:"Không tìm thấy tài khoản" });
+    // Nếu tài khoản có mật khẩu đăng nhập form, yêu cầu nhập đúng để đổi (bảo mật)
+    if (user.password) {
+      const current = req.body.currentPassword;
+      if (!current) return res.status(400).json({ success:false, message:"Nhập mật khẩu đăng nhập hiện tại để xác nhận" });
+      const bcrypt = require("bcryptjs");
+      const ok = await bcrypt.compare(current, user.password);
+      if (!ok) return res.status(400).json({ success:false, message:"Mật khẩu đăng nhập hiện tại không đúng" });
+    }
+    const bcrypt = require("bcryptjs");
+    const hash = await bcrypt.hash(password, 10);
+    await User.findByIdAndUpdate(user._id, { transactionPassword: hash });
+    res.json({ success:true, message:"Đã lưu mật khẩu giao dịch" });
+  } catch (err) {
+    res.status(500).json({ success:false, message: err.message });
+  }
+});
 app.post("/api/auth/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
