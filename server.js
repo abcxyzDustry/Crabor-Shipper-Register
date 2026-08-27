@@ -4816,7 +4816,11 @@ app.get("/api/bnpl/summary", async (req,res) => {
     }
     const pending = await BNPLTx.find({userId:req.session.userId, billingMonth:month, status:'pending_bill'}).sort({createdAt:-1});
     const total = pending.reduce((s,t)=>s+t.amount,0);
-    const invoices = await BNPLInvoice.find({userId:req.session.userId}).sort({createdAt:-1}).limit(12);
+    const invoices = await BNPLInvoice.find({userId:req.session.userId}).sort({createdAt:-1}).limit(12).lean();
+    // FIX: kèm chi tiết từng giao dịch (BNPLTx) của mỗi hóa đơn để app hiển thị "đã thanh toán cho gì"
+    for (const inv of invoices) {
+      inv.txs = await BNPLTx.find({ invoiceId: inv._id }).sort({ createdAt: 1 }).lean();
+    }
     res.json({success:true, currentMonth:month, pendingTotal:total, pendingTxs:pending, invoices});
   } catch(e){res.status(500).json({success:false,message:e.message});}
 });
@@ -4894,13 +4898,44 @@ async function createBNPLInvoicesForMonth(billingMonth){
         console.log(`[BNPL] Added ${total} to existing invoice ${exists._id} for ${userId} month ${month}`);
         continue;
       }
+      // FIX race: claim từng tx pending_bill → billed với invoiceId tạm thời TRƯỚC khi tạo invoice.
+      // Nếu 2 tiến trình cùng gọi, chỉ 1 thắng ở updateOne này (filter status:'pending_bill'),
+      // tiến trình kia không claim thêm được nên không tạo invoice đôi.
       const {issuedAt, dueDate}=getNextBillingDates();
-      const inv=await BNPLInvoice.create({
-        userId, billingMonth:month, totalAmount:total, finalAmount:total,
-        issuedAt, dueDate, status:'issued', lateFee:0, installFee:0
-      });
-      await BNPLTx.updateMany({_id:{$in:g.txIds}}, {$set:{status:'billed', invoiceId:inv._id}});
-      console.log(`[BNPL] Created invoice ${inv._id} for ${userId} month ${month} total ${total}`);
+      let createdInv = null;
+      for (const txId of g.txIds) {
+        const claim = await BNPLTx.findOneAndUpdate(
+          { _id: txId, status: 'pending_bill' },
+          { $set: { status: 'billed' } },
+          { new: true }
+        );
+        if (!claim) continue; // tx đã bị tiến trình khác claim
+        // Đảm bảo đã có invoice (tạo nếu là tx đầu tiên claim được)
+        if (!createdInv) {
+          createdInv = await BNPLInvoice.findOne({ userId, billingMonth: month, status: { $in: ['issued','overdue','installment'] } }).lean();
+          if (!createdInv) {
+            try {
+              createdInv = await BNPLInvoice.create({
+                userId, billingMonth: month, totalAmount: 0, finalAmount: 0,
+                issuedAt, dueDate, status: 'issued', lateFee: 0, installFee: 0
+              });
+              console.log(`[BNPL] Created invoice ${createdInv._id} for ${userId} month ${month}`);
+            } catch (dupErr) {
+              // ai đó vừa tạo cùng lúc → dùng lại invoice vừa tạo
+              createdInv = await BNPLInvoice.findOne({ userId, billingMonth: month, status: { $in: ['issued','overdue','installment'] } }).lean();
+              if (!createdInv) throw dupErr;
+            }
+          }
+        }
+        await BNPLTx.updateOne({ _id: txId }, { $set: { invoiceId: createdInv._id } });
+        await BNPLInvoice.updateOne({ _id: createdInv._id }, { $inc: { totalAmount: claim.amount || 0, finalAmount: claim.amount || 0 } });
+      }
+      if (!createdInv) {
+        // không claim được tx nào (đã bị xử lý) — không tạo invoice thừa
+        console.log(`[BNPL] No tx claimed for ${userId} month ${month}, skip`);
+      } else {
+        console.log(`[BNPL] Billed ${g.txIds.length} tx(s) into ${createdInv._id} for ${userId} month ${month} total ${total}`);
+      }
     }
   }
 }
@@ -5030,6 +5065,47 @@ async function refundOnAutoCancel(order) {
     }
     return 'no_refund';
   } catch(e) { console.error('[AutoCancel] hoàn tiền lỗi:', e.message); return 'error'; }
+}
+
+// ── REFUND ON MANUAL CANCEL — hoàn tiền khi KHÁCH hủy đơn ──
+// wallet: hoàn về ví CRABOR | bnpl pending_bill: xoá giao dịch trả sau
+// bnpl billed (đã vào hóa đơn): trừ đúng invoice đó
+async function refundOnCancel(order) {
+  try {
+    const amt = order.finalTotal
+      ?? order.finalPrice
+      ?? Math.max(0, (order.total || order.estimatedTotal || order.price || 0)
+        + (order.shipFee || 0) + (order.serviceFee || 0)
+        - (order.discount || order.voucherDiscount || 0));
+    const cid = order.customerId || order.customer;
+    if (!cid) return 'no_refund';
+
+    if (order.paymentMethod === 'wallet' && amt > 0) {
+      await walletCredit(cid, 'user', amt, order.orderId, `Hoàn tiền đơn ${order.orderId} (khách hủy)`);
+      global._io?.to(`customer_${cid}`).emit('walletCredited', { amount: amt, orderId: order.orderId, message: `Hoàn ${amt.toLocaleString('vi-VN')}đ vào ví CRABOR (đơn đã hủy)` });
+      return 'refunded_wallet';
+    }
+
+    if (order.paymentMethod === 'bnpl') {
+      // Xoá giao dịch trả sau còn pending (chưa lên hóa đơn)
+      const del = await BNPLTx.deleteMany({ orderId: order.orderId, status: 'pending_bill' });
+      // Nếu đã billed (đã vào hóa đơn) thì trừ ra khỏi invoice
+      const billedTx = await BNPLTx.find({ orderId: order.orderId, status: { $in: ['billed', 'paid'] } });
+      for (const tx of billedTx) {
+        if (tx.invoiceId) {
+          const inv = await BNPLInvoice.findById(tx.invoiceId);
+          if (inv && inv.status !== 'paid') {
+            const newTotal = Math.max(0, (inv.totalAmount || 0) - (tx.amount || 0));
+            const newFinal = Math.max(0, (inv.finalAmount || 0) - (tx.amount || 0));
+            await BNPLInvoice.updateOne({ _id: inv._id }, { $set: { totalAmount: newTotal, finalAmount: newFinal } });
+          }
+          await BNPLTx.updateOne({ _id: tx._id }, { $set: { status: 'pending_bill', invoiceId: null } });
+        }
+      }
+      return (del.deletedCount > 0 || billedTx.length > 0) ? 'bnpl_reversed' : 'no_refund';
+    }
+    return 'no_refund';
+  } catch(e) { console.error('[Cancel] hoàn tiền lỗi:', e.message); return 'error'; }
 }
 
 setInterval(async () => {
@@ -8443,6 +8519,9 @@ app.patch("/api/orders/:id/cancel", async (req, res) => {
     await order.save();
     notifyDiscord("cancelled", order);
 
+    // Hoàn tiền ví / gỡ ví trả sau khi khách hủy
+    try { await refundOnCancel(order); } catch(e) { console.error('[Cancel] refundOnCancel lỗi:', e.message); }
+
     // Notify shipper nếu đã assigned
     if (order.shipperId) {
       req.io.to(`shipper_${order.shipperId}`).emit("order_cancelled", {
@@ -9393,6 +9472,9 @@ app.patch("/api/ride/:id/cancel", async (req, res) => {
     order.statusHistory.push({ status: "cancelled", by: "customer", time: new Date() });
     await order.save();
 
+    // Hoàn tiền ví / gỡ ví trả sau khi khách huỷ chuyến
+    try { await refundOnCancel(order); } catch(e) { console.error('[Cancel Ride] refundOnCancel lỗi:', e.message); }
+
     if (order.shipperId) {
       req.io.to(`shipper_${order.shipperId}`).emit("ride_cancelled", {
         orderId: order.orderId,
@@ -9593,6 +9675,8 @@ app.patch("/api/cleaning/orders/:id/cancel", async (req, res) => {
     order.status = "cancelled";
     order.statusHistory.push({ status: "cancelled", by: "customer", time: new Date() });
     await order.save();
+    // Hoàn tiền ví / gỡ ví trả sau khi khách hủy
+    try { await refundOnCancel(order); } catch(e) { console.error('[Cancel Cleaning] refundOnCancel lỗi:', e.message); }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -10584,6 +10668,9 @@ app.patch("/api/laundry/orders/:id/cancel", async (req, res) => {
     order.cancelReason = req.body.reason || "Khách hàng hủy";
     order.cancelledAt = new Date();
     await order.save();
+
+    // Hoàn tiền ví / gỡ ví trả sau khi khách hủy
+    try { await refundOnCancel(order); } catch(e) { console.error('[Laundry Cancel] refundOnCancel lỗi:', e.message); }
 
     // Notify partner
     if (order.partnerId) {
@@ -13292,6 +13379,48 @@ app.post("/api/ride/book", async (req, res) => {
       await rideOrder.save();
       await walletDebit(req.session.userId, "user", amt, "debit", rideOrder.orderId, `Thanh toán cuốc xe ${rideOrder.orderId} bằng ví CRABOR`);
       req.io.to(`customer_${req.session.userId}`).emit("walletDebited", { amount: amt, orderId: rideOrder.orderId });
+    }
+
+    // ── VÍ TRẢ SAU (BNPL): check điều kiện + hạn mức, ghi nợ trả sau cho cuốc xe ──
+    const isBnplRide = (ridePayMethod || "cash") === "bnpl";
+    let bnplRideMonth = null;
+    let bnplRideAmount = 0;
+    if (isBnplRide) {
+      bnplRideAmount = Math.max(0, rideOrder.finalTotal ?? (fee + Math.round(fee * 0.1) - (rideDiscount || 0)));
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled");
+      const bnplEligible = bnplUser?.isAdmin || bnplUser?.creditBnplEnabled || (bnplUser?.totalSpent||0) >= 5000000;
+      if (!bnplEligible) {
+        await Order.findByIdAndDelete(rideOrder._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
+        return res.status(403).json({ success: false, bnplNotEligible: true, message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Tổng chi tiêu cần tối thiểu 5.000.000đ." });
+      }
+      const bnplLimit = bnplUser?.creditBnplEnabled ? Math.max(2000000, getBnplLimit(bnplUser?.totalSpent||0)) : getBnplLimit(bnplUser?.totalSpent||0);
+      bnplRideMonth = getCurrentBillingMonth();
+      const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplRideMonth, status:{$in:['pending_bill','billed']} });
+      const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
+      if (bnplUsed + bnplRideAmount > bnplLimit) {
+        await Order.findByIdAndDelete(rideOrder._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
+        return res.status(400).json({ success: false, bnplLimitExceeded: true, message: `Vượt hạn mức Ví Trả Sau. Hạn mức: ${bnplLimit.toLocaleString("vi-VN")}đ, còn lại: ${Math.max(0, bnplLimit-bnplUsed).toLocaleString("vi-VN")}đ, cần: ${bnplRideAmount.toLocaleString("vi-VN")}đ.` });
+      }
+      rideOrder.paymentStatus = "paid";
+      rideOrder.paidAt = new Date();
+      await rideOrder.save();
+      try {
+        await BNPLTx.create({
+          userId: req.session.userId,
+          orderId: rideOrder.orderId,
+          amount: bnplRideAmount,
+          serviceType: "ride",
+          billingMonth: bnplRideMonth,
+        });
+        req.io.to(`customer_${req.session.userId}`).emit("bnplUsed", {
+          amount: bnplRideAmount, orderId: rideOrder.orderId,
+          message: `Cuốc xe ${rideOrder.orderId} đã vào Ví Trả Sau — thanh toán trước ngày 15 tháng sau`,
+        });
+      } catch (bnplErr) {
+        console.error('[BNPL] tạo BNPLTx ride lỗi:', bnplErr.message);
+      }
     }
 
     // Tìm shipper gần nhất (dùng fromLat/fromLng của customer)
