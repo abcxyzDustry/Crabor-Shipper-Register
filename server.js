@@ -12811,8 +12811,8 @@ app.post("/api/order", async (req, res) => {
     let bnplOrderAmount = 0;
     if (isBnplPay) {
       bnplOrderAmount = Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
-      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin");
-      const bnplEligible = bnplUser?.isAdmin || (bnplUser?.totalSpent||0) >= 5000000;
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled");
+      const bnplEligible = bnplUser?.isAdmin || bnplUser?.creditBnplEnabled || (bnplUser?.totalSpent||0) >= 5000000;
       if (!bnplEligible) {
         return res.status(403).json({
           success: false,
@@ -12820,7 +12820,7 @@ app.post("/api/order", async (req, res) => {
           message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Tổng chi tiêu cần tối thiểu 5.000.000đ.",
         });
       }
-      const bnplLimit = getBnplLimit(bnplUser?.totalSpent||0);
+      const bnplLimit = bnplUser?.creditBnplEnabled ? Math.max(2000000, getBnplLimit(bnplUser?.totalSpent||0)) : getBnplLimit(bnplUser?.totalSpent||0);
       bnplBillingMonth = getCurrentBillingMonth();
       const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplBillingMonth, status:{$in:['pending_bill','billed']} });
       const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
