@@ -1208,7 +1208,9 @@ const bnplTxSchema = new mongoose.Schema({
   userId:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   orderId:      { type: String, trim: true },
   serviceType:  { type: String, default: 'food' },  // food, laundry, cleaning...
-  amount:       { type: Number, required: true },
+  amount:       { type: Number, required: true },   // baseAmount + fee (tổng ghi nợ trả sau)
+  baseAmount:   { type: Number, default: 0 },       // tổng đơn gốc (trước phí)
+  fee:          { type: Number, default: 0 },       // phí giao dịch trả sau (3% baseAmount)
   billingMonth: { type: String, required: true },   // "2026-07" — tháng tính vào hóa đơn
   status:       { type: String, enum: ['pending_bill','billed','paid'], default: 'pending_bill' },
   invoiceId:    { type: mongoose.Schema.Types.ObjectId }, // thuộc hóa đơn nào
@@ -1219,10 +1221,11 @@ const BNPLTx = mongoose.model('BNPLTx', bnplTxSchema);
 const bnplInvoiceSchema = new mongoose.Schema({
   userId:         { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   billingMonth:   { type: String, required: true },  // "2026-07"
-  totalAmount:    { type: Number, required: true },   // tổng tiền gốc tháng đó
+  totalAmount:    { type: Number, required: true },   // tổng tiền gốc tháng đó (không gồm phí)
+  bnplFee:        { type: Number, default: 0 },       // tổng phí giao dịch trả sau 3% (các giao dịch)
   lateFee:        { type: Number, default: 0 },       // phí 30k nếu trễ
   installFee:     { type: Number, default: 0 },       // phí 10% nếu trả góp
-  finalAmount:    { type: Number, required: true },   // totalAmount + fees
+  finalAmount:    { type: Number, required: true },   // totalAmount + bnplFee + fees
   isInstallment:  { type: Boolean, default: false },
   installTerms:   { type: Number, default: 1 },       // số kỳ
   installPaid:    { type: Number, default: 0 },       // số kỳ đã trả
@@ -1251,6 +1254,9 @@ function getCurrentBillingMonth() {
   const now = new Date();
   return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
 }
+// Phí giao dịch trả sau = 3% trên tổng đơn hàng (tách riêng trên hóa đơn)
+const BNPL_FEE_RATE = 0.03;
+const bnplFeeOf = (base) => Math.round((Number(base) || 0) * BNPL_FEE_RATE);
 function getNextBillingDates() {
   const now = new Date();
   const next = new Date(now.getFullYear(), now.getMonth()+1, 1);
@@ -4798,15 +4804,16 @@ app.post("/api/bnpl/use", async (req,res) => {
     const {orderId, amount, serviceType='food'} = req.body;
     const amt = Number(amount);
     if (!amt||amt<=0) return res.status(400).json({success:false,message:'Số tiền không hợp lệ'});
+    const fee = bnplFeeOf(amt);
     const user = await User.findById(req.session.userId).select('totalSpent creditBnplEnabled');
     const limit = user?.creditBnplEnabled ? Math.max(2000000, getBnplLimit(user?.totalSpent||0)) : getBnplLimit(user?.totalSpent||0);
     if (!limit) return res.status(403).json({success:false,message:'Chưa đủ điều kiện (cần giao dịch từ 2.000.000đ)'});
     const month = getCurrentBillingMonth();
     const txs = await BNPLTx.find({userId:req.session.userId, billingMonth:month, status:{$in:['pending_bill','billed']}});
     const used = txs.reduce((s,t)=>s+t.amount,0);
-    if (used+amt>limit) return res.status(400).json({success:false,message:`Vượt hạn mức (còn ${(limit-used).toLocaleString('vi-VN')}đ)`});
-    const tx = await BNPLTx.create({userId:req.session.userId, orderId, amount:amt, serviceType, billingMonth:month});
-    res.json({success:true, data:tx, message:`Trả sau ${amt.toLocaleString('vi-VN')}đ. Thanh toán trước ngày 15/${month.slice(5)}/${month.slice(0,4)}`});
+    if (used+amt+fee>limit) return res.status(400).json({success:false,message:`Vượt hạn mức (còn ${(limit-used).toLocaleString('vi-VN')}đ)`});
+    const tx = await BNPLTx.create({userId:req.session.userId, orderId, baseAmount:amt, fee, amount:amt+fee, serviceType, billingMonth:month});
+    res.json({success:true, data:tx, message:`Trả sau ${amt.toLocaleString('vi-VN')}đ (gồm phí ${fee.toLocaleString('vi-VN')}đ). Thanh toán trước ngày 15/${month.slice(5)}/${month.slice(0,4)}`});
   } catch(e){res.status(500).json({success:false,message:e.message});}
 });
 
@@ -4849,9 +4856,9 @@ app.post("/api/bnpl/invoice/:id/prepare-pay", async (req,res) => {
     const lateFee = late ? 30000 : 0;
     // Số tiền phải trả lần này: trả góp → chỉ KỲ HIỆN TẠI; không trả góp → toàn bộ bill
     const isInstall = inv.isInstallment && inv.status === 'installment';
-    let dueNow = inv.totalAmount + inv.installFee + lateFee;
+    let dueNow = inv.totalAmount + (inv.bnplFee || 0) + inv.installFee + lateFee;
     if (isInstall) {
-      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + inv.installFee)/(inv.installTerms||1));
+      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + (inv.bnplFee || 0) + inv.installFee)/(inv.installTerms||1));
       dueNow = Math.max(0, Math.min(perTerm, inv.finalAmount || 0));
     }
     const sePayRef = 'BNPL'+inv._id.toString().slice(-8).toUpperCase();
@@ -4880,7 +4887,7 @@ app.post("/api/bnpl/invoice/:id/installment", async (req,res) => {
     if (!inv) return res.status(404).json({success:false,message:'Không tìm thấy hoặc không đủ điều kiện'});
     // Phí trả góp = 10% chi phí gốc cho MỖI tháng (không phải 10% một lần)
     const installFee = Math.round(inv.totalAmount * 0.10 * Number(terms));
-    const finalAmount = inv.totalAmount+installFee;
+    const finalAmount = inv.totalAmount + (inv.bnplFee || 0) + installFee;
     const perTerm = Math.ceil(finalAmount/Number(terms));
     await BNPLInvoice.findByIdAndUpdate(inv._id,{isInstallment:true,installTerms:Number(terms),installFee,finalAmount,perTerm,installPaid:0,status:'installment'});
     res.json({success:true, installFee, finalAmount, perTerm, terms:Number(terms),
@@ -4906,17 +4913,19 @@ async function createBNPLInvoicesForMonth(billingMonth){
   for(const month of months){
     const pendingByUser = await BNPLTx.aggregate([
       {$match:{billingMonth:month, status:'pending_bill'}},
-      {$group:{_id:'$userId', total:{$sum:'$amount'}, txIds:{$push:'$_id'}}}
+      {$group:{_id:'$userId', base:{ $sum:'$baseAmount' }, fee:{ $sum:'$fee' }, total:{ $sum:'$amount' }, txIds:{ $push:'$_id' }}}
     ]);
     for(const g of pendingByUser){
       const userId=g._id;
+      const base=g.base||0;
+      const fee=g.fee||0;
       const total=g.total;
       const exists=await BNPLInvoice.findOne({userId, billingMonth:month, status:{$in:['issued','overdue','installment']}}).lean();
       if(exists) {
         // Nếu đã có hóa đơn chưa trả cho tháng này, cộng dồn vào hóa đơn đó
-        await BNPLInvoice.updateOne({_id: exists._id}, {$inc:{totalAmount: total, finalAmount: total}});
+        await BNPLInvoice.updateOne({_id: exists._id}, {$inc:{totalAmount: base, bnplFee: fee, finalAmount: total}});
         await BNPLTx.updateMany({_id:{$in:g.txIds}}, {$set:{status:'billed', invoiceId:exists._id}});
-        console.log(`[BNPL] Added ${total} to existing invoice ${exists._id} for ${userId} month ${month}`);
+        console.log(`[BNPL] Added ${total} (fee ${fee}) to existing invoice ${exists._id} for ${userId} month ${month}`);
         continue;
       }
       // FIX race: claim từng tx pending_bill → billed với invoiceId tạm thời TRƯỚC khi tạo invoice.
@@ -4937,7 +4946,7 @@ async function createBNPLInvoicesForMonth(billingMonth){
           if (!createdInv) {
             try {
               createdInv = await BNPLInvoice.create({
-                userId, billingMonth: month, totalAmount: 0, finalAmount: 0,
+                userId, billingMonth: month, totalAmount: 0, bnplFee: 0, finalAmount: 0,
                 issuedAt, dueDate, status: 'issued', lateFee: 0, installFee: 0
               });
               console.log(`[BNPL] Created invoice ${createdInv._id} for ${userId} month ${month}`);
@@ -4949,7 +4958,7 @@ async function createBNPLInvoicesForMonth(billingMonth){
           }
         }
         await BNPLTx.updateOne({ _id: txId }, { $set: { invoiceId: createdInv._id } });
-        await BNPLInvoice.updateOne({ _id: createdInv._id }, { $inc: { totalAmount: claim.amount || 0, finalAmount: claim.amount || 0 } });
+        await BNPLInvoice.updateOne({ _id: createdInv._id }, { $inc: { totalAmount: claim.baseAmount || 0, bnplFee: claim.fee || 0, finalAmount: claim.amount || 0 } });
       }
       if (!createdInv) {
         // không claim được tx nào (đã bị xử lý) — không tạo invoice thừa
@@ -4998,10 +5007,10 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
     // ── Số tiền phải trả lần này ─────────────────────────────
     // Nếu là trả góp: chỉ trả KỲ HIỆN TẠI (perTerm), không trả toàn bộ bill.
     // finalAmount = tổng còn nợ; kỳ cuối = phần còn lại của finalAmount.
-    let dueNow = inv.totalAmount + inv.installFee + lateFee; // không trả góp → thanh toán toàn bộ
+    let dueNow = inv.totalAmount + (inv.bnplFee || 0) + inv.installFee + lateFee; // không trả góp → thanh toán toàn bộ
     let isInstall = inv.status === 'installment' && inv.isInstallment;
     if (isInstall) {
-      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + inv.installFee) / (inv.installTerms || 1));
+      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + (inv.bnplFee || 0) + inv.installFee) / (inv.installTerms || 1));
       dueNow = Math.max(0, Math.min(perTerm, inv.finalAmount || 0));
       if (dueNow <= 0) return res.status(400).json({success:false,message:'Hóa đơn đã trả đủ các kỳ'});
     }
@@ -5155,9 +5164,10 @@ async function refundOnCancel(order) {
         if (tx.invoiceId) {
           const inv = await BNPLInvoice.findById(tx.invoiceId);
           if (inv && inv.status !== 'paid') {
-            const newTotal = Math.max(0, (inv.totalAmount || 0) - (tx.amount || 0));
+            const newTotal = Math.max(0, (inv.totalAmount || 0) - (tx.baseAmount || tx.amount || 0));
+            const newFee = Math.max(0, (inv.bnplFee || 0) - (tx.fee || 0));
             const newFinal = Math.max(0, (inv.finalAmount || 0) - (tx.amount || 0));
-            await BNPLInvoice.updateOne({ _id: inv._id }, { $set: { totalAmount: newTotal, finalAmount: newFinal } });
+            await BNPLInvoice.updateOne({ _id: inv._id }, { $set: { totalAmount: newTotal, bnplFee: newFee, finalAmount: newFinal } });
           }
           await BNPLTx.updateOne({ _id: tx._id }, { $set: { status: 'pending_bill', invoiceId: null } });
         }
@@ -13020,7 +13030,7 @@ app.post("/api/order", async (req, res) => {
       bnplBillingMonth = getCurrentBillingMonth();
       const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplBillingMonth, status:{$in:['pending_bill','billed']} });
       const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
-      if (bnplUsed + bnplOrderAmount > bnplLimit) {
+      if (bnplUsed + bnplOrderAmount + bnplFeeOf(bnplOrderAmount) > bnplLimit) {
         return res.status(400).json({
           success: false,
           bnplLimitExceeded: true,
@@ -13049,7 +13059,9 @@ app.post("/api/order", async (req, res) => {
         await BNPLTx.create({
           userId: req.session.userId,
           orderId: order.orderId,
-          amount: bnplOrderAmount,
+          baseAmount: bnplOrderAmount,
+          fee: bnplFeeOf(bnplOrderAmount),
+          amount: bnplOrderAmount + bnplFeeOf(bnplOrderAmount),
           serviceType: order.module || 'food',
           billingMonth: bnplBillingMonth,
         });
@@ -13509,7 +13521,7 @@ app.post("/api/ride/book", async (req, res) => {
       bnplRideMonth = getCurrentBillingMonth();
       const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplRideMonth, status:{$in:['pending_bill','billed']} });
       const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
-      if (bnplUsed + bnplRideAmount > bnplLimit) {
+      if (bnplUsed + bnplRideAmount + bnplFeeOf(bnplRideAmount) > bnplLimit) {
         await Order.findByIdAndDelete(rideOrder._id);
         if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
         return res.status(400).json({ success: false, bnplLimitExceeded: true, message: `Vượt hạn mức Ví Trả Sau. Hạn mức: ${bnplLimit.toLocaleString("vi-VN")}đ, còn lại: ${Math.max(0, bnplLimit-bnplUsed).toLocaleString("vi-VN")}đ, cần: ${bnplRideAmount.toLocaleString("vi-VN")}đ.` });
@@ -13521,7 +13533,9 @@ app.post("/api/ride/book", async (req, res) => {
         await BNPLTx.create({
           userId: req.session.userId,
           orderId: rideOrder.orderId,
-          amount: bnplRideAmount,
+          baseAmount: bnplRideAmount,
+          fee: bnplFeeOf(bnplRideAmount),
+          amount: bnplRideAmount + bnplFeeOf(bnplRideAmount),
           serviceType: "ride",
           billingMonth: bnplRideMonth,
         });
