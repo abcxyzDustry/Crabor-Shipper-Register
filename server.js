@@ -574,6 +574,7 @@ const productSchema = new mongoose.Schema({
   available:   { type: Boolean, default: true },
   sold:        { type: Number, default: 0, min: 0 },
   rating:      { type: Number, default: 0, min: 0, max: 5 },
+  violationKeyword: { type: String, default: null },  // từ khóa vi phạm chính sách (nếu có)
 }, { timestamps: true });
 
 productSchema.index({ partnerId: 1, available: 1 });   // menu query
@@ -931,6 +932,10 @@ const foodPartnerSchema = new mongoose.Schema({
   featuredHours:    Number,
   featuredPackage:  String,
   featuredAt:       Date,
+  // ── Chặn do vi phạm chính sách đăng món ──
+  blockedUntil:     { type: Date },          // khóa quán tới giờ này (vd 24h)
+  blockReason:      { type: String, trim: true }, // lý do block (hiển thị cho quán)
+  blockViolation:   { type: String, trim: true }, // món/from khóa đã vi phạm
 }, { timestamps: true });
 
 foodPartnerSchema.index({ phone: 1 });
@@ -1130,7 +1135,7 @@ const WalletTx = mongoose.model('WalletTx', walletTxSchema);
 const notificationSchema = new mongoose.Schema({
   ownerType: { type: String, enum: ['user','shipper','partner'], required: true },
   ownerId:   { type: mongoose.Schema.Types.ObjectId, required: true },
-  type:      { type: String, enum: ['featured','new_order','income','withdraw','topup','product','cash_due','support','warning','system'], default: 'system' },
+  type:      { type: String, enum: ['featured','new_order','income','withdraw','topup','product','cash_due','support','warning','system','block'], default: 'system' },
   title:     { type: String, required: true, trim: true },
   body:      { type: String, trim: true, maxlength: 500 },
   ref:       { type: String, trim: true },               // orderId, productId...
@@ -4445,6 +4450,153 @@ app.delete("/api/admin/banners/:id", adminAuth, async (req, res) => {
     await AIBanner.findByIdAndDelete(req.params.id);
     req.io.to("customer_broadcast").emit("bannersUpdated", { action: "delete" });
     res.json({ success: true });
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ADMIN — QUẢN LÝ MÓN & THỰC ĐƠN ĐỐI TÁC (lọc + chặn vi phạm chính sách)
+// ══════════════════════════════════════════════════════════════════════════════
+// Từ khóa nhận diện món/dịch vụ vi phạm chính sách nền tảng
+const VIOLATION_KEYWORDS = [
+  "rút ví", "rút ví trả sau", "đáo hạn", "vay nóng", "vay tiền", "cho vay",
+  "vay ví", "tín dụng đen", "cầm đồ", "cờ bạc", "cá độ", "lô đề", "đánh bạc",
+  "game đổi thưởng", "thuốc lắc", "ma túy", "cần sa", "thuốc phiện", "cỏ mỹ",
+  "heroin", "vũ khí", "súng", "dao kiếm", "đồ giả", "hàng nhái", "hành nghề trái phép",
+  "mua bán người", "nội dung nhạy cảm", "18+", "sex", "kích dục", "bán hàng đa cấp",
+];
+// Kiểm tra một chuỗi có chứa từ khóa vi phạm hay không → trả về từ khóa trùng hoặc null
+function detectViolation(text) {
+  if (!text) return null;
+  const t = String(text).toLowerCase();
+  for (const kw of VIOLATION_KEYWORDS) {
+    if (t.includes(kw.toLowerCase())) return kw;
+  }
+  return null;
+}
+
+// GET /api/admin/menu-items — list món đối tác + auto-flag vi phạm
+// ?q= tìm kiếm theo tên/mô tả · ?partner= partnerId · ?violation=1|0 · ?page=&limit=
+app.get("/api/admin/menu-items", adminAuth, async (req, res) => {
+  try {
+    const { q, violation, page = 1, limit = 50 } = req.query;
+    const filter = {};
+    if (q) filter.$or = [{ name: new RegExp(q, "i") }, { description: new RegExp(q, "i") }, { category: new RegExp(q, "i") }];
+    if (req.query.partner) filter.partnerId = req.query.partner;
+    if (violation === "1") filter.violationKeyword = { $ne: null };
+    if (violation === "0") filter.violationKeyword = { $eq: null };
+
+    const [total, items] = await Promise.all([
+      Product.countDocuments(filter),
+      Product.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(Number(limit)).lean(),
+    ]);
+
+    // Map partnerId → thông tin quán + nạp flag vi phạm động
+    const partnerIds = [...new Set(items.map(i => String(i.partnerId)).filter(Boolean))];
+    const partners = await FoodPartner.find({ _id: { $in: partnerIds } }).select("bizName phone address status blockedUntil").lean();
+    const pmap = Object.fromEntries(partners.map(p => [String(p._id), p]));
+
+    const now = Date.now();
+    const data = items.map(i => {
+      const p = pmap[String(i.partnerId)] || null;
+      const blocked = !!(p && p.blockedUntil && new Date(p.blockedUntil).getTime() > now);
+      let flag = i.violationKeyword || null;
+      if (!flag) flag = detectViolation(`${i.name} ${i.description} ${i.category}`);
+      return {
+        _id: i._id,
+        name: i.name,
+        description: i.description,
+        price: i.price,
+        image: i.image,
+        category: i.category,
+        available: i.available,
+        sold: i.sold,
+        createdAt: i.createdAt,
+        violationKeyword: flag,
+        partner: p ? { _id: p._id, bizName: p.bizName, phone: p.phone, address: p.address, blocked, blockedUntil: p.blockedUntil } : null,
+      };
+    });
+
+    res.json({ success: true, total, page: Number(page), limit: Number(limit), data });
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/admin/menu-items/:id/block — Ẩn món + block quán 24h + popup cảnh báo
+// Body: { reason? } — tự động thêm lý do vi phạm chính sách nếu có
+app.post("/api/admin/menu-items/:id/block", adminAuth, async (req, res) => {
+  try {
+    const item = await Product.findById(req.params.id);
+    if (!item) return res.status(404).json({ success: false, message: "Không tìm thấy món" });
+
+    // Xác định lý do: từ khóa vi phạm tự phát hiện hoặc lý do admin nhập
+    const kw = detectViolation(`${item.name} ${item.description} ${item.category}`);
+    const reason = (req.body && req.body.reason && String(req.body.reason).trim())
+      || (kw ? `Đăng dịch vụ vi phạm chính sách sử dụng ("${kw}")` : "Vi phạm chính sách sử dụng");
+
+    // 1) Ẩn món khỏi menu
+    await Product.findByIdAndUpdate(item._id, { available: false, violationKeyword: kw || item.violationKeyword || "blocked" });
+
+    // 2) Block quán 24h
+    const until = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const partner = await FoodPartner.findByIdAndUpdate(
+      item.partnerId,
+      { blockedUntil: until, blockReason: reason, blockViolation: item.name },
+      { new: true }
+    );
+
+    // 3) Popup cảnh báo realtime tới quán (room partner_<id>)
+    const inst = req.io || global._io;
+    if (inst) {
+      inst.to(`partner_${item.partnerId}`).emit("partner_blocked", {
+        until: until.getTime(),
+        hours: 24,
+        reason,
+        violation: item.name,
+      });
+      // Thông báo live khi menu của quán bị cập nhật (khách đang mở)
+      inst.to(`customer_broadcast`).emit("menu_updated", { partnerId: String(item.partnerId), productId: String(item._id), available: false });
+    }
+
+    // 4) Ghi notification + new_notification tới quán
+    await notifyUser("partner", item.partnerId, {
+      type: "block",
+      title: "🚫 Cảnh báo vi phạm — đã khóa quán 24h",
+      body: `Quán bị khóa 24 giờ vì món "${item.name}" vi phạm chính sách sử dụng (${reason}). Hãy gỡ/gỡ các dịch vụ không phù hợp.`,
+      ref: String(item._id),
+      refModule: "food",
+    });
+
+    if (partner) {
+      const expiresIn = Math.round((until.getTime() - Date.now()) / (60 * 60 * 1000));
+      res.json({ success: true, message: `Đã ẩn món & khóa quán ${expiresIn} giờ`, itemId: item._id, until: until.getTime(), reason, partner: partner.bizName });
+    } else {
+      res.json({ success: true, message: "Đã ẩn món (không tìm thấy quán)", itemId: item._id });
+    }
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/admin/partners/:id/unblock — Bỏ/chủ động mở khóa quán (dùng khi admin thấy nhầm)
+app.post("/api/admin/partners/:id/unblock", adminAuth, async (req, res) => {
+  try {
+    const partner = await FoodPartner.findByIdAndUpdate(
+      req.params.id,
+      { $unset: { blockedUntil: 1, blockReason: 1, blockViolation: 1 } },
+      { new: true }
+    );
+    if (!partner) return res.status(404).json({ success: false, message: "Không tìm thấy quán" });
+    const inst = req.io || global._io;
+    if (inst) inst.to(`partner_${partner._id}`).emit("partner_unblocked", { reason: req.body?.reason || "" });
+    res.json({ success: true, message: "Đã mở khóa quán", partner: { _id: partner._id, bizName: partner.bizName } });
+  } catch(err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/admin/menu-items/:id/unblock — Bỏ chặn 1 món (giữ quán, chỉ bật lại món)
+app.post("/api/admin/menu-items/:id/unblock", adminAuth, async (req, res) => {
+  try {
+    await Product.findByIdAndUpdate(req.params.id, { available: true, $unset: { violationKeyword: 1 } });
+    const item = await Product.findById(req.params.id).lean();
+    const inst = req.io || global._io;
+    if (inst && item) inst.to(`customer_broadcast`).emit("menu_updated", { partnerId: String(item.partnerId), productId: String(req.params.id), available: true });
+    res.json({ success: true, message: "Đã bật lại món" });
   } catch(err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -8009,7 +8161,19 @@ app.get("/api/partner/me", async (req, res) => {
           if (await ChinaShop.exists({ phone })) mods.push('china_shop');
         } catch (e) { console.error('[partner/me] liệt kê modules lỗi:', e.message); }
         if (!mods.length) mods.push(module);
-        return res.json({ success: true, partner: pObj, module, moduleName: name, modules: mods });
+        // Thông tin block (chỉ có ở FoodPartner khi vi phạm chính sách đăng món)
+        let blockInfo = null;
+        if (module === "food_partner" && found) {
+          const bUntil = found.blockedUntil;
+          if (bUntil && new Date(bUntil).getTime() > Date.now()) {
+            blockInfo = {
+              until: new Date(bUntil).getTime(),
+              reason: found.blockReason || "Vi phạm chính sách sử dụng",
+              violation: found.blockViolation || "",
+            };
+          }
+        }
+        return res.json({ success: true, partner: pObj, module, moduleName: name, modules: mods, blockInfo });
       }
     }
     return res.status(404).json({ success: false, notRegistered: true });
@@ -9053,6 +9217,8 @@ app.post("/api/partner/menu", async (req, res) => {
   try {
     const partner = await getSessionFoodPartner(req);
     if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    if (partner.blockedUntil && new Date(partner.blockedUntil).getTime() > Date.now())
+      return res.status(403).json({ success:false, blocked:true, code:"PARTNER_BLOCKED", until: partner.blockedUntil.getTime(), reason: partner.blockReason || "", message:`Quán đã bị khóa đến ${new Date(partner.blockedUntil).toLocaleString('vi-VN')} vì vi phạm chính sách. Không thể thay đổi thực đơn.` });
     const { name, price, category, description, available, image } = req.body;
     if (!name || !price) return res.status(400).json({ success:false, message:"Thiếu tên hoặc giá" });
     const item = await Product.create({
@@ -9077,6 +9243,8 @@ app.patch("/api/partner/menu/:id", async (req, res) => {
   try {
     const partner = await getSessionFoodPartner(req);
     if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    if (partner.blockedUntil && new Date(partner.blockedUntil).getTime() > Date.now())
+      return res.status(403).json({ success:false, blocked:true, code:"PARTNER_BLOCKED", until: partner.blockedUntil.getTime(), reason: partner.blockReason || "", message:`Quán đã bị khóa đến ${new Date(partner.blockedUntil).toLocaleString('vi-VN')} vì vi phạm chính sách. Không thể thay đổi thực đơn.` });
     const body = { ...req.body };
     if (body.image) body.image = await uploadImageToCloudinary(body.image, "menu");
     const item = await Product.findOneAndUpdate(
@@ -9093,6 +9261,8 @@ app.delete("/api/partner/menu/:id", async (req, res) => {
   try {
     const partner = await getSessionFoodPartner(req);
     if (!partner) return res.status(401).json({ success:false, message:"Chưa đăng nhập" });
+    if (partner.blockedUntil && new Date(partner.blockedUntil).getTime() > Date.now())
+      return res.status(403).json({ success:false, blocked:true, code:"PARTNER_BLOCKED", until: partner.blockedUntil.getTime(), reason: partner.blockReason || "", message:`Quán đã bị khóa đến ${new Date(partner.blockedUntil).toLocaleString('vi-VN')} vì vi phạm chính sách. Không thể thay đổi thực đơn.` });
     await Product.findOneAndDelete({ _id: req.params.id, partnerId: partner._id });
     res.json({ success: true });
   } catch(err) { res.status(500).json({ success:false, message: err.message }); }

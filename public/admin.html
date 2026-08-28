@@ -482,6 +482,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <span class="ico">✨</span> Quán nổi bật
         <span class="nav-badge" id="featuredBadge" style="display:none;background:#FFD84D;color:#000">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('social')">
+        <span class="ico">📱</span> Mạng xã hội
+        <span class="nav-badge" id="socialBadge" style="display:none;background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('menus')">
+        <span class="ico">🍽️</span> Quản lý món
+        <span class="nav-badge" id="menuBadge" style="display:none;background:#e74c3c;color:#fff">0</span>
+      </div>
       <div class="nav-item" onclick="showPage('settings')">
         <span class="ico">⚙️</span> Cài đặt
       </div>
@@ -1520,6 +1528,103 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           </table>
         </div>
       </div>
+    </section>
+
+    <!-- ── MẠNG XÃ HỘI ── -->
+    <section id="pgSocial" class="page-section">
+      <div class="page-header">
+        <div class="page-title">📱 Mạng xã hội — Bài đăng & Bot tym</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="filter-btn" onclick="loadSocial()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Bot tym điều khiển -->
+      <div class="panel" style="margin-bottom:20px">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div style="font-weight:900;font-size:.88rem">🤖 Bot tym tự động (mạng xã hội)</div>
+          <button class="filter-btn" id="botToggleBtn" onclick="toggleBot()" style="border:none;font-weight:800">…</button>
+        </div>
+        <div style="padding:16px 18px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+          <div>
+            <div style="font-size:.72rem;color:var(--muted);font-weight:700;margin-bottom:6px">Min tym</div>
+            <input type="number" id="botMin" min="0" class="filter-select" style="width:110px" value="50">
+          </div>
+          <div>
+            <div style="font-size:.72rem;color:var(--muted);font-weight:700;margin-bottom:6px">Max tym</div>
+            <input type="number" id="botMax" min="0" class="filter-select" style="width:110px" value="500">
+          </div>
+          <div style="display:flex;gap:6px;font-size:.82rem;color:var(--cream)">
+            <div class="panel" style="padding:8px 14px;text-align:center"><div style="font-weight:900;font-size:1.1rem" id="botPostCount">—</div><div style="font-size:.68rem;color:var(--muted)">Bài đang chạy</div></div>
+            <div class="panel" style="padding:8px 14px;text-align:center"><div style="font-weight:900;font-size:1.1rem;color:#f5576c" id="botTotalLikes">—</div><div style="font-size:.68rem;color:var(--muted)">Tổng tym</div></div>
+          </div>
+          <button class="filter-btn" onclick="saveBotConfig()" style="background:#3aaa5c;color:#fff;border:none">💾 Lưu cấu hình bot</button>
+        </div>
+      </div>
+
+      <!-- Danh sách bài đăng -->
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>Hình</th>
+                <th>Tiêu đề</th>
+                <th>Đối tượng</th>
+                <th>💬 Like</th>
+                <th>👁️ Xem</th>
+                <th>⚡ Click</th>
+                <th>Mục tiêu bot</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="socialTbody">
+              <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── QUẢN LÝ MÓN ĐỐI TÁC ── -->
+    <section id="pgMenus" class="page-section">
+      <div class="page-header">
+        <div class="page-title">🍽️ Quản lý món & thực đơn đối tác</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="menuSearch" class="filter-select" style="width:220px" placeholder="🔍 Tìm món / quán / danh mục..." onkeydown="if(event.key==='Enter')loadMenuItems(1)">
+          <select class="filter-select" id="menuViolation" onchange="loadMenuItems(1)">
+            <option value="">Tất cả món</option>
+            <option value="1">🚫 Có vi phạm</option>
+            <option value="0">✅ Hợp lệ</option>
+          </select>
+          <button class="filter-btn" onclick="loadMenuItems(1)">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>Món</th>
+                <th>Quán</th>
+                <th>Giá</th>
+                <th>Danh mục</th>
+                <th>Đã bán</th>
+                <th>Vi phạm</th>
+                <th>Quán (block)</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="menuTbody">
+              <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div id="menuPager" style="margin-top:14px"></div>
     </section>
 
     <section id="pgSettings" class="page-section">
@@ -2999,7 +3104,7 @@ async function deleteBannerAdmin(id) { if (!confirm('Xóa banner này?')) return
 // ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', credit:'pgCredit', featured:'pgFeatured', settings:'pgSettings' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', credit:'pgCredit', featured:'pgFeatured', social:'pgSocial', menus:'pgMenus', settings:'pgSettings' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -3023,7 +3128,180 @@ function showPage(key, ev) {
   if (key === 'withdraws') loadWithdraws();
   if (key === 'settings') { loadSettings(); }
   if (key === 'credit') loadCredit();
+  if (key === 'social') loadSocial();
+  if (key === 'menus') loadMenuItems(1);
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   TAB: MẠNG XÃ HỘI (bài đăng + bot tym)
+// ═════════════════════════════════════════════════════════════════════════════
+let _botEnabled = true;
+let _menuPage = 1;
+
+function setBotBtn() {
+  const b = document.getElementById('botToggleBtn');
+  if (!b) return;
+  b.textContent = _botEnabled ? '✅ ĐANG BẬT — Tắt bot' : '🟥 ĐANG TẮT — Bật bot';
+  b.style.background = _botEnabled ? '#3aaa5c' : '#e74c3c';
+  b.style.color = '#fff';
+}
+
+async function loadSocial() {
+  const tb = document.getElementById('socialTbody');
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
+  try {
+    const [bot, banners] = await Promise.all([
+      apiFetch('/api/admin/social/bot'),
+      apiFetch('/api/admin/banners'),
+    ]);
+    const bd = bot?.data || {};
+    _botEnabled = !!bd.enabled;
+    setBotBtn();
+    const minEl = document.getElementById('botMin'), maxEl = document.getElementById('botMax');
+    if (minEl) minEl.value = bd.min ?? 50;
+    if (maxEl) maxEl.value = bd.max ?? 500;
+    setText('botPostCount', bd.posts ?? 0);
+    setText('botTotalLikes', (bd.totalLikes ?? 0).toLocaleString('vi-VN'));
+    const badge = document.getElementById('socialBadge');
+    if (badge) { const v = bd.posts || 0; badge.textContent = v; badge.style.display = v ? 'inline' : 'none'; }
+
+    const rows = (banners?.data || []).map(b => {
+      const apps = (b.apps || []).map(a => ({customer:'🏠 KH',partner:'🏪 QÁN',shipper:'🛵 SH'}[a] || a)).join(' ');
+      const target = b.botLikesTarget != null ? b.botLikesTarget : '—';
+      return `<tr>
+        <td style="text-align:center">${b.imageUrl ? `<img src="${b.imageUrl}" style="width:44px;height:44px;border-radius:8px;object-fit:cover" />` : (b.emoji || '<span style="color:var(--muted)">—</span>')}</td>
+        <td><div style="font-weight:800;font-size:.82rem;color:var(--cream)">${b.title || 'Bài viết'}</div><div style="font-size:.7rem;color:var(--muted)">${fmtDateTime(b.createdAt)}</div></td>
+        <td style="font-size:.72rem">${apps || '—'}</td>
+        <td><span style="color:#f5576c;font-weight:900">❤️ ${b.likes ?? 0}</span></td>
+        <td>${b.impressions ?? 0}</td>
+        <td>${b.clicks ?? 0}</td>
+        <td style="font-size:.78rem;color:#f093fb">🎯 ${target}</td>
+        <td>${b.active ? '<span style="color:#3aaa5c;font-weight:800">● Đang chạy</span>' : '<span style="color:#e74c3c;font-weight:800">○ Đã ẩn</span>'}</td>
+        <td>
+          <button class="act-btn ${b.active?'reject':''}" onclick="toggleBannerActive('${b._id}',${b.active});setTimeout(loadSocial,400)" style="font-size:.7rem;padding:3px 8px">${b.active?'⏸️ Ẩn':'▶️ Bật'}</button>
+          <button class="act-btn reject" onclick="deleteBannerAdmin('${b._id}')" style="font-size:.7rem;padding:3px 8px">🗑️</button>
+        </td>
+      </tr>`;
+    }).join('');
+    tb.innerHTML = rows || emptyRow(9);
+    setText('botPostCount', (banners?.data || []).filter(b => b.active).length);
+  } catch(e) {
+    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--coral)">❌ Không tải được dữ liệu mạng xã hội</td></tr>';
+  }
+}
+
+async function toggleBot() {
+  try {
+    const r = await apiFetch('/api/admin/social/bot', 'PATCH', { enabled: !_botEnabled });
+    _botEnabled = !!r?.data?.enabled;
+    setBotBtn();
+    showNotif(_botEnabled ? '🤖 Bot đã bật' : '🤖 Bot đã tắt', 'Cấu hình cập nhật', _botEnabled ? 'green' : 'coral');
+    loadSocial();
+  } catch(e) { showNotif('Lỗi', e.message || 'Không lưu được', 'coral'); }
+}
+
+async function saveBotConfig() {
+  const min = parseInt(document.getElementById('botMin').value, 10);
+  const max = parseInt(document.getElementById('botMax').value, 10);
+  if (isNaN(min) || isNaN(max) || min < 0 || max < min) { showNotif('Lỗi', 'Khoảng tym không hợp lệ (cần 0 ≤ min ≤ max)', 'coral'); return; }
+  try {
+    const r = await apiFetch('/api/admin/social/bot', 'PATCH', { enabled: _botEnabled, min, max });
+    showNotif('💾 Đã lưu', `Bot ${r.data.enabled?'bật':'tắt'} · ` + `${min}-${max} tym/bài`, 'green');
+    loadSocial();
+  } catch(e) { showNotif('Lỗi', e.message, 'coral'); }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   TAB: QUẢN LÝ MÓN ĐỐI TÁC (lọc + chặn vi phạm chính sách)
+// ═════════════════════════════════════════════════════════════════════════════
+async function loadMenuItems(page = 1) {
+  _menuPage = page;
+  const tb = document.getElementById('menuTbody');
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
+  const q = (document.getElementById('menuSearch') || {}).value || '';
+  const violation = (document.getElementById('menuViolation') || {}).value || '';
+  try {
+    const r = await apiFetch(`/api/admin/menu-items?page=${page}&limit=50&q=${encodeURIComponent(q)}&violation=${encodeURIComponent(violation)}`);
+    const rows = (r.data || []).map(i => {
+      const img = i.image ? `<img src="${i.image}" style="width:44px;height:44px;border-radius:8px;object-fit:cover" />` : '<span style="color:var(--muted)">🍽️</span>';
+      const flag = i.violationKeyword ? `<span style="color:#e74c3c;font-weight:800;font-size:.7rem">🚫 "${i.violationKeyword}"</span>` : '<span style="color:#3aaa5c;font-size:.72rem">✅ Hợp lệ</span>';
+      const shopBlock = i.partner?.blocked
+        ? `<span style="color:#e74c3c;font-weight:800;font-size:.7rem">⛔ Block — ${fmtDateTime(i.partner.blockedUntil)}</span>`
+        : '<span style="color:var(--muted);font-size:.7rem">Bình thường</span>';
+      const avail = i.available
+        ? '<span style="color:#3aaa5c;font-weight:800">● Đang bán</span>'
+        : '<span style="color:#e74c3c;font-weight:800">● Đã ẩn</span>';
+      let actions;
+      if (i.available) {
+        actions = `<button class="act-btn reject" onclick="blockMenuItem('${i._id}','${(i.name||'').replace(/'/g,"\\'")}')" style="font-size:.7rem;padding:4px 10px">🚫 Chặn</button>`;
+      } else {
+        actions = `<button class="act-btn" onclick="unblockMenuItem('${i._id}')" style="font-size:.7rem;padding:4px 10px;background:#3aaa5c;color:#fff;border:none">▶️ Bật lại</button>`;
+      }
+      if (i.partner?.blocked) {
+        actions += ` <button class="act-btn" onclick="unblockPartner('${i.partner._id}')" style="font-size:.7rem;padding:4px 10px;background:#6495ed;color:#fff;border:none">🔓 Mở quán</button>`;
+      }
+      return `<tr>
+        <td style="text-align:center">${img}</td>
+        <td><div style="font-weight:800;font-size:.8rem;color:var(--cream)">${i.name || '—'}</div>${i.description?`<div style="font-size:.68rem;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i.description}</div>`:''}</td>
+        <td><div style="font-size:.78rem;font-weight:700">${i.partner?.bizName || '—'}</div><div style="font-size:.66rem;color:var(--muted)">${i.partner?.phone || ''}</div></td>
+        <td style="color:#FFD84D;font-weight:800">${fmtMoney(i.price)}</td>
+        <td style="font-size:.76rem">${i.category || '—'}</td>
+        <td style="font-size:.9rem;font-weight:800">${i.sold ?? 0}</td>
+        <td>${flag}<div>${shopBlock}</div></td>
+        <td>${avail}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap">${actions}</td>
+      </tr>`;
+    }).join('');
+    tb.innerHTML = rows || emptyRow(9);
+    renderPagerInner('menuPager', r.total || 0, page, 50);
+  } catch(e) {
+    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--coral)">❌ Không tải được danh sách món</td></tr>';
+  }
+}
+
+function renderPagerInner(containerId, total, page, limit) {
+  const pages = Math.ceil(total / limit);
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  if (pages <= 1) { c.innerHTML = ''; return; }
+  let html = '';
+  for (let i = 1; i <= pages; i++) {
+    html += `<button class="pager-btn ${i===page?'active':''}" onclick="loadMenuItems(${i})">${i}</button>`;
+  }
+  html += `<span style="margin-left:10px;color:var(--muted);font-size:.75rem">Tổng ${total} món</span>`;
+  c.innerHTML = html;
+}
+
+async function blockMenuItem(id, name) {
+  const msg = `🚫 Chặn món "${name || ''}"?\n\nHành động này sẽ:\n• Ẩn món khỏi menu\n• KHÓA QUÁN trong 24 giờ (đổi thực đơn)\n• Gửi popup CẢNH BÁO vi phạm chính sách tới quán\n\nNhấn OK để xác nhận.`;
+  if (!confirm(msg)) return;
+  try {
+    const r = await apiFetch('/api/admin/menu-items/' + id + '/block', 'POST', {});
+    showNotif('🚫 Đã chặn', r.message || 'Đã ẩn món & khóa quán 24h', 'coral');
+    loadMenuItems(_menuPage);
+  } catch(e) { showNotif('Lỗi', e.message || 'Không chặn được', 'coral'); }
+}
+
+async function unblockMenuItem(id) {
+  if (!confirm('Bật lại món này (quán vẫn giữ trạng thái block nếu có)?')) return;
+  try {
+    await apiFetch('/api/admin/menu-items/' + id + '/unblock', 'POST', {});
+    showNotif('▶️ Đã bật lại', 'Món đã xuất hiện lại trên menu', 'green');
+    loadMenuItems(_menuPage);
+  } catch(e) { showNotif('Lỗi', e.message, 'coral'); }
+}
+
+async function unblockPartner(pid) {
+  if (!confirm('Mở khóa (bỏ block 24h) cho quán này? Quán sẽ được đăng/thay đổi thực đơn ngay lập tức.')) return;
+  try {
+    const r = await apiFetch('/api/admin/partners/' + pid + '/unblock', 'POST', {});
+    showNotif('🔓 Đã mở khóa', r.message || 'Quán đã được mở', 'green');
+    loadMenuItems(_menuPage);
+  } catch(e) { showNotif('Lỗi', e.message, 'coral'); }
+}
+
 function viewOrderDetail(orderId) { apiFetch('/api/admin/orders/' + orderId).then(function(data) { var o = data.order || data; var body = document.getElementById('modalBody'); var modal = document.getElementById('overlay'); if (!body || !modal) { alert('Chi tiet don: ' + orderId); return; } body.innerHTML = '<div style="line-height:2"><b>Ma don:</b> ' + (o._id || orderId) + '<br><b>Khach hang:</b> ' + (o.customerName || o.customer || '-') + '<br><b>SDT:</b> ' + (o.customerPhone || '-') + '<br><b>Dia chi:</b> ' + (o.deliveryAddress || '-') + '<br><b>Tong tien:</b> ' + fmtMoney(o.total || 0) + '<br><b>Trang thai:</b> ' + (o.status || '-') + '<br><b>Thoi gian:</b> ' + fmtDate(o.createdAt) + '</div>'; modal.classList.add('show'); }).catch(function(e) { showNotif('Loi', (e && e.message) || 'Khong tai duoc don', 'coral'); }); }
 
 // Settings functions
