@@ -5534,7 +5534,7 @@ app.get("/api/loan/eligibility", async (req, res) => {
         hasActiveLoan: false, requireGoogleVerify: true, ...idn,
         message: "Xác thực danh tính qua Google để mở Vay Nhanh (đảm bảo email/SĐT thật)." });
     }
-    const eligible   = user?.isAdmin || user?.creditLoanEnabled || orderCount >= 10;
+    const eligible   = user?.isAdmin || user?.creditLoanEnabled || (user?.totalSpent||0) >= 10000000;
     const activeLoan = await Loan.findOne({ userId: req.session.userId, status:{$in:['approved','active']} });
     // KHÓA Vay Nhanh ngay lập tức khi còn hóa đơn trả sau quá hạn chưa trả
     if (await hasOverdueBnpl(req.session.userId)) {
@@ -5546,7 +5546,7 @@ app.get("/api/loan/eligibility", async (req, res) => {
       hasActiveLoan: !!activeLoan, activeLoan,
       message: eligible
         ? 'Đủ điều kiện vay nhanh'
-        : `Cần thêm ${Math.max(0, 10 - orderCount)} đơn hàng để mở Vay nhanh (cần tối thiểu 10 đơn)` });
+        : `Cần tổng chi tiêu từ 10.000.000đ trở lên để mở Vay nhanh (hiện tại ${(user?.totalSpent||0).toLocaleString('vi-VN')}đ)` });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -5559,8 +5559,8 @@ app.post("/api/loan/apply", async (req, res) => {
     if (!identitySummary(_me).googleVerified)
       return res.status(403).json({ success:false, requireGoogleVerify:true, message:'Cần xác thực danh tính qua Google trước khi vay' });
     const user = await User.findById(req.session.userId).select('totalSpent fullName');
-    if (!user || (!user.creditLoanEnabled && (user.totalSpent||0) < 2000000))
-      return res.status(403).json({ success:false, message:'Chưa đủ điều kiện (cần giao dịch từ 2.000.000đ)' });
+    if (!user || (!user.creditLoanEnabled && (user.totalSpent||0) < 10000000))
+      return res.status(403).json({ success:false, message:'Chưa đủ điều kiện vay nhanh (cần tổng chi tiêu từ 10.000.000đ trở lên)' });
     const existing = await Loan.findOne({ userId: req.session.userId, status:{$in:['pending','approved','active']} });
     if (existing) return res.status(400).json({ success:false, message:'Bạn đang có khoản vay chưa tất toán' });
     const { amount, termMonths=3, transactionPassword } = req.body;
