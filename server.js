@@ -1226,6 +1226,8 @@ const bnplInvoiceSchema = new mongoose.Schema({
   isInstallment:  { type: Boolean, default: false },
   installTerms:   { type: Number, default: 1 },       // số kỳ
   installPaid:    { type: Number, default: 0 },       // số kỳ đã trả
+  perTerm:        { type: Number, default: 0 },       // số tiền phải trả mỗi kỳ trả góp
+  paymentAmount:  { type: Number, default: 0 },       // số tiền đang/đã trả lần cuối (kỳ hiện tại)
   issuedAt:       { type: Date, required: true },     // ngày 1 tháng tiếp
   dueDate:        { type: Date, required: true },     // ngày 15 tháng tiếp
   paidAt:         Date,
@@ -4836,16 +4838,23 @@ app.post("/api/bnpl/invoice/:id/prepare-pay", async (req,res) => {
     const now = new Date();
     const late = now > inv.dueDate && inv.status!=='installment';
     const lateFee = late ? 30000 : 0;
-    const finalAmount = inv.totalAmount + inv.installFee + lateFee;
+    // Số tiền phải trả lần này: trả góp → chỉ KỲ HIỆN TẠI; không trả góp → toàn bộ bill
+    const isInstall = inv.isInstallment && inv.status === 'installment';
+    let dueNow = inv.totalAmount + inv.installFee + lateFee;
+    if (isInstall) {
+      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + inv.installFee)/(inv.installTerms||1));
+      dueNow = Math.max(0, Math.min(perTerm, inv.finalAmount || 0));
+    }
     const sePayRef = 'BNPL'+inv._id.toString().slice(-8).toUpperCase();
-    await BNPLInvoice.findByIdAndUpdate(inv._id,{lateFee,finalAmount,sePayRef});
+    await BNPLInvoice.findByIdAndUpdate(inv._id,{lateFee,sePayRef,paymentAmount:dueNow});
+    // finalAmount trong DB ACCOUNT chỉ lưu toàn bộ số nợ còn; respond trả dueNow là số cần trả lần này
     res.json({
-      success:true, finalAmount, lateFee, sePayRef,
-      qrUrl: sepayQrUrl(finalAmount, sePayRef),
+      success:true, amount: dueNow, finalAmount: dueNow, isInstallment: isInstall, lateFee, sePayRef,
+      qrUrl: sepayQrUrl(dueNow, sePayRef),
       bankName: SEPAY_CONFIG.bankName, bankCode: SEPAY_CONFIG.bankCode,
       accountNo: SEPAY_CONFIG.accountNo, accountName: SEPAY_CONFIG.accountName,
-      message:`Chuyển khoản ${finalAmount.toLocaleString('vi-VN')}đ · Nội dung: ${sePayRef}`,
-      note: late ? `⚠️ Quá hạn: +30.000đ phí trễ` : `✅ Thanh toán đúng hạn`,
+      message:`Chuyển khoản ${dueNow.toLocaleString('vi-VN')}đ · Nội dung: ${sePayRef}`,
+      note: late ? `⚠️ Quá hạn: +30.000đ phí trễ` : (isInstall ? `✅ Thanh toán kỳ ${(inv.installPaid||0)+1}/${inv.installTerms||1} trả góp` : `✅ Thanh toán đúng hạn`),
     });
   } catch(e){res.status(500).json({success:false,message:e.message});}
 });
@@ -4863,7 +4872,7 @@ app.post("/api/bnpl/invoice/:id/installment", async (req,res) => {
     const installFee = Math.round(inv.totalAmount * 0.10 * Number(terms));
     const finalAmount = inv.totalAmount+installFee;
     const perTerm = Math.ceil(finalAmount/Number(terms));
-    await BNPLInvoice.findByIdAndUpdate(inv._id,{isInstallment:true,installTerms:Number(terms),installFee,finalAmount,status:'installment'});
+    await BNPLInvoice.findByIdAndUpdate(inv._id,{isInstallment:true,installTerms:Number(terms),installFee,finalAmount,perTerm,installPaid:0,status:'installment'});
     res.json({success:true, installFee, finalAmount, perTerm, terms:Number(terms),
       message:`Trả góp ${terms} kỳ. Phí 10%/tháng: ${installFee.toLocaleString('vi-VN')}đ. Mỗi kỳ: ${perTerm.toLocaleString('vi-VN')}đ`});
   } catch(e){res.status(500).json({success:false,message:e.message});}
@@ -4975,29 +4984,57 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
     const now = new Date();
     const late = now > inv.dueDate && inv.status!=='installment';
     const lateFee = late ? 30000 : 0;
-    const finalAmount = inv.totalAmount + inv.installFee + lateFee;
-    await BNPLInvoice.findByIdAndUpdate(inv._id,{lateFee,finalAmount});
+
+    // ── Số tiền phải trả lần này ─────────────────────────────
+    // Nếu là trả góp: chỉ trả KỲ HIỆN TẠI (perTerm), không trả toàn bộ bill.
+    // finalAmount = tổng còn nợ; kỳ cuối = phần còn lại của finalAmount.
+    let dueNow = inv.totalAmount + inv.installFee + lateFee; // không trả góp → thanh toán toàn bộ
+    let isInstall = inv.status === 'installment' && inv.isInstallment;
+    if (isInstall) {
+      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + inv.installFee) / (inv.installTerms || 1));
+      dueNow = Math.max(0, Math.min(perTerm, inv.finalAmount || 0));
+      if (dueNow <= 0) return res.status(400).json({success:false,message:'Hóa đơn đã trả đủ các kỳ'});
+    }
+
+    // Lưu amount kỳ này để SePay khớp
+    await BNPLInvoice.findByIdAndUpdate(inv._id,{lateFee, paymentAmount: dueNow});
+
+    // ── Helper đánh dấu 1 kỳ đã trả (hoặc đóng hóa đơn nếu đủ) ──
+    const markInstallPaid = async () => {
+      if (!isInstall) {
+        await BNPLInvoice.findByIdAndUpdate(inv._id,{status:'paid',paidAt:new Date()});
+        await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
+        return true; // paid hết
+      }
+      const newPaid = (inv.installPaid || 0) + 1;
+      const terms = inv.installTerms || 1;
+      const remain = Math.max(0, (inv.finalAmount||0) - dueNow);
+      const done = newPaid >= terms || remain <= 0;
+      await BNPLInvoice.findByIdAndUpdate(inv._id,{ installPaid: newPaid, finalAmount: remain, ...(done ? {status:'paid',paidAt:new Date()} : {}) });
+      if (done) await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
+      return done;
+    };
 
     if (method === 'wallet') {
       try {
-        await walletDebit(req.session.userId, 'user', finalAmount, 'bnpl_pay', inv._id.toString(), `Thanh toán hóa đơn trả sau ${inv.billingMonth||''} bằng ví CRABOR`);
+        await walletDebit(req.session.userId, 'user', dueNow, 'bnpl_pay', inv._id.toString(), `Thanh toán kỳ trả góp ${inv.billingMonth||''} bằng ví CRABOR`);
       } catch (e) {
-        return res.status(400).json({ success:false, walletInsufficient:true, message:`Ví CRABOR không đủ số dư. Cần ${finalAmount.toLocaleString('vi-VN')}đ` });
+        return res.status(400).json({ success:false, walletInsufficient:true, message:`Ví CRABOR không đủ số dư. Cần ${dueNow.toLocaleString('vi-VN')}đ` });
       }
-      await BNPLInvoice.findByIdAndUpdate(inv._id,{status:'paid',paidAt:new Date(),paymentMethod:'wallet'});
-      await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
-      req.io.to('admin').emit('bnplPaid',{invoiceId:inv._id,amount:finalAmount,method:'wallet'});
-      return res.json({ success:true, status:'paid', method:'wallet', finalAmount, message:`Đã thanh toán ${finalAmount.toLocaleString('vi-VN')}đ bằng ví CRABOR` });
+      const done = await markInstallPaid();
+      const remainAfter = Math.max(0,(inv.finalAmount||dueNow)-dueNow);
+      req.io.to('admin').emit(done ? 'bnplPaid' : 'bnplInstallPaid',{invoiceId:inv._id,amount:dueNow,remaining:remainAfter,method:'wallet'});
+      return res.json({ success:true, status: done ? 'paid':'installment', method:'wallet', amount: dueNow, isInstallment: isInstall, installPaid: (inv.installPaid||0)+1, installTerms: inv.installTerms, remainingTerms: done ? 0 : Math.max(0, (inv.installTerms||1)-((inv.installPaid||0)+1)), remainingAmount: remainAfter, finalAmount: remainAfter, message:`Đã trả kỳ này ${dueNow.toLocaleString('vi-VN')}đ bằng ví CRABOR` + (done?' (đã trả đủ)':'') });
     }
 
     if (method === 'sepay') {
       const sePayRef = 'BNPL'+inv._id.toString().slice(-8).toUpperCase();
       await BNPLInvoice.findByIdAndUpdate(inv._id,{sePayRef,paymentMethod:'sepay'});
-      return res.json({ success:true, status:'pending', method:'sepay', finalAmount, lateFee, sePayRef,
-        qrUrl: sepayQrUrl(finalAmount, sePayRef),
+      return res.json({ success:true, status:'pending', method:'sepay', amount: dueNow, isInstallment: isInstall, finalAmount: dueNow, lateFee, sePayRef,
+        qrUrl: sepayQrUrl(dueNow, sePayRef),
         bankName: SEPAY_CONFIG.bankName, bankCode: SEPAY_CONFIG.bankCode,
         accountNo: SEPAY_CONFIG.accountNo, accountName: SEPAY_CONFIG.accountName,
-        message:`Chuyển khoản ${finalAmount.toLocaleString('vi-VN')}đ · Nội dung: ${sePayRef}` });
+        message:`Chuyển khoản ${dueNow.toLocaleString('vi-VN')}đ · Nội dung: ${sePayRef}` });
     }
 
     // payos
@@ -5005,11 +5042,11 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
     const orderCode = Number(String(Date.now()).slice(-9));
     const paymentData = {
       orderCode,
-      amount: Math.round(finalAmount),
+      amount: Math.round(dueNow),
       description: ('BNPL ' + inv._id.toString().slice(-6)).replace(/[^a-zA-Z0-9 ]/g,'').slice(0,25),
       returnUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/success`,
       cancelUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/cancel`,
-      items: [{ name: 'Hoa don tra sau CRABOR'.slice(0,40), quantity:1, price: Math.round(finalAmount) }],
+      items: [{ name: 'Hoa don tra sau CRABOR'.slice(0,40), quantity:1, price: Math.round(dueNow) }],
     };
     let paymentLink;
     if (typeof payOS.paymentRequests?.create === 'function') paymentLink = await payOS.paymentRequests.create(paymentData);
@@ -5018,7 +5055,7 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
     const linkData = paymentLink?.data && typeof paymentLink.data === 'object' && !Array.isArray(paymentLink.data)
       ? paymentLink.data : paymentLink;
     await BNPLInvoice.findByIdAndUpdate(inv._id,{payosOrderCode:String(orderCode),paymentMethod:'payos'});
-    return res.json({ success:true, status:'pending', method:'payos', finalAmount, orderCode,
+    return res.json({ success:true, status:'pending', method:'payos', amount: dueNow, isInstallment: isInstall, finalAmount: dueNow, orderCode,
       checkoutUrl: linkData?.checkoutUrl, qrCode: linkData?.qrCode });
   } catch(e){ res.status(500).json({success:false,message:e.message}); }
 });
@@ -5036,6 +5073,17 @@ app.get("/api/bnpl/invoice/payos/:orderCode", async (req,res) => {
     const data = info?.data && typeof info.data === 'object' ? info.data : info;
     const st = String(data?.status||'').toUpperCase();
     if (st === 'PAID') {
+      if (inv.isInstallment && inv.status === 'installment') {
+        const dueNow = inv.paymentAmount || inv.perTerm || Math.ceil(inv.finalAmount/(inv.installTerms||1));
+        const newPaid = (inv.installPaid || 0) + 1;
+        const terms = inv.installTerms || 1;
+        const done = newPaid >= terms;
+        const remain = Math.max(0, (inv.finalAmount||0) - dueNow);
+        await BNPLInvoice.findByIdAndUpdate(inv._id,{ installPaid: newPaid, finalAmount: remain, ...(done ? {status:'paid',paidAt:new Date()} : {}) });
+        if (done) { await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'}); }
+        global._io?.to('admin').emit(done ? 'bnplPaid':'bnplInstallPaid',{invoiceId:inv._id,amount:dueNow,remaining:remain,method:'payos'});
+        return res.json({success:true,status: done ? 'paid':'installment'});
+      }
       await BNPLInvoice.findByIdAndUpdate(inv._id,{status:'paid',paidAt:new Date()});
       await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
       global._io?.to('admin').emit('bnplPaid',{invoiceId:inv._id,amount:inv.finalAmount,method:'payos'});
@@ -5471,7 +5519,23 @@ async function processSePayPayment(payload, ioRef, force = false) {
   if (bnplMatch) {
     const suffix = bnplMatch[1];
     const inv = await BNPLInvoice.findOne({ sePayRef: { $regex: suffix, $options:'i' }, status:{$in:['issued','overdue','installment']} });
-    if (inv && amount >= (inv.finalAmount - 1000)) { // tolerance 1k
+    if (inv && inv.isInstallment && inv.status === 'installment') {
+      // Trả góp: khớp đúng số tiền kỳ hiện tại (paymentAmount / perTerm)
+      const dueNow = inv.paymentAmount || inv.perTerm || Math.ceil(inv.finalAmount/(inv.installTerms||1));
+      if (amount >= (dueNow - 1000)) {
+        const newPaid = (inv.installPaid || 0) + 1;
+        const terms = inv.installTerms || 1;
+        const done = newPaid >= terms;
+        const remain = Math.max(0, (inv.finalAmount||0) - dueNow);
+        await BNPLInvoice.findByIdAndUpdate(inv._id,{ installPaid: newPaid, finalAmount: remain, ...(done ? {status:'paid',paidAt:new Date()} : {}) });
+        if (done) { await BNPLTx.updateMany({ invoiceId: inv._id }, { status:'paid' }); }
+        await User.findByIdAndUpdate(inv.userId, { $inc: { loyaltyPts: Math.floor(dueNow/10) } });
+        ioInstance?.to('admin').emit(done ? 'bnplPaid' : 'bnplInstallPaid',{invoiceId:inv._id,amount:dueNow,remaining:remain,method:'sepay'});
+        ioInstance?.to(inv.userId.toString()).emit('bnplConfirmed', { invoiceId:inv._id });
+        console.log(`[SEPAY] BNPL installment paid: ${inv._id} kỳ ${newPaid}/${terms} · ${dueNow.toLocaleString('vi-VN')}đ`);
+        handled = true;
+      }
+    } else if (inv && amount >= (inv.finalAmount - 1000)) { // tolerance 1k — thanh toán toàn bộ
       await BNPLInvoice.findByIdAndUpdate(inv._id, { status:'paid', paidAt: new Date() });
       await BNPLTx.updateMany({ invoiceId: inv._id }, { status:'paid' });
       await User.findByIdAndUpdate(inv.userId, { $inc: { loyaltyPts: Math.floor(inv.totalAmount/10) } });
