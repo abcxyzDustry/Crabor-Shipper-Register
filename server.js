@@ -5668,14 +5668,31 @@ async function processSePayPayment(payload, ioRef, force = false) {
       $expr: { $regexMatch: { input: { $toString: "$_id" }, regex: new RegExp(uid + "$", "i") } },
     }).catch(() => null);
     if (user && amount >= 10000) {
-      await walletCredit(user._id, 'user', amount, rawRef, 'Nạp ví CRABOR');
-      ioInstance?.to(`customer_${user._id}`).emit('walletCredited', { amount, newBalance: (await User.findById(user._id).select('walletBalance').lean())?.walletBalance });
-      await notifyUser('user', user._id, {
-        type: 'topup', title: '💵 Nạp ví thành công!',
-        body: `${amount.toLocaleString('vi-VN')}đ đã được nạp vào ví CRABOR của bạn`,
-        ref: rawRef, refModule: 'topup',
-      });
-      handled = true;
+      // Chống cộng đúp khi webhook + polling chạy song song trên CÙNG giao dịch.
+      // Polling retry (force=true) có thể chạy trước khi webhook hoàn tất set note='matched',
+      // dẫn tới cộng tiền 2 lần. Kiểm tra xem đã có giao dịch credit CRTOPUP cùng ref + amount
+      // trong 90 giây qua chưa → nếu có thì bỏ qua (đã xử lý).
+      const dupTopup = await WalletTx.findOne({
+        ownerId: user._id,
+        ownerType: 'user',
+        type: 'credit',
+        ref: { $regex: 'CRTOPUP', $options: 'i' },
+        amount,
+        createdAt: { $gte: new Date(Date.now() - 90 * 1000) },
+      }).catch(() => null);
+      if (dupTopup) {
+        console.log(`[SEPAY] Dup topup ${rawRef} ${amount}đ — bỏ qua (đã cộng trước đó)`);
+        handled = true;
+      } else {
+        await walletCredit(user._id, 'user', amount, rawRef, 'Nạp ví CRABOR');
+        ioInstance?.to(`customer_${user._id}`).emit('walletCredited', { amount, newBalance: (await User.findById(user._id).select('walletBalance').lean())?.walletBalance });
+        await notifyUser('user', user._id, {
+          type: 'topup', title: '💵 Nạp ví thành công!',
+          body: `${amount.toLocaleString('vi-VN')}đ đã được nạp vào ví CRABOR của bạn`,
+          ref: rawRef, refModule: 'topup',
+        });
+        handled = true;
+      }
     }
   }
 
