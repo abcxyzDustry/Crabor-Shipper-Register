@@ -1257,6 +1257,14 @@ function getNextBillingDates() {
   const due  = new Date(now.getFullYear(), now.getMonth()+1, 15, 15, 0, 0);
   return { issuedAt: next, dueDate: due };
 }
+// Ngày đáo hạn KỲ HIỆN TẠI của hóa đơn trả góp = dueDate + (installPaid) tháng (kỳ 1 = dueDate, kỳ 2 = +1 tháng...)
+function getTermDueDate(inv) {
+  if (!inv) return null;
+  const isInstall = !!inv.isInstallment && inv.status === 'installment';
+  const n = isInstall ? (inv.installPaid || 0) : 0;
+  const d = new Date(inv.dueDate);
+  return new Date(d.getFullYear(), d.getMonth() + n, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds());
+}
 
 
 // ── APP CONFIG ────────────────────────
@@ -4823,6 +4831,7 @@ app.get("/api/bnpl/summary", async (req,res) => {
     // FIX: kèm chi tiết từng giao dịch (BNPLTx) của mỗi hóa đơn để app hiển thị "đã thanh toán cho gì"
     for (const inv of invoices) {
       inv.txs = await BNPLTx.find({ invoiceId: inv._id }).sort({ createdAt: 1 }).lean();
+      inv.nextDueDate = getTermDueDate(inv);
     }
     res.json({success:true, currentMonth:month, pendingTotal:total, pendingTxs:pending, invoices});
   } catch(e){res.status(500).json({success:false,message:e.message});}
@@ -4850,6 +4859,7 @@ app.post("/api/bnpl/invoice/:id/prepare-pay", async (req,res) => {
     // finalAmount trong DB ACCOUNT chỉ lưu toàn bộ số nợ còn; respond trả dueNow là số cần trả lần này
     res.json({
       success:true, amount: dueNow, finalAmount: dueNow, isInstallment: isInstall, lateFee, sePayRef,
+      nextDueDate: getTermDueDate(inv),
       qrUrl: sepayQrUrl(dueNow, sePayRef),
       bankName: SEPAY_CONFIG.bankName, bankCode: SEPAY_CONFIG.bankCode,
       accountNo: SEPAY_CONFIG.accountNo, accountName: SEPAY_CONFIG.accountName,
@@ -5024,13 +5034,13 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
       const done = await markInstallPaid();
       const remainAfter = Math.max(0,(inv.finalAmount||dueNow)-dueNow);
       req.io.to('admin').emit(done ? 'bnplPaid' : 'bnplInstallPaid',{invoiceId:inv._id,amount:dueNow,remaining:remainAfter,method:'wallet'});
-      return res.json({ success:true, status: done ? 'paid':'installment', method:'wallet', amount: dueNow, isInstallment: isInstall, installPaid: (inv.installPaid||0)+1, installTerms: inv.installTerms, remainingTerms: done ? 0 : Math.max(0, (inv.installTerms||1)-((inv.installPaid||0)+1)), remainingAmount: remainAfter, finalAmount: remainAfter, message:`Đã trả kỳ này ${dueNow.toLocaleString('vi-VN')}đ bằng ví CRABOR` + (done?' (đã trả đủ)':'') });
+      return res.json({ success:true, status: done ? 'paid':'installment', method:'wallet', amount: dueNow, isInstallment: isInstall, nextDueDate: getTermDueDate(inv), installPaid: (inv.installPaid||0)+1, installTerms: inv.installTerms, remainingTerms: done ? 0 : Math.max(0, (inv.installTerms||1)-((inv.installPaid||0)+1)), remainingAmount: remainAfter, finalAmount: remainAfter, message:`Đã trả kỳ này ${dueNow.toLocaleString('vi-VN')}đ bằng ví CRABOR` + (done?' (đã trả đủ)':'') });
     }
 
     if (method === 'sepay') {
       const sePayRef = 'BNPL'+inv._id.toString().slice(-8).toUpperCase();
       await BNPLInvoice.findByIdAndUpdate(inv._id,{sePayRef,paymentMethod:'sepay'});
-      return res.json({ success:true, status:'pending', method:'sepay', amount: dueNow, isInstallment: isInstall, finalAmount: dueNow, lateFee, sePayRef,
+      return res.json({ success:true, status:'pending', method:'sepay', amount: dueNow, isInstallment: isInstall, finalAmount: dueNow, lateFee, sePayRef, nextDueDate: getTermDueDate(inv),
         qrUrl: sepayQrUrl(dueNow, sePayRef),
         bankName: SEPAY_CONFIG.bankName, bankCode: SEPAY_CONFIG.bankCode,
         accountNo: SEPAY_CONFIG.accountNo, accountName: SEPAY_CONFIG.accountName,
@@ -5055,7 +5065,7 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
     const linkData = paymentLink?.data && typeof paymentLink.data === 'object' && !Array.isArray(paymentLink.data)
       ? paymentLink.data : paymentLink;
     await BNPLInvoice.findByIdAndUpdate(inv._id,{payosOrderCode:String(orderCode),paymentMethod:'payos'});
-    return res.json({ success:true, status:'pending', method:'payos', amount: dueNow, isInstallment: isInstall, finalAmount: dueNow, orderCode,
+    return res.json({ success:true, status:'pending', method:'payos', amount: dueNow, isInstallment: isInstall, nextDueDate: getTermDueDate(inv), finalAmount: dueNow, orderCode,
       checkoutUrl: linkData?.checkoutUrl, qrCode: linkData?.qrCode });
   } catch(e){ res.status(500).json({success:false,message:e.message}); }
 });
