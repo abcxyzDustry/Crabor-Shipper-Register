@@ -1223,7 +1223,8 @@ const bnplInvoiceSchema = new mongoose.Schema({
   billingMonth:   { type: String, required: true },  // "2026-07"
   totalAmount:    { type: Number, required: true },   // tổng tiền gốc tháng đó (không gồm phí)
   bnplFee:        { type: Number, default: 0 },       // tổng phí giao dịch trả sau 3% (các giao dịch)
-  lateFee:        { type: Number, default: 0 },       // phí 30k nếu trễ
+  serviceFee:     { type: Number, default: 0 },       // phí dịch vụ cố định 30k/tháng khi có giao dịch trả sau
+  lateFee:        { type: Number, default: 0 },       // phí phạt quá hạn 1%/ngày trên tổng hóa đơn (tính động)
   installFee:     { type: Number, default: 0 },       // phí 10% nếu trả góp
   finalAmount:    { type: Number, required: true },   // totalAmount + bnplFee + fees
   isInstallment:  { type: Boolean, default: false },
@@ -1257,6 +1258,36 @@ function getCurrentBillingMonth() {
 // Phí giao dịch trả sau = 3% trên tổng đơn hàng (tách riêng trên hóa đơn)
 const BNPL_FEE_RATE = 0.03;
 const bnplFeeOf = (base) => Math.round((Number(base) || 0) * BNPL_FEE_RATE);
+// Phí phạt quá hạn = 1% mỗi ngày trên tổng hóa đơn (gốc + phí trả sau), không chồng lãi.
+const BNPL_PENALTY_RATE = 0.01;
+// Phí dịch vụ cố định 30.000đ/tháng khi có phát sinh giao dịch trả sau trong tháng
+const BNPL_SERVICE_FEE = 30000;
+function bnplDaysOverdue(inv, now = new Date()) {
+  if (!inv || !inv.dueDate) return 0;
+  const due = new Date(inv.dueDate);
+  const late = now > due;
+  if (!late) return 0;
+  return Math.max(1, Math.floor((now - due) / (24 * 60 * 60 * 1000)));
+}
+function bnplPenaltyOf(inv, now = new Date()) {
+  const days = bnplDaysOverdue(inv, now);
+  if (!days) return 0;
+  const base = (inv.totalAmount || 0) + (inv.bnplFee || 0);
+  return Math.floor(base * BNPL_PENALTY_RATE * days);
+}
+// Khóa Ví Trả Sau + Vay Nhanh: true khi user còn hóa đơn quá hạn chưa trả
+// (hóa đơn tháng status='overdue' HOẶC hóa đơn trả góp mà kỳ hiện tại đã quá hạn)
+async function hasOverdueBnpl(userId, now = new Date()) {
+  const overdue = await BNPLInvoice.find({ userId, status: { $in: ['overdue', 'installment'] } }).lean().catch(() => []);
+  for (const inv of overdue) {
+    if (inv.status === 'overdue') return true;
+    if (inv.isInstallment) {
+      const termDue = getTermDueDate(inv);
+      if (now > new Date(termDue)) return true;
+    }
+  }
+  return false;
+}
 function getNextBillingDates() {
   const now = new Date();
   const next = new Date(now.getFullYear(), now.getMonth()+1, 1);
@@ -4785,6 +4816,13 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     const usedThisMonth = txs.reduce((s,t)=>s+t.amount,0);
     const available  = Math.max(0, limit - usedThisMonth);
     const unpaid     = await BNPLInvoice.find({ userId:req.session.userId, status:{$in:['issued','overdue','installment']} }).sort({dueDate:1});
+    // KHÓA Ví Trả Sau ngay lập tức khi còn hóa đơn quá hạn chưa trả
+    const bnplLocked = await hasOverdueBnpl(req.session.userId);
+    if (bnplLocked) {
+      return res.json({ success:true, eligible:false, limit, spent, orderCount: user.totalOrders || 0, usedThisMonth, available:0,
+        bnplLocked:true, unpaidInvoices: unpaid,
+        message:'Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa.' });
+    }
     res.json({ success:true, eligible, limit, spent, orderCount: user.totalOrders || 0, usedThisMonth, available,
       message: eligible
         ? `Hạn mức: ${limit.toLocaleString('vi-VN')}đ | Còn: ${available.toLocaleString('vi-VN')}đ`
@@ -4806,6 +4844,9 @@ app.post("/api/bnpl/use", async (req,res) => {
     if (!amt||amt<=0) return res.status(400).json({success:false,message:'Số tiền không hợp lệ'});
     const fee = bnplFeeOf(amt);
     const user = await User.findById(req.session.userId).select('totalSpent creditBnplEnabled');
+    // KHÓA: còn hóa đơn quá hạn → chặn mọi giao dịch trả sau
+    if (await hasOverdueBnpl(req.session.userId))
+      return res.status(403).json({success:false, bnplLocked:true, message:'Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn. Vui lòng thanh toán để mở khóa.'});
     const limit = user?.creditBnplEnabled ? Math.max(2000000, getBnplLimit(user?.totalSpent||0)) : getBnplLimit(user?.totalSpent||0);
     if (!limit) return res.status(403).json({success:false,message:'Chưa đủ điều kiện (cần giao dịch từ 2.000.000đ)'});
     const month = getCurrentBillingMonth();
@@ -4839,6 +4880,8 @@ app.get("/api/bnpl/summary", async (req,res) => {
     for (const inv of invoices) {
       inv.txs = await BNPLTx.find({ invoiceId: inv._id }).sort({ createdAt: 1 }).lean();
       inv.nextDueDate = getTermDueDate(inv);
+      // Phí phạt động: 1% mỗi ngày trên tổng hóa đơn nếu quá hạn (để app/admin hiển thị đúng)
+      inv.lateFee = bnplPenaltyOf(inv);
     }
     res.json({success:true, currentMonth:month, pendingTotal:total, pendingTxs:pending, invoices});
   } catch(e){res.status(500).json({success:false,message:e.message});}
@@ -4853,12 +4896,12 @@ app.post("/api/bnpl/invoice/:id/prepare-pay", async (req,res) => {
     if (inv.status==='paid') return res.status(400).json({success:false,message:'Đã thanh toán'});
     const now = new Date();
     const late = now > inv.dueDate && inv.status!=='installment';
-    const lateFee = late ? 30000 : 0;
+    const lateFee = late ? bnplPenaltyOf(inv, now) : 0;
     // Số tiền phải trả lần này: trả góp → chỉ KỲ HIỆN TẠI; không trả góp → toàn bộ bill
     const isInstall = inv.isInstallment && inv.status === 'installment';
-    let dueNow = inv.totalAmount + (inv.bnplFee || 0) + inv.installFee + lateFee;
+    let dueNow = inv.totalAmount + (inv.bnplFee || 0) + (inv.serviceFee || 0) + inv.installFee + lateFee;
     if (isInstall) {
-      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + (inv.bnplFee || 0) + inv.installFee)/(inv.installTerms||1));
+      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + (inv.bnplFee || 0) + (inv.serviceFee || 0) + inv.installFee)/(inv.installTerms||1));
       dueNow = Math.max(0, Math.min(perTerm, inv.finalAmount || 0));
     }
     const sePayRef = 'BNPL'+inv._id.toString().slice(-8).toUpperCase();
@@ -4887,7 +4930,7 @@ app.post("/api/bnpl/invoice/:id/installment", async (req,res) => {
     if (!inv) return res.status(404).json({success:false,message:'Không tìm thấy hoặc không đủ điều kiện'});
     // Phí trả góp = 10% chi phí gốc cho MỖI tháng (không phải 10% một lần)
     const installFee = Math.round(inv.totalAmount * 0.10 * Number(terms));
-    const finalAmount = inv.totalAmount + (inv.bnplFee || 0) + installFee;
+    const finalAmount = inv.totalAmount + (inv.bnplFee || 0) + (inv.serviceFee || 0) + installFee;
     const perTerm = Math.ceil(finalAmount/Number(terms));
     await BNPLInvoice.findByIdAndUpdate(inv._id,{isInstallment:true,installTerms:Number(terms),installFee,finalAmount,perTerm,installPaid:0,status:'installment'});
     res.json({success:true, installFee, finalAmount, perTerm, terms:Number(terms),
@@ -4923,7 +4966,12 @@ async function createBNPLInvoicesForMonth(billingMonth){
       const exists=await BNPLInvoice.findOne({userId, billingMonth:month, status:{$in:['issued','overdue','installment']}}).lean();
       if(exists) {
         // Nếu đã có hóa đơn chưa trả cho tháng này, cộng dồn vào hóa đơn đó
-        await BNPLInvoice.updateOne({_id: exists._id}, {$inc:{totalAmount: base, bnplFee: fee, finalAmount: total}});
+        // Phí dịch vụ cố định 30k/tháng chỉ tính MỘT lần: nếu hóa đơn chưa có serviceFee thì thêm lần đầu.
+        const addService = !(exists.serviceFee > 0) ? BNPL_SERVICE_FEE : 0;
+        await BNPLInvoice.updateOne({_id: exists._id}, {
+          $inc: { totalAmount: base, bnplFee: fee, finalAmount: total + addService },
+          $set: addService ? { serviceFee: BNPL_SERVICE_FEE } : {},
+        });
         await BNPLTx.updateMany({_id:{$in:g.txIds}}, {$set:{status:'billed', invoiceId:exists._id}});
         console.log(`[BNPL] Added ${total} (fee ${fee}) to existing invoice ${exists._id} for ${userId} month ${month}`);
         continue;
@@ -4946,7 +4994,7 @@ async function createBNPLInvoicesForMonth(billingMonth){
           if (!createdInv) {
             try {
               createdInv = await BNPLInvoice.create({
-                userId, billingMonth: month, totalAmount: 0, bnplFee: 0, finalAmount: 0,
+                userId, billingMonth: month, totalAmount: 0, bnplFee: 0, serviceFee: BNPL_SERVICE_FEE, finalAmount: BNPL_SERVICE_FEE,
                 issuedAt, dueDate, status: 'issued', lateFee: 0, installFee: 0
               });
               console.log(`[BNPL] Created invoice ${createdInv._id} for ${userId} month ${month}`);
@@ -4986,7 +5034,9 @@ const _originalSummary = null; // placeholder
 // CRON: auto-overdue check mỗi 6h
 setInterval(async()=>{
   try {
-    await BNPLInvoice.updateMany({status:'issued',dueDate:{$lt:new Date()}},{$set:{status:'overdue',lateFee:30000}});
+    // Phí phạt tính theo ngày quá hạn 1% (động, không lưu cố định).
+    // Chỉ đánh dấu quá hạn; việc tính phí phạt + khóa Ví Trả Sau/Vay được tính tại thời điểm truy cập.
+    await BNPLInvoice.updateMany({status:'issued',dueDate:{$lt:new Date()}},{$set:{status:'overdue'}});
   } catch(e){}
 }, 6*60*60*1000);
 
@@ -5002,15 +5052,15 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
     if (inv.status==='paid') return res.status(400).json({success:false,message:'Hóa đơn đã thanh toán'});
     const now = new Date();
     const late = now > inv.dueDate && inv.status!=='installment';
-    const lateFee = late ? 30000 : 0;
+    const lateFee = late ? bnplPenaltyOf(inv, now) : 0;
 
     // ── Số tiền phải trả lần này ─────────────────────────────
     // Nếu là trả góp: chỉ trả KỲ HIỆN TẠI (perTerm), không trả toàn bộ bill.
     // finalAmount = tổng còn nợ; kỳ cuối = phần còn lại của finalAmount.
-    let dueNow = inv.totalAmount + (inv.bnplFee || 0) + inv.installFee + lateFee; // không trả góp → thanh toán toàn bộ
+    let dueNow = inv.totalAmount + (inv.bnplFee || 0) + (inv.serviceFee || 0) + inv.installFee + lateFee; // không trả góp → thanh toán toàn bộ
     let isInstall = inv.status === 'installment' && inv.isInstallment;
     if (isInstall) {
-      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + (inv.bnplFee || 0) + inv.installFee) / (inv.installTerms || 1));
+      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + (inv.bnplFee || 0) + (inv.serviceFee || 0) + inv.installFee) / (inv.installTerms || 1));
       dueNow = Math.max(0, Math.min(perTerm, inv.finalAmount || 0));
       if (dueNow <= 0) return res.status(400).json({success:false,message:'Hóa đơn đã trả đủ các kỳ'});
     }
@@ -5334,6 +5384,12 @@ app.get("/api/loan/eligibility", async (req, res) => {
     }
     const eligible   = user?.isAdmin || user?.creditLoanEnabled || orderCount >= 10;
     const activeLoan = await Loan.findOne({ userId: req.session.userId, status:{$in:['approved','active']} });
+    // KHÓA Vay Nhanh ngay lập tức khi còn hóa đơn trả sau quá hạn chưa trả
+    if (await hasOverdueBnpl(req.session.userId)) {
+      return res.json({ success:true, eligible:false, orderCount, totalSpent: user?.totalSpent||0,
+        hasActiveLoan: !!activeLoan, activeLoan, bnplLocked:true,
+        message:'Vay Nhanh đã bị khóa do còn hóa đơn Ví Trả Sau quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa.' });
+    }
     res.json({ success:true, eligible, orderCount, totalSpent: user?.totalSpent||0,
       hasActiveLoan: !!activeLoan, activeLoan,
       message: eligible
@@ -5369,6 +5425,9 @@ app.post("/api/loan/apply", async (req, res) => {
     const pwOk = await bcrypt.compare(transactionPassword, _fullUser.transactionPassword);
     if (!pwOk)
       return res.status(400).json({ success:false, message:'Mật khẩu giao dịch không đúng' });
+    // KHÓA Vay Nhanh: còn hóa đơn trả sau quá hạn → không cho vay
+    if (await hasOverdueBnpl(req.session.userId))
+      return res.status(403).json({ success:false, bnplLocked:true, message:'Vay Nhanh đã bị khóa do còn hóa đơn Ví Trả Sau quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa.' });
     const rate = 1.5; // %/tháng
     const totalRepay = Math.round(amt * (1 + rate/100 * termMonths));
     const loan = await Loan.create({ userId: req.session.userId, amount:amt, termMonths, interestRate:rate, totalRepay, status:'pending' });
@@ -13043,6 +13102,13 @@ app.post("/api/order", async (req, res) => {
           message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Tổng chi tiêu cần tối thiểu 5.000.000đ.",
         });
       }
+      if (await hasOverdueBnpl(req.session.userId)) {
+        return res.status(403).json({
+          success: false,
+          bnplLocked: true,
+          message: "Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa.",
+        });
+      }
       const bnplLimit = bnplUser?.creditBnplEnabled ? Math.max(2000000, getBnplLimit(bnplUser?.totalSpent||0)) : getBnplLimit(bnplUser?.totalSpent||0);
       bnplBillingMonth = getCurrentBillingMonth();
       const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplBillingMonth, status:{$in:['pending_bill','billed']} });
@@ -13533,6 +13599,11 @@ app.post("/api/ride/book", async (req, res) => {
         await Order.findByIdAndDelete(rideOrder._id);
         if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
         return res.status(403).json({ success: false, bnplNotEligible: true, message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Tổng chi tiêu cần tối thiểu 5.000.000đ." });
+      }
+      if (await hasOverdueBnpl(req.session.userId)) {
+        await Order.findByIdAndDelete(rideOrder._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
+        return res.status(403).json({ success: false, bnplLocked: true, message: "Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa." });
       }
       const bnplLimit = bnplUser?.creditBnplEnabled ? Math.max(2000000, getBnplLimit(bnplUser?.totalSpent||0)) : getBnplLimit(bnplUser?.totalSpent||0);
       bnplRideMonth = getCurrentBillingMonth();
