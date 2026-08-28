@@ -1247,6 +1247,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
             <button class="ai-quick-btn" onclick="aiBannerQuick('Tạo banner tuyển shipper Early Bird')">🛵 Tuyển shipper</button>
             <button class="ai-quick-btn" onclick="aiBannerQuick('Tạo banner cuối tuần giảm phí ship')">🎉 Cuối tuần</button>
             <button class="ai-quick-btn" onclick="aiBannerQuick('Tạo banner chào mừng khách hàng mới')">👋 Chào mừng</button>
+            <button class="ai-quick-btn" onclick="aiBannerQuick('Tạo banner tài chính giới thiệu Ví Trả Sau, hạn mức 2 triệu, ký hợp đồng để mở khóa')">💳 Banner tài chính</button>
           </div>
           <div class="ai-chat-input-row">
             <input class="ai-chat-input" id="aiBannerInput"
@@ -1287,6 +1288,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
                 <button type="button" class="app-chip active" id="appChipCustomer" onclick="toggleBannerApp('customer')">📍 Customer</button>
                 <button type="button" class="app-chip" id="appChipPartner" onclick="toggleBannerApp('partner')">🏪 Partner</button>
                 <button type="button" class="app-chip" id="appChipShipper" onclick="toggleBannerApp('shipper')">🛵 Shipper</button>
+              </div>
+            </div>
+            <div class="bpp-meta-row" style="align-items:flex-start">
+              <span class="bpp-meta-label">Phân loại</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button type="button" class="app-chip active" id="catChipPromo" onclick="setBannerCategory('promo')">🎉 Khuyến mãi</button>
+                <button type="button" class="app-chip" id="catChipFinance" onclick="setBannerCategory('finance')">💳 Tài chính</button>
               </div>
             </div>
             <div class="bpp-meta-row" style="font-size:.72rem;color:var(--muted)">
@@ -1420,6 +1428,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <button class="set-tab active" id="crTabUsers" onclick="showCreditTab('users',this)">👤 Khách hàng</button>
         <button class="set-tab" id="crTabBnpl" onclick="showCreditTab('bnpl',this)">💳 Ví trả sau (BNPL)</button>
         <button class="set-tab" id="crTabLoans" onclick="showCreditTab('loans',this)">🏦 Vay nhanh</button>
+        <button class="set-tab" id="crTabActivations" onclick="showCreditTab('activations',this)">🔓 Duyệt mở khóa <span id="crActBadge" style="background:var(--coral);color:#fff;border-radius:50px;padding:1px 7px;font-size:.7rem;margin-left:4px">0</span></button>
       </div>
 
       <!-- USERS pane -->
@@ -1467,6 +1476,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
             </table>
           </div>
           <div class="pager" id="crLoansPager"></div>
+        </div>
+      </div>
+
+      <!-- BNPL ACTIVATIONS pane -->
+      <div id="cr-pane-activations" class="cr-pane" style="display:none">
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+          <button class="filter-btn" onclick="loadCreditActivations()">↻ Refresh</button>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">🔓 Mở khóa Ví trả sau — hồ sơ chờ duyệt</span><span style="font-size:.75rem;color:var(--muted)">Khách ký hợp đồng → admin duyệt để cấp Ví trả sau (base 2.000.000đ)</span></div>
+          <div class="table-wrap">
+            <table class="reg-table">
+              <thead><tr><th>SĐT</th><th>Tên / Email</th><th>Tổng chi</th><th>Đơn</th><th>Điểm TC</th><th>Hủy đơn</th><th>Trả đúng hạn</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+              <tbody id="crActTbody"><tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
@@ -2847,7 +2872,7 @@ const AI_BANNER_SYSTEM = `Bạn là chuyên gia thiết kế banner marketing ch
 Khi admin mô tả banner muốn tạo, hãy:
 1. Trả lời ngắn gọn xác nhận ý tưởng (1-2 câu)
 2. Xuất JSON banner TRÊN MỘT DÒNG duy nhất theo format CHÍNH XÁC:
-BANNER_JSON:{"title":"...","subtitle":"...","badge":"...","emoji":"...","gradient":"linear-gradient(135deg,#xxx,#yyy)","ctaText":"...","ctaLink":"/customer"}
+BANNER_JSON:{"title":"...","subtitle":"...","badge":"...","emoji":"...","gradient":"linear-gradient(135deg,#xxx,#yyy)","ctaText":"...","ctaLink":"/customer","category":"promo"}
 
 Quy tắc JSON:
 - title: tên/slogan ngắn (max 30 ký tự)  
@@ -2857,6 +2882,9 @@ Quy tắc JSON:
 - gradient: màu gradient hấp dẫn (dùng màu sắc CRABOR: coral #E8504A, hoặc màu phù hợp nội dung)
 - ctaText: nút kêu gọi (max 12 ký tự)
 - ctaLink: /customer, /register, hoặc URL hành động
+- category: "promo" (khuyến mãi bình thường) hoặc "finance" (banner tài chính cho màn hình Tài chính/Ví Trả Sau/Vay Nhanh). Mặc định "promo".
+
+LƯU Ý BANNER TÀI CHÍNH (category="finance"): chỉ khi admin yêu cầu nội dung về tài chính như Ví Trả Sau (BNPL), Vay Nhanh, hạn mức, điểm tin cậy, lãi suất. Với banner finance: dùng emoji 💳 / 🏦 / 💰, gradient xanh dương hoặc tím (Vd: linear-gradient(135deg,#2b6cb0,#6b46c1)), ctaText như "Mở khóa ngay" hoặc "Vay ngay", ctaLink trỏ về màn hình tài chính (VD: /finance). Các banner khuyến mãi thông thường luôn dùng category="promo".
 
 Luôn xuất BANNER_JSON ngay cả khi hỏi thêm thông tin. Trả lời bằng tiếng Việt.`;
 function _appendAiMsg(role, html, isLoading=false) { const msgs = document.getElementById('aiBannerMsgs'); if (!msgs) return; const div = document.createElement('div'); div.className = 'ai-msg ' + (role==='admin' ? 'admin-msg' : 'bot-msg' + (isLoading?' loading':'')); div.innerHTML = html; msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight; return div; }
@@ -3074,6 +3102,14 @@ function toggleBannerApp(app) {
   else _pendingBanner.apps.push(app);
   renderAppChips();
 }
+let _bannerCategory = 'promo';
+function renderCategoryChips() {
+  ['promo','finance'].forEach(c => {
+    const chip = document.getElementById('catChip' + (c === 'finance' ? 'Finance' : 'Promo'));
+    if (chip) chip.classList.toggle('active', _bannerCategory === c);
+  });
+}
+function setBannerCategory(c) { _bannerCategory = c; renderCategoryChips(); }
 function discardBannerPreview() { _pendingBanner = null; renderAppChips(); const area = document.getElementById('bppPreviewArea'); if(area) area.innerHTML = `<div class="bpp-empty"><div class="bpp-empty-icon">🎨</div><div style="font-weight:800;font-size:.88rem;margin-bottom:6px">Banner đã bị hủy</div><div style="font-size:.78rem">Chat để tạo banner mới</div></div>`; const meta = document.getElementById('bppMeta'); if(meta) meta.style.display = 'none'; const pub = document.getElementById('bppPublishBtn'); if(pub) pub.disabled = true; const disc = document.getElementById('bppDiscardBtn'); if(disc) disc.style.display = 'none'; }
 async function publishBanner() {
   if (!_pendingBanner) return null;
@@ -3082,7 +3118,7 @@ async function publishBanner() {
   const expiry = document.getElementById('bppExpiry')?.value;
   const ctaLink = document.getElementById('bppCtaLink')?.value || '/customer';
   try {
-    const payload = { ..._pendingBanner, apps: Array.isArray(_pendingBanner.apps) && _pendingBanner.apps.length ? _pendingBanner.apps : ['customer'], imageStyle: _bannerStyle, ctaLink, active: true, expiresAt: expiry ? new Date(expiry) : null };
+    const payload = { ..._pendingBanner, apps: Array.isArray(_pendingBanner.apps) && _pendingBanner.apps.length ? _pendingBanner.apps : ['customer'], imageStyle: _bannerStyle, ctaLink, category: _bannerCategory || 'promo', active: true, expiresAt: expiry ? new Date(expiry) : null };
     const r = await apiFetch('/api/admin/banners', 'POST', payload);
     if (r.success) { showNotif('🚀 Banner đã được đăng!', 'Đang hiển thị cho khách hàng realtime', 'green'); _appendAiMsg('bot', `✅ <strong>Banner đã được đăng thành công!</strong><br>Khách hàng sẽ thấy ngay lập tức trên app. Muốn tạo banner khác không? 😊`); discardBannerPreview(); loadActiveBanners(); return r.data || null; }
     else { showNotif('❌ Lỗi', r.message || 'Không đăng được banner'); if(publishBtn) { publishBtn.disabled = false; publishBtn.textContent = '🚀 Đăng banner'; } return null; }
@@ -3406,6 +3442,7 @@ function showCreditTab(tab, btn){
   if(tab==='users') loadCreditUsers();
   if(tab==='bnpl') loadCreditBnpl();
   if(tab==='loans') loadCreditLoans();
+  if(tab==='activations') loadCreditActivations();
 }
 async function loadCredit(){
   loadCreditStats(); loadCreditUsers();
@@ -3420,8 +3457,56 @@ async function loadCreditStats(){
     document.getElementById('crStPendingLoan').textContent=r.pendingLoans;
     document.getElementById('crStPendingAmt').textContent=fmtMoney(r.totalLoanAmt||0);
     const badge=document.getElementById('creditBadge');
-    if(badge){ const n=r.pendingLoans+(r.pendingInvoices||0); if(n>0){ badge.style.display='inline-flex'; badge.textContent=n; } else badge.style.display='none'; }
+    if(badge){ const n=r.pendingLoans+(r.pendingInvoices||0)+(r.pendingBnplActivations||0); if(n>0){ badge.style.display='inline-flex'; badge.textContent=n; } else badge.style.display='none'; }
+    const actBadge=document.getElementById('crActBadge');
+    if(actBadge) actBadge.textContent=r.pendingBnplActivations||0;
   }catch(e){ console.error('credit stats',e); }
+}
+async function loadCreditActivations(){
+  const tbody=document.getElementById('crActTbody');
+  try{
+    const r=await apiFetch('/api/admin/bnpl/activations');
+    if(!r.success) throw new Error(r.message);
+    const list=r.data||[];
+    const badge=document.getElementById('crActBadge');
+    if(badge) badge.textContent=list.filter(x=>x.bnplActivationStatus==='pending').length;
+    if(!list.length){ tbody.innerHTML='<tr><td colspan=9 style="text-align:center;padding:20px;color:var(--muted)">Không có hồ sơ mở khóa</td></tr>'; return; }
+    const stMap={pending:'<span class="badge b-pending">⏳ Chờ duyệt</span>',approved:'<span class="badge b-approved">✅ Đã duyệt</span>',rejected:'<span class="badge" style="background:var(--coral);color:#fff">❌ Từ chối</span>'};
+    tbody.innerHTML=list.map(u=>{
+      const st=stMap[u.bnplActivationStatus]||'<span class="badge">—</span>';
+      const actions = u.bnplActivationStatus==='pending'
+        ? `<button class="act-btn" style="font-size:.7rem;padding:4px 10px;background:#27ae60;color:#fff" onclick="approveBnplActivation('${u._id}')">✅ Duyệt</button>
+           <button class="act-btn reject" style="font-size:.7rem;padding:4px 10px" onclick="rejectBnplActivation('${u._id}')">❌ Từ chối</button>`
+        : `<span style="font-size:.72rem;color:var(--muted)">Đã xử lý</span>`;
+      return `<tr>
+        <td style="font-family:var(--font-mono);color:var(--coral);font-weight:700">${u.phone||''}</td>
+        <td><div style="font-weight:700">${u.fullName||''}</div><div style="font-size:.72rem;color:var(--muted)">${u.email||''}</div></td>
+        <td>${fmtMoney(u.totalSpent||0)}</td>
+        <td style="text-align:center">${u.totalOrders||0}</td>
+        <td style="text-align:center"><span class="badge" style="background:${((u.trustScore??60)>=50)?'#27ae60':'#e67e22'};color:#fff">${u.trustScore??60}</span></td>
+        <td style="text-align:center">${u.cancelCount||0}</td>
+        <td>${fmtMoney(u.bnplOnTimePaid||0)}</td>
+        <td>${st}</td>
+        <td><div style="display:flex;gap:6px">${actions}</div></td>
+      </tr>`;
+    }).join('');
+  }catch(e){ tbody.innerHTML='<tr><td colspan=9 style="text-align:center;padding:20px;color:var(--coral)">❌ Lỗi tải hồ sơ</td></tr>'; }
+}
+async function approveBnplActivation(userId){
+  if(!confirm('Duyệt mở khóa Ví trả sau cho khách này? Họ sẽ được hạn mức nền 2.000.000đ.')) return;
+  try{
+    const r=await apiFetch('/api/admin/bnpl/activation/'+userId,'PATCH',{status:'approved'});
+    if(r.success){ showNotif('✅ Đã duyệt','Ví trả sau đã mở khóa cho khách','green'); loadCreditActivations(); }
+    else showNotif('❌ Lỗi',r.message||'Không duyệt được');
+  }catch(e){ showNotif('❌ Lỗi',e.message); }
+}
+async function rejectBnplActivation(userId){
+  if(!confirm('Từ chối hồ sơ mở khóa Ví trả sau này?')) return;
+  try{
+    const r=await apiFetch('/api/admin/bnpl/activation/'+userId,'PATCH',{status:'rejected'});
+    if(r.success){ showNotif('❌ Đã từ chối','Hồ sơ bị từ chối','green'); loadCreditActivations(); }
+    else showNotif('❌ Lỗi',r.message||'Không từ chối được');
+  }catch(e){ showNotif('❌ Lỗi',e.message); }
 }
 async function loadCreditUsers(page){
   if(page) crCurrentUserPage=page;

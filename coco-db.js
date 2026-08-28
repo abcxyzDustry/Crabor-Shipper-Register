@@ -86,7 +86,7 @@ async function buildUserContext(userId) {
     const User = M('User');
     if (User) {
       const user = await User.findById(userId)
-        .select('fullName phone walletBalance loyaltyPts totalSpent totalOrders status district');
+        .select('fullName phone walletBalance loyaltyPts totalSpent totalOrders status district trustScore cancelCount bnplOnTimePaid bnplActivationStatus');
       if (user) {
         ctx.userId     = user._id.toString();
         ctx.name       = user.fullName || 'bạn';
@@ -97,6 +97,9 @@ async function buildUserContext(userId) {
         ctx.totalOrders= user.totalOrders || 0;
         ctx.district   = user.district || '';
         ctx.status     = user.status;
+        ctx.trustScore = user.trustScore ?? 60;
+        ctx.bnplOnTimePaid = user.bnplOnTimePaid || 0;
+        ctx.bnplActivationStatus = user.bnplActivationStatus || 'none';
       }
     }
 
@@ -157,14 +160,18 @@ async function buildUserContext(userId) {
       ]);
       ctx.bnplUsed = thisMonthTotal[0]?.total || 0;
     }
-    // BNPL limit dựa totalSpent
-    if (ctx.totalSpent !== undefined) {
-      const ts = ctx.totalSpent;
-      if (ts < 2000000)       ctx.bnplLimit = 0;
-      else if (ts < 5000000)  ctx.bnplLimit = 2000000;
-      else if (ts < 10000000) ctx.bnplLimit = 5000000;
-      else if (ts < 20000000) ctx.bnplLimit = 10000000;
-      else                    ctx.bnplLimit = 20000000;
+    // BNPL limit dựa tổng BNPL đã trả đúng hạn (bậc thang). Nếu chưa mở khóa/không đủ điều kiện → 0.
+    if (ctx.bnplOnTimePaid !== undefined) {
+      const otp = ctx.bnplOnTimePaid || 0;
+      let ctxLimit;
+      if (otp >= 16000000)      ctxLimit = 32000000;
+      else if (otp >= 8000000)  ctxLimit = 16000000;
+      else if (otp >= 4000000)  ctxLimit = 8000000;
+      else if (otp >= 2000000)  ctxLimit = 4000000;
+      else                      ctxLimit = 2000000;
+      const unlocked = ctx.bnplActivationStatus === 'approved';
+      if (!unlocked || (ctx.totalSpent||0) < 5000000 || (ctx.trustScore ?? 60) < 50) ctxLimit = 0;
+      ctx.bnplLimit = ctxLimit;
     }
 
     // ── Loan (Vay nhanh) ─────────────────────────────────────
