@@ -5009,6 +5009,7 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     if (!idn.googleVerified) {
       return res.json({ success:true, eligible:false, limit:0, spent: user.totalSpent||0,
         orderCount: user.totalOrders || 0, usedThisMonth:0, available:0,
+        trustScore: user.trustScore ?? 60, cancelLocked: isCancelLocked(user), onTimePaid: user.bnplOnTimePaid||0,
         requireGoogleVerify: true, ...idn,
         message: "Xác thực danh tính qua Google để mở Ví Trả Sau (đảm bảo email/SĐT thật)." });
     }
