@@ -3516,6 +3516,7 @@ async function loadCreditUsers(page){
     const r=await apiFetch('/api/admin/customers?q='+encodeURIComponent(q)+'&page='+crCurrentUserPage+'&limit=20');
     if(!r.success) throw new Error(r.message);
     const list=r.customers||[];
+    window._lastCreditUsers=list;
     if(!list.length){ tbody.innerHTML='<tr><td colspan=9 style="text-align:center;padding:20px;color:var(--muted)">Không có khách hàng</td></tr>'; return; }
     tbody.innerHTML=list.map(u=>`
       <tr>
@@ -3530,6 +3531,7 @@ async function loadCreditUsers(page){
         <td style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="act-btn ${u.creditBnplEnabled?'reject':''}" onclick="toggleCredit('${u._id}','creditBnplEnabled',${!u.creditBnplEnabled})" style="font-size:.7rem;padding:4px 8px">${u.creditBnplEnabled?'🔒 Tắt BNPL':'💳 Kích BNPL'}</button>
           <button class="act-btn ${u.creditLoanEnabled?'reject':''}" onclick="toggleCredit('${u._id}','creditLoanEnabled',${!u.creditLoanEnabled})" style="font-size:.7rem;padding:4px 8px">${u.creditLoanEnabled?'🔒 Tắt Vay':'🏦 Kích Vay'}</button>
+          <button class="act-btn" onclick="viewCreditProfile('${u._id}')" style="font-size:.7rem;padding:4px 8px;background:#6c63ff;color:#fff;border-color:#6c63ff">👁️ Hồ sơ</button>
         </td>
       </tr>`).join('');
     renderPager('crUsersPager', r.total, crCurrentUserPage, 20, n=>loadCreditUsers(n));
@@ -3554,6 +3556,70 @@ async function adjustTrustScore(userId, current){
     else showNotif('Lỗi', r.message,'coral');
   }catch(e){ showNotif('Lỗi', e.message,'coral'); }
 }
+async function viewCreditProfile(userId){
+  const modal=document.getElementById('creditProfileModal');
+  const body=document.getElementById('creditProfileBody');
+  if(modal) modal.style.display='flex';
+  if(body) body.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">⏳ Đang tải hồ sơ...</div>';
+  try{
+    let u=(window._lastCreditUsers||[]).find(x=>String(x._id)===String(userId));
+    if(!u){
+      const r=await apiFetch('/api/admin/customers?q=&page=1&limit=100');
+      if(r.success && r.customers) u=r.customers.find(x=>String(x._id)===String(userId));
+    }
+    if(!u) throw new Error('Không tìm thấy hồ sơ');
+    const kyc=u.kyc||{};
+    const face=kyc.selfie||kyc.facePhoto||u.facePhoto||'';
+    const front=kyc.cccdFront||kyc.cccdFront||'';
+    const back=kyc.cccdBack||kyc.cccdBack||'';
+    const ec=kyc.emergencyContact||kyc.emergencyContact||u.emergencyContact||{};
+    const hasDocs = face||front||back;
+    if(!hasDocs && !ec.name){
+      body.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted)">
+        <div style="font-size:2rem">📭</div>
+        <div style="margin-top:8px">Chưa có hồ sơ thẩm định</div>
+        <div style="font-size:.8rem;margin-top:4px">Khách chưa nộp khuôn mặt/CCCD/liên hệ phụ</div>
+        <div style="margin-top:12px;font-size:.85rem;color:var(--cream)">SĐT: <b>${u.phone||''}</b> · ${u.fullName||''} · Điểm: <b>${u.trustScore??60}/100</b></div>
+      </div>`;
+      return;
+    }
+    body.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:12px">
+          <div style="font-size:.75rem;color:var(--muted);font-weight:800;margin-bottom:6px">👤 Thông tin</div>
+          <div style="font-weight:900;color:var(--cream)">${u.fullName||'Chưa đặt tên'}</div>
+          <div style="font-size:.85rem;color:var(--coral);font-weight:700">${u.phone||''}</div>
+          <div style="font-size:.8rem;color:var(--muted)">${u.email||''}</div>
+          <div style="margin-top:8px;font-size:.8rem">Điểm tin cậy: <b style="color:${(u.trustScore??60)>=50?'#27ae60':'#e67e22'}">${u.trustScore??60}/100</b> · Chi tiêu: <b>${fmtMoney(u.totalSpent||0)}</b></div>
+          <div style="font-size:.8rem">Trạng thái: ${u.creditBnplEnabled?'✅ BNPL đã kích':'⏳ Chưa kích'} · ${u.bnplActivationStatus||'none'}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:12px">
+          <div style="font-size:.75rem;color:var(--muted);font-weight:800;margin-bottom:6px">👥 Liên hệ phụ</div>
+          ${ec.name?`<div><b>${ec.name}</b> · ${ec.phone||''}</div><div style="font-size:.85rem;color:var(--muted)">Quan hệ: ${ec.relation||''}</div>`:'<span style="color:var(--muted)">Chưa có</span>'}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        ${[
+          {label:'Khuôn mặt', url:face},
+          {label:'CCCD mặt trước', url:front},
+          {label:'CCCD mặt sau', url:back},
+        ].map(item=> `
+          <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:8px;text-align:center">
+            <div style="font-size:.75rem;font-weight:800;color:var(--muted);margin-bottom:6px">${item.label}</div>
+            ${item.url?`<img src="${item.url}" onclick="openLb('${item.url}','${item.label}')" style="width:100%;height:160px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid var(--border)" />`:'<div style="height:160px;display:flex;align-items:center;justify-content:center;color:var(--muted);border:1px dashed var(--border);border-radius:8px">Chưa có</div>'}
+          </div>
+        `).join('')}
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="act-btn" onclick="closeCreditProfile()" style="padding:8px 16px">Đóng</button>
+        <button class="act-btn approve" onclick="closeCreditProfile(); document.getElementById('creditSearch').value='${u.phone||''}'; loadCreditUsers();" style="padding:8px 16px">🔍 Xem trong danh sách</button>
+      </div>
+    `;
+  }catch(e){
+    if(body) body.innerHTML='<div style="color:var(--coral);padding:20px">❌ '+ (e.message||'Lỗi tải hồ sơ') +'</div>';
+  }
+}
+function closeCreditProfile(){ const m=document.getElementById('creditProfileModal'); if(m) m.style.display='none'; }
 async function loadCreditBnpl(page){
   if(page) crCurrentBnplPage=page;
   const status=document.getElementById('crBnplStatus')?.value||'all';
@@ -3711,6 +3777,16 @@ setInterval(() => { if (currentUser) loadStats(); }, 30000);
   <!-- Coco AI Widget v2 (Groq-powered) -->
   <script src="/coco-widget.js"></script>
 
+<!-- Credit Profile Modal - xem ho so tham dinh -->
+<div id="creditProfileModal" onclick="if(event.target===this)closeCreditProfile()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;max-width:720px;width:100%;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)">
+      <div style="font-weight:900;font-size:1rem;color:var(--cream)">👁️ Hồ sơ thẩm định</div>
+      <button onclick="closeCreditProfile()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <div id="creditProfileBody" style="padding:20px">Đang tải...</div>
+  </div>
+</div>
 <!-- Lightbox for document images -->
 <div id="docLightbox" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:10000;align-items:center;justify-content:center;flex-direction:column;gap:12px">
   <span onclick="document.getElementById('docLightbox').style.display='none'" style="position:absolute;top:16px;right:24px;color:#fff;font-size:36px;cursor:pointer;line-height:1">✕</span>
