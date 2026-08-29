@@ -15122,6 +15122,21 @@ app.patch("/api/admin/customers/:id/status", adminAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/admin/customers/:id/trustscore — Điều chỉnh điểm tin cậy (0-100)
+app.patch("/api/admin/customers/:id/trustscore", adminAuth, async (req, res) => {
+  try {
+    const raw = Number(req.body.score);
+    if (raw === null || raw === undefined || isNaN(raw))
+      return res.status(400).json({ success: false, message: "Thiếu giá trị điểm tin cậy" });
+    const score = Math.max(0, Math.min(100, Math.round(raw)));
+    const user = await User.findByIdAndUpdate(req.params.id, { trustScore: score }, { new: true });
+    if (!user) return res.status(404).json({ success: false, message: "Không tìm thấy user" });
+    res.json({ success: true, trustScore: user.trustScore, user });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/admin/clear-balance — Xoá số dư ví về 0 (khách/shipper/đối tác)
 app.post("/api/admin/clear-balance", adminAuth, async (req, res) => {
   try {

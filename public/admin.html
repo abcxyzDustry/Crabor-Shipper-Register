@@ -1437,8 +1437,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           <div class="panel-head"><span class="panel-title">👤 Khách hàng — Kích hoạt tín dụng</span><span style="font-size:.75rem;color:var(--muted)">Bật/tắt Ví trả sau &amp; Vay nhanh cho từng TK</span></div>
           <div class="table-wrap">
             <table class="reg-table">
-              <thead><tr><th>SĐT</th><th>Tên / Email</th><th>Tổng chi</th><th>Đơn</th><th>Ví trả sau</th><th>Vay nhanh</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
-              <tbody id="crUsersTbody"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr></tbody>
+              <thead><tr><th>SĐT</th><th>Tên / Email</th><th>Điểm TC</th><th>Tổng chi</th><th>Đơn</th><th>Ví trả sau</th><th>Vay nhanh</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+              <tbody id="crUsersTbody"><tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr></tbody>
             </table>
           </div>
           <div class="pager" id="crUsersPager"></div>
@@ -3516,11 +3516,12 @@ async function loadCreditUsers(page){
     const r=await apiFetch('/api/admin/customers?q='+encodeURIComponent(q)+'&page='+crCurrentUserPage+'&limit=20');
     if(!r.success) throw new Error(r.message);
     const list=r.customers||[];
-    if(!list.length){ tbody.innerHTML='<tr><td colspan=8 style="text-align:center;padding:20px;color:var(--muted)">Không có khách hàng</td></tr>'; return; }
+    if(!list.length){ tbody.innerHTML='<tr><td colspan=9 style="text-align:center;padding:20px;color:var(--muted)">Không có khách hàng</td></tr>'; return; }
     tbody.innerHTML=list.map(u=>`
       <tr>
         <td style="font-family:var(--font-mono);color:var(--coral);font-weight:700">${u.phone}</td>
         <td><div style="font-weight:700">${u.fullName||''}</div><div style="font-size:.72rem;color:var(--muted)">${u.email||''}</div></td>
+        <td style="text-align:center"><span class="badge" style="background:${((u.trustScore??60)>=50)?'#27ae60':'#e67e22'};color:#fff;font-size:.72rem">${u.trustScore??60}/100</span> <button class="act-btn" style="font-size:.62rem;padding:2px 6px" onclick="adjustTrustScore('${u._id}',${u.trustScore??60})">🎚</button></td>
         <td>${fmtMoney(u.totalSpent||0)}</td>
         <td style="text-align:center">${u.totalOrders||0}</td>
         <td><span class="badge ${u.creditBnplEnabled?'b-approved':'b-pending'}" style="font-size:.7rem">${u.creditBnplEnabled?'✅ Đã kích':'⏳ Chưa'}</span></td>
@@ -3538,6 +3539,18 @@ async function toggleCredit(userId, field, enabled){
   try{
     const r=await apiFetch('/api/admin/credit/toggle','POST',{userId, field, enabled});
     if(r.success){ showNotif(enabled?'✅ Đã kích':'🔒 Đã tắt', (field==='creditBnplEnabled'?'Ví trả sau':'Vay nhanh')+' '+(enabled?'đã bật':'đã tắt'), 'green'); loadCreditUsers(); loadCreditStats(); }
+    else showNotif('Lỗi', r.message,'coral');
+  }catch(e){ showNotif('Lỗi', e.message,'coral'); }
+}
+async function adjustTrustScore(userId, current){
+  const input=prompt('Nhập điểm tin cậy mới (0-100):', current);
+  if(input===null) return;
+  const score=Number(input);
+  if(isNaN(score)){ showNotif('Lỗi','Điểm không hợp lệ','coral'); return; }
+  if(score<0||score>100){ showNotif('Lỗi','Điểm phải trong khoảng 0-100','coral'); return; }
+  try{
+    const r=await apiFetch('/api/admin/customers/'+userId+'/trustscore','PATCH',{score});
+    if(r.success){ showNotif('✅ Đã cập nhật','Điểm tin cậy: '+r.trustScore+'/100','green'); loadCreditUsers(); loadCreditStats(); }
     else showNotif('Lỗi', r.message,'coral');
   }catch(e){ showNotif('Lỗi', e.message,'coral'); }
 }
