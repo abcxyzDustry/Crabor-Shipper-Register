@@ -5853,11 +5853,15 @@ app.post("/api/admin/credit/toggle", adminAuth, async (req,res)=>{
     const target = await User.findById(userId).select('trustScore totalSpent creditBnplEnabled');
     if(!target) return res.status(404).json({success:false, message:'Không tìm thấy user'});
     const patch = { [field]: !!enabled };
-    if (enabled && field === 'creditBnplEnabled') {
-      patch.bnplActivationStatus = 'approved';
-      // Fix: bạn tăng lên 100 nhưng app vẫn 60 do đọc từ doc khác hoặc chưa refresh — ép lên 75+ và đủ 5M để eligible gate pass ngay
-      if ((target.trustScore ?? 60) < 70) patch.trustScore = 75;
-      if ((target.totalSpent || 0) < 5000000) patch.totalSpent = 5000000;
+    if (field === 'creditBnplEnabled') {
+      if (enabled) {
+        patch.bnplActivationStatus = 'approved';
+        if ((target.trustScore ?? 60) < 70) patch.trustScore = 75;
+        if ((target.totalSpent || 0) < 5000000) patch.totalSpent = 5000000;
+      } else {
+        // Tat Kich -> thu hoi quyen bypass, dua ve chua mo khoa de cac gate lai check nhu thuong
+        patch.bnplActivationStatus = 'none';
+      }
     }
     const user = await User.findByIdAndUpdate(userId, patch, {new:true}).select('phone email fullName creditBnplEnabled creditLoanEnabled bnplActivationStatus trustScore totalSpent');
     res.json({success:true, user, patched: patch});
