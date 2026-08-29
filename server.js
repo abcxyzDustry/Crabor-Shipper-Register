@@ -5836,7 +5836,13 @@ app.post("/api/admin/credit/toggle", adminAuth, async (req,res)=>{
   try{
     const { userId, field, enabled } = req.body;
     if(!userId || !['creditBnplEnabled','creditLoanEnabled'].includes(field)) return res.status(400).json({success:false, message:'Thiếu field'});
-    const user = await User.findByIdAndUpdate(userId, {[field]: !!enabled}, {new:true}).select('phone email fullName creditBnplEnabled creditLoanEnabled');
+    // Bypass đặc quyền: khi bật/Kích, đồng bộ cả trạng thái "mở khóa" (approved) để mọi gate
+    // (eligibility / /bnpl/use / order / ride / activation) đều coi là đã mở khóa, không bắt buộc duyệt hồ sơ.
+    const patch = { [field]: !!enabled };
+    if (enabled && field === 'creditBnplEnabled') {
+      patch.bnplActivationStatus = 'approved';
+    }
+    const user = await User.findByIdAndUpdate(userId, patch, {new:true}).select('phone email fullName creditBnplEnabled creditLoanEnabled bnplActivationStatus');
     if(!user) return res.status(404).json({success:false, message:'Không tìm thấy user'});
     res.json({success:true, user});
   }catch(e){ res.status(500).json({success:false, message:e.message}); }
