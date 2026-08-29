@@ -5005,8 +5005,10 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified creditBnplEnabled creditLoanEnabled trustScore cancelCount bnplOnTimePaid bnplLateCount bnplActivationStatus');
     if (!user) return res.status(404).json({ success:false });
     const idn = identitySummary(user);
-    // BẮT BUỘC xác thực Google trước khi mở Ví Trả Sau
-    if (!idn.googleVerified) {
+    // Đặc quyền: admin hoặc user được admin "Kích BNPL" (bypass) bỏ qua mọi cổng chặn
+    const special = user.isAdmin || user.creditBnplEnabled;
+    // BẮT BUỘC xác thực Google trước khi mở Ví Trả Sau — chỉ áp dụng cho luồng tự đăng ký thường
+    if (!special && !idn.googleVerified) {
       return res.json({ success:true, eligible:false, limit:0, spent: user.totalSpent||0,
         orderCount: user.totalOrders || 0, usedThisMonth:0, available:0,
         trustScore: user.trustScore ?? 60, cancelLocked: isCancelLocked(user), onTimePaid: user.bnplOnTimePaid||0,
@@ -5020,7 +5022,6 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     const onTimePaid  = user.bnplOnTimePaid || 0;
     const cancelLocked= isCancelLocked(user);
     const activated   = user.isAdmin || user.creditBnplEnabled || user.bnplActivationStatus === 'approved';
-    const special     = user.isAdmin || user.creditBnplEnabled;
     const canGrant    = spent >= 5000000 && trustScore >= TRUST_MIN_UNLOCK && !cancelLocked;
     let eligible      = false;
     let limit         = 0;
