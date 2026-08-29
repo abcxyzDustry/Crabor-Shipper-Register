@@ -3569,10 +3569,15 @@ async function viewCreditProfile(userId){
     }
     if(!u) throw new Error('Không tìm thấy hồ sơ');
     const kyc=u.kyc||{};
-    const face=kyc.selfie||kyc.facePhoto||u.facePhoto||'';
-    const front=kyc.cccdFront||kyc.cccdFront||'';
-    const back=kyc.cccdBack||kyc.cccdBack||'';
-    const ec=kyc.emergencyContact||kyc.emergencyContact||u.emergencyContact||{};
+    const isValidUrl = (url)=> url && typeof url==='string' && !url.startsWith('file://') && (url.startsWith('http') || url.startsWith('data:image'));
+    const faceRaw=kyc.selfie||kyc.facePhoto||u.facePhoto||'';
+    const frontRaw=kyc.cccdFront||kyc.cccdFront||'';
+    const backRaw=kyc.cccdBack||kyc.cccdBack||'';
+    const face=isValidUrl(faceRaw)?faceRaw:'';
+    const front=isValidUrl(frontRaw)?frontRaw:'';
+    const back=isValidUrl(backRaw)?backRaw:'';
+    const ec=kyc.emergencyContact||u.emergencyContact||{};
+    const hasInvalidFile = [faceRaw,frontRaw,backRaw].some(v=> typeof v==='string' && v.startsWith('file://'));
     const hasDocs = face||front||back;
     if(!hasDocs && !ec.name){
       body.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted)">
@@ -3583,7 +3588,9 @@ async function viewCreditProfile(userId){
       </div>`;
       return;
     }
+    const fileWarning = hasInvalidFile ? `<div style="background:rgba(231,76,60,.15);color:#e74c3c;padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:.85rem">⚠️ Hồ sơ cũ dùng file:// cục bộ, không xem được từ admin. Yêu cầu khách nộp lại hồ sơ mới (đã fix gửi dạng base64).</div>` : '';
     body.innerHTML=`
+      ${fileWarning}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
         <div style="background:rgba(255,255,255,.05);border-radius:12px;padding:12px">
           <div style="font-size:.75rem;color:var(--muted);font-weight:800;margin-bottom:6px">👤 Thông tin</div>
