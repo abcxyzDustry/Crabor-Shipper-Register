@@ -1211,6 +1211,14 @@ const loanSchema = new mongoose.Schema({
   disbursedAt:  Date,
   dueAt:        Date,
   note:         { type: String, trim: true },
+  // Thẩm định bổ sung
+  kyc: {
+    facePhoto: String,
+    cccdFront: String,
+    cccdBack: String,
+    emergencyContact: { name: String, phone: String, relation: String },
+    submittedAt: Date,
+  },
 }, { timestamps: true });
 const Loan = mongoose.model('Loan', loanSchema);
 
@@ -5129,7 +5137,11 @@ app.post("/api/bnpl/activation", async (req, res) => {
       return res.status(403).json({ success:false, message:'Bạn đã hủy quá nhiều đơn hàng nên bị khóa mở khóa Ví Trả Sau.' });
     if (await hasOverdueBnpl(req.session.userId))
       return res.status(403).json({ success:false, bnplLocked:true, message:'Còn hóa đơn Ví Trả Sau quá hạn chưa thanh toán, không thể mở khóa/đăng ký.' });
-    const { transactionPassword, acceptContract } = req.body;
+    const { transactionPassword, acceptContract, facePhoto, cccdFront, cccdBack, emergencyContact } = req.body;
+    // Thẩm định bắt buộc: khuôn mặt + CCCD 2 mặt + liên hệ phụ
+    if (!facePhoto || !cccdFront || !cccdBack) return res.status(400).json({ success:false, message:'Cần đủ ảnh khuôn mặt và 2 mặt CCCD để thẩm định' });
+    if (!emergencyContact?.name || !emergencyContact?.phone || !emergencyContact?.relation) return res.status(400).json({ success:false, message:'Cần đủ thông tin liên hệ phụ (tên, SĐT, quan hệ)' });
+    if (!/^0[0-9]{9}$/.test(String(emergencyContact.phone).replace(/\s/g,''))) return res.status(400).json({ success:false, message:'SĐT liên hệ phụ không hợp lệ (0xxxxxxxxx)' });
     // Xác thực mật khẩu giao dịch CRABOR
     if (!user?.transactionPassword)
       return res.status(400).json({ success:false, requireTransactionPassword:true, message:'Bạn chưa đặt mật khẩu giao dịch. Vui lòng đặt mật khẩu giao dịch trước khi mở khóa.' });
@@ -5141,7 +5153,15 @@ app.post("/api/bnpl/activation", async (req, res) => {
       return res.status(400).json({ success:false, message:'Mật khẩu giao dịch không đúng' });
     if (!acceptContract)
       return res.status(400).json({ success:false, message:'Bạn cần đồng ý với điều khoản hợp đồng Ví Trả Sau.' });
-    await User.findByIdAndUpdate(req.session.userId, { bnplActivationStatus: 'pending' });
+    await User.findByIdAndUpdate(req.session.userId, {
+      bnplActivationStatus: 'pending',
+      kyc: {
+        selfie: facePhoto, cccdFront, cccdBack,
+        emergencyContact,
+        submittedAt: new Date(),
+      },
+      kycStatus: 'pending',
+    });
     req.io.to('admin').emit('newBnplActivation', { userId: req.session.userId });
     res.json({ success:true, message:'Đã gửi hồ sơ mở khóa Ví Trả Sau. Admin sẽ xét duyệt trong 24h.' });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
@@ -5738,10 +5758,13 @@ app.post("/api/loan/apply", async (req, res) => {
       return res.status(403).json({ success:false, message:'Chưa đủ điều kiện vay nhanh (cần tổng chi tiêu từ 10.000.000đ trở lên)' });
     const existing = await Loan.findOne({ userId: req.session.userId, status:{$in:['pending','approved','active']} });
     if (existing) return res.status(400).json({ success:false, message:'Bạn đang có khoản vay chưa tất toán' });
-    const { amount, termMonths=3, transactionPassword } = req.body;
+    const { amount, termMonths=3, transactionPassword, facePhoto, cccdFront, cccdBack, emergencyContact } = req.body;
     const amt = Number(amount);
     if (amt < 1000000)  return res.status(400).json({ success:false, message:'Tối thiểu 1.000.000đ' });
     if (amt > 10000000) return res.status(400).json({ success:false, message:'Tối đa 10.000.000đ' });
+    if (!facePhoto || !cccdFront || !cccdBack) return res.status(400).json({ success:false, message:'Cần đủ ảnh khuôn mặt và 2 mặt CCCD để thẩm định' });
+    if (!emergencyContact?.name || !emergencyContact?.phone || !emergencyContact?.relation) return res.status(400).json({ success:false, message:'Cần đủ thông tin liên hệ phụ (tên, SĐT, quan hệ)' });
+    if (!/^0[0-9]{9}$/.test(String(emergencyContact.phone).replace(/\s/g,''))) return res.status(400).json({ success:false, message:'SĐT liên hệ phụ không hợp lệ' });
     // Xác thực mật khẩu giao dịch CRABOR
     const _fullUser = await User.findById(req.session.userId).select('transactionPassword');
     if (!_fullUser?.transactionPassword)
@@ -5757,7 +5780,15 @@ app.post("/api/loan/apply", async (req, res) => {
       return res.status(403).json({ success:false, bnplLocked:true, message:'Vay Nhanh đã bị khóa do còn hóa đơn Ví Trả Sau quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa.' });
     const rate = 1.5; // %/tháng
     const totalRepay = Math.round(amt * (1 + rate/100 * termMonths));
-    const loan = await Loan.create({ userId: req.session.userId, amount:amt, termMonths, interestRate:rate, totalRepay, status:'pending' });
+    const loan = await Loan.create({
+      userId: req.session.userId, amount:amt, termMonths, interestRate:rate, totalRepay, status:'pending',
+      kyc: { facePhoto, cccdFront, cccdBack, emergencyContact, submittedAt: new Date() }
+    });
+    // Luu them vao User.kyc de admin xem tap trung
+    await User.findByIdAndUpdate(req.session.userId, {
+      kyc: { selfie: facePhoto, cccdFront, cccdBack, emergencyContact, submittedAt: new Date() },
+      kycStatus: 'pending',
+    }).catch(()=>{});
     req.io.to('admin').emit('newLoanApplication', { loanId:loan._id, userId: req.session.userId, amount:amt, userName: user.fullName });
     res.json({ success:true, data:loan, message:`Đã gửi đơn vay ${amt.toLocaleString('vi-VN')}đ. Admin sẽ xét duyệt trong 24h.` });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
