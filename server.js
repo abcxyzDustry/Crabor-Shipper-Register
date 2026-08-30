@@ -5308,8 +5308,12 @@ async function createBNPLInvoicesForMonth(billingMonth){
       const exists=await BNPLInvoice.findOne({userId, billingMonth:month, status:{$in:['issued','overdue','installment']}}).lean();
       if(exists) {
         // Nếu đã có hóa đơn chưa trả cho tháng này, cộng dồn vào hóa đơn đó
-        // Phí dịch vụ cố định 30k/tháng chỉ tính MỘT lần: nếu hóa đơn chưa có serviceFee thì thêm lần đầu.
-        const addService = !(exists.serviceFee > 0) ? BNPL_SERVICE_FEE : 0;
+        // Phí dịch vụ cố định 30k/tháng chỉ tính MỘT lần/tháng nếu có phát sinh: check toàn bộ tháng
+        let addService = 0;
+        if (!(exists.serviceFee > 0)) {
+          const alreadyChargedAny = await BNPLInvoice.findOne({ userId, billingMonth: month, serviceFee: { $gt: 0 } }).lean();
+          addService = alreadyChargedAny ? 0 : BNPL_SERVICE_FEE;
+        }
         await BNPLInvoice.updateOne({_id: exists._id}, {
           $inc: { totalAmount: base, bnplFee: fee, finalAmount: total + addService },
           $set: addService ? { serviceFee: BNPL_SERVICE_FEE } : {},
@@ -5334,12 +5338,15 @@ async function createBNPLInvoicesForMonth(billingMonth){
         if (!createdInv) {
           createdInv = await BNPLInvoice.findOne({ userId, billingMonth: month, status: { $in: ['issued','overdue','installment'] } }).lean();
           if (!createdInv) {
+            // Phí 30k chỉ 1 lần/tháng nếu có phát sinh: nếu tháng này đã từng có hóa đơn nào (kể cả đã paid) có serviceFee>0 thì hóa đơn mới không tính lại
+            const alreadyCharged = await BNPLInvoice.findOne({ userId, billingMonth: month, serviceFee: { $gt: 0 } }).lean();
+            const svc = alreadyCharged ? 0 : BNPL_SERVICE_FEE;
             try {
               createdInv = await BNPLInvoice.create({
-                userId, billingMonth: month, totalAmount: 0, bnplFee: 0, serviceFee: BNPL_SERVICE_FEE, finalAmount: BNPL_SERVICE_FEE,
+                userId, billingMonth: month, totalAmount: 0, bnplFee: 0, serviceFee: svc, finalAmount: svc,
                 issuedAt, dueDate, status: 'issued', lateFee: 0, installFee: 0
               });
-              console.log(`[BNPL] Created invoice ${createdInv._id} for ${userId} month ${month}`);
+              console.log(`[BNPL] Created invoice ${createdInv._id} for ${userId} month ${month} ${svc?`(serviceFee ${svc})`:''}`);
             } catch (dupErr) {
               // ai đó vừa tạo cùng lúc → dùng lại invoice vừa tạo
               createdInv = await BNPLInvoice.findOne({ userId, billingMonth: month, status: { $in: ['issued','overdue','installment'] } }).lean();
