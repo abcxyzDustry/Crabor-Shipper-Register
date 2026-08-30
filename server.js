@@ -5500,7 +5500,18 @@ app.get("/api/bnpl/invoice/payos/:orderCode", async (req,res) => {
     const st = String(data?.status||'').toUpperCase();
     if (st === 'PAID') {
       if (inv.isInstallment && inv.status === 'installment') {
-        const dueNow = inv.paymentAmount || inv.perTerm || Math.ceil(inv.finalAmount/(inv.installTerms||1));
+        const fullRemaining = inv.finalAmount || 0;
+        const dueNowSingle = inv.paymentAmount || inv.perTerm || Math.ceil(fullRemaining/(inv.installTerms||1));
+        // Nếu paymentAmount == fullRemaining → đây là tất toán
+        const isPayAll = inv.paymentAmount && Math.abs(inv.paymentAmount - fullRemaining) < 1000;
+        if (isPayAll) {
+          await BNPLInvoice.findByIdAndUpdate(inv._id,{ installPaid: inv.installTerms || 1, finalAmount: 0, status:'paid', paidAt:new Date() });
+          await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
+          await applyBnplPaidTrust(inv.userId, inv);
+          global._io?.to('admin').emit('bnplPaid',{invoiceId:inv._id,amount:fullRemaining,remaining:0,method:'payos'});
+          return res.json({success:true,status:'paid'});
+        }
+        const dueNow = dueNowSingle;
         const newPaid = (inv.installPaid || 0) + 1;
         const terms = inv.installTerms || 1;
         const done = newPaid >= terms;
@@ -5985,9 +5996,21 @@ async function processSePayPayment(payload, ioRef, force = false) {
     const suffix = bnplMatch[1];
     const inv = await BNPLInvoice.findOne({ sePayRef: { $regex: suffix, $options:'i' }, status:{$in:['issued','overdue','installment']} });
     if (inv && inv.isInstallment && inv.status === 'installment') {
-      // Trả góp: khớp đúng số tiền kỳ hiện tại (paymentAmount / perTerm)
-      const dueNow = inv.paymentAmount || inv.perTerm || Math.ceil(inv.finalAmount/(inv.installTerms||1));
-      if (amount >= (dueNow - 1000)) {
+      const fullRemaining = inv.finalAmount || 0;
+      const dueNowSingle = inv.paymentAmount || inv.perTerm || Math.ceil(fullRemaining/(inv.installTerms||1));
+      // Ưu tiên tất toán: nếu amount khớp toàn bộ phần còn lại → tất toán
+      if (fullRemaining > 0 && amount >= (fullRemaining - 1000)) {
+        await BNPLInvoice.findByIdAndUpdate(inv._id,{ installPaid: inv.installTerms || 1, finalAmount: 0, status:'paid', paidAt:new Date() });
+        await BNPLTx.updateMany({ invoiceId: inv._id }, { status:'paid' });
+        await applyBnplPaidTrust(inv.userId, inv);
+        await User.findByIdAndUpdate(inv.userId, { $inc: { loyaltyPts: Math.floor(fullRemaining/10) } });
+        ioInstance?.to('admin').emit('bnplPaid',{invoiceId:inv._id,amount:fullRemaining,remaining:0,method:'sepay'});
+        ioInstance?.to(inv.userId.toString()).emit('bnplConfirmed', { invoiceId:inv._id });
+        console.log(`[SEPAY] BNPL tất toán: ${inv._id} · ${fullRemaining.toLocaleString('vi-VN')}đ`);
+        handled = true;
+      } else if (amount >= (dueNowSingle - 1000)) {
+        // Trả góp: khớp đúng số tiền kỳ hiện tại (paymentAmount / perTerm)
+        const dueNow = dueNowSingle;
         const newPaid = (inv.installPaid || 0) + 1;
         const terms = inv.installTerms || 1;
         const done = newPaid >= terms;
