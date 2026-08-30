@@ -2909,7 +2909,9 @@ async function toBannerDataURL(imgOrUrl) {
     return await new Promise(resolve => {
       const pic = new Image();
       pic.onload = () => {
-        const TW = 768, TH = 1152;
+        // Đồng bộ tỷ lệ với app: finance = 2.25:1 ngang (1152x512), promo = 2:3 dọc (768x1152)
+        const isFinance = (_bannerCategory === 'finance') || (_pendingBanner && _pendingBanner.category === 'finance');
+        const TW = isFinance ? 1152 : 768, TH = isFinance ? 512 : 1152;
         const canvas = document.createElement('canvas');
         canvas.width = TW; canvas.height = TH;
         const ctx = canvas.getContext('2d');
@@ -2989,9 +2991,12 @@ async function sendAiBannerMsg() {
     let displayReply = reply.replace(/BANNER_JSON:\s*\{[\s\S]+?\}/, '').replace(/IMAGE_PROMPT:[\s\S]+/, '').trim();
     let bannerData = null;
     if (jsonMatch) { try { bannerData = JSON.parse(jsonMatch[1]); } catch (pjErr) { console.warn('[bannerAi] parse JSON lỗi:', pjErr?.message || pjErr); } }
-    // LLM quên IMAGE_PROMPT → tự tổng hợp từ dữ liệu banner
+    // LLM quên IMAGE_PROMPT → tự tổng hợp từ dữ liệu banner — đồng bộ tỷ lệ với app
     if (bannerData && !imagePromptMatch) {
-      imagePromptMatch = [null, 'Vertical promotional banner for a food delivery mobile app. Background gradient ' + (bannerData.gradient || 'coral red #E8504A to dark red') + '. Large bold headline text "' + (bannerData.title || 'CRABOR') + '"' + (bannerData.subtitle ? ', smaller subtitle "' + bannerData.subtitle + '"' : '') + (bannerData.badge ? ', small corner badge label "' + bannerData.badge + '"' : '') + '. Modern clean advertising layout, appetizing, high contrast, no watermark.'];
+      const isFin = (bannerData.category === 'finance') || (_bannerCategory === 'finance');
+      const orientation = isFin ? 'Horizontal (16:9 landscape, 2.25:1 wide) ' : 'Vertical (2:3 portrait) ';
+      const ratioHint = isFin ? ' WIDE landscape banner for wallet carousel (1152x512)' : ' TALL portrait banner for feed';
+      imagePromptMatch = [null, orientation + 'promotional banner for a food delivery mobile app.' + ratioHint + '. Background gradient ' + (bannerData.gradient || 'coral red #E8504A to dark red') + '. Large bold headline text "' + (bannerData.title || 'CRABOR') + '"' + (bannerData.subtitle ? ', smaller subtitle "' + bannerData.subtitle + '"' : '') + (bannerData.badge ? ', small corner badge label "' + bannerData.badge + '"' : '') + '. Modern clean advertising layout, appetizing, high contrast, no watermark.'];
     }
     if (bannerData && imagePromptMatch) {
       try {
@@ -2999,9 +3004,13 @@ async function sendAiBannerMsg() {
         const imgPrompt = imagePromptMatch[1].trim().slice(0, 500);
         displayReply += '<br><br>🎨 Đang sinh ảnh banner bằng GPT Image...';
         _appendAiMsg('bot', displayReply);
-        // Loading state
+        // Loading state — đồng bộ tỷ lệ với app: finance 2.25:1 ngang (360x160), promo 2:3 dọc (320x480 placeholder)
         const area = document.getElementById('bppPreviewArea');
-        if (area) area.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:320px;height:200px;border-radius:18px;background:var(--bg3);color:var(--muted);font-size:.85rem;gap:10px"><div style="font-size:1.5rem;animation:spin 1.5s linear infinite">🎨</div><div>Đang tạo ảnh bằng GPT Image...</div></div>';
+        if (area) {
+          const isFinLoad = (_bannerCategory === 'finance') || (bannerData.category === 'finance');
+          const phW = isFinLoad ? 360 : 320, phH = isFinLoad ? 160 : 200;
+          area.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:'+phW+'px;height:'+phH+'px;border-radius:18px;background:var(--bg3);color:var(--muted);font-size:.85rem;gap:10px"><div style="font-size:1.5rem;animation:spin 1.5s linear infinite">🎨</div><div>Đang tạo ảnh bằng GPT Image... ('+(isFinLoad?'2.25:1 ngang':'2:3 dọc')+')</div></div>';
+        }
         // === IMAGE GENERATION (separate from fetch try-catch) ===
         const generateBannerImage = async () => {
           await ensurePuterLoaded();
@@ -3064,8 +3073,12 @@ async function sendAiBannerMsg() {
 function renderBannerPreview(b, imgUrl) {
   const area = document.getElementById('bppPreviewArea'); const meta = document.getElementById('bppMeta'); const publishBtn = document.getElementById('bppPublishBtn'); const discardBtn = document.getElementById('bppDiscardBtn');
   if (!area || !imgUrl) return;
-  area.innerHTML = `<div style="width:320px;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.4);position:relative">
-    <img src="${imgUrl}" alt="AI Banner" style="width:100%;display:block" />
+  const isFinancePreview = (b.category === 'finance') || (_bannerCategory === 'finance');
+  const preW = isFinancePreview ? 360 : 320;
+  const ratioLabel = isFinancePreview ? '2.25:1 ngang (khớp Ví Trả Sau)' : '2:3 dọc';
+  area.innerHTML = `<div style="width:${preW}px;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.4);position:relative">
+    <img src="${imgUrl}" alt="AI Banner" style="width:100%;display:block;aspect-ratio:${isFinancePreview?'2.25 / 1':'2 / 3'};object-fit:cover" />
+    <div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:.6rem;padding:2px 6px;border-radius:4px">${ratioLabel}</div>
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7));display:flex;flex-direction:column;justify-content:flex-end;padding:14px;pointer-events:none">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <span style="font-size:1.4rem">${b.emoji||''}</span>
