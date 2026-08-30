@@ -1297,6 +1297,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
                 <button type="button" class="app-chip" id="catChipFinance" onclick="setBannerCategory('finance')">💳 Tài chính</button>
               </div>
             </div>
+            <div class="bpp-meta-row" style="align-items:flex-start">
+              <span class="bpp-meta-label">📝 Bài viết MXH *</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                <textarea id="bppArticle" rows="4" placeholder="Nội dung bài viết sẽ hiển thị trên tab Mạng xã hội (ví dụ: giới thiệu chi tiết ưu đãi Ví Trả Sau, cách mở khóa, hạn mức...)" style="width:100%;background:#111;border:1.5px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:#F5F0DC;font-size:.82rem;font-family:inherit;outline:none;resize:vertical;min-height:80px"></textarea>
+                <div style="display:flex;gap:6px">
+                  <button type="button" onclick="autoGenArticle()" style="background:rgba(100,149,237,.15);color:#6495ed;border:1px solid rgba(100,149,237,.3);border-radius:20px;padding:4px 10px;font-size:.7rem;font-weight:800;cursor:pointer">✨ Tự sinh từ banner</button>
+                  <span style="font-size:.68rem;color:var(--muted);align-self:center">Bắt buộc — mỗi banner phải có bài viết đi kèm</span>
+                </div>
+              </div>
+            </div>
             <div class="bpp-meta-row" style="font-size:.72rem;color:var(--muted)">
               <span>📊</span>
               <span id="bppStats">Sẵn sàng đăng</span>
@@ -3100,6 +3110,13 @@ function renderBannerPreview(b, imgUrl) {
   if (exp && !exp.value) { const d = new Date(Date.now() + 7*24*3600*1000); exp.value = d.toISOString().slice(0,16); }
   const ctaLinkInp = document.getElementById('bppCtaLink'); if(ctaLinkInp) ctaLinkInp.value = b.ctaLink || '/customer';
   const statsSpan = document.getElementById('bppStats'); if(statsSpan) statsSpan.textContent = 'Sẵn sàng đăng · Chưa có impressions';
+  // Tự sinh nội dung bài viết MXH nếu chưa có, đồng bộ với textarea
+  const articleEl = document.getElementById('bppArticle');
+  if (articleEl) {
+    if (!_pendingBanner.content && !articleEl.value) autoGenArticle();
+    else if (_pendingBanner.content) articleEl.value = _pendingBanner.content;
+    articleEl.oninput = () => { if (_pendingBanner) _pendingBanner.content = articleEl.value; };
+  }
 }
 function renderAppChips() {
   const apps = Array.isArray(_pendingBanner?.apps) && _pendingBanner.apps.length ? _pendingBanner.apps : ['customer'];
@@ -3122,16 +3139,37 @@ function renderCategoryChips() {
     if (chip) chip.classList.toggle('active', _bannerCategory === c);
   });
 }
-function setBannerCategory(c) { _bannerCategory = c; renderCategoryChips(); }
+function setBannerCategory(c) { _bannerCategory = c; renderCategoryChips(); if (_pendingBanner) _pendingBanner.category = c; }
+function autoGenArticle() {
+  if (!_pendingBanner) return;
+  const b = _pendingBanner;
+  const isFin = (b.category === 'finance') || (_bannerCategory === 'finance');
+  let txt = '';
+  if (isFin) {
+    txt = `${b.emoji||'💳'} ${b.title||''}\n${b.subtitle||''}\n\n`+
+          `Ví Trả Sau CRABOR giúp bạn mua trước – trả sau linh hoạt. Hạn mức khởi điểm 2.000.000đ, tăng dần theo điểm tin cậy và lịch sử trả đúng hạn.`+
+          `\n• Phí giao dịch 3% • Phí dịch vụ 30k/tháng (1 lần) • Quá hạn 1%/ngày.`+
+          `\n${b.badge?`\n🏷️ Ưu đãi: ${b.badge}`:''} ${b.ctaText?`\n👉 ${b.ctaText}: mở Ví Trả Sau trong app để dùng ngay!`:''}`;
+  } else {
+    txt = `${b.emoji||'🎉'} ${b.title||''}\n${b.subtitle||''}\n\n`+
+          `Đừng bỏ lỡ ưu đãi hấp dẫn từ CRABOR! Đặt đơn ngay để nhận ${b.badge||'quà tặng'}.\n`+
+          `${b.ctaText?`\n👉 ${b.ctaText} ngay hôm nay!`:''}`;
+  }
+  const el = document.getElementById('bppArticle');
+  if (el) { el.value = txt.trim(); _pendingBanner.content = el.value; }
+}
 function discardBannerPreview() { _pendingBanner = null; renderAppChips(); const area = document.getElementById('bppPreviewArea'); if(area) area.innerHTML = `<div class="bpp-empty"><div class="bpp-empty-icon">🎨</div><div style="font-weight:800;font-size:.88rem;margin-bottom:6px">Banner đã bị hủy</div><div style="font-size:.78rem">Chat để tạo banner mới</div></div>`; const meta = document.getElementById('bppMeta'); if(meta) meta.style.display = 'none'; const pub = document.getElementById('bppPublishBtn'); if(pub) pub.disabled = true; const disc = document.getElementById('bppDiscardBtn'); if(disc) disc.style.display = 'none'; }
 async function publishBanner() {
   if (!_pendingBanner) return null;
+  const articleVal = document.getElementById('bppArticle')?.value?.trim() || _pendingBanner.content?.trim() || '';
+  if (!articleVal) { alert('Vui lòng nhập nội dung bài viết MXH — mỗi banner phải kèm 1 bài viết để hiển thị trên tab Mạng xã hội'); const el=document.getElementById('bppArticle'); if(el) el.focus(); const pb=document.getElementById('bppPublishBtn'); if(pb){pb.disabled=false; pb.textContent='🚀 Đăng banner';} return null; }
+  _pendingBanner.content = articleVal;
   const publishBtn = document.getElementById('bppPublishBtn');
   if(publishBtn) { publishBtn.disabled = true; publishBtn.textContent = '⏳ Đang đăng...'; }
   const expiry = document.getElementById('bppExpiry')?.value;
   const ctaLink = document.getElementById('bppCtaLink')?.value || '/customer';
   try {
-    const payload = { ..._pendingBanner, apps: Array.isArray(_pendingBanner.apps) && _pendingBanner.apps.length ? _pendingBanner.apps : ['customer'], imageStyle: _bannerStyle, ctaLink, category: _bannerCategory || 'promo', active: true, expiresAt: expiry ? new Date(expiry) : null };
+    const payload = { ..._pendingBanner, content: articleVal, apps: Array.isArray(_pendingBanner.apps) && _pendingBanner.apps.length ? _pendingBanner.apps : ['customer'], imageStyle: _bannerStyle, ctaLink, category: _bannerCategory || 'promo', active: true, expiresAt: expiry ? new Date(expiry) : null };
     const r = await apiFetch('/api/admin/banners', 'POST', payload);
     if (r.success) { showNotif('🚀 Banner đã được đăng!', 'Đang hiển thị cho khách hàng realtime', 'green'); _appendAiMsg('bot', `✅ <strong>Banner đã được đăng thành công!</strong><br>Khách hàng sẽ thấy ngay lập tức trên app. Muốn tạo banner khác không? 😊`); discardBannerPreview(); loadActiveBanners(); return r.data || null; }
     else { showNotif('❌ Lỗi', r.message || 'Không đăng được banner'); if(publishBtn) { publishBtn.disabled = false; publishBtn.textContent = '🚀 Đăng banner'; } return null; }
