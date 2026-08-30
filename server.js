@@ -5399,12 +5399,19 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
     // ── Số tiền phải trả lần này ─────────────────────────────
     // Nếu là trả góp: chỉ trả KỲ HIỆN TẠI (perTerm), không trả toàn bộ bill.
     // finalAmount = tổng còn nợ; kỳ cuối = phần còn lại của finalAmount.
+    // Nếu payAll=true: tất toán toàn bộ phần còn lại.
     let dueNow = inv.totalAmount + (inv.bnplFee || 0) + (inv.serviceFee || 0) + inv.installFee + lateFee; // không trả góp → thanh toán toàn bộ
     let isInstall = inv.status === 'installment' && inv.isInstallment;
+    const payAll = !!req.body?.payAll;
     if (isInstall) {
-      const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + (inv.bnplFee || 0) + (inv.serviceFee || 0) + inv.installFee) / (inv.installTerms || 1));
-      dueNow = Math.max(0, Math.min(perTerm, inv.finalAmount || 0));
-      if (dueNow <= 0) return res.status(400).json({success:false,message:'Hóa đơn đã trả đủ các kỳ'});
+      if (payAll) {
+        dueNow = Math.max(0, inv.finalAmount || 0);
+        if (dueNow <= 0) return res.status(400).json({success:false,message:'Hóa đơn đã trả đủ các kỳ'});
+      } else {
+        const perTerm = inv.perTerm || Math.ceil((inv.totalAmount + (inv.bnplFee || 0) + (inv.serviceFee || 0) + inv.installFee) / (inv.installTerms || 1));
+        dueNow = Math.max(0, Math.min(perTerm, inv.finalAmount || 0));
+        if (dueNow <= 0) return res.status(400).json({success:false,message:'Hóa đơn đã trả đủ các kỳ'});
+      }
     }
 
     // Lưu amount kỳ này để SePay khớp
@@ -5417,10 +5424,17 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
         await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
         return true; // paid hết
       }
-      const newPaid = (inv.installPaid || 0) + 1;
-      const terms = inv.installTerms || 1;
-      const remain = Math.max(0, (inv.finalAmount||0) - dueNow);
-      const done = newPaid >= terms || remain <= 0;
+      let newPaid, remain, done;
+      if (payAll) {
+        newPaid = inv.installTerms || 1;
+        remain = 0;
+        done = true;
+      } else {
+        newPaid = (inv.installPaid || 0) + 1;
+        const terms = inv.installTerms || 1;
+        remain = Math.max(0, (inv.finalAmount||0) - dueNow);
+        done = newPaid >= terms || remain <= 0;
+      }
       await BNPLInvoice.findByIdAndUpdate(inv._id,{ installPaid: newPaid, finalAmount: remain, ...(done ? {status:'paid',paidAt:new Date()} : {}) });
       if (done) await BNPLTx.updateMany({invoiceId:inv._id},{status:'paid'});
       return done;
