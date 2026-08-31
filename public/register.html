@@ -1855,17 +1855,11 @@ function showToast(msg, duration=3500) {
 //  INIT
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded', ()=>{
-  // Bỏ welcomeScreen, show card + step1 (chọn dịch vụ) ngay từ đầu
+  // Mac dinh hien welcome-screen dep, an card - chi hien card khi chon dich vu
   const ws = document.getElementById('welcomeScreen');
   const card = document.getElementById('card');
-  if(ws) ws.classList.add('hide');
-  if(card) card.classList.remove('hide');
-  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('show'));
-  const s1 = document.getElementById('step1');
-  if(s1) s1.classList.add('show');
-  currentStep = 1;
-  const sb = document.getElementById('stepsBar');
-  if(sb) sb.innerHTML = '';
+  if(ws) ws.classList.remove('hide');
+  if(card) card.classList.add('hide');
 
   // Fetch earlyBird slot count for welcome screen badge
   fetch('/api/public/earlybird').then(r=>r.json()).then(d => {
