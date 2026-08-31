@@ -263,6 +263,23 @@ if (ADMIN_APP_KEY) {
     const html = fs.readFileSync(path.join(__dirname, "public", "admin.html"), "utf8");
     return res.send(html);
   });
+  app.get("/admin", (req, res) => {
+    const appKey =
+      (req.headers["x-app-key"] || "") === ADMIN_APP_KEY ||
+      (req.query && req.query.app === ADMIN_APP_KEY);
+    if (!appKey) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
+    const html = fs.readFileSync(path.join(__dirname, "public", "admin.html"), "utf8");
+    return res.send(html);
+  });
+  // Chan ca /admin/* va /admin.html tren web thuan (khong co app key) - truoc static
+  app.use((req, res, next) => {
+    const pth = req.path || "";
+    if (pth === "/admin" || pth === "/admin.html" || pth.startsWith("/admin/") || pth.startsWith("/admin.html")) {
+      const got = (req.headers["x-app-key"] || req.query.app || "").toString();
+      if (got !== ADMIN_APP_KEY) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
+    }
+    next();
+  });
   app.use("/api/admin", requireApp);
 }
 
