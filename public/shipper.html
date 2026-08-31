@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="theme-color" content="#E8504A">
-<title>CRABOR — Ứng dụng All-in-One</title>
+<title>CRABOR — Dành cho Shipper</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -740,10 +740,10 @@ footer{
     CRABOR
   </div>
   <ul class="nav-links">
-    <li><a href="/user.html">Khách hàng</a></li>
-    <li><a href="/shipper.html">Shipper</a></li>
-    <li><a href="/partner.html">Đối tác</a></li>
     <li><a href="#services">Dịch vụ</a></li>
+    <li><a href="#features">Tính năng</a></li>
+    <li><a href="#about">Về chúng tôi</a></li>
+    <li><a href="#join">Tham gia</a></li>
     <li><a href="#download">Tải app</a></li>
   </ul>
   <div style="display:flex;align-items:center;gap:10px">
@@ -761,32 +761,27 @@ footer{
 
   <div class="hero-content">
     <div class="hero-text">
-      <div class="hero-tag"><span>Mới</span>Dự kiến cuối 9 đầu 10/2026 tại Hà Nội</div>
+      <div class="hero-tag"><span>Early Bird</span>Còn 50 suất · Thu nhập 20–50k/đơn · Chủ động giờ</div>
       <h1 class="hero-title">
-        CRABOR<br>
-        <em>All-in-One</em><br>
-        Super App
+        Chạy CRABOR<br>
+        <em>Thu nhập mỗi ngày</em>
       </h1>
       <p class="hero-sub">
-        Một ứng dụng duy nhất — Giao đồ ăn, Giặt là, Dọn nhà, China Shop, Xe công nghệ.
-        Tất cả trong lòng bàn tay. <strong>Tải ngay thôi nào!</strong>
+        Thu nhập <strong>20k–50k/đơn</strong>, tự chọn giờ, nhận tiền hàng ngày, app shipper chuyên dụng.<br>Phí kích hoạt <strong>700k</strong> — hoàn sau 50 đơn (Early Bird).
       </p>
       <div class="hero-btns">
-        <button class="btn-primary" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">
-          Tải ứng dụng ngay
+        <button class="btn-primary" onclick="window.location.href='/register#shipper'">
+          Đăng ký Shipper ngay — 700k
         </button>
-        <button class="btn-outline register" onclick="window.location.href='/register#partner'">
-          Đăng ký đối tác
-        </button>
-        <button class="btn-outline" onclick="window.location.href='/register#shipper'">
-          Trở thành Shipper
+        <button class="btn-outline" onclick="document.getElementById('join').scrollIntoView({behavior:'smooth'})">
+          Xem quyền lợi Shipper
         </button>
       </div>
       <div class="hero-stats">
-        <div class="hero-stat"><div class="hs-num">5+</div><div class="hs-label">Dịch vụ</div></div>
-        <div class="hero-stat"><div class="hs-num">30'</div><div class="hs-label">Giao hàng</div></div>
-        <div class="hero-stat"><div class="hs-num">24/7</div><div class="hs-label">Hỗ trợ</div></div>
-        <div class="hero-stat"><div class="hs-num">0đ</div><div class="hs-label">Phí đăng ký</div></div>
+        <div class="hero-stat"><div class="hs-num">20–50k</div><div class="hs-label">/đơn</div></div>
+        <div class="hero-stat"><div class="hs-num">Tự chọn</div><div class="hs-label">Giờ làm</div></div>
+        <div class="hero-stat"><div class="hs-num">Hàng ngày</div><div class="hs-label">Nhận tiền</div></div>
+        <div class="hero-stat"><div class="hs-num">700k</div><div class="hs-label">Kích hoạt</div></div>
       </div>
     </div>
     <div class="hero-phone">
@@ -951,8 +946,8 @@ footer{
   <div class="container">
     <div class="reveal" style="text-align:center">
       <div class="section-label" style="margin:0 auto 16px">Tham gia CRABOR</div>
-      <h2 class="section-title">Bạn muốn là <em>ai?</em></h2>
-      <p class="section-sub" style="margin:0 auto">Chọn vai trò phù hợp với bạn và bắt đầu hành trình cùng CRABOR ngay hôm nay.</p>
+      <h2 class="section-title">Dành cho <em>Shipper</em></h2>
+      <p class="section-sub" style="margin:0 auto">Chủ động thời gian, thu nhập minh bạch, đồng phục & app chuyên dụng — bắt đầu sau 24h duyệt.</p>
     </div>
     <div class="join-grid">
       <!-- USER -->
@@ -970,8 +965,8 @@ footer{
             <li><span class="perk-ico"></span>Khuyến mãi độc quyền</li>
             <li><span class="perk-ico"></span>Thông báo từng bước đơn hàng</li>
           </ul>
-          <button class="jc-btn jc-btn-user" onclick="window.location.href='/user.html'">
-            Khám phá dành cho Khách hàng →
+          <button class="jc-btn jc-btn-user" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">
+            Tải app ngay — Miễn phí
           </button>
         </div>
       </div>
@@ -990,8 +985,8 @@ footer{
             <li><span class="perk-ico"></span>Đồng phục CRABOR chính hãng</li>
             <li><span class="perk-ico"></span>App shipper chuyên dụng, dễ dùng</li>
           </ul>
-          <button class="jc-btn jc-btn-shipper" onclick="window.location.href='/shipper.html'">
-            Dành cho Shipper — Thu nhập 20–50k/đơn →
+          <button class="jc-btn jc-btn-shipper" onclick="window.location.href='/register#shipper'">
+            Đăng ký Shipper — 700k kích hoạt
           </button>
         </div>
       </div>
@@ -1010,8 +1005,8 @@ footer{
             <li><span class="perk-ico"></span>Thanh toán minh bạch theo kỳ</li>
             <li><span class="perk-ico"></span>Đăng ký miễn phí — hoa hồng 12–20%</li>
           </ul>
-          <button class="jc-btn jc-btn-partner" onclick="window.location.href='/partner.html'">
-            Dành cho Đối tác — Miễn phí →
+          <button class="jc-btn jc-btn-partner" onclick="window.location.href='/register#partner'">
+            Đăng ký đối tác ngay
           </button>
         </div>
       </div>
@@ -1103,9 +1098,9 @@ footer{
 <div class="sticky-banner" id="stickyBanner">
   <div class="sticky-inner">
     <span class="sticky-label">Bạn muốn là:</span>
-    <button class="sticky-btn sticky-user" onclick="window.location.href='/user.html'">Khách hàng →</button>
-    <button class="sticky-btn sticky-shipper" onclick="window.location.href='/shipper.html'">Shipper →</button>
-    <button class="sticky-btn sticky-partner" onclick="window.location.href='/partner.html'">Đối tác →</button>
+    <button class="sticky-btn sticky-user" onclick="window.location.href='/user.html'" style="opacity:.8">Khách hàng →</button>
+    <button class="sticky-btn sticky-shipper" onclick="window.location.href='/register#shipper'" style="background:var(--red);color:#fff;box-shadow:0 0 0 2px #fff">Shipper — Đăng ký ngay</button>
+    <button class="sticky-btn sticky-partner" onclick="window.location.href='/partner.html'" style="opacity:.8">Đối tác →</button>
   </div>
 </div>
 
