@@ -389,6 +389,53 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
     .set-toggle.active { background:var(--coral); }
     .set-toggle.active::after { left:22px;background:#fff; }
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* ── HOCHO (Học Hộ) scoped — green theme adapt to Crabor dark ── */
+.hocho-page{ --hocho-green:#16a34a; --hocho-lime:#84cc16; --hocho-gold:#F0B429; --hocho-coral:#E8504A; --hocho-card:#111811; --hocho-border:rgba(132,204,22,.14); }
+.hocho-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+.hocho-stat-tile{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:18px;position:relative;overflow:hidden}
+.hocho-stat-tile::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.hocho-stat-tile.green::before{background:linear-gradient(90deg,var(--hocho-green),var(--hocho-lime))}
+.hocho-stat-tile.coral::before{background:linear-gradient(90deg,var(--hocho-coral),#f87171)}
+.hocho-stat-tile.gold::before{background:linear-gradient(90deg,var(--hocho-gold),#fbbf24)}
+.hocho-stat-tile.blue::before{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.hocho-stat-label{font-size:.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.hocho-stat-val{font-family:'Syne',sans-serif;font-size:1.9rem;font-weight:900;color:var(--cream)}
+.hocho-stat-val.green{color:var(--hocho-lime)}
+.hocho-stat-val.coral{color:var(--hocho-coral)}
+.hocho-stat-val.gold{color:var(--hocho-gold)}
+.hocho-stat-sub{font-size:.73rem;color:var(--muted);font-weight:600;margin-top:4px}
+.hocho-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.hocho-filter-btn{background:var(--bg3);border:1px solid var(--border);border-radius:50px;padding:7px 14px;font-size:.78rem;font-weight:800;color:var(--muted);cursor:pointer;transition:.2s;font-family:'Syne',sans-serif}
+.hocho-filter-btn:hover,.hocho-filter-btn.active{background:rgba(22,163,74,.15);border-color:rgba(22,163,74,.35);color:var(--hocho-lime)}
+.hocho-table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.hocho-table-header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)}
+.hocho-table-title{font-weight:900;font-size:.9rem;color:var(--cream)}
+.hocho-table-count{font-size:.75rem;color:var(--muted);font-weight:700}
+.hocho-page .mono{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--hocho-lime)}
+.hocho-badge{display:inline-flex;align-items:center;gap:5px;border-radius:50px;padding:3px 9px;font-size:.72rem;font-weight:900;white-space:nowrap;border:1px solid}
+.hocho-badge-pending_payment{background:rgba(240,180,41,.12);color:var(--hocho-gold);border-color:rgba(240,180,41,.25)}
+.hocho-badge-pending_approval{background:rgba(132,204,22,.1);color:var(--hocho-lime);border-color:rgba(132,204,22,.2)}
+.hocho-badge-active{background:rgba(22,163,74,.15);color:#4ade80;border-color:rgba(22,163,74,.3)}
+.hocho-badge-rejected{background:rgba(232,80,74,.1);color:var(--hocho-coral);border-color:rgba(232,80,74,.2)}
+.hocho-badge-waiting{background:rgba(240,180,41,.1);color:var(--hocho-gold);border-color:rgba(240,180,41,.2)}
+.hocho-badge-matching,.hocho-badge-accepted,.hocho-badge-heading,.hocho-badge-arrived,.hocho-badge-in_progress{background:rgba(132,204,22,.1);color:var(--hocho-lime);border-color:rgba(132,204,22,.2)}
+.hocho-badge-completed{background:rgba(22,163,74,.15);color:#4ade80;border-color:rgba(22,163,74,.3)}
+.hocho-badge-cancelled{background:rgba(232,80,74,.1);color:var(--hocho-coral);border-color:rgba(232,80,74,.2)}
+.hocho-badge-unpaid{background:rgba(240,180,41,.1);color:var(--hocho-gold);border-color:rgba(240,180,41,.2)}
+.hocho-badge-paid{background:rgba(22,163,74,.12);color:#4ade80;border-color:rgba(22,163,74,.25)}
+.hocho-badge-pending{background:rgba(132,204,22,.1);color:var(--hocho-lime);border-color:rgba(132,204,22,.2)}
+.hocho-badge-approved{background:rgba(22,163,74,.12);color:#4ade80;border-color:rgba(22,163,74,.25)}
+.hocho-badge-suspended{background:rgba(255,255,255,.06);color:var(--muted);border-color:var(--border)}
+.hocho-btn-approve{background:rgba(22,163,74,.15);color:#4ade80;border:1px solid rgba(22,163,74,.3);border-radius:8px;padding:5px 11px;font-size:.75rem;font-weight:800;cursor:pointer;font-family:'Syne',sans-serif;transition:.2s}
+.hocho-btn-approve:hover{background:rgba(22,163,74,.3)}
+.hocho-btn-reject{background:rgba(232,80,74,.1);color:var(--hocho-coral);border:1px solid rgba(232,80,74,.25);border-radius:8px;padding:5px 11px;font-size:.75rem;font-weight:800;cursor:pointer;font-family:'Syne',sans-serif;transition:.2s}
+.hocho-btn-reject:hover{background:rgba(232,80,74,.2)}
+.hocho-btn-confirm{background:rgba(132,204,22,.1);color:var(--hocho-lime);border:1px solid rgba(132,204,22,.25);border-radius:8px;padding:5px 11px;font-size:.75rem;font-weight:800;cursor:pointer;font-family:'Syne',sans-serif;transition:.2s}
+.hocho-btn-confirm:hover{background:rgba(132,204,22,.2)}
+.hocho-loading{text-align:center;padding:36px;color:var(--muted);font-weight:700;font-size:.85rem}
+.hocho-spinner{width:26px;height:26px;border:2px solid rgba(132,204,22,.2);border-top-color:var(--hocho-lime);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
+.hocho-warning{background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.2);border-radius:12px;padding:12px 16px;margin-bottom:14px;font-size:.82rem;color:rgba(240,180,41,.9);font-weight:700}
 </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="/outline-icons.js"></script>
@@ -494,6 +541,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
       <div class="nav-item" onclick="showPage('settings')">
         <span class="ico">⚙️</span> Cài đặt
       </div>
+      <div class="nav-section" style="color:#84cc16;border-top:1px solid var(--border);margin-top:12px;padding-top:12px">📚 HỌC HỘ (hocho)</div>
+      <div class="nav-item" id="nav-hocho-dashboard" onclick="showHochoPage('dashboard')"><span class="ico">📊</span> Hocho Dashboard <span class="nav-badge" id="hochoPendingBadge" style="display:none;background:#84cc16;color:#000">0</span></div>
+      <div class="nav-item" id="nav-hocho-partners-approval" onclick="showHochoPage('partners-approval')"><span class="ico">⏳</span> Chờ duyệt <span class="nav-badge" id="hochoPendingApprovalBadge" style="display:none">0</span></div>
+      <div class="nav-item" id="nav-hocho-partners" onclick="showHochoPage('partners')"><span class="ico">👥</span> Đối tác</div>
+      <div class="nav-item" id="nav-hocho-customers" onclick="showHochoPage('customers')"><span class="ico">🎓</span> Khách hàng</div>
+      <div class="nav-item" id="nav-hocho-orders" onclick="showHochoPage('orders')"><span class="ico">📚</span> Đơn học hộ</div>
+      <div class="nav-item" id="nav-hocho-order-payments" onclick="showHochoPage('order-payments')"><span class="ico">🏦</span> Xác nhận CK <span class="nav-badge" id="hochoOrderPayBadge" style="display:none;background:#F0B429;color:#000">0</span></div>
+      <div class="nav-item" id="nav-hocho-payments" onclick="showHochoPage('payments')"><span class="ico">💰</span> Thanh toán ĐK</div>
+      <div class="nav-item" id="nav-hocho-earnings" onclick="showHochoPage('earnings')"><span class="ico">💵</span> Thu nhập chờ duyệt</div>
+      <div class="nav-item" id="nav-hocho-withdrawals" onclick="showHochoPage('withdrawals')"><span class="ico">🏧</span> Rút tiền <span class="nav-badge" id="hochoWithdrawBadge" style="display:none">0</span></div>
     </nav>
     <div class="sb-user">
       <div class="name" id="sbName">Admin</div>
@@ -1857,7 +1914,137 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
 
     </section>
 
+
+    <!-- ════════════════════ HOCHO (HỌC HỘ) — 9 PAGES ════════════════════ -->
+    <!-- DASHBOARD -->
+    <section id="pgHochoDashboard" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">📚 HỌC HỘ — Tổng quan <small id="hochoDashDate">—</small></div>
+        <div class="header-actions">
+          <button class="act-btn" onclick="loadHochoDashboard()">↻ Làm mới</button>
+          <button class="act-btn" onclick="hochoLogout()" style="border-color:rgba(232,80,74,.3);color:var(--coral)">Đăng xuất Hocho</button>
+        </div>
+      </div>
+      <div class="hocho-stats-grid" id="hochoStatsGrid"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" id="hochoDashTables"></div>
+    </section>
+
+    <!-- PARTNERS APPROVAL -->
+    <section id="pgHochoPartnersApproval" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">⏳ Học Hộ — Chờ duyệt hồ sơ <small>Đối tác đã nộp phí · Cần xem xét</small></div>
+        <div class="header-actions"><button class="act-btn" onclick="loadHochoApproval()">↻ Làm mới</button></div>
+      </div>
+      <div id="hochoApprovalList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+    </section>
+
+    <!-- ALL PARTNERS -->
+    <section id="pgHochoPartners" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">👥 Học Hộ — Tất cả đối tác</div>
+        <div class="header-actions"><button class="act-btn" onclick="loadHochoPartners('')">↻ Làm mới</button></div>
+      </div>
+      <div class="hocho-filter-bar">
+        <button class="hocho-filter-btn active" onclick="filterHochoPartners('',this)">Tất cả</button>
+        <button class="hocho-filter-btn" onclick="filterHochoPartners('active',this)">✅ Active</button>
+        <button class="hocho-filter-btn" onclick="filterHochoPartners('pending_approval',this)">🔄 Chờ duyệt</button>
+        <button class="hocho-filter-btn" onclick="filterHochoPartners('pending_payment',this)">⏳ Chờ TT</button>
+        <button class="hocho-filter-btn" onclick="filterHochoPartners('rejected',this)">❌ Từ chối</button>
+      </div>
+      <div id="hochoPartnersList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+    </section>
+
+    <!-- CUSTOMERS -->
+    <section id="pgHochoCustomers" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">🎓 Học Hộ — Khách hàng</div>
+        <div class="header-actions"><button class="act-btn" onclick="loadHochoCustomers()">↻ Làm mới</button></div>
+      </div>
+      <div id="hochoCustomersList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+    </section>
+
+    <!-- ORDERS -->
+    <section id="pgHochoOrders" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">📚 Học Hộ — Đơn hàng</div>
+        <div class="header-actions"><button class="act-btn" onclick="loadHochoOrders('')">↻ Làm mới</button></div>
+      </div>
+      <div class="hocho-filter-bar">
+        <button class="hocho-filter-btn active" onclick="filterHochoOrders('',this)">Tất cả</button>
+        <button class="hocho-filter-btn" onclick="filterHochoOrders('matching',this)">🔍 Đang tìm</button>
+        <button class="hocho-filter-btn" onclick="filterHochoOrders('accepted',this)">✅ Đã nhận</button>
+        <button class="hocho-filter-btn" onclick="filterHochoOrders('heading',this)">🚶 Đang đến</button>
+        <button class="hocho-filter-btn" onclick="filterHochoOrders('in_progress',this)">⚡ Đang học</button>
+        <button class="hocho-filter-btn" onclick="filterHochoOrders('completed',this)">🎉 Hoàn thành</button>
+        <button class="hocho-filter-btn" onclick="filterHochoOrders('cancelled',this)">❌ Huỷ</button>
+      </div>
+      <div id="hochoOrdersList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+    </section>
+
+    <!-- ORDER PAYMENTS -->
+    <section id="pgHochoOrderPayments" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">🏦 Học Hộ — Xác nhận CK đơn hàng</div>
+        <div class="header-actions"><button class="act-btn" onclick="loadHochoOrderPayments()">↻ Làm mới</button></div>
+      </div>
+      <div class="hocho-warning">⚠️ Khách đã bấm "Đã thanh toán" — kiểm tra đúng đã nhận tiền trong TK ngân hàng SePay rồi mới xác nhận. Đơn CHỈ hiện cho đối tác sau khi xác nhận.</div>
+      <div id="hochoOrderPaymentsActions" style="margin-bottom:12px"></div>
+      <div id="hochoOrderPaymentsList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+    </section>
+
+    <!-- PAYMENTS -->
+    <section id="pgHochoPayments" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">💰 Học Hộ — Thanh toán ĐK</div>
+        <div class="header-actions"><button class="act-btn" onclick="loadHochoPayments()">↻ Làm mới</button></div>
+      </div>
+      <div id="hochoPaymentsList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+    </section>
+
+    <!-- EARNINGS -->
+    <section id="pgHochoEarnings" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">💵 Học Hộ — Thu nhập chờ duyệt</div>
+        <div class="header-actions"><button class="act-btn" onclick="loadHochoEarnings()">↻ Làm mới</button></div>
+      </div>
+      <div class="hocho-warning">Đơn đã hoàn thành — duyệt để chuyển tiền từ "chờ duyệt" sang số dư có thể rút của đối tác.</div>
+      <div id="hochoEarningsActions" style="margin-bottom:12px"></div>
+      <div id="hochoEarningsList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+    </section>
+
+    <!-- WITHDRAWALS -->
+    <section id="pgHochoWithdrawals" class="page-section hocho-page">
+      <div class="page-header">
+        <div class="page-title">🏧 Học Hộ — Rút tiền</div>
+        <div class="header-actions">
+          <select class="filter-select" id="hochoWdFilter" onchange="loadHochoWithdrawals(this.value)"><option value="">Tất cả</option><option value="pending">⏳ Chờ duyệt</option><option value="approved">✅ Đã duyệt</option><option value="rejected">❌ Từ chối</option></select>
+          <button class="act-btn" onclick="loadHochoWithdrawals(document.getElementById('hochoWdFilter').value)">↻ Làm mới</button>
+        </div>
+      </div>
+      <div id="hochoWithdrawalsList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+      <br>
+      <div class="page-title" style="font-size:1.15rem;margin-top:8px">Số dư đối tác</div>
+      <div style="font-size:.82rem;color:var(--muted);font-weight:600;margin-bottom:12px">Số dư chưa rút của từng đối tác active</div>
+      <div id="hochoBalanceList"><div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div></div>
+    </section>
+
   </main>
+
+</div>
+
+
+<!-- HOCHO LOGIN MODAL -->
+<div class="overlay" id="hochoLoginOverlay" style="z-index:350">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-head"><h2>🔐 Đăng nhập HỌC HỘ</h2><button class="modal-close" onclick="closeHochoLogin()">×</button></div>
+    <div class="modal-body">
+      <div style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Nhập tài khoản Hocho admin<br><span style="font-family:var(--font-mono);font-size:.73rem">Mặc định: admin / hocho2024admin</span></div>
+      <div class="lf"><label>Username</label><input type="text" id="hochoUsername" placeholder="admin" autocomplete="off"></div>
+      <div class="lf"><label>Password</label><input type="password" id="hochoPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')hochoDoLogin()"></div>
+      <div id="hochoLoginErr" style="color:var(--coral);font-size:.82rem;font-weight:800;display:none;margin-top:8px"></div>
+    </div>
+    <div class="modal-foot"><button class="modal-cancel" onclick="closeHochoLogin()">Đóng</button><button class="modal-save" onclick="hochoDoLogin()" style="background:#16a34a">Đăng nhập Hocho</button></div>
+  </div>
 </div>
 
 <!-- MODAL -->
@@ -3752,6 +3939,385 @@ function closeBannerModal() { const modal=document.getElementById('bannerModalOv
 function saveBanner() { const title=document.getElementById('bmTitle')?.value.trim(); if(!title){alert('Vui lòng nhập tiêu đề!');return;} const nb={id:Date.now(),title,desc:document.getElementById('bmDesc')?.value||'',color:document.getElementById('bmColor')?.value||'linear-gradient(135deg,#E8504A,#c93d37)',target:document.getElementById('bmTarget')?.value||'Tất cả',startDate:document.getElementById('bmStart')?.value||'',endDate:document.getElementById('bmEnd')?.value||'',views:0,clicks:0,status:'active'}; bannerList.unshift(nb); saveBannerData(); renderBannerGrid(); renderBannerHistory(); closeBannerModal(); showNotif('✅ Banner mới',`"${title}" đã được tạo!`,'coral'); }
 function pauseBanner(id){const b=bannerList.find(x=>x.id===id);if(b){b.status=b.status==='active'?'paused':'active';saveBannerData();renderBannerGrid();renderBannerHistory();}showNotif('⏸','Banner đã cập nhật');}
 function deleteBanner(id){if(!confirm('Xóa banner?'))return;bannerList=bannerList.filter(x=>x.id!==id);saveBannerData();renderBannerGrid();renderBannerHistory();showNotif('🗑 Đã xóa','');}
+
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   HOCHO (HỌC HỘ) — integrated 9 pages, scoped IDs, Bearer token
+//   API base: /api/hocho/admin  —  token key: hocho_admin_token
+// ═════════════════════════════════════════════════════════════════════════════
+const HOCHO_API_BASE = '/api/hocho/admin';
+let HOCHO_TOKEN = localStorage.getItem('hocho_admin_token') || null;
+let hochoCurrentPage = 'dashboard';
+let hochoPendingAfterLogin = null;
+
+const HOCHO_PAGES = {
+  'dashboard': 'pgHochoDashboard',
+  'partners-approval': 'pgHochoPartnersApproval',
+  'partners': 'pgHochoPartners',
+  'customers': 'pgHochoCustomers',
+  'orders': 'pgHochoOrders',
+  'order-payments': 'pgHochoOrderPayments',
+  'payments': 'pgHochoPayments',
+  'earnings': 'pgHochoEarnings',
+  'withdrawals': 'pgHochoWithdrawals',
+};
+
+function hochoAdminFetch(url, opts={}){
+  const headers = { 'Content-Type':'application/json', ...(opts.headers||{}) };
+  if(HOCHO_TOKEN) headers['Authorization'] = 'Bearer ' + HOCHO_TOKEN;
+  return fetch(url, { ...opts, headers }).then(async r=>{
+    if(r.status===401 || r.status===403){
+      // token invalid -> show login
+      HOCHO_TOKEN=null; localStorage.removeItem('hocho_admin_token');
+      showHochoLogin(hochoCurrentPage);
+      throw new Error('Phiên Hocho hết hạn');
+    }
+    const j = await r.json().catch(()=>({success:false,message:'Invalid JSON'}));
+    return j;
+  });
+}
+
+function showHochoLogin(afterPage){
+  hochoPendingAfterLogin = afterPage || hochoCurrentPage;
+  const o=document.getElementById('hochoLoginOverlay'); if(o) o.classList.add('show');
+  const err=document.getElementById('hochoLoginErr'); if(err) err.style.display='none';
+}
+function closeHochoLogin(){
+  const o=document.getElementById('hochoLoginOverlay'); if(o) o.classList.remove('show');
+}
+async function hochoDoLogin(){
+  const u=document.getElementById('hochoUsername')?.value.trim();
+  const p=document.getElementById('hochoPassword')?.value;
+  const errEl=document.getElementById('hochoLoginErr');
+  if(!u||!p){ if(errEl){errEl.textContent='❌ Nhập đủ username & password'; errEl.style.display='block';} return; }
+  errEl.style.display='none';
+  try{
+    const r=await fetch(HOCHO_API_BASE + '/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:u, password:p }) });
+    const d=await r.json();
+    if(d.success){
+      HOCHO_TOKEN=d.data.token;
+      localStorage.setItem('hocho_admin_token', HOCHO_TOKEN);
+      closeHochoLogin();
+      showNotif('✅ Hocho đăng nhập', 'Đã đăng nhập HỌC HỘ','green');
+      if(hochoPendingAfterLogin) { const pg=hochoPendingAfterLogin; hochoPendingAfterLogin=null; showHochoPage(pg); }
+      else loadHochoDashboard();
+      // refresh badges
+      try{ const dash=await hochoAdminFetch(HOCHO_API_BASE + '/dashboard'); if(dash.success) updateHochoBadges(dash.data); }catch(_){}
+    } else {
+      errEl.textContent='❌ ' + (d.message||'Sai thông tin'); errEl.style.display='block';
+    }
+  }catch(e){
+    errEl.textContent='❌ Không kết nối server'; errEl.style.display='block';
+  }
+}
+function hochoLogout(){
+  HOCHO_TOKEN=null; localStorage.removeItem('hocho_admin_token');
+  showNotif('Đã đăng xuất Hocho','Phiên Hocho đã xóa','coral');
+}
+function updateHochoBadges(data){
+  if(!data) return;
+  const p = data.partners||{}; const o = data.orders||{}; const w = data.withdrawals||{};
+  const pendingApproval = p.pending_approval||0;
+  const pendingPay = o.waiting||0;
+  const pendingWd = w.pending_count||0;
+  const totalHochoPending = (pendingApproval||0)+(pendingPay||0)+(pendingWd||0);
+  const el = document.getElementById('hochoPendingBadge'); if(el){ el.textContent=pendingApproval||totalHochoPending||0; el.style.display=(pendingApproval||totalHochoPending)?'inline':'none'; }
+  const el2=document.getElementById('hochoPendingApprovalBadge'); if(el2){ el2.textContent=pendingApproval; el2.style.display=pendingApproval?'inline':'none'; }
+  const el3=document.getElementById('hochoOrderPayBadge'); if(el3){ el3.textContent=pendingPay; el3.style.display=pendingPay?'inline':'none'; }
+  const el4=document.getElementById('hochoWithdrawBadge'); if(el4){ el4.textContent=pendingWd; el4.style.display=pendingWd?'inline':'none'; }
+}
+
+// patch original showPage to also hide hocho pages
+const _origShowPage = showPage;
+showPage = function(key, ev){
+  // hide hocho
+  Object.values(HOCHO_PAGES).forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.remove('show'); });
+  document.querySelectorAll('[id^="nav-hocho-"]').forEach(el=>el.classList.remove('active'));
+  return _origShowPage(key, ev);
+};
+
+function showHochoPage(id){
+  if(!HOCHO_TOKEN){
+    // try auto check if existing token still valid? we already know null -> show login
+    showHochoLogin(id);
+    // still switch UI to show the page shell (so after login it stays)
+    hochoCurrentPage=id;
+    // hide crabor pages
+    Object.values(pages).forEach(pid=>{ const e=document.getElementById(pid); if(e) e.classList.remove('show'); });
+    Object.values(HOCHO_PAGES).forEach(pid=>{ const e=document.getElementById(pid); if(e) e.classList.remove('show'); });
+    const target=document.getElementById(HOCHO_PAGES[id]); if(target) target.classList.add('show');
+    document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+    const nav=document.getElementById('nav-hocho-'+id); if(nav) nav.classList.add('active');
+    return;
+  }
+  hochoCurrentPage=id;
+  // hide crabor pages
+  Object.values(pages).forEach(pid=>{ const e=document.getElementById(pid); if(e) e.classList.remove('show'); });
+  Object.values(HOCHO_PAGES).forEach(pid=>{ const e=document.getElementById(pid); if(e) e.classList.remove('show'); });
+  const target=document.getElementById(HOCHO_PAGES[id]); if(target) target.classList.add('show');
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  const nav=document.getElementById('nav-hocho-'+id); if(nav) nav.classList.add('active');
+  loadCurrentHochoPage();
+}
+
+function loadCurrentHochoPage(){
+  const map={
+    'dashboard': loadHochoDashboard,
+    'partners-approval': loadHochoApproval,
+    'partners': ()=>loadHochoPartners(''),
+    'customers': loadHochoCustomers,
+    'orders': ()=>loadHochoOrders(''),
+    'order-payments': loadHochoOrderPayments,
+    'payments': loadHochoPayments,
+    'earnings': loadHochoEarnings,
+    'withdrawals': ()=>loadHochoWithdrawals(''),
+  };
+  if(map[hochoCurrentPage]) map[hochoCurrentPage]();
+}
+
+// ── DASHBOARD ──
+async function loadHochoDashboard(){
+  const dateEl=document.getElementById('hochoDashDate'); if(dateEl) dateEl.textContent='Cập nhật: '+new Date().toLocaleString('vi-VN');
+  const grid=document.getElementById('hochoStatsGrid'); if(grid) grid.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  try{
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/dashboard');
+    if(!d.success) { if(grid) grid.innerHTML='<div class="hocho-loading">❌ '+ (d.message||'Lỗi') +'</div>'; return; }
+    updateHochoBadges(d.data);
+    const { partners, orders, revenue, customers, wallets } = d.data;
+    const withdrawals = d.data.withdrawals||{};
+    if(!grid) return;
+    grid.innerHTML = `
+      <div class="hocho-stat-tile green"><div class="hocho-stat-label">Đối tác hoạt động</div><div class="hocho-stat-val green">${partners.active}</div><div class="hocho-stat-sub">🟢 Online: ${partners.online_now} · Tổng: ${partners.total}</div></div>
+      <div class="hocho-stat-tile gold"><div class="hocho-stat-label">Chờ duyệt hồ sơ</div><div class="hocho-stat-val gold">${partners.pending_approval}</div><div class="hocho-stat-sub">Chờ thanh toán: ${partners.pending_payment}</div></div>
+      <div class="hocho-stat-tile blue"><div class="hocho-stat-label">Đơn hàng</div><div class="hocho-stat-val" style="color:#60a5fa">${orders.total}</div><div class="hocho-stat-sub">✅ Hoàn thành: ${orders.completed} · ⚡ Đang xử lý: ${(orders.accepted||0)+(orders.heading||0)+(orders.arrived||0)+(orders.in_progress||0)}</div></div>
+      <div class="hocho-stat-tile coral"><div class="hocho-stat-label">Doanh thu platform</div><div class="hocho-stat-val coral">${hochoFmtMoney(revenue.platform_orders)}</div><div class="hocho-stat-sub">Phí ĐK: ${hochoFmtMoney(revenue.registration)} · Tổng: ${hochoFmtMoney(revenue.total)}</div></div>
+      <div class="hocho-stat-tile gold"><div class="hocho-stat-label">Yêu cầu rút tiền</div><div class="hocho-stat-val gold">${withdrawals.pending_count||0}</div><div class="hocho-stat-sub">Số tiền đang chờ: ${hochoFmtMoney(withdrawals.pending_amount||0)}</div></div>
+      <div class="hocho-stat-tile green"><div class="hocho-stat-label">Tổng số dư đối tác</div><div class="hocho-stat-val green">${hochoFmtMoney(withdrawals.total_balance||0)}</div><div class="hocho-stat-sub">Đã rút tổng: ${hochoFmtMoney(withdrawals.total_withdrawn||0)}</div></div>
+      <div class="hocho-stat-tile gold"><div class="hocho-stat-label">Thu nhập chờ duyệt</div><div class="hocho-stat-val gold">${hochoFmtMoney(withdrawals.total_pending_earning||0)}</div><div class="hocho-stat-sub">Đơn hoàn thành chưa duyệt tiền</div></div>
+      <div class="hocho-stat-tile blue"><div class="hocho-stat-label">Khách hàng</div><div class="hocho-stat-val" style="color:#60a5fa">${customers?.total||0}</div><div class="hocho-stat-sub">Tổng số dư ví hocho: ${hochoFmtMoney(wallets?.total_customer_wallet||0)}</div></div>
+    `;
+  }catch(e){ if(grid) grid.innerHTML='<div class="hocho-loading">❌ Lỗi tải dashboard</div>'; showNotif('❌ Lỗi Hocho','Không tải được dashboard','coral'); }
+}
+
+// ── APPROVAL ──
+async function loadHochoApproval(){
+  const el=document.getElementById('hochoApprovalList'); if(el) el.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  try{
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/partners?status=pending_approval');
+    if(!d.success || !d.data.length){ if(el) el.innerHTML='<div class="hocho-loading">✅ Không có hồ sơ nào chờ duyệt</div>'; return; }
+    if(el) el.innerHTML=buildHochoPartnersTable(d.data, true);
+  }catch(e){ if(el) el.innerHTML='<div class="hocho-loading">❌ Lỗi tải dữ liệu</div>'; }
+}
+
+// ── PARTNERS ──
+async function loadHochoPartners(status){
+  const el=document.getElementById('hochoPartnersList'); if(el) el.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  try{
+    const qs=status?`status=${status}`:'';
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/partners' + (qs?'?'+qs:''));
+    if(!d.success) return;
+    if(el) el.innerHTML=buildHochoPartnersTable(d.data, false);
+  }catch(e){ if(el) el.innerHTML='<div class="hocho-loading">❌ Lỗi</div>'; }
+}
+function filterHochoPartners(status, btn){
+  document.querySelectorAll('#pgHochoPartners .hocho-filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  loadHochoPartners(status);
+}
+function buildHochoPartnersTable(data, showApprove){
+  if(!data.length) return '<div class="hocho-loading">Không có dữ liệu</div>';
+  return `
+  <div class="hocho-table-wrap">
+    <div class="hocho-table-header"><div class="hocho-table-title">👥 Danh sách đối tác</div><div class="hocho-table-count">${data.length} đối tác</div></div>
+    <div style="overflow-x:auto"><table class="reg-table">
+      <thead><tr><th>Họ tên</th><th>SĐT</th><th>Trường</th><th>Trạng thái</th><th>Thanh toán</th><th>⭐</th><th>Đơn</th><th>Chờ duyệt</th><th>Có thể rút</th>${showApprove?'<th>Hành động</th>':''}</tr></thead>
+      <tbody>
+        ${data.map(p=>`
+          <tr>
+            <td><div style="font-weight:900">${p.full_name}</div><div style="font-size:.7rem;color:var(--muted)">${p.register_id||''}</div></td>
+            <td class="mono">${p.phone||p.email||''}</td>
+            <td style="max-width:150px;font-size:.8rem">${p.university||''}</td>
+            <td><span class="hocho-badge hocho-badge-${p.status}">${hochoStatusLabel(p.status)}</span></td>
+            <td><span class="hocho-badge hocho-badge-${p.payment_status}">${hochoPayLabel(p.payment_status)}</span></td>
+            <td>${p.rating||5}</td>
+            <td>${p.completed_orders||0}/${p.total_orders||0}</td>
+            <td style="color:var(--hocho-gold);font-weight:800">${hochoFmtMoney(p.pending_balance||0)}</td>
+            <td style="color:var(--hocho-lime);font-weight:900">${hochoFmtMoney(p.balance||0)}</td>
+            ${showApprove?`<td style="display:flex;gap:6px;flex-wrap:wrap"><button class="hocho-btn-approve" onclick="hochoApprovePartner('${p._id}','${(p.full_name||'').replace(/'/g,"\\'")}')">✓ Duyệt</button><button class="hocho-btn-reject" onclick="hochoRejectPartner('${p._id}','${(p.full_name||'').replace(/'/g,"\\'")}')">✗ Từ chối</button></td>`:''}
+          </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+// ── CUSTOMERS ──
+async function loadHochoCustomers(){
+  const el=document.getElementById('hochoCustomersList'); if(el) el.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  try{
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/customers');
+    if(!d.success) return;
+    if(!d.data.length){ if(el) el.innerHTML='<div class="hocho-loading">Chưa có khách hàng nào</div>'; return; }
+    if(el) el.innerHTML=`
+    <div class="hocho-table-wrap"><div class="hocho-table-header"><div class="hocho-table-title">🎓 Danh sách khách hàng</div><div class="hocho-table-count">${d.data.length} khách hàng</div></div>
+    <div style="overflow-x:auto"><table class="reg-table"><thead><tr><th>Họ tên</th><th>SĐT</th><th>Email</th><th>Số dư ví hocho</th><th>Ngày tham gia</th></tr></thead>
+    <tbody>${d.data.map(c=>`<tr><td style="font-weight:900">${c.full_name||''}</td><td class="mono">${c.phone||'—'}</td><td style="font-size:.8rem">${c.email||'—'}</td><td style="color:var(--hocho-lime);font-weight:900">${hochoFmtMoney(c.wallet_balance||0)}</td><td style="font-size:.78rem;color:var(--muted)">${hochoFmtDate(c.createdAt)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  }catch(e){ if(el) el.innerHTML='<div class="hocho-loading">❌ Lỗi tải dữ liệu</div>'; }
+}
+
+// ── ORDERS ──
+async function loadHochoOrders(status){
+  const el=document.getElementById('hochoOrdersList'); if(el) el.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  try{
+    const qs=status?`status=${status}`:'';
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/orders' + (qs?'?'+qs:''));
+    if(!d.success) return;
+    if(!d.data.length){ if(el) el.innerHTML='<div class="hocho-loading">Không có đơn nào</div>'; return; }
+    if(el) el.innerHTML=`
+    <div class="hocho-table-wrap"><div class="hocho-table-header"><div class="hocho-table-title">📚 Danh sách đơn hàng</div><div class="hocho-table-count">${d.data.length} đơn</div></div>
+    <div style="overflow-x:auto"><table class="reg-table"><thead><tr><th>Mã đơn</th><th>Khách</th><th>Trường</th><th>Phòng</th><th>Trạng thái</th><th>TT tiền</th><th>Giá</th><th>Ngày đặt</th></tr></thead>
+    <tbody>${d.data.map(o=>`<tr><td class="mono">${o.order_code||''}</td><td><div style="font-weight:900">${o.customer_name||''}</div><div style="font-size:.7rem;color:var(--muted)">${o.customer_phone||''}</div></td><td style="font-size:.8rem;max-width:130px">${o.university||''}</td><td style="font-size:.82rem">${o.building||''} ${o.floor?'T'+o.floor:''} P${o.room_number||''}</td><td><span class="hocho-badge hocho-badge-${o.status}">${hochoOrderStatusLabel(o.status)}</span></td><td><span class="hocho-badge hocho-badge-${o.payment_status}">${hochoPayLabel(o.payment_status)}</span></td><td style="color:var(--hocho-lime);font-weight:900">${hochoFmtMoney(o.price||200000)}</td><td style="font-size:.78rem;color:var(--muted)">${hochoFmtDate(o.createdAt)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  }catch(e){ if(el) el.innerHTML='<div class="hocho-loading">❌ Lỗi</div>'; }
+}
+function filterHochoOrders(status, btn){
+  document.querySelectorAll('#pgHochoOrders .hocho-filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  loadHochoOrders(status);
+}
+
+// ── PAYMENTS (pending registration) ──
+async function loadHochoPayments(){
+  const el=document.getElementById('hochoPaymentsList'); if(el) el.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  try{
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/partners?status=pending_approval');
+    const d2=await hochoAdminFetch(HOCHO_API_BASE + '/partners?status=pending_payment');
+    const combined=[...(d.data||[]), ...(d2.data||[])].filter(p=>p.payment_status!=='paid');
+    if(!combined.length){ if(el) el.innerHTML='<div class="hocho-loading">✅ Không có thanh toán nào chờ xử lý</div>'; return; }
+    if(el) el.innerHTML=`
+    <div class="hocho-warning">⚠️ Kiểm tra đã nhận chuyển khoản SePay đúng số tiền/nội dung trước khi xác nhận.</div>
+    <div class="hocho-table-wrap"><div class="hocho-table-header"><div class="hocho-table-title">💰 Chờ xác nhận thanh toán</div><div class="hocho-table-count">${combined.length} hồ sơ</div></div>
+    <div style="overflow-x:auto"><table class="reg-table"><thead><tr><th>Họ tên</th><th>SĐT/Email</th><th>Mã hồ sơ</th><th>Trạng thái TT</th><th>Phí</th><th>Ngày ĐK</th><th>Xác nhận</th></tr></thead>
+    <tbody>${combined.map(p=>`<tr><td style="font-weight:900">${p.full_name}</td><td class="mono">${p.phone||''}</td><td class="mono">${p.register_id||''}</td><td><span class="hocho-badge hocho-badge-${p.payment_status}">${hochoPayLabel(p.payment_status)}</span></td><td style="color:var(--hocho-lime);font-weight:900">200.000đ</td><td style="font-size:.78rem;color:var(--muted)">${hochoFmtDate(p.createdAt)}</td><td>${p.payment_status!=='paid'?`<button class="hocho-btn-confirm" onclick="hochoConfirmPayment('${p._id}','${(p.full_name||'').replace(/'/g,"\\'")}')">✓ Xác nhận đã nhận tiền</button>`:'<span style="color:var(--hocho-lime)">✅ Đã xác nhận</span>'}</td></tr>`).join('')}</tbody></table></div></div>`;
+  }catch(e){ if(el) el.innerHTML='<div class="hocho-loading">❌ Lỗi</div>'; }
+}
+
+// ── ORDER PAYMENTS ──
+async function loadHochoOrderPayments(){
+  const list=document.getElementById('hochoOrderPaymentsList'); const acts=document.getElementById('hochoOrderPaymentsActions');
+  if(list) list.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  if(acts) acts.innerHTML='';
+  try{
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/pending-order-payments');
+    if(!d.success) return;
+    if(!d.data.length){ if(list) list.innerHTML='<div class="hocho-loading">✅ Không có đơn nào chờ xác nhận CK</div>'; return; }
+    if(acts) acts.innerHTML=`<button class="hocho-btn-confirm" onclick="hochoConfirmAllOrderPayments()">✓ Xác nhận tất cả (${d.data.length} đơn)</button>`;
+    if(list) list.innerHTML=`
+    <div class="hocho-table-wrap"><div class="hocho-table-header"><div class="hocho-table-title">🏦 Đơn chờ xác nhận CK</div><div class="hocho-table-count">${d.data.length} đơn</div></div>
+    <div style="overflow-x:auto"><table class="reg-table"><thead><tr><th>Mã đơn</th><th>Khách</th><th>SĐT</th><th>Trường/Phòng</th><th>Số tiền CK</th><th>Khách bấm lúc</th><th>Hành động</th></tr></thead>
+    <tbody>${d.data.map(o=>`<tr><td class="mono">${o.order_code||''}</td><td style="font-weight:900">${o.customer_name||''}</td><td class="mono">${o.customer_phone||''}</td><td style="font-size:.8rem">${o.university||''} · P${o.room_number||''}</td><td style="color:var(--hocho-lime);font-weight:900">${hochoFmtMoney((o.price||200000)-(o.wallet_applied||0))}</td><td style="font-size:.78rem;color:var(--muted)">${hochoFmtDate(o.payment_claimed_at)}</td><td><button class="hocho-btn-approve" onclick="hochoConfirmOrderPayment('${o._id}')">✓ Đã nhận tiền</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  }catch(e){ if(list) list.innerHTML='<div class="hocho-loading">❌ Lỗi tải dữ liệu</div>'; }
+}
+async function hochoConfirmOrderPayment(orderId){
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/confirm-order-payment', { method:'POST', body: JSON.stringify({ order_id: orderId }) }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success){ loadHochoOrderPayments(); loadHochoDashboard(); } }catch(e){}
+}
+async function hochoConfirmAllOrderPayments(){
+  if(!confirm('Xác nhận đã nhận tiền cho TẤT CẢ đơn đang chờ?')) return;
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/confirm-all-order-payments', { method:'POST' }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success){ loadHochoOrderPayments(); loadHochoDashboard(); } }catch(e){}
+}
+
+// ── EARNINGS ──
+async function loadHochoEarnings(){
+  const list=document.getElementById('hochoEarningsList'); const acts=document.getElementById('hochoEarningsActions');
+  if(list) list.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  if(acts) acts.innerHTML='';
+  try{
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/pending-earnings');
+    if(!d.success) return;
+    if(!d.data.length){ if(list) list.innerHTML='<div class="hocho-loading">✅ Không có thu nhập nào chờ duyệt</div>'; return; }
+    if(acts) acts.innerHTML=`<button class="hocho-btn-confirm" onclick="hochoApproveAllEarnings()">✓ Duyệt tất cả (${d.data.length} đơn)</button>`;
+    if(list) list.innerHTML=`
+    <div class="hocho-table-wrap"><div class="hocho-table-header"><div class="hocho-table-title">💵 Thu nhập chờ duyệt</div><div class="hocho-table-count">${d.data.length} đơn</div></div>
+    <div style="overflow-x:auto"><table class="reg-table"><thead><tr><th>Mã đơn</th><th>Đối tác</th><th>SĐT</th><th>Số tiền</th><th>Hoàn thành lúc</th><th>Hành động</th></tr></thead>
+    <tbody>${d.data.map(o=>`<tr><td class="mono">${o.order_code||''}</td><td style="font-weight:900">${o.partner_id?.full_name||'—'}</td><td class="mono">${o.partner_id?.phone||''}</td><td style="color:var(--hocho-lime);font-weight:900">${hochoFmtMoney(o.partner_earning)}</td><td style="font-size:.78rem;color:var(--muted)">${hochoFmtDate(o.completed_at)}</td><td><button class="hocho-btn-approve" onclick="hochoApproveEarning('${o._id}')">✓ Duyệt</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  }catch(e){ if(list) list.innerHTML='<div class="hocho-loading">❌ Lỗi tải dữ liệu</div>'; }
+}
+async function hochoApproveEarning(orderId){
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/approve-earning', { method:'POST', body: JSON.stringify({ order_id: orderId }) }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success){ loadHochoEarnings(); loadHochoDashboard(); } }catch(e){}
+}
+async function hochoApproveAllEarnings(){
+  if(!confirm('Duyệt TẤT CẢ thu nhập đang chờ?')) return;
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/approve-all-earnings', { method:'POST' }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success){ loadHochoEarnings(); loadHochoDashboard(); } }catch(e){}
+}
+
+// ── ACTIONS ──
+async function hochoApprovePartner(id, name){
+  if(!confirm(`Duyệt đối tác "${name}"?`)) return;
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/approve-partner', { method:'POST', body: JSON.stringify({ partner_id: id }) }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success){ loadHochoApproval(); loadHochoDashboard(); } }catch(e){ showNotif('❌ Lỗi','Không kết nối','coral'); }
+}
+async function hochoRejectPartner(id, name){
+  if(!confirm(`Từ chối đối tác "${name}"?`)) return;
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/reject-partner', { method:'POST', body: JSON.stringify({ partner_id: id }) }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success){ loadHochoApproval(); loadHochoDashboard(); } }catch(e){ showNotif('❌ Lỗi','Không kết nối','coral'); }
+}
+async function hochoConfirmPayment(id, name){
+  if(!confirm(`Xác nhận đã nhận 200.000đ từ "${name}"?`)) return;
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/confirm-payment', { method:'POST', body: JSON.stringify({ partner_id: id }) }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success) loadHochoPayments(); }catch(e){ showNotif('❌ Lỗi','Không kết nối','coral'); }
+}
+
+// ── WITHDRAWALS ──
+async function loadHochoWithdrawals(status){
+  const wList=document.getElementById('hochoWithdrawalsList'); const bList=document.getElementById('hochoBalanceList');
+  if(wList) wList.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  if(bList) bList.innerHTML='<div class="hocho-loading"><div class="hocho-spinner"></div>Đang tải...</div>';
+  try{
+    const qs=status?`status=${status}`:'';
+    const d=await hochoAdminFetch(HOCHO_API_BASE + '/withdrawals' + (qs?'?'+qs:''));
+    if(!d.success) return;
+    if(!d.data.length){ if(wList) wList.innerHTML='<div class="hocho-loading">✅ Không có yêu cầu rút tiền nào</div>'; }
+    else {
+      if(wList) wList.innerHTML=`
+      <div class="hocho-table-wrap"><div class="hocho-table-header"><div class="hocho-table-title">🏧 Yêu cầu rút tiền</div><div class="hocho-table-count">${d.data.length} yêu cầu</div></div>
+      <div style="overflow-x:auto"><table class="reg-table"><thead><tr><th>Đối tác</th><th>SĐT</th><th>Số tiền</th><th>Ngân hàng</th><th>Số TK</th><th>Chủ TK</th><th>Trạng thái</th><th>Ngày gửi</th><th>Hành động</th></tr></thead>
+      <tbody>${d.data.map(w=>`<tr><td style="font-weight:900">${w.partner_name||''}</td><td class="mono">${w.partner_phone||''}</td><td style="color:var(--hocho-lime);font-weight:900">${hochoFmtMoney(w.amount)}</td><td style="font-weight:800">${w.bank_name||''}</td><td class="mono">${w.bank_account||''}</td><td style="font-weight:800">${w.bank_owner||''}</td><td><span class="hocho-badge hocho-badge-${w.status}">${hochoWithdrawStatusLabel(w.status)}</span></td><td style="font-size:.78rem;color:var(--muted)">${hochoFmtDate(w.createdAt)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${w.status==='pending'?`<button class="hocho-btn-approve" onclick="hochoApproveWithdrawal('${w._id}','${(w.partner_name||'').replace(/'/g,"\\'")}','${w.amount}')">✓ Duyệt</button><button class="hocho-btn-reject" onclick="hochoRejectWithdrawal('${w._id}','${(w.partner_name||'').replace(/'/g,"\\'")}')">✗ Từ chối</button>`:`<span style="color:var(--muted);font-size:.78rem">${w.admin_note||'—'}</span>`}</td></tr>`).join('')}</tbody></table></div></div>`;
+    }
+    const db=await hochoAdminFetch(HOCHO_API_BASE + '/partners?status=active');
+    if(db.success && db.data.length){
+      const sorted=db.data.sort((a,b)=>(b.balance||0)-(a.balance||0));
+      if(bList) bList.innerHTML=`
+      <div class="hocho-table-wrap"><div class="hocho-table-header"><div class="hocho-table-title">💼 Số dư đối tác</div><div class="hocho-table-count">${sorted.length} đối tác active</div></div>
+      <div style="overflow-x:auto"><table class="reg-table"><thead><tr><th>Đối tác</th><th>SĐT</th><th>Trường</th><th>Số dư hiện tại</th><th>Tổng đã kiếm</th><th>Đã rút</th><th>Đơn hoàn thành</th></tr></thead>
+      <tbody>${sorted.map(p=>`<tr><td style="font-weight:900">${p.full_name||''}</td><td class="mono">${p.phone||''}</td><td style="font-size:.8rem">${p.university||''}</td><td style="color:var(--hocho-lime);font-weight:900">${hochoFmtMoney(p.balance||0)}</td><td style="color:var(--hocho-gold);font-weight:800">${hochoFmtMoney(p.earnings_total||0)}</td><td style="color:var(--muted)">${hochoFmtMoney(p.withdrawn_total||0)}</td><td style="text-align:center">${p.completed_orders||0}</td></tr>`).join('')}</tbody></table></div></div>`;
+    } else {
+      if(bList) bList.innerHTML='<div class="hocho-loading">Chưa có đối tác active nào</div>';
+    }
+  }catch(e){ if(wList) wList.innerHTML='<div class="hocho-loading">❌ Lỗi tải dữ liệu</div>'; }
+}
+async function hochoApproveWithdrawal(id, name, amount){
+  if(!confirm(`Xác nhận đã chuyển ${hochoFmtMoney(amount)} cho ${name}?`)) return;
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/approve-withdrawal', { method:'POST', body: JSON.stringify({ request_id: id, admin_note: 'Đã chuyển khoản' }) }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success) loadHochoWithdrawals(document.getElementById('hochoWdFilter')?.value||''); }catch(e){}
+}
+async function hochoRejectWithdrawal(id, name){
+  const note=prompt(`Lý do từ chối yêu cầu của ${name}:`);
+  if(note===null) return;
+  try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/reject-withdrawal', { method:'POST', body: JSON.stringify({ request_id: id, admin_note: note||'Không hợp lệ' }) }); showNotif(d.success?'✅ Đã từ chối & hoàn số dư':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success) loadHochoWithdrawals(document.getElementById('hochoWdFilter')?.value||''); }catch(e){}
+}
+
+// ── HELPERS ──
+function hochoFmtMoney(n){ return (n||0).toLocaleString('vi-VN')+'đ'; }
+function hochoFmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('vi-VN'); }
+function hochoStatusLabel(s){ return {pending_payment:'⏳ Chờ TT', pending_approval:'🔄 Chờ duyệt', active:'✅ Active', rejected:'❌ Từ chối', suspended:'⛔ Tạm khoá'}[s]||s; }
+function hochoPayLabel(s){ return {unpaid:'Chưa TT', pending:'Đã CK', paid:'Đã xác nhận'}[s]||s; }
+function hochoOrderStatusLabel(s){ return {waiting:'⏳ Chờ', matching:'🔍 Đang quét', accepted:'✅ Nhận đơn', heading:'🚶 Đang đến', arrived:'📍 Đã đến', in_progress:'⚡ Đang học', completed:'🎉 Xong', cancelled:'❌ Huỷ', rejected:'🚫 Từ chối'}[s]||s; }
+function hochoWithdrawStatusLabel(s){ return {pending:'⏳ Chờ duyệt', approved:'✅ Đã duyệt', rejected:'❌ Từ chối'}[s]||s; }
+
+// Auto-check Hocho token on boot to update badges silently
+(async()=>{
+  if(!HOCHO_TOKEN) return;
+  try{
+    const r=await fetch(HOCHO_API_BASE + '/dashboard', { headers:{ Authorization:'Bearer '+HOCHO_TOKEN }});
+    if(r.ok){ const j=await r.json(); if(j.success) updateHochoBadges(j.data); }
+    else { HOCHO_TOKEN=null; localStorage.removeItem('hocho_admin_token'); }
+  }catch(_){}
+})();
 
 
 // Auto-refresh
