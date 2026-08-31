@@ -455,18 +455,40 @@ input[type=range] { width: 100%; accent-color: #E8504A; margin-top: 8px; }
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
 
-/* Responsive */
+/* ── Responsive: Mobile vs Laptop ── */
 @media(max-width:700px) {
-  body { padding: 20px 12px 60px; }
-  .card-head, .card-body, .progress-wrap { padding-left: 25px; padding-right: 25px; }
-  .head-title { font-size: 2rem; }
+  body { padding: 16px 12px 60px; }
+  .card, .welcome-screen { border-radius: 20px; }
+  .card-head, .card-body, .progress-wrap { padding-left: 22px; padding-right: 22px; }
+  .head-title { font-size: 1.9rem; }
   .grid-2 { grid-template-columns: 1fr; }
   .otp-box { width: 50px; height: 60px; font-size: 1.8rem; }
   .fee-box .fl .amt { font-size: 2.2rem; }
   .welcome-modules { grid-template-columns: 1fr; }
-  .welcome-features { grid-template-columns: 1fr; gap: 30px; }
+  .welcome-features { grid-template-columns: 1fr; gap: 24px; }
   .welcome-title { font-size: 2.2rem; }
   .welcome-title em { font-size: 1.5rem; }
+}
+/* Laptop / Desktop: lap day man hinh, cam giac web chu khong phai mobile */
+@media(min-width:900px) {
+  body { padding: 24px 32px 80px; }
+  .card, .welcome-screen { max-width: 1080px; width: 100%; }
+  .card-body { padding: 36px 44px 44px; }
+  .welcome-body { padding: 40px 44px; }
+  .card-head { padding: 40px 44px 32px; }
+  .progress-wrap { padding: 0 44px 22px; }
+}
+@media(min-width:1200px) {
+  body { padding: 32px 40px 80px; gap: 32px; }
+  .card, .welcome-screen { max-width: 1180px; }
+  .card-body { padding: 40px 48px 48px; }
+  .welcome-body { padding: 44px 48px; }
+  .card-head { padding: 44px 48px 36px; }
+  .progress-wrap { padding: 0 48px 24px; }
+  .welcome-head { padding: 50px 48px 36px; }
+}
+@media(min-width:1400px) {
+  .card, .welcome-screen { max-width: 1280px; }
 }
 
 
