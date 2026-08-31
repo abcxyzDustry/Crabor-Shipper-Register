@@ -6046,28 +6046,76 @@ async function processSePayPayment(payload, ioRef, force = false) {
   }
 
   // ── 2. Shipper registration fee ──────────────────────────
+  // Legacy CRSHIP / CRB-FP - giu de tuong thich, nhung tu dong phe duyet luon
   const shipMatch = rawRef.match(/CRSHIP([A-Z0-9]+)/);
   const regMatch = rawRef.match(/CRB-FP-([A-Z0-9]+)/i);
   if (shipMatch && !handled) {
     const appId = shipMatch[1];
     const app_ = await Shipper.findOne({ appId: { $regex: appId, $options:'i' }, status:'pending_payment' });
     if (app_) {
-      await Shipper.findByIdAndUpdate(app_._id, { status:'pending_review', paidAt: new Date(), feePaid: amount, feeStatus:'paid' });
+      await Shipper.findByIdAndUpdate(app_._id, { status:'approved', paidAt: new Date(), feePaid: amount, feeStatus:'paid', approvedAt: new Date(), approvedBy: 'sepay_auto' });
+      ioInstance?.to('admin').emit('shipperApproved', { shipperId: app_._id, auto: true });
       ioInstance?.to('admin').emit('shipperFeePaid', { shipperId: app_._id });
-      console.log(`[SEPAY] Shipper fee confirmed: ${app_._id}`);
+      console.log(`[SEPAY] Shipper fee confirmed (CRSHIP auto-approved): ${app_._id}`);
       handled = true;
     }
   }
-  // App shipper QR: nội dung CRABOR CRB-FP-XXXX → auto đánh dấu feeStatus=paid
+  // App shipper QR: noi dung CRABOR CRB-FP-XXXX -> auto phe duyet
   if (regMatch && !handled) {
     const regSuffix = regMatch[1];
     const app_ = await Shipper.findOne({ registerId: { $regex: '^CRB-FP-' + regSuffix + '$', $options:'i' } });
     if (app_) {
-      await Shipper.findByIdAndUpdate(app_._id, { feeStatus:'paid', paidAt: new Date(), feePaid: amount });
+      const upd = { feeStatus:'paid', paidAt: new Date(), feePaid: amount };
+      if (app_.status !== 'approved' && app_.status !== 'active') { upd.status = 'approved'; upd.approvedAt = new Date(); upd.approvedBy = 'sepay_auto'; }
+      await Shipper.findByIdAndUpdate(app_._id, upd);
+      ioInstance?.to(`shipper_${app_._id}`).emit('shipper_approved', { approved: true, amount });
       ioInstance?.to(`shipper_${app_._id}`).emit('shipper_fee_paid', { paid: true, amount });
+      ioInstance?.to('admin').emit('shipperApproved', { shipperId: app_._id, via:'shipper_app_qr' });
       ioInstance?.to('admin').emit('shipperFeePaid', { shipperId: app_._id, via:'shipper_app_qr' });
-      console.log(`[SEPAY] Shipper app fee confirmed: ${app_.registerId} — ${amount.toLocaleString('vi-VN')}đ`);
+      console.log(`[SEPAY] Shipper app fee confirmed (auto-approved): ${app_.registerId} — ${amount.toLocaleString('vi-VN')}đ`);
       handled = true;
+    }
+  }
+  // ── 2a. Shipper CRB-S-... hoac SDT - tu dong phe duyet ngay khi SePay khop ──
+  if (!handled) {
+    const crbS = rawRef.match(/CRB-S-[A-Z0-9]{4,8}/i);
+    const phoneMatch = rawRef.match(/0\d{9,10}/);
+    let shipper = null;
+    if (crbS) {
+      shipper = await Shipper.findOne({ registerId: crbS[0].toUpperCase() });
+    } else if (phoneMatch) {
+      const ph = phoneMatch[0];
+      shipper = await Shipper.findOne({ phone: ph });
+      // fallback: neu phone co 84 dau thi thu 0...
+      if (!shipper && ph.startsWith('84')) {
+        shipper = await Shipper.findOne({ phone: '0' + ph.slice(2) });
+      }
+    }
+    if (shipper) {
+      const need = shipper.fee || 500000;
+      // amount phai >= fee - 1k (cho phep lech nho)
+      if (amount + 1000 >= need && shipper.feeStatus !== 'paid') {
+        const upd2 = { feeStatus:'paid', paidAt: new Date(), feePaid: amount };
+        if (shipper.status !== 'approved' && shipper.status !== 'active') { upd2.status = 'approved'; upd2.approvedAt = new Date(); upd2.approvedBy = 'sepay_auto'; }
+        await Shipper.findByIdAndUpdate(shipper._id, upd2);
+        ioInstance?.to(`shipper_${shipper._id}`).emit('shipper_approved', { approved: true, amount });
+        ioInstance?.to('admin').emit('shipperApproved', { shipperId: shipper._id, registerId: shipper.registerId, auto: true });
+        ioInstance?.to('admin').emit('shipperFeePaid', { shipperId: shipper._id, registerId: shipper.registerId });
+        console.log(`[SEPAY] Shipper auto-approved (CRB-S/phone): ${shipper.registerId} — ${amount.toLocaleString('vi-VN')}đ >= ${need.toLocaleString('vi-VN')}đ`);
+        handled = true;
+      } else if (shipper.feeStatus === 'paid' && shipper.status !== 'approved' && shipper.status !== 'active') {
+        // Da tra phi truoc do nhung chua duyet -> duyet ngay
+        await Shipper.findByIdAndUpdate(shipper._id, { status:'approved', approvedAt: new Date(), approvedBy: 'sepay_auto' });
+        ioInstance?.to(`shipper_${shipper._id}`).emit('shipper_approved', { approved: true });
+        ioInstance?.to('admin').emit('shipperApproved', { shipperId: shipper._id, registerId: shipper.registerId, auto: true });
+        console.log(`[SEPAY] Shipper auto-approved (da tra phi): ${shipper.registerId}`);
+        handled = true;
+      } else if (shipper && !handled) {
+        // Log de debug neu amount khong du
+        if (amount + 1000 < need) {
+          console.log(`[SEPAY] Shipper ${shipper.registerId}: amount ${amount} < fee ${need} -> chua du de phe duyet`);
+        }
+      }
     }
   }
 
