@@ -618,44 +618,6 @@ body { padding-top: 36px; }
   </div>
   <div class="card-body">
 
-    <!-- STEP 1: CHỌN DỊCH VỤ -->
-    <div id="step1" class="step-panel show">
-      <div class="panel-title">Bạn muốn đăng ký gì?</div>
-      <div class="panel-sub">Chọn loại dịch vụ để bắt đầu đăng ký hợp tác với CRABOR</div>
-      <div class="svc-list">
-        <div class="svc-card" onclick="pickService('gl')">
-          <span class="svc-ico">👕</span>
-          <div class="svc-info"><b>Giặt Là</b><p>Hoa hồng 30%/đơn · Miễn phí đăng ký</p></div>
-          <span class="svc-arr">→</span>
-        </div>
-        <div class="svc-card" onclick="pickService('gv')">
-          <span class="svc-ico">🧹</span>
-          <div class="svc-info"><b>Giúp Việc / Dọn dẹp</b><p>Thu nhập 200k–350k/ca · Miễn phí</p></div>
-          <span class="svc-arr">→</span>
-        </div>
-        <div class="svc-card" onclick="pickService('cs')">
-          <span class="svc-ico">🛒</span>
-          <div class="svc-info"><b>China Shop</b><p>Hoa hồng 20% · Phí gian hàng 500k/năm</p></div>
-          <span class="svc-arr">→</span>
-        </div>
-        <div class="svc-card" onclick="pickService('sp')">
-          <span class="svc-ico">🛵</span>
-          <div class="svc-info"><b>Shipper</b><p>Thu nhập 20k–50k/đơn · Early Bird</p></div>
-          <span class="svc-arr">→</span>
-        </div>
-        <div class="svc-card" onclick="pickService('fd')">
-          <span class="svc-ico">🍜</span>
-          <div class="svc-info"><b>Nhà hàng / Quán ăn</b><p>Hoa hồng 20%/đơn</p></div>
-          <span class="svc-arr">→</span>
-        </div>
-        <div class="svc-card" onclick="document.getElementById('card').classList.add('hide');document.getElementById('welcomeScreen').classList.remove('hide');setTimeout(()=>{document.getElementById('lookupInput').scrollIntoView({behavior:'smooth',block:'center'});document.getElementById('lookupInput').focus();},150)">
-          <span class="svc-ico">🔍</span>
-          <div class="svc-info"><b>Tra cứu hồ sơ</b><p>Nhập SĐT hoặc mã hồ sơ để kiểm tra trạng thái</p></div>
-          <span class="svc-arr">→</span>
-        </div>
-      </div>
-    </div>
-
     <!-- STEP 2: SĐT -->
     <div id="step2" class="step-panel">
       <div class="panel-title">Số điện thoại</div>
@@ -1355,6 +1317,7 @@ function renderSteps(labels, active) {
 //  NAVIGATION
 // ══════════════════════════════════════
 function goStep(n) {
+  if (n===1) { document.getElementById('card').classList.add('hide'); document.getElementById('welcomeScreen').classList.remove('hide'); window.scrollTo({top:0,behavior:'smooth'}); return; }
   if (n===2 && !validateStep1()) return;
   // OTP đã bỏ — phoneVerified luôn true
   if (n===6) buildSummary();
