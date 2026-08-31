@@ -949,47 +949,7 @@ footer{
       <h2 class="section-title">Dành cho <em>Đối tác</em></h2>
       <p class="section-sub" style="margin:0 auto">Tăng doanh thu không cần thêm mặt bằng — CRABOR lo vận hành, bạn lo chất lượng.</p>
     </div>
-    <div class="join-grid">
-      <!-- USER -->
-      <div class="join-card reveal reveal-delay-1">
-        <div class="jc-header jc-h-user">
-          <div class="jc-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/></svg></div>
-          <div class="jc-role">Người dùng</div>
-          <div class="jc-tagline">Đặt hàng mọi lúc · Giao siêu nhanh</div>
-        </div>
-        <div class="jc-body">
-          <ul class="jc-perks">
-            <li><span class="perk-ico"></span>Theo dõi đơn real-time</li>
-            <li><span class="perk-ico"></span>Thanh toán đa phương thức</li>
-            <li><span class="perk-ico"></span>Tích điểm thưởng mỗi đơn</li>
-            <li><span class="perk-ico"></span>Khuyến mãi độc quyền</li>
-            <li><span class="perk-ico"></span>Thông báo từng bước đơn hàng</li>
-          </ul>
-          <button class="jc-btn jc-btn-user" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">
-            Tải app ngay — Miễn phí
-          </button>
-        </div>
-      </div>
-      <!-- SHIPPER -->
-      <div class="join-card reveal reveal-delay-2">
-        <div class="jc-header jc-h-shipper">
-          <div class="jc-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M5.5 17.5h8l3-7h2a3 3 0 0 1 3 3v0a3 3 0 0 1-2 2.8"/><path d="M9 10.5h4l1.5-4H8l-2.5 7"/><path d="M18.5 14V9"/></svg></div>
-          <div class="jc-role">Shipper</div>
-          <div class="jc-tagline">Thu nhập 20k–50k/đơn · Chủ động giờ</div>
-        </div>
-        <div class="jc-body">
-          <ul class="jc-perks">
-            <li><span class="perk-ico"></span>Thu nhập 20k–50k/đơn giao hàng</li>
-            <li><span class="perk-ico"></span>Tự chọn giờ làm — không ép ca</li>
-            <li><span class="perk-ico"></span>Nhận tiền hàng ngày, không chờ</li>
-            <li><span class="perk-ico"></span>Đồng phục CRABOR chính hãng</li>
-            <li><span class="perk-ico"></span>App shipper chuyên dụng, dễ dùng</li>
-          </ul>
-          <button class="jc-btn jc-btn-shipper" onclick="window.location.href='/register#shipper'">
-            Đăng ký Shipper — 700k kích hoạt
-          </button>
-        </div>
-      </div>
+    <div class="join-grid" style="grid-template-columns:min(400px,100%);justify-content:center">
       <!-- PARTNER -->
       <div class="join-card reveal reveal-delay-3">
         <div class="jc-header jc-h-partner">
@@ -1098,9 +1058,7 @@ footer{
 <div class="sticky-banner" id="stickyBanner">
   <div class="sticky-inner">
     <span class="sticky-label">Bạn muốn là:</span>
-    <button class="sticky-btn sticky-user" onclick="window.location.href='/user.html'" style="opacity:.8">Khách hàng →</button>
-    <button class="sticky-btn sticky-shipper" onclick="window.location.href='/shipper.html'" style="opacity:.8">Shipper →</button>
-    <button class="sticky-btn sticky-partner" onclick="window.location.href='/register#partner'" style="background:#fff;color:#0d1424;box-shadow:0 0 0 2px var(--yellow)">Đối tác — Đăng ký ngay</button>
+    <button class="sticky-btn sticky-partner" onclick="window.location.href='/register#partner'" style="background:#fff;color:#0d1424;box-shadow:0 0 0 2px var(--yellow)">Đăng ký Đối tác — Miễn phí →</button>
   </div>
 </div>
 

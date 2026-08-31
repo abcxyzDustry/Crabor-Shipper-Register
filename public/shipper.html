@@ -949,27 +949,7 @@ footer{
       <h2 class="section-title">Dành cho <em>Shipper</em></h2>
       <p class="section-sub" style="margin:0 auto">Chủ động thời gian, thu nhập minh bạch, đồng phục & app chuyên dụng — bắt đầu sau 24h duyệt.</p>
     </div>
-    <div class="join-grid">
-      <!-- USER -->
-      <div class="join-card reveal reveal-delay-1">
-        <div class="jc-header jc-h-user">
-          <div class="jc-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/></svg></div>
-          <div class="jc-role">Người dùng</div>
-          <div class="jc-tagline">Đặt hàng mọi lúc · Giao siêu nhanh</div>
-        </div>
-        <div class="jc-body">
-          <ul class="jc-perks">
-            <li><span class="perk-ico"></span>Theo dõi đơn real-time</li>
-            <li><span class="perk-ico"></span>Thanh toán đa phương thức</li>
-            <li><span class="perk-ico"></span>Tích điểm thưởng mỗi đơn</li>
-            <li><span class="perk-ico"></span>Khuyến mãi độc quyền</li>
-            <li><span class="perk-ico"></span>Thông báo từng bước đơn hàng</li>
-          </ul>
-          <button class="jc-btn jc-btn-user" onclick="document.getElementById('download').scrollIntoView({behavior:'smooth'})">
-            Tải app ngay — Miễn phí
-          </button>
-        </div>
-      </div>
+    <div class="join-grid" style="grid-template-columns:min(400px,100%);justify-content:center">
       <!-- SHIPPER -->
       <div class="join-card reveal reveal-delay-2">
         <div class="jc-header jc-h-shipper">
@@ -987,26 +967,6 @@ footer{
           </ul>
           <button class="jc-btn jc-btn-shipper" onclick="window.location.href='/register#shipper'">
             Đăng ký Shipper — 700k kích hoạt
-          </button>
-        </div>
-      </div>
-      <!-- PARTNER -->
-      <div class="join-card reveal reveal-delay-3">
-        <div class="jc-header jc-h-partner">
-          <div class="jc-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9v0a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><rect x="4" y="11" width="16" height="10" rx="1"/><path d="M10 21v-5h4v5"/></svg></div>
-          <div class="jc-role">Đối tác</div>
-          <div class="jc-tagline">Nhà hàng · Giặt là · Dọn nhà · China Shop</div>
-        </div>
-        <div class="jc-body">
-          <ul class="jc-perks">
-            <li><span class="perk-ico"></span>Tiếp cận hàng nghìn khách hàng</li>
-            <li><span class="perk-ico"></span>Shipper CRABOR giao hàng cho bạn</li>
-            <li><span class="perk-ico"></span>Dashboard quản lý đơn real-time</li>
-            <li><span class="perk-ico"></span>Thanh toán minh bạch theo kỳ</li>
-            <li><span class="perk-ico"></span>Đăng ký miễn phí — hoa hồng 12–20%</li>
-          </ul>
-          <button class="jc-btn jc-btn-partner" onclick="window.location.href='/register#partner'">
-            Đăng ký đối tác ngay
           </button>
         </div>
       </div>
@@ -1098,9 +1058,7 @@ footer{
 <div class="sticky-banner" id="stickyBanner">
   <div class="sticky-inner">
     <span class="sticky-label">Bạn muốn là:</span>
-    <button class="sticky-btn sticky-user" onclick="window.location.href='/user.html'" style="opacity:.8">Khách hàng →</button>
-    <button class="sticky-btn sticky-shipper" onclick="window.location.href='/register#shipper'" style="background:var(--red);color:#fff;box-shadow:0 0 0 2px #fff">Shipper — Đăng ký ngay</button>
-    <button class="sticky-btn sticky-partner" onclick="window.location.href='/partner.html'" style="opacity:.8">Đối tác →</button>
+    <button class="sticky-btn sticky-shipper" onclick="window.location.href='/register#shipper'" style="background:var(--red);color:#fff;box-shadow:0 0 0 2px #fff">Đăng ký Shipper — 700k →</button>
   </div>
 </div>
 
