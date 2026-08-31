@@ -245,8 +245,9 @@ app.use((req,res,next)=>{ res.on("finish",()=>SystemHealth.recordRequest(res.sta
 function requireApp(req, res, next) {
   const key = process.env.ADMIN_APP_KEY || "";
   if (!key) return next();
-  if (req.headers["x-app-key"] !== key) {
-    return res.status(403).json({ success: false, error: "Invalid app key" });
+  const got = (req.headers["x-app-key"] || req.query.app || req.query["app"] || "").toString();
+  if (got !== key) {
+    return res.status(403).json({ success: false, error: "Invalid app key - admin desktop only" });
   }
   next();
 }
@@ -360,7 +361,7 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", (room) => {
     if (String(room || "").toLowerCase() === "admin") {
       const key = process.env.ADMIN_APP_KEY || "";
-      const appKey = socket.handshake && socket.handshake.auth && socket.handshake.auth.appKey;
+      const appKey = (socket.handshake && socket.handshake.auth && socket.handshake.auth.appKey) || (socket.handshake && socket.handshake.query && socket.handshake.query.app);
       if (key && appKey !== key) return;
     }
     socket.join(room);
