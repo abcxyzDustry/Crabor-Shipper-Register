@@ -41,6 +41,7 @@ const GLYPHS = {
   coffee: `<g><path d="M4 8 h13 v6 a5 5 0 0 1 -5 5 H9 a5 5 0 0 1 -5-5 Z" /><path d="M17 9 h2 a2.5 2.5 0 0 1 0 5 h-2" /><line x1="8" y1="3" x2="8" y2="5.5" /><line x1="12" y1="3" x2="12" y2="5.5" /></g>`,
   cup: `<g><path d="M6 4 l1.2 16 h9.6 L18 4 Z" /><line x1="5" y1="8" x2="19" y2="8" /></g>`,
   tea: `<g><path d="M6 4 l1.2 16 h9.6 L18 4 Z" /><line x1="5" y1="8" x2="19" y2="8" /><circle cx="10" cy="12" r="0.8" /><circle cx="14" cy="15" r="0.8" /></g>`,
+  search: `<g><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></g>`,
 };
 const EMOJI_MAP = {
   "🏠": 'home',
@@ -107,6 +108,13 @@ const EMOJI_MAP = {
   "☕": 'coffee',
   "🥤": 'cup',
   "🧋": 'tea',
+  "🔍": 'search',
+  "🔎": 'search',
+  "🛍️": 'cart',
+  "🛍": 'cart',
+  "🚀": 'star',
+  "✨": 'star',
+  "🇨🇳": 'info',
 };
 
 function svgForGlyph(name, size, color){

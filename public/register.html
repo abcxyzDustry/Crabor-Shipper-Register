@@ -534,40 +534,40 @@ body { padding-top: 36px; }
     </div>
     <div class="welcome-modules">
       <div class="welcome-module-btn gl" onclick="startRegistration('gl')">
-        <span class="module-icon"></span>
+        <span class="module-icon">👕</span>
         <span class="module-name">Giặt Là</span>
         <span class="module-desc">Đăng ký tiệm giặt là hợp tác với CRABOR<br>Hoa hồng 30%/đơn</span>
-        <span class="module-badge">Miễn phí đăng ký</span>
+        <span class="module-badge">🚀 Miễn phí đăng ký</span>
       </div>
       <div class="welcome-module-btn gv" onclick="startRegistration('gv')">
-        <span class="module-icon"></span>
+        <span class="module-icon">🧹</span>
         <span class="module-name">Giúp Việc</span>
         <span class="module-desc">Đăng ký làm người giúp việc chuyên nghiệp<br>Thu nhập 200k–350k/ca</span>
-        <span class="module-badge">Miễn phí 100%</span>
+        <span class="module-badge">✨ Miễn phí 100%</span>
       </div>
       <div class="welcome-module-btn cs" onclick="startRegistration('cs')">
-        <span class="module-icon"></span>
+        <span class="module-icon">🛒</span>
         <span class="module-name">China Shop</span>
         <span class="module-desc">Bán hàng nội địa Trung trên CRABOR<br>Phí gian hàng 500k/năm</span>
-        <span class="module-badge">Hoa hồng 20%</span>
+        <span class="module-badge">🇨🇳 Hoa hồng 20%</span>
       </div>
       <div class="welcome-module-btn sp" onclick="startRegistration('sp')">
-        <span class="module-icon"></span>
+        <span class="module-icon">🛵</span>
         <span class="module-name">Shipper</span>
         <span class="module-desc">Trở thành tài xế giao hàng CRABOR<br>Thu nhập 20k–50k/đơn</span>
-        <span class="module-badge" id="spEarlyBadge">Early Bird · Đang tải...</span>
+        <span class="module-badge" id="spEarlyBadge">⚡ Early Bird · Đang tải...</span>
       </div>
       <div class="welcome-module-btn fd" onclick="startRegistration('fd')">
-        <span class="module-icon"></span>
+        <span class="module-icon">🍜</span>
         <span class="module-name">Nhà hàng</span>
         <span class="module-desc">Đăng ký quán ăn lên nền tảng CRABOR<br>Hoa hồng 20%/đơn</span>
-        <span class="module-badge">Đối tác Giao Đồ Ăn</span>
+        <span class="module-badge">🍜 Đối tác Giao Đồ Ăn</span>
       </div>
-      <div class="welcome-module-btn rx" onclick="startRegistration('rx')">
-        <span class="module-icon"></span>
-        <span class="module-name">Tài xế CN</span>
-        <span class="module-desc">Đăng ký tài xế xe công nghệ CRABOR<br>Thu nhập 500k–2tr/ngày</span>
-        <span class="module-badge">Sắp ra mắt Q3/2026</span>
+      <div class="welcome-module-btn rx" onclick="document.getElementById('lookupInput').scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>document.getElementById('lookupInput').focus(),400)" style="border-color:#FFD84D;background:#fffbe6">
+        <span class="module-icon">🔍</span>
+        <span class="module-name">Tra cứu hồ sơ</span>
+        <span class="module-desc">Kiểm tra trạng thái hồ sơ đã đăng ký<br>Nhập SĐT hoặc mã CRB-XXXX</span>
+        <span class="module-badge" style="background:#E8504A;color:#fff">🔍 Tra cứu ngay</span>
       </div>
     </div>
 
@@ -635,33 +635,33 @@ body { padding-top: 36px; }
       <div class="panel-sub">Chọn loại dịch vụ để bắt đầu đăng ký hợp tác với CRABOR</div>
       <div class="svc-list">
         <div class="svc-card" onclick="pickService('gl')">
-          <span class="svc-ico"></span>
+          <span class="svc-ico">👕</span>
           <div class="svc-info"><b>Giặt Là</b><p>Hoa hồng 30%/đơn · Miễn phí đăng ký</p></div>
           <span class="svc-arr">→</span>
         </div>
         <div class="svc-card" onclick="pickService('gv')">
-          <span class="svc-ico"></span>
+          <span class="svc-ico">🧹</span>
           <div class="svc-info"><b>Giúp Việc / Dọn dẹp</b><p>Thu nhập 200k–350k/ca · Miễn phí</p></div>
           <span class="svc-arr">→</span>
         </div>
         <div class="svc-card" onclick="pickService('cs')">
-          <span class="svc-ico"></span>
+          <span class="svc-ico">🛒</span>
           <div class="svc-info"><b>China Shop</b><p>Hoa hồng 20% · Phí gian hàng 500k/năm</p></div>
           <span class="svc-arr">→</span>
         </div>
         <div class="svc-card" onclick="pickService('sp')">
-          <span class="svc-ico"></span>
+          <span class="svc-ico">🛵</span>
           <div class="svc-info"><b>Shipper</b><p>Thu nhập 20k–50k/đơn · Early Bird</p></div>
           <span class="svc-arr">→</span>
         </div>
         <div class="svc-card" onclick="pickService('fd')">
-          <span class="svc-ico"></span>
+          <span class="svc-ico">🍜</span>
           <div class="svc-info"><b>Nhà hàng / Quán ăn</b><p>Hoa hồng 20%/đơn</p></div>
           <span class="svc-arr">→</span>
         </div>
-        <div class="svc-card" onclick="pickService('rx')">
-          <span class="svc-ico"></span>
-          <div class="svc-info"><b>Tài xế Công nghệ</b><p>Sắp ra mắt Q3/2026</p></div>
+        <div class="svc-card" onclick="document.getElementById('card').classList.add('hide');document.getElementById('welcomeScreen').classList.remove('hide');setTimeout(()=>{document.getElementById('lookupInput').scrollIntoView({behavior:'smooth',block:'center'});document.getElementById('lookupInput').focus();},150)">
+          <span class="svc-ico">🔍</span>
+          <div class="svc-info"><b>Tra cứu hồ sơ</b><p>Nhập SĐT hoặc mã hồ sơ để kiểm tra trạng thái</p></div>
           <span class="svc-arr">→</span>
         </div>
       </div>
