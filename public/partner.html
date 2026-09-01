@@ -1426,8 +1426,11 @@ async function submitHelpTicket(){
   const err=document.getElementById('helpErr'), ok=document.getElementById('helpOk');
   err.style.display='none'; ok.style.display='none';
   if(!name||!contact||!message){ err.textContent='Vui lòng điền đủ họ tên, liên hệ và nội dung.'; err.style.display='block'; return; }
+  // Map help topic to SupportTicket enum: order_issue/payment/complaint/sos/other
+  const topicMap={support:'other',order:'order_issue',payment:'payment',shipper:'other',partner:'other',privacy:'other',other:'other',complaint:'complaint',sos:'sos'};
+  const ticketType=topicMap[topic]||'other';
   try{
-    const r=await fetch('/api/support',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type: topic, subject: '['+topic+'] '+name, message: 'Từ: '+name+' ('+contact+')\n\n'+message, contact})});
+    const r=await fetch('/api/support',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type: ticketType, role: 'customer', phone: contact, orderId: '', message: '['+topic+'] Từ: '+name+' ('+contact+')\n\n'+message})});
     const d=await r.json();
     if(d.success){ ok.style.display='block'; document.getElementById('helpName').value='';document.getElementById('helpContact').value='';document.getElementById('helpMessage').value=''; setTimeout(closeHelpModal,1800); }
     else{ err.textContent=d.message||'Gửi thất bại'; err.style.display='block'; }
