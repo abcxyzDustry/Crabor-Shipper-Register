@@ -1081,10 +1081,10 @@ footer{
       <h4>Hỗ trợ</h4>
       <ul>
         <li onclick="openModal()">Điều khoản & Chính sách</li>
-        <li>Chính sách bảo mật</li>
-        <li>Trung tâm trợ giúp</li>
-        <li>Liên hệ</li>
-        <li>FAQ</li>
+        <li onclick="openPrivacyModal()">Chính sách bảo mật</li>
+        <li onclick="openHelpModal()">Trung tâm trợ giúp</li>
+        <li onclick="openHelpModal()">Liên hệ</li>
+        <li onclick="openFaqModal()">FAQ</li>
       </ul>
     </div>
   </div>
@@ -1376,5 +1376,122 @@ heroObserver.observe(heroSection);
 
   <!-- Coco AI Widget v2 (Groq-powered) -->
   <script src="/coco-widget.js"></script>
+
+<!-- HELP CENTER POPUP -->
+<div class="modal-overlay" id="helpModal" onclick="closeHelpOutside(event)">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">Trung tâm trợ giúp — Gửi yêu cầu tới CRABOR</div>
+      <button class="modal-close" onclick="closeHelpModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:16px">Điền thông tin, admin CRABOR sẽ trả lời trực tiếp qua ticket (thường trong 3-7 ngày, 24h xác nhận).</p>
+      <div class="field"><label>Họ tên *</label><input type="text" id="helpName" placeholder="Nguyễn Văn A" class="filter-select" style="width:100%"></div>
+      <div class="field"><label>SĐT / Email *</label><input type="text" id="helpContact" placeholder="0901 234 567 hoặc email@gmail.com" class="filter-select" style="width:100%"></div>
+      <div class="field"><label>Chủ đề *</label><select id="helpTopic" class="filter-select" style="width:100%"><option value="support">Hỗ trợ chung</option><option value="order">Đơn hàng</option><option value="payment">Thanh toán</option><option value="shipper">Shipper</option><option value="partner">Đối tác</option><option value="privacy">Bảo mật</option><option value="other">Khác</option></select></div>
+      <div class="field"><label>Nội dung *</label><textarea id="helpMessage" placeholder="Mô tả chi tiết vấn đề, kèm mã đơn/mã hồ sơ nếu có..." style="width:100%;min-height:100px" class="filter-select"></textarea></div>
+      <div id="helpErr" style="color:var(--coral);font-size:.8rem;display:none;margin-top:8px"></div>
+      <div id="helpOk" style="color:var(--green);font-size:.85rem;display:none;margin-top:8px">✅ Đã gửi ticket! Admin sẽ trả lời, bạn có thể tra cứu tại mục Hỗ trợ trong app.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="modal-cancel" onclick="closeHelpModal()">Đóng</button>
+      <button class="modal-save" onclick="submitHelpTicket()">Gửi yêu cầu →</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ POPUP -->
+<div class="modal-overlay" id="faqModal" onclick="closeFaqOutside(event)">
+  <div class="modal" style="max-width:720px;max-height:90vh">
+    <div class="modal-header">
+      <div class="modal-title">FAQ — Câu hỏi thường gặp</div>
+      <button class="modal-close" onclick="closeFaqModal()">×</button>
+    </div>
+    <div class="modal-body" style="max-height:65vh;overflow-y:auto">
+      <div id="faqList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PRIVACY MODAL -->
+<div class="modal-overlay" id="privacyModal" onclick="closePrivacyOutside(event)">
+  <div class="modal" style="max-width:800px">
+    <div class="modal-header">
+      <div class="modal-title">Chính sách bảo mật — Bảo vệ Dữ liệu Cá nhân</div>
+      <button class="modal-close" onclick="closePrivacyModal()">×</button>
+    </div>
+    <div class="modal-body">
+      
+<div class="tos-part">
+<div class="tos-part-title">PHẦN VI. CHÍNH SÁCH BẢO VỆ DỮ LIỆU CÁ NHÂN (theo Nghị định 13/2023/NĐ-CP)</div>
+<div class="tos-section"><h4>1. Dữ liệu thu thập</h4><p>Họ tên, số điện thoại, email, địa chỉ giao nhận, dữ liệu định vị (GPS) trong quá trình vận chuyển, giấy tờ tùy thân/giấy phép lái xe/đăng ký xe (đối tác Giao hàng), thông tin đăng ký kinh doanh/an toàn thực phẩm (đối tác), lịch sử giao dịch.</p></div>
+<div class="tos-section"><h4>2. Mục đích xử lý</h4><p><strong>Vận hành dịch vụ:</strong> xử lý đơn hàng, điều phối giao hàng, thanh toán, chăm sóc khách hàng — điều kiện bắt buộc.<br><strong>Marketing/khảo sát:</strong> CHỈ khi có đồng ý riêng (opt-in), có thể rút lại bất kỳ lúc nào trong Cài đặt.</p></div>
+<div class="tos-section"><h4>3. Chia sẻ dữ liệu</h4><p>CRABOR chỉ chia sẻ dữ liệu cần thiết (tên, SĐT, địa chỉ) giữa Người dùng - Đối tác - Shipper trong phạm vi đơn hàng. Không bán/cho thuê dữ liệu cho bên thứ ba, trừ khi có yêu cầu của cơ quan nhà nước có thẩm quyền.</p></div>
+<div class="tos-section"><h4>4. Thời gian lưu trữ</h4><p>Giao dịch: tối đa 05 năm hoặc theo luật kế toán/thuế. GPS real-time: tối đa 90 ngày.</p></div>
+<div class="tos-section"><h4>5. Quyền của bạn</h4><p>Được biết, đồng ý, rút lại đồng ý, yêu cầu xóa/hạn chế/cung cấp bản sao dữ liệu, khiếu nại — qua Trung tâm trợ giúp (Phần VII).</p></div>
+<div class="tos-section"><h4>6. Biện pháp bảo vệ</h4><p>Mã hóa khi lưu trữ & truyền tải, phân quyền nội bộ, thông báo sự cố lộ dữ liệu trong 72 giờ.</p></div>
+</div>
+
+      <div class="tos-divider"></div>
+      <p style="font-size:.82rem;color:var(--muted)">Tham chiếu Nghị định 13/2023/NĐ-CP. Chi tiết đầy đủ trong Bộ Chính Sách Pháp Lý (13 phần) - bấm "Điều khoản & Chính sách" ở footer.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// === HELP CENTER ===
+function openHelpModal(){ document.getElementById('helpModal').classList.add('open'); }
+function closeHelpModal(){ document.getElementById('helpModal').classList.remove('open'); }
+function closeHelpOutside(e){ if(e.target.id==='helpModal') closeHelpModal(); }
+async function submitHelpTicket(){
+  const name=document.getElementById('helpName').value.trim();
+  const contact=document.getElementById('helpContact').value.trim();
+  const topic=document.getElementById('helpTopic').value;
+  const message=document.getElementById('helpMessage').value.trim();
+  const err=document.getElementById('helpErr'), ok=document.getElementById('helpOk');
+  err.style.display='none'; ok.style.display='none';
+  if(!name||!contact||!message){ err.textContent='Vui lòng điền đủ họ tên, liên hệ và nội dung.'; err.style.display='block'; return; }
+  try{
+    const r=await fetch('/api/support',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type: topic, subject: '['+topic+'] '+name, message: 'Từ: '+name+' ('+contact+')\n\n'+message, contact})});
+    const d=await r.json();
+    if(d.success){ ok.style.display='block'; document.getElementById('helpName').value='';document.getElementById('helpContact').value='';document.getElementById('helpMessage').value=''; setTimeout(closeHelpModal,1800); }
+    else{ err.textContent=d.message||'Gửi thất bại'; err.style.display='block'; }
+  }catch(e){ err.textContent='Không kết nối được server'; err.style.display='block'; }
+}
+// === PRIVACY ===
+function openPrivacyModal(){ document.getElementById('privacyModal').classList.add('open'); }
+function closePrivacyModal(){ document.getElementById('privacyModal').classList.remove('open'); }
+function closePrivacyOutside(e){ if(e.target.id==='privacyModal') closePrivacyModal(); }
+// === FAQ ===
+const FAQ_DATA=[
+  {q:"CRABOR là gì? Khi nào ra mắt?",a:"CRABOR là super app All-in-One tại Hà Nội: Giao đồ ăn (30 phút), Giặt là, Dọn nhà, China Shop, Xe công nghệ. Dự kiến cuối 9 đầu 10/2026."},
+  {q:"Đăng ký Shipper mất phí bao nhiêu? Có hoàn lại không?",a:"Phí kích hoạt 700.000đ (Early Bird 500.000đ nếu còn suất). Hoàn 100% sau 50 đơn thành công trong 3 tháng. Ký quỹ này bảo đảm đồng phục/thiết bị và công nợ, hoàn trả trong 30 ngày khi chấm dứt hợp tác."},
+  {q:"Đối tác nhà hàng/ Giặt là mất phí không? Hoa hồng bao nhiêu?",a:"Đăng ký miễn phí. Hoa hồng tham khảo tối đa 20% (Nhà hàng), 30% (Giặt là), theo hợp đồng riêng. Thanh toán hàng tuần thứ Hai, có bảng kê."},
+  {q:"Hủy đơn có mất phí không?",a:"Hủy miễn phí trước khi Đối tác xác nhận. Sau khi đã chuẩn bị/giao, xét hoàn một phần theo bằng chứng (Phần VIII). Hoàn về phương thức ban đầu trong 5-10 ngày."},
+  {q:"Dữ liệu cá nhân của tôi được bảo vệ thế nào?",a:"Theo Nghị định 13/2023: chỉ thu thập họ tên, SĐT, địa chỉ, GPS khi giao. Chỉ chia sẻ trong đơn hàng, không bán. Lưu giao dịch 5 năm, GPS 90 ngày. Bạn có quyền rút đồng ý, xóa, khiếu nại qua Trung tâm trợ giúp."},
+  {q:"Shipper có phải nhân viên của CRABOR không?",a:"Không. Shipper là đối tác độc lập, tự chủ thời gian/khu vực, không bị quản lý giờ giấc. CRABOR khấu trừ tối đa 10% phí nền tảng mỗi đơn và khấu trừ thuế thay theo Nghị định 117/2025."},
+  {q:"Thanh toán COD và online khác nhau thế nào?",a:"COD: Shipper thu hộ tiền mặt, phí ghi vào công nợ đối soát hàng tuần. Online: qua cổng trung gian được NHNN cấp phép, CRABOR không giữ tiền dưới dạng ví điện tử."},
+  {q:"Ví trả sau & Vay nhanh có phải của CRABOR không?",a:"Không. CRABOR chỉ giới thiệu, Đối tác Tài chính được NHNN cấp phép mới thẩm định/giải ngân/thu hồi. Chỉ hiệu lực sau khi CRABOR ký với đối tác được cấp phép và có thể cần thử nghiệm theo Nghị định 94/2025. Lãi không quá 20%/năm."},
+  {q:"Dọn nhà/ Giúp việc có an toàn không?",a:"Đối tác từ 18 tuổi, eKYC, lý lịch tư pháp/cam kết, phỏng vấn. Chỉ làm đúng phạm vi, không động tài sản, không ghi hình. Có nút SOS, hủy miễn phí trước 2h, bồi thường nếu có lỗi có bằng chứng."},
+  {q:"Khiếu nại ở đâu? Bao lâu được xử lý?",a:"Qua Trung tâm trợ giúp (popup này) hoặc mục Hỗ trợ trong app, email/hotline công bố khi ra mắt. Gửi trong 24h kèm bằng chứng, CRABOR xác nhận 24h, xử lý 3-7 ngày."},
+  {q:"Tài khoản bị khóa thì làm sao?",a:"Theo mức độ: cảnh cáo → hạn chế → tạm khóa → khóa vĩnh viễn. Luôn có thông báo lý do và cho giải trình, trừ gian lận rõ ràng. Khiếu nại theo Phần VII."},
+  {q:"Thuế của Shipper/ Đối tác ai nộp?",a:"CRABOR khấu trừ, kê khai và nộp thay thuế GTGT/TNCN theo Nghị định 117/2025 trước khi chi trả, cấp chứng từ khấu trừ để bạn tra cứu trong app."},
+  {q:"Làm sao tra cứu hồ sơ đăng ký?",a:"Vào /register → Tra cứu tình trạng hồ sơ, nhập SĐT hoặc mã CRB-... để xem trạng thái, phí, duyệt."},
+  {q:"Tải app ở đâu?",a:"Miễn phí trên App Store / Google Play (mục Tải ngay). Đăng ký 30 giây, không cần thẻ tín dụng."},
+];
+function openFaqModal(){
+  const list=document.getElementById('faqList');
+  list.innerHTML=FAQ_DATA.map((it,i)=>`
+    <div style="border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden">
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--bg);font-weight:800">${it.q}<span style="color:var(--coral)">+</span></div>
+      <div style="display:none;padding:14px 16px;background:#fff;color:var(--ink-2);font-size:.9rem;line-height:1.6">${it.a}</div>
+    </div>
+  `).join('');
+  document.getElementById('faqModal').classList.add('open');
+}
+function closeFaqModal(){ document.getElementById('faqModal').classList.remove('open'); }
+function closeFaqOutside(e){ if(e.target.id==='faqModal') closeFaqModal(); }
+</script>
+
 </body>
 </html>
