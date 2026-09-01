@@ -2178,7 +2178,7 @@ app.get("/api/payment/plan", async (req, res) => {
   }
 });
 
-// POST /api/payment/confirm — xác nhận thanh toán
+// POST /api/payment/confirm — xác nhận thanh toán (CHONG FAKE: chi SePay moi duoc duyet)
 app.post("/api/payment/confirm", async (req, res) => {
   try {
     const { phone, id } = req.query;
@@ -2186,22 +2186,53 @@ app.post("/api/payment/confirm", async (req, res) => {
     if (!phone && !id) return res.status(400).json({ success: false, message: "Thiếu thông tin" });
 
     const filter = phone ? { phone: normalizePhone(phone) } : { registerId: id };
-    const shipper = await Shipper.findOneAndUpdate(
-      filter,
-      { feeStatus: paid ? "paid" : "unpaid" },
-      { new: true }
-    ).select("registerId phone plan feeStatus");
+    const shipper = await Shipper.findOne(filter).select("registerId phone plan fee feeStatus status");
     if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy hồ sơ" });
 
-    // Notify admin
-    req.io.to("admin").emit("paymentConfirmed", {
-      registerId: shipper.registerId,
-      phone: shipper.phone,
-      plan: shipper.plan,
-      paid,
-    });
+    // Neu chon "Thanh toan sau" -> luu unpaid, khong duyet
+    if (!paid) {
+      await Shipper.findOneAndUpdate(filter, { feeStatus: "unpaid" });
+      req.io.to("admin").emit("paymentConfirmed", { registerId: shipper.registerId, phone: shipper.phone, plan: shipper.plan, paid: false });
+      return res.json({ success: true, data: { registerId: shipper.registerId, paid: false } });
+    }
 
-    res.json({ success: true, data: { registerId: shipper.registerId, paid } });
+    // paid=true: KIEM TRA SEPAY that su da khop chua, khong cho fake
+    const need = shipper.fee || 500000;
+    // Shipper da duoc SePay webhook duyet truoc do -> feeStatus da la paid
+    if (shipper.feeStatus === "paid" && (shipper.status === "approved" || shipper.status === "active")) {
+      return res.json({ success: true, data: { registerId: shipper.registerId, paid: true, verified: true } });
+    }
+    if (shipper.feeStatus === "paid") {
+      // Da co SePay nhung chua duyet -> duyet ngay (truong hop webhook da set paid nhung status chua approved)
+      await Shipper.findOneAndUpdate(filter, { status: "approved", approvedAt: new Date(), approvedBy: "sepay_auto" });
+      return res.json({ success: true, data: { registerId: shipper.registerId, paid: true, verified: true } });
+    }
+
+    // Chua co SePay: kiem tra SePayTx co khop khong (ref chua phone hoac registerId, amount >= fee)
+    const orRef = [
+      { ref: { $regex: shipper.phone, $options: "i" } },
+      { ref: { $regex: shipper.registerId, $options: "i" } }
+    ];
+    // Them CRB-S- suffix
+    const suffix = shipper.registerId ? shipper.registerId.split("-").pop() : "";
+    if (suffix) orRef.push({ ref: { $regex: suffix, $options: "i" } });
+
+    const sepayTx = await SePayTx.findOne({
+      $or: orRef,
+      amount: { $gte: need - 1000 },
+      handled: true
+    }).sort({ createdAt: -1 });
+
+    if (!sepayTx) {
+      // Chua thay SePay -> tra ve pending, khong duyet, de frontend hien "Dang cho SePay"
+      return res.status(402).json({ success: false, message: "Chưa nhận được thanh toán SePay. Vui lòng kiểm tra lại nội dung chuyển khoản (phải chứa SĐT hoặc mã hồ sơ) và số tiền " + need.toLocaleString("vi-VN") + "đ. Nếu vừa chuyển, vui lòng đợi 10-30s rồi bấm lại.", pending: true, need, feeStatus: shipper.feeStatus });
+    }
+
+    // Co SePay -> duyet
+    await Shipper.findOneAndUpdate(filter, { feeStatus: "paid", status: "approved", paidAt: new Date(), feePaid: sepayTx.amount, approvedAt: new Date(), approvedBy: "sepay_auto" });
+    req.io.to("admin").emit("paymentConfirmed", { registerId: shipper.registerId, phone: shipper.phone, plan: shipper.plan, paid: true, verified: true });
+    req.io.to("admin").emit("shipperApproved", { shipperId: shipper._id, registerId: shipper.registerId, auto: true });
+    res.json({ success: true, data: { registerId: shipper.registerId, paid: true, verified: true } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -2226,28 +2257,42 @@ app.get("/api/shipper/fee", async (req, res) => {
   }
 });
 
-// POST /api/shipper/fee/confirm — xác nhận đã thanh toán phí đăng ký từ shipper app (session-based)
+// POST /api/shipper/fee/confirm — xác nhận đã thanh toán phí đăng ký từ shipper app (session-based) - CHONG FAKE
 app.post("/api/shipper/fee/confirm", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập shipper" });
     const { paid } = req.body;
-    const shipper = await Shipper.findOneAndUpdate(
-      { _id: req.session.shipperId },
-      { feeStatus: paid ? "paid" : "unpaid" },
-      { new: true }
-    ).select("registerId phone plan feeStatus");
+    const shipper = await Shipper.findById(req.session.shipperId).select("registerId phone plan fee feeStatus status");
     if (!shipper) return res.status(404).json({ success: false, message: "Không tìm thấy hồ sơ Shipper" });
 
-    req.io.to("admin").emit("paymentConfirmed", {
-      registerId: shipper.registerId,
-      phone: shipper.phone,
-      plan: shipper.plan,
-      paid,
-      via: "shipper_app",
-    });
+    if (!paid) {
+      await Shipper.findByIdAndUpdate(shipper._id, { feeStatus: "unpaid" });
+      req.io.to("admin").emit("paymentConfirmed", { registerId: shipper.registerId, phone: shipper.phone, plan: shipper.plan, paid: false, via: "shipper_app" });
+      return res.json({ success: true, data: { registerId: shipper.registerId, paid: false } });
+    }
 
-    res.json({ success: true, data: { registerId: shipper.registerId, paid } });
+    const need = shipper.fee || 500000;
+    if (shipper.feeStatus === "paid" && (shipper.status === "approved" || shipper.status === "active")) {
+      return res.json({ success: true, data: { registerId: shipper.registerId, paid: true, verified: true } });
+    }
+    if (shipper.feeStatus === "paid") {
+      await Shipper.findByIdAndUpdate(shipper._id, { status: "approved", approvedAt: new Date(), approvedBy: "sepay_auto" });
+      return res.json({ success: true, data: { registerId: shipper.registerId, paid: true, verified: true } });
+    }
+    const orRef = [
+      { ref: { $regex: shipper.phone, $options: "i" } },
+      { ref: { $regex: shipper.registerId, $options: "i" } }
+    ];
+    const suffix = shipper.registerId ? shipper.registerId.split("-").pop() : "";
+    if (suffix) orRef.push({ ref: { $regex: suffix, $options: "i" } });
+    const sepayTx = await SePayTx.findOne({ $or: orRef, amount: { $gte: need - 1000 }, handled: true }).sort({ createdAt: -1 });
+    if (!sepayTx) {
+      return res.status(402).json({ success: false, message: "Chưa nhận được thanh toán SePay. Vui lòng kiểm tra nội dung CK và số tiền " + need.toLocaleString("vi-VN") + "đ.", pending: true, need, feeStatus: shipper.feeStatus });
+    }
+    await Shipper.findByIdAndUpdate(shipper._id, { feeStatus: "paid", status: "approved", paidAt: new Date(), feePaid: sepayTx.amount, approvedAt: new Date(), approvedBy: "sepay_auto" });
+    req.io.to("admin").emit("shipperApproved", { shipperId: shipper._id, registerId: shipper.registerId, auto: true });
+    res.json({ success: true, data: { registerId: shipper.registerId, paid: true, verified: true } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

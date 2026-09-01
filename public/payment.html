@@ -710,7 +710,7 @@ async function confirmPayment() {
 
   const btn = document.getElementById('btnPaid');
   btn.disabled = true;
-  btn.innerHTML = '<span style="border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;width:18px;height:18px;animation:spin .7s linear infinite;display:inline-block"></span><span>Đang xác nhận...</span>';
+  btn.innerHTML = '<span style="border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;width:18px;height:18px;animation:spin .7s linear infinite;display:inline-block"></span><span>Đang kiểm tra SePay...</span>';
 
   try {
     const q = phone ? `phone=${encodeURIComponent(phone)}` : `id=${encodeURIComponent(regId)}`;
@@ -721,9 +721,47 @@ async function confirmPayment() {
     });
     const d = await r.json();
 
-    if (d.success) {
+    if (r.ok && d.success && d.data && d.data.verified) {
       clearInterval(timerInt);
       showThankYou(d.data);
+      return;
+    }
+    if (r.status === 402 && d.pending) {
+      // Chua co SePay - hien thong bao va poll 30s
+      toast('⏳ ' + (d.message || 'Chưa nhận được thanh toán SePay. Đang chờ...'));
+      btn.innerHTML = '<span>⏳</span><span>Đang chờ SePay (30s)...</span>';
+      // Poll moi 3s trong 30s
+      let tries = 0;
+      const poll = setInterval(async () => {
+        tries++;
+        try {
+          const q2 = phone ? `phone=${encodeURIComponent(phone)}` : `id=${encodeURIComponent(regId)}`;
+          const rp = await fetch('/api/payment/plan?' + q2);
+          const dp = await rp.json();
+          if (dp.success && dp.data && dp.data.feeStatus === 'paid') {
+            clearInterval(poll);
+            clearInterval(timerInt);
+            toast('✅ SePay đã xác nhận! Đang duyệt hồ sơ...');
+            showThankYou({ registerId: dp.data.registerId, paid: true, verified: true });
+            return;
+          }
+        } catch(e) {}
+        if (tries >= 10) {
+          clearInterval(poll);
+          btn.disabled = false;
+          btn.innerHTML = '<span>✅</span><span>Tôi đã thanh toán</span>';
+          toast('❌ Vẫn chưa nhận được SePay. Vui lòng kiểm tra lại nội dung CK (phải chứa SĐT hoặc mã hồ sơ) và số tiền, rồi bấm lại.');
+        } else {
+          btn.innerHTML = '<span>⏳</span><span>Đang chờ SePay (' + (30 - tries*3) + 's)...</span>';
+        }
+      }, 3000);
+      return;
+    }
+    if (d.success) {
+      // Truong hop hiem: success nhung chua verified (khong nen xay ra)
+      toast('❌ ' + (d.message || 'Chưa xác thực được thanh toán'));
+      btn.disabled = false;
+      btn.innerHTML = '<span>✅</span><span>Tôi đã thanh toán</span>';
     } else {
       toast('❌ ' + (d.message || 'Lỗi xác nhận'));
       btn.disabled = false;
