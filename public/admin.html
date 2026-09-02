@@ -1792,8 +1792,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
 
       <!-- COMMISSION -->
       <div id="set-commission" class="set-pane" style="display:none">
+        <div class="panel" style="margin-bottom:16px">
+          <div class="panel-head"><span class="panel-title">📊 Thống kê hoa hồng thực tế</span><button class="act-btn" onclick="loadCommissionStats()">↻ Refresh</button></div>
+          <div style="padding:16px">
+            <div id="commissionStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"></div>
+            <div id="commissionStatsDetail" style="margin-top:12px;font-size:.82rem;color:var(--muted)"></div>
+          </div>
+        </div>
         <div class="panel">
-          <div class="panel-head"><span class="panel-title">💰 Tỷ lệ hoa hồng theo module</span></div>
+          <div class="panel-head"><span class="panel-title">💰 Tỷ lệ hoa hồng theo module (phí nền tảng)</span></div>
           <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
             <div class="set-field"><label>🍜 Giao đồ ăn</label>
               <div style="display:flex;align-items:center;gap:8px">
@@ -1825,6 +1832,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
                 <span style="color:#aaa;font-weight:700">%/chuyến</span>
               </div>
             </div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-head"><span class="panel-title">💳 Phí Ví Trả Sau (BNPL) — Mua trước trả sau</span></div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+            <div class="set-field"><label>Phí BNPL (%/đơn)</label><div style="display:flex;align-items:center;gap:8px"><input class="set-inp" id="bnplFee" type="number" value="3" min="0" max="100" step="0.1" style="width:100px"><span style="color:#aaa;font-weight:700">% giá trị đơn</span></div><div style="font-size:.72rem;color:var(--muted)">Hiện: <span id="bnplFeeCurrent">3%</span> — tính trên giá trị gốc mỗi giao dịch BNPL</div></div>
+            <div class="set-field"><label>Phí dịch vụ tháng</label><div style="display:flex;align-items:center;gap:8px"><input class="set-inp" id="bnplServiceFee" type="number" value="30000" min="0" step="1000" style="width:130px"><span style="color:#aaa;font-weight:700">đ/tháng</span></div><div style="font-size:.72rem;color:var(--muted)">Chỉ 1 lần/tháng nếu có GD</div></div>
+            <div class="set-field"><label>Phí trả chậm</label><div style="display:flex;align-items:center;gap:8px"><input class="set-inp" id="bnplLateFee" type="number" value="1" min="0" max="100" step="0.1" style="width:100px"><span style="color:#aaa;font-weight:700">% / ngày</span></div></div>
+            <div class="set-field"><label>Phí trả góp</label><div style="display:flex;align-items:center;gap:8px"><input class="set-inp" id="bnplInstallFee" type="number" value="10" min="0" max="100" step="0.1" style="width:100px"><span style="color:#aaa;font-weight:700">% / tổng HĐ</span></div></div>
+            <div style="display:flex;gap:8px;margin-top:8px"><button class="filter-btn" style="background:var(--coral);flex:1" onclick="saveBnplFees()">💾 Lưu phí BNPL</button><button class="act-btn" onclick="loadBnplFees()">↻ Tải lại</button></div>
           </div>
         </div>
       </div>
@@ -3684,8 +3701,57 @@ async function rejectWithdraw(id) {
     else showNotif('Lỗi', r.message || 'Không từ chối được', 'coral');
   } catch (e) { showNotif('Lỗi', e.message || 'Không từ chối được', 'coral'); }
   }
+async function loadCommissionStats(){
+  try{
+    const r=await apiFetch('/api/admin/config/commissions');
+    if(!r.success) return;
+    const c=r.data.commissions, s=r.data.stats;
+    const el=document.getElementById('commissionStats');
+    if(el){
+      el.innerHTML=Object.entries(c).map(([k,v])=>{
+        const label={food:'🍜 Giao đồ ăn',laundry:'👕 Giặt Là',cleaning:'🧹 Giúp Việc',china_shop:'🛍️ China Shop',ride:'🚗 Tài xế'}[k]||k;
+        const stat=s[k]||{total:0,count:0};
+        return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px"><div style="font-weight:800;font-size:.85rem">${label}</div><div style="font-size:1.4rem;font-weight:900;color:var(--coral);margin:6px 0">${v}%</div><div style="font-size:.72rem;color:var(--muted)">Tổng GD: ${(stat.total||0).toLocaleString('vi-VN')}đ · ${stat.count||0} đơn</div></div>`;
+      }).join('');
+    }
+    const detail=document.getElementById('commissionStatsDetail');
+    if(detail) detail.textContent='Cập nhật: '+new Date().toLocaleString('vi-VN');
+    if(document.getElementById('comFood')) document.getElementById('comFood').value=c.food;
+    if(document.getElementById('comLaundry')) document.getElementById('comLaundry').value=c.laundry;
+    if(document.getElementById('comClean')) document.getElementById('comClean').value=c.cleaning;
+    if(document.getElementById('comChina')) document.getElementById('comChina').value=c.china_shop;
+    if(document.getElementById('comRide')) document.getElementById('comRide').value=c.ride;
+  }catch(e){ console.warn('loadCommissionStats',e); }
+}
+async function loadBnplFees(){
+  try{
+    const r=await apiFetch('/api/admin/config/bnpl-fees');
+    if(!r.success) return;
+    const f=r.data;
+    if(document.getElementById('bnplFee')) document.getElementById('bnplFee').value=f.bnplFee;
+    if(document.getElementById('bnplServiceFee')) document.getElementById('bnplServiceFee').value=f.serviceFee;
+    if(document.getElementById('bnplLateFee')) document.getElementById('bnplLateFee').value=f.lateFee;
+    if(document.getElementById('bnplInstallFee')) document.getElementById('bnplInstallFee').value=f.installFee;
+    if(document.getElementById('bnplFeeCurrent')) document.getElementById('bnplFeeCurrent').textContent=f.bnplFee+'%';
+  }catch(e){}
+}
+async function saveBnplFees(){
+  try{
+    const payload={bnplFee: parseFloat(document.getElementById('bnplFee').value), serviceFee: parseInt(document.getElementById('bnplServiceFee').value), lateFee: parseFloat(document.getElementById('bnplLateFee').value), installFee: parseFloat(document.getElementById('bnplInstallFee').value)};
+    const r=await apiFetch('/api/admin/config/bnpl-fees','PATCH',payload);
+    if(r.success) showNotif('✅ Đã lưu','Phí BNPL đã cập nhật','green'); else showNotif('❌ Lỗi',r.message,'coral');
+  }catch(e){ showNotif('❌ Lỗi',e.message,'coral'); }
+}
+async function saveCommission(){
+  try{
+    const payload={food: parseFloat(document.getElementById('comFood').value), laundry: parseFloat(document.getElementById('comLaundry').value), cleaning: parseFloat(document.getElementById('comClean').value), china_shop: parseFloat(document.getElementById('comChina').value), ride: parseFloat(document.getElementById('comRide').value)};
+    const r=await apiFetch('/api/admin/config/commissions','PATCH',payload);
+    if(r.success) showNotif('✅ Đã lưu','Hoa hồng đã cập nhật','green'); else showNotif('❌ Lỗi',r.message,'coral');
+  }catch(e){ showNotif('❌ Lỗi',e.message,'coral'); }
+}
 function saveSettings() {
-  try { var g = function(id) { return document.getElementById(id); }; var payload = { commissionFood: parseFloat((g('comFood') && g('comFood').value) || 20), commissionLaundry: parseFloat((g('comLaundry') && g('comLaundry').value) || 30), commissionCleaning: parseFloat((g('comClean') && g('comClean').value) || 30), commissionShop: parseFloat((g('comChina') && g('comChina').value) || 20), commissionRide: parseFloat((g('comRide') && g('comRide').value) || 30), deliveryBaseFee: parseFloat((g('delBase') && g('delBase').value) || 15000), deliveryPerKm: parseFloat((g('delPerKm') && g('delPerKm').value) || 5000), minOrderAmount: parseFloat((g('minOrder') && g('minOrder').value) || 20000) }; localStorage.setItem('crabor_settings', JSON.stringify(payload)); showNotif('Đã lưu', 'Cài đặt đã được lưu thành công', 'green'); } catch(e) { showNotif('Lỗi', 'Không thể lưu cài đặt', 'coral'); }
+  saveCommission(); saveBnplFees();
+  try { var g = function(id) { return document.getElementById(id); }; var payload = { commissionFood: parseFloat((g('comFood') && g('comFood').value) || 20), commissionLaundry: parseFloat((g('comLaundry') && g('comLaundry').value) || 30), commissionCleaning: parseFloat((g('comClean') && g('comClean').value) || 30), commissionShop: parseFloat((g('comChina') && g('comChina').value) || 20), commissionRide: parseFloat((g('comRide') && g('comRide').value) || 30), deliveryBaseFee: parseFloat((g('delBase') && g('delBase').value) || 15000), deliveryPerKm: parseFloat((g('delPerKm') && g('delPerKm').value) || 5000), minOrderAmount: parseFloat((g('minOrder') && g('minOrder').value) || 20000) }; localStorage.setItem('crabor_settings', JSON.stringify(payload)); } catch(e) {}
 }
 function showSetTab(key, btn) {
   document.querySelectorAll('.set-pane').forEach(function(p){ if(p) p.style.display = 'none'; });
@@ -3693,6 +3759,7 @@ function showSetTab(key, btn) {
   var panel = document.getElementById('set-' + key);
   if (panel) panel.style.display = 'block';
   if (btn) btn.classList.add('active');
+  if(key==='commission'){ loadCommissionStats(); loadBnplFees(); }
 }
 function themeSet(t) {
   const html = document.documentElement;

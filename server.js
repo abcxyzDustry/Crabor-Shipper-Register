@@ -2390,6 +2390,66 @@ app.patch("/api/admin/config/earlybird", adminAuth, async (req, res) => {
   }
 });
 
+// GET /api/admin/config/commissions — lay ti le hoa hong thuc te
+app.get("/api/admin/config/commissions", adminAuth, async (req, res) => {
+  try {
+    const defaults = { food:20, laundry:30, cleaning:30, china_shop:20, ride:30 };
+    const result = {};
+    for (const [k,v] of Object.entries(defaults)) {
+      result[k] = await getConfig("commission_"+k, v);
+    }
+    // Thong ke thuc te: tong doanh thu va hoa hong theo module
+    const stats = await Order.aggregate([
+      { $match: { status: { $in: ["delivered","completed","confirmed"] } } },
+      { $group: { _id: "$module", total: { $sum: "$finalTotal" }, count: { $sum: 1 } } }
+    ]);
+    const byModule = Object.fromEntries(stats.map(s=>[s._id, s]));
+    res.json({ success:true, data:{ commissions: result, stats: byModule } });
+  } catch(err){ res.status(500).json({success:false,message:err.message}); }
+});
+
+// PATCH /api/admin/config/commissions — cap nhat ti le
+app.patch("/api/admin/config/commissions", adminAuth, async (req, res) => {
+  try {
+    const allowed = ["food","laundry","cleaning","china_shop","ride"];
+    for(const k of allowed){
+      if(req.body[k] !== undefined){
+        const v = Number(req.body[k]);
+        if(isNaN(v) || v<0 || v>100) return res.status(400).json({success:false,message:`Ti le ${k} khong hop le (0-100)`});
+        await setConfig("commission_"+k, v);
+      }
+    }
+    res.json({success:true, message:"Đã cập nhật hoa hồng"});
+  } catch(err){ res.status(500).json({success:false,message:err.message}); }
+});
+
+// GET /api/admin/config/bnpl-fees
+app.get("/api/admin/config/bnpl-fees", adminAuth, async (req,res)=>{
+  try{
+    const fees = {
+      bnplFee: await getConfig("bnplFeePercent", 3),
+      serviceFee: await getConfig("bnplServiceFee", 30000),
+      lateFee: await getConfig("bnplLateFeePercent", 1),
+      installFee: await getConfig("bnplInstallFeePercent", 10)
+    };
+    res.json({success:true,data:fees});
+  }catch(err){ res.status(500).json({success:false,message:err.message}); }
+});
+app.patch("/api/admin/config/bnpl-fees", adminAuth, async (req,res)=>{
+  try{
+    const {bnplFee, serviceFee, lateFee, installFee} = req.body;
+    if(bnplFee!==undefined){ if(bnplFee<0||bnplFee>100) return res.status(400).json({success:false,message:"bnplFee 0-100"}); await setConfig("bnplFeePercent",Number(bnplFee));}
+    if(serviceFee!==undefined){ if(serviceFee<0) return res.status(400).json({success:false,message:"serviceFee >=0"}); await setConfig("bnplServiceFee",Number(serviceFee));}
+    if(lateFee!==undefined){ if(lateFee<0||lateFee>100) return res.status(400).json({success:false,message:"lateFee 0-100"}); await setConfig("bnplLateFeePercent",Number(lateFee));}
+    if(installFee!==undefined){ if(installFee<0||installFee>100) return res.status(400).json({success:false,message:"installFee 0-100"}); await setConfig("bnplInstallFeePercent",Number(installFee));}
+    res.json({success:true,message:"Đã cập nhật phí BNPL"});
+  }catch(err){ res.status(500).json({success:false,message:err.message}); }
+});
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── STORAGE STATS: dung lượng MongoDB + Cloudinary ──────────────
 app.get("/api/admin/storage-stats", adminAuth, async (req, res) => {
   try {
@@ -12905,6 +12965,10 @@ setInterval(async () => {
 //   - Partner nhà hàng & China Shop: giữ 80% giá hàng (nền tảng thu 20%/đơn)
 //   - Giặt là & Dọn nhà: nền tảng thu 30%
 const DEFAULT_COMMISSION = { food: 20, laundry: 30, cleaning: 30, china_shop: 20, ride: 30 };
+async function getCommissionPct(module){
+  const v = await getConfig("commission_"+module, DEFAULT_COMMISSION[module] ?? 20);
+  return Number(v);
+}
 
 // ── Helper: earnings base của đơn shipper thực hiện ────────────
 // Đồ ăn/giặt: tính trên shipFee. Xe công nghệ (ride): cước nằm ở total (shipFee=0).
