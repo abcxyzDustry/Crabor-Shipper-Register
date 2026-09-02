@@ -2033,17 +2033,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
 </div>
 
 
-<!-- HOCHO LOGIN MODAL -->
-<div class="overlay" id="hochoLoginOverlay" style="z-index:350">
-  <div class="modal" style="max-width:400px">
-    <div class="modal-head"><h2>🔐 Đăng nhập HỌC HỘ</h2><button class="modal-close" onclick="closeHochoLogin()">×</button></div>
-    <div class="modal-body">
-      <div style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Nhập tài khoản Hocho admin<br><span style="font-family:var(--font-mono);font-size:.73rem">Mặc định: admin / hocho2024admin</span></div>
-      <div class="lf"><label>Username</label><input type="text" id="hochoUsername" placeholder="admin" autocomplete="off"></div>
-      <div class="lf"><label>Password</label><input type="password" id="hochoPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')hochoDoLogin()"></div>
-      <div id="hochoLoginErr" style="color:var(--coral);font-size:.82rem;font-weight:800;display:none;margin-top:8px"></div>
-    </div>
-    <div class="modal-foot"><button class="modal-cancel" onclick="closeHochoLogin()">Đóng</button><button class="modal-save" onclick="hochoDoLogin()" style="background:#16a34a">Đăng nhập Hocho</button></div>
+<div class="modal-foot"><button class="modal-cancel" onclick="closeHochoLogin()">Đóng</button><button class="modal-save" onclick="hochoDoLogin()" style="background:#16a34a">Đăng nhập Hocho</button></div>
   </div>
 </div>
 
@@ -3947,9 +3937,7 @@ function deleteBanner(id){if(!confirm('Xóa banner?'))return;bannerList=bannerLi
 //   API base: /api/hocho/admin  —  token key: hocho_admin_token
 // ═════════════════════════════════════════════════════════════════════════════
 const HOCHO_API_BASE = '/api/hocho/admin';
-let HOCHO_TOKEN = localStorage.getItem('hocho_admin_token') || null;
 let hochoCurrentPage = 'dashboard';
-let hochoPendingAfterLogin = null;
 
 const HOCHO_PAGES = {
   'dashboard': 'pgHochoDashboard',
@@ -3978,39 +3966,10 @@ function hochoAdminFetch(url, opts={}){
   });
 }
 
-function showHochoLogin(afterPage){
-  hochoPendingAfterLogin = afterPage || hochoCurrentPage;
-  const o=document.getElementById('hochoLoginOverlay'); if(o) o.classList.add('show');
-  const err=document.getElementById('hochoLoginErr'); if(err) err.style.display='none';
-}
-function closeHochoLogin(){
-  const o=document.getElementById('hochoLoginOverlay'); if(o) o.classList.remove('show');
-}
-async function hochoDoLogin(){
-  const u=document.getElementById('hochoUsername')?.value.trim();
-  const p=document.getElementById('hochoPassword')?.value;
-  const errEl=document.getElementById('hochoLoginErr');
-  if(!u||!p){ if(errEl){errEl.textContent='❌ Nhập đủ username & password'; errEl.style.display='block';} return; }
-  errEl.style.display='none';
-  try{
-    const r=await fetch(HOCHO_API_BASE + '/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:u, password:p }) });
-    const d=await r.json();
-    if(d.success){
-      HOCHO_TOKEN=d.data.token;
-      localStorage.setItem('hocho_admin_token', HOCHO_TOKEN);
-      closeHochoLogin();
-      showNotif('✅ Hocho đăng nhập', 'Đã đăng nhập HỌC HỘ','green');
-      if(hochoPendingAfterLogin) { const pg=hochoPendingAfterLogin; hochoPendingAfterLogin=null; showHochoPage(pg); }
-      else loadHochoDashboard();
-      // refresh badges
-      try{ const dash=await hochoAdminFetch(HOCHO_API_BASE + '/dashboard'); if(dash.success) updateHochoBadges(dash.data); }catch(_){}
-    } else {
-      errEl.textContent='❌ ' + (d.message||'Sai thông tin'); errEl.style.display='block';
-    }
-  }catch(e){
-    errEl.textContent='❌ Không kết nối server'; errEl.style.display='block';
-  }
-}
+function showHochoLogin(afterPage){ /* removed - no separate login */ }
+function closeHochoLogin(){}
+async function hochoDoLogin(){ return; }
+
 function hochoLogout(){
   HOCHO_TOKEN=null; localStorage.removeItem('hocho_admin_token');
   showNotif('Đã đăng xuất Hocho','Phiên Hocho đã xóa','coral');
