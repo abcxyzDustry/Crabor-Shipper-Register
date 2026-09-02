@@ -722,6 +722,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
                   <button onclick="saveEbMax()" style="background:var(--yellow);color:#111;border:none;border-radius:8px;padding:9px 16px;font-weight:900;font-size:.8rem;cursor:pointer;white-space:nowrap">Lưu</button>
                   <button onclick="setEbMax(0)" style="background:rgba(232,80,74,.2);color:var(--coral);border:1px solid rgba(232,80,74,.3);border-radius:8px;padding:9px 12px;font-weight:900;font-size:.8rem;cursor:pointer" title="Đặt về 0 để tắt Early Bird">Tắt EB</button>
                 </div>
+                <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div>
+                    <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:6px">Giá Early Bird (đ)</div>
+                    <input id="ebPriceInput" type="number" min="0" step="1000" value="500000"
+                      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--cream);font-family:var(--font-mono);font-size:.85rem;font-weight:700;outline:none">
+                    <div style="font-size:.7rem;color:var(--muted);margin-top:4px">Hiện tại: <span id="ebPriceCurrent" style="color:var(--yellow);font-weight:700">500.000đ</span></div>
+                  </div>
+                  <div>
+                    <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:6px">Giá gói Thường (đ)</div>
+                    <input id="standardPriceInput" type="number" min="0" step="1000" value="700000"
+                      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--cream);font-family:var(--font-mono);font-size:.85rem;font-weight:700;outline:none">
+                    <div style="font-size:.7rem;color:var(--muted);margin-top:4px">Hiện tại: <span id="standardPriceCurrent" style="color:var(--muted);font-weight:700">700.000đ</span></div>
+                  </div>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:8px">
+                  <button onclick="saveEbPrices()" style="flex:1;background:var(--coral);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:900;font-size:.85rem;cursor:pointer">💰 Lưu giá gói</button>
+                </div>
                 <div id="ebConfigMsg" style="margin-top:8px;font-size:.75rem;color:var(--green);display:none">✅ Đã lưu cấu hình</div>
                 <div style="margin-top:8px;font-size:.72rem;color:rgba(245,240,220,.35);line-height:1.5">Khi đạt giới hạn → form đăng ký tự động chuyển sang gói Bình Thường (700k). Đặt về 0 để tắt Early Bird ngay lập tức.</div>
               </div>
@@ -2404,6 +2421,17 @@ async function loadStats() {
     const ebMaxInput   = document.getElementById('ebMaxInput');
     if (ebMaxCurrent) ebMaxCurrent.textContent = ebMax;
     if (ebMaxInput && document.activeElement !== ebMaxInput) ebMaxInput.value = ebMax;
+    // Gia goi
+    const ebPrice = d.earlyBirdPrice ?? d.ebPrice ?? 500000;
+    const stdPrice = d.standardPrice ?? 700000;
+    const ebPriceCurrent = document.getElementById('ebPriceCurrent');
+    const ebPriceInput = document.getElementById('ebPriceInput');
+    const stdPriceCurrent = document.getElementById('standardPriceCurrent');
+    const stdPriceInput = document.getElementById('standardPriceInput');
+    if(ebPriceCurrent) ebPriceCurrent.textContent = ebPrice.toLocaleString('vi-VN')+'đ';
+    if(ebPriceInput && document.activeElement !== ebPriceInput) ebPriceInput.value = ebPrice;
+    if(stdPriceCurrent) stdPriceCurrent.textContent = stdPrice.toLocaleString('vi-VN')+'đ';
+    if(stdPriceInput && document.activeElement !== stdPriceInput) stdPriceInput.value = stdPrice;
     if (d.salesTotal !== undefined && document.getElementById('salesBadge')) { document.getElementById('salesBadge').textContent = d.salesTotal; document.getElementById('salesBadge').style.display = d.salesTotal ? 'inline' : 'none'; }
     if (d.customers !== undefined) { setText('stCustomers', d.customers); if(document.getElementById('stCustomersSub')) document.getElementById('stCustomersSub').textContent = `+${d.customersToday||0} hôm nay`; }
     if (d.totalOrders !== undefined) { setText('stOrders', d.totalOrders); if(document.getElementById('stOrdersSub')) document.getElementById('stOrdersSub').textContent = `+${d.todayOrders||0} hôm nay`; }
@@ -2728,6 +2756,21 @@ async function saveEbMax() {
   } catch(e) { showNotif('❌ Lỗi', 'Không lưu được', 'coral'); }
 }
 function setEbMax(v) { document.getElementById('ebMaxInput').value = v; saveEbMax(); }
+async function saveEbPrices(){
+  const ebPrice = parseInt(document.getElementById('ebPriceInput').value);
+  const standardPrice = parseInt(document.getElementById('standardPriceInput').value);
+  if (isNaN(ebPrice) || ebPrice < 0 || isNaN(standardPrice) || standardPrice < 0) { showNotif('❌ Lỗi', 'Giá không hợp lệ', 'coral'); return; }
+  try{
+    const r = await apiFetch('/api/admin/config/earlybird', 'PATCH', { ebPrice, standardPrice });
+    if(r.success){
+      const msg=document.getElementById('ebConfigMsg');
+      if(msg){ msg.textContent='✅ Đã lưu giá gói'; msg.style.display='block'; setTimeout(()=>msg.style.display='none',3000); }
+      if(document.getElementById('ebPriceCurrent')) document.getElementById('ebPriceCurrent').textContent = ebPrice.toLocaleString('vi-VN')+'đ';
+      if(document.getElementById('standardPriceCurrent')) document.getElementById('standardPriceCurrent').textContent = standardPrice.toLocaleString('vi-VN')+'đ';
+      showNotif('✅ Đã cập nhật', 'Giá Early Bird: '+ebPrice.toLocaleString('vi-VN')+'đ, Thường: '+standardPrice.toLocaleString('vi-VN')+'đ', 'green'); loadStats();
+    }
+  }catch(e){ showNotif('❌ Lỗi', 'Không lưu được giá', 'coral'); }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //   SALES MANAGEMENT

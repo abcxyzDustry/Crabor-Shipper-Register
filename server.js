@@ -2357,8 +2357,9 @@ app.get("/api/admin/config/earlybird", adminAuth, async (req, res) => {
   try {
     const ebMax   = await getConfig("earlyBirdMax", 50);
     const ebPrice = await getConfig("earlyBirdPrice", 500000);
+    const standardPrice = await getConfig("standardPrice", 700000);
     const ebUsed = await Shipper.countDocuments({ plan: "early_bird" });
-    res.json({ success: true, data: { ebMax, ebPrice, ebUsed, slotsLeft: Math.max(0, ebMax - ebUsed) } });
+    res.json({ success: true, data: { ebMax, ebPrice, standardPrice, ebUsed, slotsLeft: Math.max(0, ebMax - ebUsed) } });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -2367,7 +2368,7 @@ app.get("/api/admin/config/earlybird", adminAuth, async (req, res) => {
 // PATCH /api/admin/config/earlybird — cập nhật số suất + giá early bird
 app.patch("/api/admin/config/earlybird", adminAuth, async (req, res) => {
   try {
-    const { ebMax, ebPrice } = req.body;
+    const { ebMax, ebPrice, standardPrice } = req.body;
     if (ebMax !== undefined) {
       if (typeof ebMax !== "number" || ebMax < 0) return res.status(400).json({ success: false, message: "Số suất không hợp lệ" });
       await setConfig("earlyBirdMax", ebMax);
@@ -2376,9 +2377,14 @@ app.patch("/api/admin/config/earlybird", adminAuth, async (req, res) => {
       if (typeof ebPrice !== "number" || ebPrice < 0) return res.status(400).json({ success: false, message: "Giá không hợp lệ" });
       await setConfig("earlyBirdPrice", ebPrice);
     }
+    if (standardPrice !== undefined) {
+      if (typeof standardPrice !== "number" || standardPrice < 0) return res.status(400).json({ success: false, message: "Giá gói thường không hợp lệ" });
+      await setConfig("standardPrice", standardPrice);
+    }
     const curMax = await getConfig("earlyBirdMax", 50);
     const curPrice = await getConfig("earlyBirdPrice", 500000);
-    res.json({ success: true, data: { ebMax: curMax, ebPrice: curPrice } });
+    const curStandard = await getConfig("standardPrice", 700000);
+    res.json({ success: true, data: { ebMax: curMax, ebPrice: curPrice, standardPrice: curStandard } });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -9537,7 +9543,7 @@ app.post("/api/shipper/register", async (req, res) => {
     const isCleaningAccount = req.body.cleaningRegistered === true;
     const shipper = await Shipper.create({
       phone, firstName, lastName, email, dob, address, district, vehicle,
-      plan, fee: plan === "early_bird" ? ebPrice : 700000,
+      plan, fee: plan === "early_bird" ? ebPrice : (await getConfig("standardPrice", 700000)),
       status: "pending", documents,
       workType: isCleaningAccount ? "cleaning" : "shipper",
       preferences: isCleaningAccount
