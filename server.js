@@ -2445,10 +2445,6 @@ app.patch("/api/admin/config/bnpl-fees", adminAuth, async (req,res)=>{
     res.json({success:true,message:"Đã cập nhật phí BNPL"});
   }catch(err){ res.status(500).json({success:false,message:err.message}); }
 });
-  } catch(err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
 
 // ── STORAGE STATS: dung lượng MongoDB + Cloudinary ──────────────
 app.get("/api/admin/storage-stats", adminAuth, async (req, res) => {
