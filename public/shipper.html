@@ -771,6 +771,18 @@ footer{
 }
 @media(max-width:768px){.news-card{flex:0 0 280px}.news-header{padding:0 20px}}
 
+
+/* === MOBILE SCROLL FIX - dam bao tu cuon tren web mobile === */
+@media(max-width:768px){
+  .news-track{animation:newsScroll 30s linear infinite !important;will-change:transform;transform:translate3d(0,0,0)}
+  .news-track-wrap{overflow:hidden !important; -webkit-overflow-scrolling:touch}
+}
+@media(hover:none){
+  .news-track:hover{animation-play-state:running !important}
+  .welcome-banner-track:hover{animation-play-state:running !important}
+}
+.news-track,.welcome-banner-track{will-change:transform;transform:translate3d(0,0,0);backface-visibility:hidden}
+
 </style>
   <script src="/outline-icons.js"></script>
 </head>
