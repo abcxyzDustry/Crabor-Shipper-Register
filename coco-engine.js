@@ -150,6 +150,8 @@ const INTENT_RULES = [
   { intent:'ask_order_status', patterns:[/đơn.*đang đâu|đơn.*tình trạng|đơn.*trạng thái|đơn.*chưa|đơn.*rồi|track.*đơn|follow.*đơn/i] },
   // Về công ty
   { intent:'ask_company', patterns:[/công ty|công ty crabor|được thành lập|thành lập|quy mô|cơ sở/i] },
+  // Banner / Khuyến mãi / Tin tức
+  { intent:'ask_banner', patterns:[/banner|khuyến mãi|khuyen mai|ưu đãi|uudai|tin tức|tin tuc|chương trình|chuong trinh|quảng cáo|quang cao|voucher.*mới|mã giảm/i] },
 ];
 
 function detectIntent(text) {
@@ -282,6 +284,17 @@ const CocoTools = {
     return { created: true, id: doc._id };
   },
 
+  // Tool: lấy banner/khuyến mãi đang chạy (cho Coco đọc)
+  async getActiveBanners(appRole = null, limit = 5) {
+    try {
+      const AIBanner = mongoose.model('AIBanner');
+      const q = { active: true };
+      if (appRole && ['customer','shipper','partner'].includes(appRole)) q.apps = appRole;
+      const banners = await AIBanner.find(q).sort({ createdAt: -1 }).limit(limit).lean();
+      return banners;
+    } catch(e) { return []; }
+  },
+
   // Tool: lấy context user
   async getUserContext(userId, User, WalletTx, BNPLInvoice, Loan) {
     if (!userId) return {};
@@ -334,6 +347,22 @@ async function cocoRespond({ text, sessionId, userId, userCtx = {} }) {
       text: `Em là **Coco** — trợ lý AI của CRABOR 🦀\n\nEm không phải chatbot thông thường — em tự học từ mọi cuộc trò chuyện, đọc được tài liệu, và nhớ thông tin tài khoản của anh/chị.\n\nEm được xây dựng hoàn toàn nội bộ bởi đội CRABOR — không dùng AI ngoài 💪`,
       intent, learned: false,
     };
+  }
+
+  // ── Banner / Khuyến mãi — Coco đọc trực tiếp từ AIBanner ──
+  if (intent === 'ask_banner') {
+    try {
+      const appRole = (userCtx.role || userCtx.appRole || '').toLowerCase();
+      const roleMap = { customer:'customer', user:'customer', shipper:'shipper', partner:'partner' };
+      const filterRole = roleMap[appRole] || null;
+      const banners = await CocoTools.getActiveBanners(filterRole, 5);
+      if (banners.length) {
+        const list = banners.map((b,i) => `${i+1}. **${b.title}**${b.badge?` [${b.badge}]`:''} — ${b.subtitle||b.content||''}${b.category?` (${b.category})`:''}`).join("\n");
+        const more = banners.length === 5 ? "\n\nXem thêm tại mục Tin tức CRABOR trên trang chủ nhé!" : "";
+        return { text: `🎉 **Khuyến mãi & Banner đang chạy${filterRole?` (dành cho ${filterRole})`:''}:**\n\n${list}${more}`, intent, learned: false };
+      }
+      return { text: `Hiện chưa có banner khuyến mãi nào đang chạy. Theo dõi mục **Tin tức CRABOR** trên trang chủ để cập nhật nhé! 🎉`, intent, learned: false };
+    } catch(e) { /* fallback to knowledge */ }
   }
 
   // ── Account-specific — cần userId ──
@@ -424,6 +453,17 @@ async function processLearnQueue() {
 // ══════════════════════════════════════════════════════════════
 
 async function seedCocoKnowledge() {
+  // Dam bao banner hint luon ton tai du da seed truoc do
+  const bannerHintExists = await CocoKnowledge.findOne({ intent: 'ask_banner' });
+  if (!bannerHintExists) {
+    await CocoKnowledge.create({
+      category: 'faq', intent: 'ask_banner', confidence: 1.0,
+      keywords: ['banner','khuyến mãi','khuyen mai','ưu đãi','uudai','tin tức','quảng cáo','chương trình','voucher'],
+      answer: '🎉 CRABOR hiện có các banner khuyến mãi đang chạy — em có thể đọc trực tiếp từ hệ thống banner! Hãy hỏi "có khuyến mãi gì" hoặc xem mục **Tin tức CRABOR** trên trang chủ (tự cuộn) để xem tất cả banner + bài viết nhé!',
+      source: 'seed', active: true
+    });
+    console.log('[Coco] Added banner hint knowledge');
+  }
   const count = await CocoKnowledge.countDocuments();
   if (count > 0) return; // đã có data
 
@@ -437,6 +477,11 @@ async function seedCocoKnowledge() {
     { category:'faq', intent:'ask_founder', confidence:1.0,
       keywords:['sáng lập','founder','kiều thanh hải','ai làm','ai tạo','câu chuyện','hành trình'],
       answer:'👨‍💻 CRABOR được sáng lập bởi **Kiều Thanh Hải** — sinh viên năm 2 Logistics, Đại học Đại Nam, Hà Nội.\n\n🚀 20 tuổi · tự học code từ 0 · 3tr/tháng · không nhà đầu tư · một mình xây 21.000+ dòng code.\n\n💬 "Tôi muốn xây ứng dụng mà mọi người Hà Nội đều muốn có." — Kiều Thanh Hải' },
+
+    // Banner hint
+    { category:'faq', intent:'ask_banner', confidence:1.0,
+      keywords:['banner','khuyến mãi','khuyen mai','ưu đãi','uudai','tin tức','quảng cáo','chương trình','voucher'],
+      answer:'🎉 CRABOR hiện có các banner khuyến mãi đang chạy — em có thể đọc trực tiếp từ hệ thống banner! Hãy hỏi "có khuyến mãi gì" hoặc xem mục **Tin tức CRABOR** trên trang chủ (tự cuộn) để xem tất cả banner + bài viết nhé!' },
 
     // Shipper
     { category:'faq', intent:'ask_register_shipper', confidence:1.0,
