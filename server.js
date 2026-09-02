@@ -4346,24 +4346,8 @@ async function autoFeatureTopDish(partnerId) {
 }
 
 async function autoFeaturePick() {
-  // Quán có nhiều đánh giá 5★ nhất (chọn ngẫu nhiên nếu hòa)
-  const stars = await Order.aggregate([
-    { $match: { module: "food", status: { $in: ["delivered"] }, ratingPartner: 5 } },
-    { $group: { _id: "$partnerId", stars: { $sum: 1 } } },
-    { $sort: { stars: -1 } },
-  ]);
-  const valid = (stars || []).filter(s => s._id);
-  if (!valid.length) return null;
-  const max = valid[0].stars;
-  const top = valid.filter(s => s.stars === max);
-  const picked = top[Math.floor(Math.random() * top.length)];
-  const partner = await FoodPartner.findOne({ _id: picked._id, status: "approved" });
-  if (!partner) return null;
-  return {
-    partner,
-    fiveStars: max,
-    topDish: await autoFeatureTopDish(partner._id),
-  };
+  // DISABLED: Bo han chuc nang tu dong chon quan nhieu 5* nhat len banner noi bat theo yeu cau
+  return null;
 }
 
 async function autoFeatureSelectionDoc(state) {
