@@ -543,6 +543,9 @@ const userSchema = new mongoose.Schema({
   // Hệ thống ĐIỂM TIN CẬY (trust score) 0-100 đánh giá hành vi chi tiêu
   trustScore:        { type: Number, default: 60, min: 0, max: 100 },
   bnplOnTimePaid:    { type: Number, default: 0, min: 0 },   // tổng giá trị BNPL đã trả ĐÚNG HẠN (cho tăng hạn mức)
+  bnplLocked:       { type: Boolean, default: false },
+  bnplLockedReason: { type: String, trim: true },
+  bnplLockedAt:     { type: Date },
   bnplLimitLevel:  { type: Number, default: 0, min: 0, max: 4 }, // cấp hạn mức hiện tại (0:2M,1:4M,2:8M,3:16M,4:32M) - tăng mỗi 6 tháng
   bnplLastReviewAt:{ type: Date }, // lần xét duyệt tăng hạn mức gần nhất
   bnplLateCount:     { type: Number, default: 0, min: 0 },   // số lần trả trễ hạn
@@ -5155,6 +5158,7 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     const trustScore  = user.trustScore ?? 60;
     const onTimePaid  = user.bnplOnTimePaid || 0;
     const cancelLocked= isCancelLocked(user);
+    if(user.bnplLocked) return res.json({ success:true, eligible:false, limit:0, spent, orderCount: user.totalOrders || 0, usedThisMonth:0, available:0, trustScore, cancelLocked, onTimePaid, bnplLocked:true, bnplLockedReason: user.bnplLockedReason, activationStatus: (user.bnplActivationStatus||'none'), canApply:false, tiers: BNPL_LIMIT_TIERS, currentLimitIndex:0, nextLimit:null, message:'Rất tiếc Ví Trả Sau của bạn đã bị khóa với lý do: '+(user.bnplLockedReason||'bảo mật')+' — Vui lòng liên hệ hỗ trợ.' });
     const activated   = user.isAdmin || user.creditBnplEnabled || user.bnplActivationStatus === 'approved';
     const canGrant    = spent >= 5000000 && trustScore >= TRUST_MIN_UNLOCK && !cancelLocked;
     let eligible      = false;
@@ -5355,6 +5359,24 @@ app.patch("/api/admin/bnpl/activation/:userId", adminAuth, async (req, res) => {
     req.io.to(`customer_${user._id}`).emit('bnplActivationUpdated', { status });
     res.json({ success:true, message: status === 'approved' ? 'Đã duyệt mở khóa Ví Trả Sau' : 'Đã từ chối hồ sơ mở khóa Ví Trả Sau' });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// POST /api/admin/bnpl/lock/:userId — Khoa/Mo khoa Vi Tra Sau voi ly do bao mat
+app.post("/api/admin/bnpl/lock/:userId", adminAuth, async (req,res)=>{
+  try{
+    const { locked, reason } = req.body;
+    const user = await User.findById(req.params.userId);
+    if(!user) return res.status(404).json({success:false});
+    await User.findByIdAndUpdate(user._id, { bnplLocked: !!locked, bnplLockedReason: reason|| (locked?"Bảo mật":""), bnplLockedAt: locked ? new Date() : null });
+    if(locked){
+      try{ await Notification.create({ ownerType:"user", ownerId:user._id, type:"system", title:"🔒 Ví Trả Sau đã bị khóa", body: `Rất tiếc Ví Trả Sau của bạn đã bị khóa với lý do: ${reason||"bảo mật"}. Vui lòng liên hệ hỗ trợ.`, ref:"bnpl_locked" }); }catch(e){}
+      req.io.to(`customer_${user._id}`).emit("bnplLocked", { locked:true, reason });
+    } else {
+      try{ await Notification.create({ ownerType:"user", ownerId:user._id, type:"system", title:"🔓 Ví Trả Sau đã mở khóa", body:"Ví Trả Sau của bạn đã được mở khóa. Bạn có thể tiếp tục sử dụng.", ref:"bnpl_unlocked" }); }catch(e){}
+      req.io.to(`customer_${user._id}`).emit("bnplLocked", { locked:false });
+    }
+    res.json({success:true, message: locked?"Đã khóa Ví Trả Sau":"Đã mở khóa Ví Trả Sau"});
+  }catch(err){ res.status(500).json({success:false,message:err.message}); }
 });
 
 // PATCH /api/admin/bnpl/limit/:userId — Dieu chinh han muc thu cong
@@ -13797,7 +13819,14 @@ app.post("/api/order", async (req, res) => {
     let bnplOrderAmount = 0;
     if (isBnplPay) {
       bnplOrderAmount = Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
-      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt");
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt bnplLocked bnplLockedReason");
+      if (bnplUser?.bnplLocked) {
+        return res.status(403).json({
+          success: false,
+          bnplLocked: true,
+          message: `Rất tiếc Ví Trả Sau của bạn đã bị khóa với lý do: ${bnplUser.bnplLockedReason||"bảo mật"} — Vui lòng liên hệ hỗ trợ. Phương thức Ví Trả Sau đã bị vô hiệu hóa.`
+        });
+      }
       const bnplSpecial   = bnplUser?.isAdmin || bnplUser?.creditBnplEnabled;
       const bnplActivated = bnplUser?.bnplActivationStatus === 'approved';
       const bnplEligible  = bnplSpecial || (bnplActivated && (bnplUser?.totalSpent||0) >= 5000000 && (bnplUser?.trustScore ?? 60) >= TRUST_MIN_UNLOCK && !isCancelLocked(bnplUser));
@@ -14299,7 +14328,14 @@ app.post("/api/ride/book", async (req, res) => {
     let bnplRideAmount = 0;
     if (isBnplRide) {
       bnplRideAmount = Math.max(0, rideOrder.finalTotal ?? (fee + Math.round(fee * 0.1) - (rideDiscount || 0)));
-      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt");
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt bnplLocked bnplLockedReason");
+      if (bnplUser?.bnplLocked) {
+        return res.status(403).json({
+          success: false,
+          bnplLocked: true,
+          message: `Rất tiếc Ví Trả Sau của bạn đã bị khóa với lý do: ${bnplUser.bnplLockedReason||"bảo mật"} — Vui lòng liên hệ hỗ trợ. Phương thức Ví Trả Sau đã bị vô hiệu hóa.`
+        });
+      }
       const bnplSpecial   = bnplUser?.isAdmin || bnplUser?.creditBnplEnabled;
       const bnplActivated = bnplUser?.bnplActivationStatus === 'approved';
       const bnplEligible  = bnplSpecial || (bnplActivated && (bnplUser?.totalSpent||0) >= 5000000 && (bnplUser?.trustScore ?? 60) >= TRUST_MIN_UNLOCK && !isCancelLocked(bnplUser));

@@ -3941,12 +3941,23 @@ async function loadCreditUsers(page){
         <td><span class="status-pill ${u.status==='active'?'status-ap':'status-rj'}">${u.status==='active'?'Hoạt động':'Bị khóa'}</span></td>
         <td style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="act-btn ${u.creditBnplEnabled?'reject':''}" onclick="toggleCredit('${u._id}','creditBnplEnabled',${!u.creditBnplEnabled})" style="font-size:.7rem;padding:4px 8px">${u.creditBnplEnabled?'🔒 Tắt BNPL':'💳 Kích BNPL'}</button>
+          <button class="act-btn" onclick="lockBnpl('${u._id}','${u.fullName||''}',${!!u.bnplLocked})" style="font-size:.7rem;padding:4px 8px;background:${u.bnplLocked?'#27ae60':'#e74c3c'};color:#fff;border-color:${u.bnplLocked?'#27ae60':'#e74c3c'}">${u.bnplLocked?'🔓 Mở khóa':'🔒 Khóa BNPL'}</button>
           <button class="act-btn ${u.creditLoanEnabled?'reject':''}" onclick="toggleCredit('${u._id}','creditLoanEnabled',${!u.creditLoanEnabled})" style="font-size:.7rem;padding:4px 8px">${u.creditLoanEnabled?'🔒 Tắt Vay':'🏦 Kích Vay'}</button>
           <button class="act-btn" onclick="viewCreditProfile('${u._id}')" style="font-size:.7rem;padding:4px 8px;background:#6c63ff;color:#fff;border-color:#6c63ff">👁️ Hồ sơ</button>
         </td>
       </tr>`).join('');
     renderPager('crUsersPager', r.total, crCurrentUserPage, 20, n=>loadCreditUsers(n));
   }catch(e){ tbody.innerHTML='<tr><td colspan=9 style="text-align:center;color:var(--coral)">'+(e.message||'Lỗi')+'</td></tr>'; }
+}
+async function lockBnpl(userId, name, isLocked){
+  if(isLocked){
+    if(!confirm(`Mở khóa Ví Trả Sau cho "${name}"?`)) return;
+    try{ const r=await apiFetch('/api/admin/bnpl/lock/'+userId,'POST',{locked:false}); if(r.success) { showNotif('🔓 Đã mở khóa','Ví Trả Sau đã mở khóa','green'); loadCreditUsers(); } else showNotif('Lỗi',r.message,'coral'); }catch(e){ showNotif('Lỗi',e.message,'coral'); }
+  } else {
+    const reason=prompt(`Nhập lý do khóa Ví Trả Sau cho "${name}" (mặc định: bảo mật):`,'bảo mật');
+    if(reason===null) return;
+    try{ const r=await apiFetch('/api/admin/bnpl/lock/'+userId,'POST',{locked:true, reason: reason||'bảo mật'}); if(r.success) { showNotif('🔒 Đã khóa','Ví Trả Sau đã bị khóa với lý do: '+(reason||'bảo mật'),'coral'); loadCreditUsers(); } else showNotif('Lỗi',r.message,'coral'); }catch(e){ showNotif('Lỗi',e.message,'coral'); }
+  }
 }
 async function toggleCredit(userId, field, enabled){
   try{
