@@ -5306,8 +5306,20 @@ app.get("/api/bnpl/activation", async (req, res) => {
 app.get("/api/admin/bnpl/activations", adminAuth, async (req,res) => {
   try {
     const users = await User.find({ bnplActivationStatus: { $in: ['pending','approved','rejected'] } })
-      .select('phone email fullName totalSpent totalOrders trustScore cancelCount bnplActivationStatus bnplOnTimePaid').sort({updatedAt:-1}).limit(100).lean();
-    res.json({ success:true, data: users });
+      .select('phone email fullName totalSpent totalOrders trustScore cancelCount bnplActivationStatus bnplOnTimePaid bnplLimitLevel bnplLastReviewAt bnplLateCount').sort({updatedAt:-1}).limit(100).lean();
+    // Them thong tin han muc va dem nguoc 6 thang
+    const now = new Date();
+    const enriched = users.map(u=>{
+      const level = u.bnplLimitLevel||0;
+      const tiers = [2000000,4000000,8000000,16000000,32000000];
+      const currentLimit = tiers[level]||2000000;
+      const nextLimit = tiers[level+1]||null;
+      const last = u.bnplLastReviewAt ? new Date(u.bnplLastReviewAt) : (u.updatedAt ? new Date(u.updatedAt) : now);
+      const nextReview = new Date(last.getTime() + 6*30*24*3600*1000);
+      const daysLeft = Math.max(0, Math.ceil((nextReview - now)/(24*3600*1000)));
+      return { ...u, currentLimit, nextLimit, level, nextReview, daysLeft };
+    });
+    res.json({ success:true, data: enriched });
   } catch(e){ res.status(500).json({ success:false, message:e.message }); }
 });
 
@@ -5343,6 +5355,20 @@ app.patch("/api/admin/bnpl/activation/:userId", adminAuth, async (req, res) => {
     req.io.to(`customer_${user._id}`).emit('bnplActivationUpdated', { status });
     res.json({ success:true, message: status === 'approved' ? 'Đã duyệt mở khóa Ví Trả Sau' : 'Đã từ chối hồ sơ mở khóa Ví Trả Sau' });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
+});
+
+// PATCH /api/admin/bnpl/limit/:userId — Dieu chinh han muc thu cong
+app.patch("/api/admin/bnpl/limit/:userId", adminAuth, async (req,res)=>{
+  try{
+    const { level } = req.body;
+    if(level===undefined || level<0 || level>4) return res.status(400).json({success:false,message:"Level 0-4"});
+    const user = await User.findById(req.params.userId);
+    if(!user) return res.status(404).json({success:false});
+    await User.findByIdAndUpdate(user._id, { bnplLimitLevel: Number(level), bnplLastReviewAt: new Date() });
+    const tiers=[2000000,4000000,8000000,16000000,32000000];
+    req.io.to(`customer_${user._id}`).emit('bnplLimitUpdated', { level, limit: tiers[level] });
+    res.json({success:true, message:`Đã điều chỉnh hạn mức lên ${tiers[level].toLocaleString('vi-VN')}đ`});
+  }catch(err){ res.status(500).json({success:false,message:err.message}); }
 });
 
 // GET /api/bnpl/summary — tổng kết tháng + hóa đơn

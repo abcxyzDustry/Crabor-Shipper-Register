@@ -1476,7 +1476,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
     <!-- ── CREDIT PAGE — Ví trả sau & Vay nhanh ── -->
     <section id="pgCredit" class="page-section">
       <div class="page-header">
-        <div class="page-title">💳 Tín dụng — Ví trả sau &amp; Vay nhanh</div>
+        <div class="page-title">💳 Tín dụng — Ví trả sau &amp; Vay nhanh <span style="font-size:.75rem;background:var(--coral);color:#fff;border-radius:50px;padding:3px 8px;margin-left:8px">6 tháng xét 1 lần</span></div>
         <div style="display:flex;gap:8px;align-items:center">
           <input class="search-input" id="creditSearch" placeholder="Tìm SĐT / email / tên..." style="min-width:220px" onkeydown="if(event.key==='Enter') loadCredit()">
           <button class="filter-btn" onclick="loadCredit()">🔍 Tìm</button>
@@ -1505,6 +1505,37 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           <div style="font-size:.72rem;color:#aaa;font-weight:800;margin-bottom:6px">⏳ CHỜ DUYỆT VAY</div>
           <div style="font-size:1.5rem;font-weight:900;color:var(--coral)" id="crStPendingLoan">—</div>
           <div style="font-size:.72rem;color:#aaa;margin-top:4px" id="crStPendingAmt">—</div>
+        </div>
+      </div>
+
+      <!-- Dieu chinh han muc + dem nguoc 6 thang -->
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-head"><span class="panel-title">⏳ Điều chỉnh hạn mức &amp; Đếm ngược 6 tháng</span><span style="font-size:.72rem;color:var(--muted)">Mỗi 6 tháng xét tăng 1 cấp nếu trả đúng hạn</span></div>
+        <div style="padding:16px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center">
+              <div style="font-size:.72rem;color:var(--muted);font-weight:800">HẠN MỨC HIỆN TẠI</div>
+              <div style="font-size:1.3rem;font-weight:900;color:var(--coral)" id="crLimitCurrent">—</div>
+              <div style="font-size:.7rem;color:var(--muted)" id="crLimitNext">—</div>
+            </div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center">
+              <div style="font-size:.72rem;color:var(--muted);font-weight:800">ĐẾM NGƯỢC XÉT DUYỆT</div>
+              <div style="font-size:1.8rem;font-weight:900;color:var(--yellow);font-family:var(--font-mono)" id="crCountdown">—</div>
+              <div style="font-size:.7rem;color:var(--muted)" id="crCountdownSub">—</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select class="filter-select" id="crLimitSelect" style="flex:1;min-width:160px">
+              <option value="0">2.000.000đ (Mới)</option>
+              <option value="1">4.000.000đ</option>
+              <option value="2">8.000.000đ</option>
+              <option value="3">16.000.000đ</option>
+              <option value="4">32.000.000đ</option>
+            </select>
+            <input class="filter-select" id="crLimitUserId" placeholder="Nhập UserId hoặc SĐT" style="flex:1;min-width:180px">
+            <button class="filter-btn" style="background:var(--coral)" onclick="adjustBnplLimit()">💳 Điều chỉnh hạn mức</button>
+          </div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Chọn cấp và nhập UserId/SĐT để điều chỉnh thủ công. Hệ thống tự động xét mỗi 6 tháng nếu đủ điều kiện.</div>
         </div>
       </div>
 
@@ -3782,6 +3813,47 @@ function showCreditTab(tab, btn){
   if(tab==='bnpl') loadCreditBnpl();
   if(tab==='loans') loadCreditLoans();
   if(tab==='activations') loadCreditActivations();
+}
+async function adjustBnplLimit(){
+  const level=parseInt(document.getElementById('crLimitSelect').value);
+  const userId=document.getElementById('crLimitUserId').value.trim();
+  if(!userId) return showNotif('❌ Lỗi','Nhập UserId hoặc SĐT','coral');
+  try{
+    // Thu tim userId tu SDT neu can
+    let targetId=userId;
+    if(/^0[0-9]{9,10}$/.test(userId)){
+      const r=await apiFetch('/api/admin/bnpl/activations');
+      const found=(r.data||[]).find(u=>u.phone===userId);
+      if(found) targetId=found._id; else return showNotif('❌','Không tìm thấy SĐT','coral');
+    }
+    const r=await apiFetch('/api/admin/bnpl/limit/'+targetId,'PATCH',{level});
+    if(r.success) showNotif('✅','Đã điều chỉnh hạn mức','green'); else showNotif('❌',r.message,'coral');
+  }catch(e){ showNotif('❌',e.message,'coral'); }
+}
+async function updateCreditLimitCountdown(){
+  try{
+    const r=await apiFetch('/api/admin/bnpl/activations');
+    if(!r.success||!r.data.length) return;
+    // Lay user dau tien co level <4 de hien thi dem nguoc
+    const u=r.data.find(x=> (x.level||0)<4) || r.data[0];
+    if(!u) return;
+    const tiers=[2000000,4000000,8000000,16000000,32000000];
+    const cur=tiers[u.level||0]||2000000;
+    const nxt=tiers[(u.level||0)+1]||null;
+    if(document.getElementById('crLimitCurrent')) document.getElementById('crLimitCurrent').textContent=cur.toLocaleString('vi-VN')+'đ';
+    if(document.getElementById('crLimitNext')) document.getElementById('crLimitNext').textContent=nxt?`Tiếp: ${nxt.toLocaleString('vi-VN')}đ`:'Đã tối đa';
+    const nextReview=u.nextReview?new Date(u.nextReview):null;
+    if(nextReview && document.getElementById('crCountdown')){
+      const days=Math.max(0,Math.ceil((nextReview-new Date())/(24*3600*1000)));
+      document.getElementById('crCountdown').textContent=days+' ngày';
+      document.getElementById('crCountdownSub').textContent='Xét: '+nextReview.toLocaleDateString('vi-VN');
+      // Countdown live
+      setInterval(()=>{
+        const d=Math.max(0,Math.ceil((nextReview-new Date())/(24*3600*1000)));
+        document.getElementById('crCountdown').textContent=d+' ngày';
+      }, 60*60*1000);
+    }
+  }catch(e){}
 }
 async function loadCredit(){
   loadCreditStats(); loadCreditUsers();
