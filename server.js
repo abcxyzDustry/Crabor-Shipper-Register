@@ -543,6 +543,8 @@ const userSchema = new mongoose.Schema({
   // Hệ thống ĐIỂM TIN CẬY (trust score) 0-100 đánh giá hành vi chi tiêu
   trustScore:        { type: Number, default: 60, min: 0, max: 100 },
   bnplOnTimePaid:    { type: Number, default: 0, min: 0 },   // tổng giá trị BNPL đã trả ĐÚNG HẠN (cho tăng hạn mức)
+  bnplLimitLevel:  { type: Number, default: 0, min: 0, max: 4 }, // cấp hạn mức hiện tại (0:2M,1:4M,2:8M,3:16M,4:32M) - tăng mỗi 6 tháng
+  bnplLastReviewAt:{ type: Date }, // lần xét duyệt tăng hạn mức gần nhất
   bnplLateCount:     { type: Number, default: 0, min: 0 },   // số lần trả trễ hạn
   bnplActivationStatus: { type: String, enum: ["none","pending","approved","rejected"], default: "none" }, // trạng thái mở khóa Ví Trả Sau (ký kết hợp đồng)
   transactionPassword: { type: String },   // bcrypt hash — mật khẩu giao dịch (xác nhận vay/thanh toán)
@@ -1283,13 +1285,27 @@ const BNPLInvoice = mongoose.model('BNPLInvoice', bnplInvoiceSchema);
 // ── BNPL CREDIT LIMIT + ĐIỂM TIN CẬY ─────────────────────
 // Hạn mức Ví Trả Sau: nền 2tr khi đã mở khóa; tăng theo TỔNG BNPL đã trả ĐÚNG HẠN.
 // Chương trình "chi tiêu & trả đúng → tăng hạn mức": ≥2tr→4tr, ≥4tr→8tr, ≥8tr→16tr, ≥16tr→32tr
-function getBnplLimit(onTimePaid = 0) {
+function getBnplLimit(onTimePaid = 0, level = null) {
+  // Moi: tang theo cap do (level) - moi 6 thang xet 1 lan, cu giu tuong thich voi onTimePaid
+  const tiers = [2000000,4000000,8000000,16000000,32000000];
+  if (level !== null && level !== undefined) {
+    const lv = Math.max(0, Math.min(4, Number(level)||0));
+    return tiers[lv];
+  }
   const otp = Number(onTimePaid) || 0;
-  if (otp <  2000000)  return 2000000;   // hạn mức nền khi vừa mở khóa
+  if (otp <  2000000)  return 2000000;
   if (otp <  4000000)  return 4000000;
   if (otp <  8000000)  return 8000000;
   if (otp < 16000000)  return 16000000;
   return 32000000;
+}
+function getBnplLevelFromOnTimePaid(onTimePaid){
+  const otp = Number(onTimePaid)||0;
+  if(otp < 2000000) return 0;
+  if(otp < 4000000) return 1;
+  if(otp < 8000000) return 2;
+  if(otp < 16000000) return 3;
+  return 4;
 }
 // Thang hạn mức + mức chi tiêu cần để đạt hạn mức kế (cho UI hiển thị chương trình)
 const BNPL_LIMIT_TIERS = [
@@ -5498,6 +5514,29 @@ async function createBNPLInvoicesForMonth(billingMonth){
 }
 // Chạy mỗi ngày 01:05 để chốt bill tháng trước
 try{ cron.schedule("5 1 1 * *", async()=>{ const prev=new Date(); prev.setMonth(prev.getMonth()-1); const m=getBillingMonth(prev); await createBNPLInvoicesForMonth(m); }, {timezone:"Asia/Ho_Chi_Minh"}); }catch(e){}
+// BNPL: moi 6 thang (ngay 1 thang 1,7 luc 02:00) xet tang han muc 1 cap neu tra dung han tot
+try{
+  cron.schedule("0 2 1 1,7 *", async () => {
+    console.log("⏰ [CRON 6 thang] Xet tang han muc BNPL");
+    try{
+      const users = await User.find({ bnplActivationStatus: "approved", bnplLimitLevel: { $lt: 4 } });
+      for(const u of users){
+        const last = u.bnplLastReviewAt ? new Date(u.bnplLastReviewAt) : new Date(u.updatedAt || u.createdAt);
+        const monthsSince = (Date.now() - last.getTime()) / (30*24*3600e3);
+        if(monthsSince < 5.5) continue;
+        const needForNext = [2000000,4000000,8000000,16000000][u.bnplLimitLevel||0] || 2000000;
+        if((u.bnplOnTimePaid||0) >= needForNext && (u.trustScore||60) >= 50 && (u.bnplLateCount||0) < 2){
+          const newLevel = Math.min(4, (u.bnplLimitLevel||0)+1);
+          await User.findByIdAndUpdate(u._id, { bnplLimitLevel: newLevel, bnplLastReviewAt: new Date() });
+          try{ await Notification.create({ ownerType:"user", ownerId:u._id, type:"system", title:"🎉 Hạn mức Ví Trả Sau đã tăng!", body:`Chúc mừng! Hạn mức của bạn đã tăng lên ${( [4000000,8000000,16000000,32000000][newLevel-1]||2000000).toLocaleString("vi-VN")}đ sau 6 tháng trả đúng hạn.`, ref:"bnpl_level_up" }); }catch(e){}
+          console.log(`[BNPL 6m] Tang ${u.phone} len cap ${newLevel}`);
+        } else {
+          await User.findByIdAndUpdate(u._id, { bnplLastReviewAt: new Date() });
+        }
+      }
+    }catch(e){ console.error("CRON BNPL 6m",e.message); }
+  }, {timezone:"Asia/Ho_Chi_Minh"});
+}catch(e){}
 // Manual trigger cho admin / test — chốt luôn tháng hiện tại
 app.post("/api/admin/bnpl/billing/trigger", adminAuth, async (req,res)=>{
   try{
