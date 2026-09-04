@@ -5303,6 +5303,27 @@ app.patch("/api/admin/bnpl/activation/:userId", adminAuth, async (req, res) => {
     const user = await User.findById(req.params.userId);
     if (!user) return res.status(404).json({ success:false });
     await User.findByIdAndUpdate(user._id, { bnplActivationStatus: status });
+    // Tao thong bao chuong + notification cho user
+    if (status === 'approved') {
+      try {
+        await Notification.create({
+          ownerType: 'user', ownerId: user._id,
+          type: 'system', title: '🎉 Ví Trả Sau đã được phê duyệt!',
+          body: 'Chúc mừng bạn đã được CRABOR phê duyệt Ví Trả Sau với hạn mức 2.000.000đ. Hãy khám phá ngay!',
+          ref: 'bnpl_approved'
+        });
+        req.io.to(`customer_${user._id}`).emit('newNotification', { type: 'system', title: 'Ví Trả Sau đã được phê duyệt!' });
+      } catch(e) { console.warn('BNPL notify', e.message); }
+    } else {
+      try {
+        await Notification.create({
+          ownerType: 'user', ownerId: user._id,
+          type: 'system', title: 'Hồ sơ Ví Trả Sau bị từ chối',
+          body: 'Hồ sơ mở khóa Ví Trả Sau của bạn chưa được duyệt. Vui lòng liên hệ hỗ trợ.',
+          ref: 'bnpl_rejected'
+        });
+      } catch(e) {}
+    }
     req.io.to(`customer_${user._id}`).emit('bnplActivationUpdated', { status });
     res.json({ success:true, message: status === 'approved' ? 'Đã duyệt mở khóa Ví Trả Sau' : 'Đã từ chối hồ sơ mở khóa Ví Trả Sau' });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
