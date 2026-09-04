@@ -5136,7 +5136,7 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session.userId) return res.status(401).json({ success:false });
-    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified creditBnplEnabled creditLoanEnabled trustScore cancelCount bnplOnTimePaid bnplLateCount bnplActivationStatus');
+    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified creditBnplEnabled creditLoanEnabled trustScore cancelCount bnplOnTimePaid bnplLateCount bnplActivationStatus bnplLimitLevel bnplLastReviewAt');
     if (!user) return res.status(404).json({ success:false });
     const idn = identitySummary(user);
     // Đặc quyền: admin hoặc user được admin "Kích BNPL" (bypass) bỏ qua mọi cổng chặn
@@ -5184,14 +5184,14 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     const bnplLocked = await hasOverdueBnpl(req.session.userId);
     if (bnplLocked && !special) {
       return res.json({ success:true, eligible:false, limit:0, spent, orderCount: user.totalOrders || 0, usedThisMonth, available:0,
-        trustScore, cancelLocked, onTimePaid, activationStatus: (user.bnplActivationStatus||'none'), canApply:false, tiers: BNPL_LIMIT_TIERS, currentLimitIndex, nextLimit,
+        trustScore, cancelLocked, onTimePaid, bnplLimitLevel: user.bnplLimitLevel||0, activationStatus: (user.bnplActivationStatus||'none'), canApply:false, tiers: BNPL_LIMIT_TIERS, currentLimitIndex, nextLimit, level: user.bnplLimitLevel||0,
         bnplLocked:true, unpaidInvoices: unpaid,
         message:'Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa.' });
     }
     // Nếu special mà vẫn overdue, vẫn trả eligible:true nhưng kèm cảnh báo bnplLocked để UI hiển thị
     if (bnplLocked && special) {
       return res.json({ success:true, eligible, limit, spent, orderCount: user.totalOrders || 0, usedThisMonth, available,
-        trustScore, cancelLocked, onTimePaid, activationStatus: (user.bnplActivationStatus||'none'), canApply: (!activated && canGrant), tiers: BNPL_LIMIT_TIERS, currentLimitIndex, nextLimit,
+        trustScore, cancelLocked, onTimePaid, bnplLimitLevel: user.bnplLimitLevel||0, activationStatus: (user.bnplActivationStatus||'none'), canApply: (!activated && canGrant), tiers: BNPL_LIMIT_TIERS, currentLimitIndex, nextLimit, level: user.bnplLimitLevel||0,
         bnplLocked:true, unpaidInvoices: unpaid,
         message: eligible ? `Hạn mức: ${limit.toLocaleString('vi-VN')}đ | Còn: ${available.toLocaleString('vi-VN')}đ (có ${unpaid.length} hóa đơn quá hạn)` : (lockReason || 'Chưa đủ điều kiện mở Ví Trả Sau'),
         unpaidInvoices: unpaid });
@@ -5217,7 +5217,7 @@ app.post("/api/bnpl/use", async (req,res) => {
     const amt = Number(amount);
     if (!amt||amt<=0) return res.status(400).json({success:false,message:'Số tiền không hợp lệ'});
     const fee = bnplFeeOf(amt);
-    const user = await User.findById(req.session.userId).select('totalSpent creditBnplEnabled isAdmin trustScore cancelCount bnplOnTimePaid bnplActivationStatus');
+    const user = await User.findById(req.session.userId).select('totalSpent creditBnplEnabled isAdmin trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt');
     // KHÓA: còn hóa đơn quá hạn → chặn mọi giao dịch trả sau
     if (await hasOverdueBnpl(req.session.userId))
       return res.status(403).json({success:false, bnplLocked:true, message:'Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn. Vui lòng thanh toán để mở khóa.'});
@@ -5250,7 +5250,7 @@ app.post("/api/bnpl/activation", async (req, res) => {
     const _specialAct = _me?.isAdmin || _me?.creditBnplEnabled;
     if (!_specialAct && !identitySummary(_me).googleVerified)
       return res.status(403).json({ success:false, requireGoogleVerify:true, message:'Cần xác thực danh tính qua Google trước khi mở khóa Ví Trả Sau' });
-    const user = await User.findById(req.session.userId).select('totalSpent trustScore cancelCount transactionPassword bnplActivationStatus bnplOnTimePaid');
+    const user = await User.findById(req.session.userId).select('totalSpent trustScore cancelCount transactionPassword bnplActivationStatus bnplOnTimePaid bnplLimitLevel bnplLastReviewAt');
     if (user?.bnplActivationStatus === 'approved')
       return res.status(400).json({ success:false, message:'Ví Trả Sau đã được mở khóa.' });
     // Điều kiện: đủ 5tr chi tiêu + điểm tin cậy ≥ 50 + không "hay hủy đơn"
@@ -5296,7 +5296,7 @@ app.post("/api/bnpl/activation", async (req, res) => {
 app.get("/api/bnpl/activation", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success:false });
-    const user = await User.findById(req.session.userId).select('bnplActivationStatus trustScore totalSpent cancelCount bnplOnTimePaid creditBnplEnabled').lean();
+    const user = await User.findById(req.session.userId).select('bnplActivationStatus trustScore totalSpent cancelCount bnplOnTimePaid creditBnplEnabled bnplLimitLevel bnplLastReviewAt').lean();
     if (!user) return res.status(404).json({ success:false });
     res.json({ success:true, status: user.bnplActivationStatus || 'none', creditBnplEnabled: !!user.creditBnplEnabled, trustScore: user.trustScore ?? 60, totalSpent: user.totalSpent||0, cancelCount: user.cancelCount||0, bnplOnTimePaid: user.bnplOnTimePaid||0, canApply: (user.totalSpent||0) >= 5000000 && (user.trustScore ?? 60) >= TRUST_MIN_UNLOCK && !isCancelLocked(user) && (user.bnplActivationStatus||'none') !== 'approved' });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
@@ -13778,7 +13778,7 @@ app.post("/api/order", async (req, res) => {
     let bnplOrderAmount = 0;
     if (isBnplPay) {
       bnplOrderAmount = Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
-      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus");
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt");
       const bnplSpecial   = bnplUser?.isAdmin || bnplUser?.creditBnplEnabled;
       const bnplActivated = bnplUser?.bnplActivationStatus === 'approved';
       const bnplEligible  = bnplSpecial || (bnplActivated && (bnplUser?.totalSpent||0) >= 5000000 && (bnplUser?.trustScore ?? 60) >= TRUST_MIN_UNLOCK && !isCancelLocked(bnplUser));
@@ -14280,7 +14280,7 @@ app.post("/api/ride/book", async (req, res) => {
     let bnplRideAmount = 0;
     if (isBnplRide) {
       bnplRideAmount = Math.max(0, rideOrder.finalTotal ?? (fee + Math.round(fee * 0.1) - (rideDiscount || 0)));
-      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus");
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt");
       const bnplSpecial   = bnplUser?.isAdmin || bnplUser?.creditBnplEnabled;
       const bnplActivated = bnplUser?.bnplActivationStatus === 'approved';
       const bnplEligible  = bnplSpecial || (bnplActivated && (bnplUser?.totalSpent||0) >= 5000000 && (bnplUser?.trustScore ?? 60) >= TRUST_MIN_UNLOCK && !isCancelLocked(bnplUser));
