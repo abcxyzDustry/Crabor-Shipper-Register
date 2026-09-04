@@ -5753,8 +5753,27 @@ async function refundOnAutoCancel(order) {
       return 'refunded_wallet';
     }
     if (order.paymentMethod === 'bnpl') {
-      await BNPLTx.deleteMany({ orderId: order.orderId, status: 'pending_bill' });
-      return 'bnpl_reversed';
+      // Giong refundOnCancel: xoa pending + tru billed khoi invoice de hoan han muc
+      const del = await BNPLTx.deleteMany({ orderId: order.orderId, status: 'pending_bill' });
+      const billedTx = await BNPLTx.find({ orderId: order.orderId, status: { $in: ['billed', 'paid'] } });
+      for (const tx of billedTx) {
+        if (tx.invoiceId) {
+          const inv = await BNPLInvoice.findById(tx.invoiceId);
+          if (inv && inv.status !== 'paid') {
+            const newTotal = Math.max(0, (inv.totalAmount || 0) - (tx.baseAmount || tx.amount || 0));
+            const newFee = Math.max(0, (inv.bnplFee || 0) - (tx.fee || 0));
+            const newFinal = Math.max(0, (inv.finalAmount || 0) - (tx.amount || 0));
+            await BNPLInvoice.updateOne({ _id: inv._id }, { $set: { totalAmount: newTotal, bnplFee: newFee, finalAmount: newFinal } });
+          }
+          await BNPLTx.updateOne({ _id: tx._id }, { $set: { status: 'pending_bill', invoiceId: null } });
+        }
+      }
+      // Thong bao cho customer de cap nhat han muc
+      const cid = order.customerId || order.customer;
+      if (cid) {
+        global._io?.to(`customer_${cid}`).emit('bnplRefunded', { orderId: order.orderId, amount: amt });
+      }
+      return (del.deletedCount > 0 || billedTx.length > 0) ? 'bnpl_reversed' : 'no_refund';
     }
     return 'no_refund';
   } catch(e) { console.error('[AutoCancel] hoàn tiền lỗi:', e.message); return 'error'; }
