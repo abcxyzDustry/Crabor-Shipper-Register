@@ -5162,7 +5162,7 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     let lockReason    = null;
     if (activated) {
       eligible = special || (spent >= 5000000 && trustScore >= TRUST_MIN_UNLOCK && !cancelLocked);
-      limit    = eligible ? getBnplLimit(onTimePaid) : 0;
+      limit    = eligible ? getBnplLimit(onTimePaid, user?.bnplLimitLevel) : 0;
       if (!eligible) {
         if (cancelLocked) lockReason = 'Bạn đã hủy quá nhiều đơn hàng nên bị khóa Ví Trả Sau, dù có đủ 5.000.000đ chi tiêu.';
         else if (spent < 5000000) lockReason = `Cần tổng chi tiêu tối thiểu 5.000.000đ để dùng Ví Trả Sau (hiện tại: ${spent.toLocaleString('vi-VN')}đ)`;
@@ -5178,7 +5178,7 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
     const usedThisMonth = txs.reduce((s,t)=>s+t.amount,0);
     const available  = Math.max(0, limit - usedThisMonth);
     const unpaid     = await BNPLInvoice.find({ userId:req.session.userId, status:{$in:['issued','overdue','installment']} }).sort({dueDate:1});
-    const currentLimitIndex = Math.max(0, BNPL_LIMIT_TIERS.findIndex(t => getBnplLimit(onTimePaid) === t.limit));
+    const currentLimitIndex = Math.max(0, BNPL_LIMIT_TIERS.findIndex(t => getBnplLimit(onTimePaid, user?.bnplLimitLevel) === t.limit));
     const nextLimit = BNPL_LIMIT_TIERS[currentLimitIndex+1] || null;
     // KHÓA Ví Trả Sau khi còn hóa đơn quá hạn — nhưng BYPASS (special) không bị khóa cứng, vẫn hiện eligible để admin test
     const bnplLocked = await hasOverdueBnpl(req.session.userId);
@@ -5228,7 +5228,7 @@ app.post("/api/bnpl/use", async (req,res) => {
       return res.status(403).json({success:false, message:'Bạn chưa mở khóa Ví Trả Sau. Vui lòng đăng ký mở khóa (ký hợp đồng) trong mục Tài chính.'});
     if (!special && (((user?.totalSpent||0) < 5000000) || ((user?.trustScore ?? 60) < TRUST_MIN_UNLOCK) || isCancelLocked(user)))
       return res.status(403).json({success:false, message:'Chưa đủ điều kiện dùng Ví Trả Sau (cần ≥5.000.000đ chi tiêu, điểm tin cậy ≥ 50 và không hủy đơn nhiều).'});
-    const limit = special ? Math.max(2000000, getBnplLimit(user?.bnplOnTimePaid||0)) : getBnplLimit(user?.bnplOnTimePaid||0);
+    const limit = special ? Math.max(2000000, getBnplLimit(user?.bnplOnTimePaid||0, user?.bnplLimitLevel)) : getBnplLimit(user?.bnplOnTimePaid||0, user?.bnplLimitLevel);
     if (!limit) return res.status(403).json({success:false,message:'Chưa đủ điều kiện dùng Ví Trả Sau.'});
     const month = getCurrentBillingMonth();
     const txs = await BNPLTx.find({userId:req.session.userId, billingMonth:month, status:{$in:['pending_bill','billed']}});
@@ -6851,7 +6851,7 @@ async function buildUserContext(userId) {
       totalSpent:  user.totalSpent||0,
       loyaltyPts:  user.loyaltyPts||0,
       walletBal:   user.walletBalance||0,
-      bnplLimit:   getBnplLimit(user.bnplOnTimePaid||0),
+      bnplLimit:   getBnplLimit(user.bnplOnTimePaid||0, user.bnplLimitLevel),
       recentOrders: orders,
       recentTx:    wallet,
       unpaidInvoices: bnplElig,
@@ -13796,7 +13796,7 @@ app.post("/api/order", async (req, res) => {
           message: "Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa.",
         });
       }
-      const bnplLimit = bnplSpecial ? Math.max(2000000, getBnplLimit(bnplUser?.bnplOnTimePaid||0)) : getBnplLimit(bnplUser?.bnplOnTimePaid||0);
+      const bnplLimit = bnplSpecial ? Math.max(2000000, getBnplLimit(bnplUser?.bnplOnTimePaid||0, bnplUser?.bnplLimitLevel)) : getBnplLimit(bnplUser?.bnplOnTimePaid||0, bnplUser?.bnplLimitLevel);
       bnplBillingMonth = getCurrentBillingMonth();
       const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplBillingMonth, status:{$in:['pending_bill','billed']} });
       const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
@@ -14294,7 +14294,7 @@ app.post("/api/ride/book", async (req, res) => {
         if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
         return res.status(403).json({ success: false, bnplLocked: true, message: "Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa." });
       }
-      const bnplLimit = bnplSpecial ? Math.max(2000000, getBnplLimit(bnplUser?.bnplOnTimePaid||0)) : getBnplLimit(bnplUser?.bnplOnTimePaid||0);
+      const bnplLimit = bnplSpecial ? Math.max(2000000, getBnplLimit(bnplUser?.bnplOnTimePaid||0, bnplUser?.bnplLimitLevel)) : getBnplLimit(bnplUser?.bnplOnTimePaid||0, bnplUser?.bnplLimitLevel);
       bnplRideMonth = getCurrentBillingMonth();
       const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplRideMonth, status:{$in:['pending_bill','billed']} });
       const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
