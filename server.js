@@ -8803,8 +8803,16 @@ app.patch("/api/partner/profile", async (req, res) => {
     ];
 
     const update = {};
-    if (avatar !== undefined) update.avatar = await uploadImageToCloudinary(avatar, "avatar");
-    if (coverImage !== undefined) update.coverImage = await uploadImageToCloudinary(coverImage, "shop");
+    if (avatar !== undefined) {
+      const v = validateImageSpec(avatar, 'avatar');
+      if (!v.ok) return res.status(400).json({ success: false, message: v.msg });
+      update.avatar = await uploadImageToCloudinary(avatar, "avatar");
+    }
+    if (coverImage !== undefined) {
+      const v = validateImageSpec(coverImage, 'cover');
+      if (!v.ok) return res.status(400).json({ success: false, message: v.msg });
+      update.coverImage = await uploadImageToCloudinary(coverImage, "shop");
+    }
     if (bizName !== undefined) update.bizName = bizName;
     if (description !== undefined) update.description = description;
     if (openTime !== undefined) update.openTime = openTime;
@@ -8948,6 +8956,8 @@ app.patch("/api/shipper/profile", async (req, res) => {
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa xác thực" });
     const { avatar } = req.body;
     if (!avatar) return res.status(400).json({ success: false, message: "Thiếu avatar" });
+    const v = validateImageSpec(avatar, 'avatar');
+    if (!v.ok) return res.status(400).json({ success: false, message: v.msg });
     const avatarUp = await uploadImageToCloudinary(avatar, "avatar");
     const shipper = await Shipper.findByIdAndUpdate(req.session.shipperId, { $set: { avatar: avatarUp } }, { new: true })
       .select("fullName phone avatar vehiclePlate");
@@ -9011,6 +9021,40 @@ async function uploadImageFields(fields, folder = "docs") {
   return Object.fromEntries(entries);
 }
 
+// Helper: validate ảnh avatar/cover theo spec: avatar ≥240x240, cover ≥320x180, ≤15MB (JPG/PNG)
+function validateImageSpec(data, kind) {
+  if (!data || !data.startsWith('data:image')) return { ok: false, msg: 'Dữ liệu ảnh không hợp lệ (chỉ JPG/PNG)' };
+  const isJpg = data.startsWith('data:image/jpeg') || data.startsWith('data:image/jpg');
+  const isPng = data.startsWith('data:image/png');
+  if (!isJpg && !isPng) return { ok: false, msg: 'Chỉ chấp nhận JPG, PNG' };
+  if (Buffer.byteLength(data, 'utf8') > 15 * 1024 * 1024) return { ok: false, msg: 'Dung lượng tối đa 15MB' };
+  try {
+    const b64 = data.split(',')[1] || '';
+    const buf = Buffer.from(b64, 'base64');
+    let w = 0, h = 0;
+    if (isPng && buf.length > 24 && buf[0]===0x89 && buf[1]===0x50) {
+      w = buf.readUInt32BE(16); h = buf.readUInt32BE(20);
+    } else if (isJpg && buf.length > 4) {
+      // JPEG SOF0/SOF2 scan
+      let i = 2;
+      while (i < buf.length - 9) {
+        if (buf[i] !== 0xFF) break;
+        const marker = buf[i+1];
+        const len = buf.readUInt16BE(i+2);
+        if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+          h = buf.readUInt16BE(i+5); w = buf.readUInt16BE(i+7); break;
+        }
+        i += 2 + len;
+      }
+    }
+    if (w && h) {
+      if (kind === 'avatar' && (w < 240 || h < 240)) return { ok: false, msg: `Ảnh đại diện tối thiểu 240x240 (hiện ${w}x${h})` };
+      if (kind === 'cover' && (w < 320 || h < 180)) return { ok: false, msg: `Ảnh bìa tối thiểu 320x180 (hiện ${w}x${h})` };
+    }
+  } catch (_) {}
+  return { ok: true };
+}
+
 // POST /api/upload/image — Upload ảnh chung (partner/shipper, authenticated)
 // Body: { data: "data:image/...", folder: "menu"|"shop"|"avatar" }
 app.post("/api/upload/image", async (req, res) => {
@@ -9018,8 +9062,11 @@ app.post("/api/upload/image", async (req, res) => {
     const { data, folder = "misc" } = req.body;
     if (!data || !data.startsWith('data:image'))
       return res.status(400).json({ success: false, message: "Dữ liệu ảnh không hợp lệ" });
-    if (Buffer.byteLength(data, 'utf8') > 8 * 1024 * 1024)
-      return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 8MB)" });
+    const kind = folder === 'avatar' ? 'avatar' : folder === 'shop' || folder === 'cover' ? 'cover' : null;
+    const spec = validateImageSpec(data, kind);
+    if (!spec.ok) return res.status(400).json({ success: false, message: spec.msg });
+    if (Buffer.byteLength(data, 'utf8') > 15 * 1024 * 1024)
+      return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 15MB)" });
 
     const url = await uploadImageToCloudinary(data, folder);
     if (!url || url === data) throw new Error("Chưa cấu hình Cloudinary hoặc upload thất bại");
