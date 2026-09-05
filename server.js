@@ -5139,8 +5139,10 @@ app.get("/api/bnpl/eligibility", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session.userId) return res.status(401).json({ success:false });
-    const user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified creditBnplEnabled creditLoanEnabled trustScore cancelCount bnplOnTimePaid bnplLateCount bnplActivationStatus bnplLimitLevel bnplLastReviewAt');
+    let user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified creditBnplEnabled creditLoanEnabled trustScore cancelCount bnplOnTimePaid bnplLateCount bnplActivationStatus bnplLimitLevel bnplLastReviewAt bnplLocked bnplLockedReason');
     if (!user) return res.status(404).json({ success:false });
+    // Đồng bộ khóa vĩnh viễn nếu quá hạn >1h (cả thường + trả góp) — áp dụng ngay khi check eligibility
+    if(!user.bnplLocked){ const didLock = await enforcePermanentLockForUser(req.session.userId); if(didLock){ user = await User.findById(req.session.userId).select('totalSpent totalOrders isAdmin googleId emailVerified creditBnplEnabled creditLoanEnabled trustScore cancelCount bnplOnTimePaid bnplLateCount bnplActivationStatus bnplLimitLevel bnplLastReviewAt bnplLocked bnplLockedReason'); } }
     const idn = identitySummary(user);
     // Đặc quyền: admin hoặc user được admin "Kích BNPL" (bypass) bỏ qua mọi cổng chặn
     const special = user.isAdmin || user.creditBnplEnabled;
@@ -5221,7 +5223,11 @@ app.post("/api/bnpl/use", async (req,res) => {
     const amt = Number(amount);
     if (!amt||amt<=0) return res.status(400).json({success:false,message:'Số tiền không hợp lệ'});
     const fee = bnplFeeOf(amt);
-    const user = await User.findById(req.session.userId).select('totalSpent creditBnplEnabled isAdmin trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt');
+    const user = await User.findById(req.session.userId).select('totalSpent creditBnplEnabled isAdmin trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt bnplLocked');
+    // Đồng bộ khóa vĩnh viễn nếu trễ >1h trước khi cho dùng BNPL
+    await enforcePermanentLockForUser(req.session.userId);
+    const freshU = await User.findById(req.session.userId).select('bnplLocked bnplLockedReason');
+    if(freshU?.bnplLocked) return res.status(403).json({success:false, bnplLocked:true, permanent:true, message:'Ví Trả Sau đã bị khóa vĩnh viễn vì trễ thanh toán quá 1 giờ sau hạn. Vui lòng liên hệ hỗ trợ.'});
     // KHÓA: còn hóa đơn quá hạn → chặn mọi giao dịch trả sau
     if (await hasOverdueBnpl(req.session.userId))
       return res.status(403).json({success:false, bnplLocked:true, message:'Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn. Vui lòng thanh toán để mở khóa.'});
@@ -5397,6 +5403,7 @@ app.patch("/api/admin/bnpl/limit/:userId", adminAuth, async (req,res)=>{
 app.get("/api/bnpl/summary", async (req,res) => {
   try {
     if (!req.session.userId) return res.status(401).json({success:false});
+    await enforcePermanentLockForUser(req.session.userId); // khóa vĩnh viễn nếu trễ >1h
     const month = getCurrentBillingMonth();
     // Tự động chốt bill nếu có pending mà chưa có invoice CHƯA TRẢ (issued/overdue/installment)
     // FIX: trước đây tìm bất kỳ invoice (kể cả đã paid) nên khi tháng đã có invoice paid,
@@ -5605,6 +5612,74 @@ setInterval(async()=>{
     await BNPLInvoice.updateMany({status:'issued',dueDate:{$lt:new Date()}},{$set:{status:'overdue'}});
   } catch(e){}
 }, 6*60*60*1000);
+
+// ── BNPL: khóa VĨNH VIỄN vì lý do bảo mật nếu trễ >1h sau dueDate (cả hóa đơn thường + kỳ trả góp) ──
+const BNPL_PERMANENT_LOCK_GRACE_MS = 60 * 60 * 1000; // 1 giờ
+async function enforcePermanentBnplLock(){
+  try{
+    const now = new Date();
+    const grace = BNPL_PERMANENT_LOCK_GRACE_MS;
+    // Lấy các hóa đơn chưa trả (issued/overdue/installment) — check termDue + 1h
+    const cands = await BNPLInvoice.find({ status: { $in: ['issued','overdue','installment'] } }).lean();
+    const toLock = new Map(); // userId -> inv
+    for(const inv of cands){
+      let termDue = null;
+      if(inv.status === 'installment' && inv.isInstallment){
+        termDue = getTermDueDate(inv);
+      } else {
+        termDue = inv.dueDate;
+      }
+      if(!termDue) continue;
+      const due = new Date(termDue);
+      if(now - due >= grace){
+        const uid = String(inv.userId);
+        if(!toLock.has(uid)) toLock.set(uid, inv);
+      }
+    }
+    for(const [uid, inv] of toLock){
+      const user = await User.findById(uid).select('bnplLocked bnplLockedReason').lean();
+      if(!user || user.bnplLocked) continue;
+      const reason = 'Bảo mật - Trễ thanh toán quá 1 giờ sau hạn';
+      await User.findByIdAndUpdate(uid, { bnplLocked: true, bnplLockedReason: reason, bnplLockedAt: now });
+      try{
+        await Notification.create({
+          ownerType: 'user', ownerId: uid,
+          type: 'system', title: '🔒 Ví Trả Sau đã bị khóa vĩnh viễn',
+          body: `Ví Trả Sau của bạn đã bị khóa vĩnh viễn vì trễ thanh toán hóa đơn #${String(inv._id).slice(-6)} quá 1 giờ sau hạn (${new Date(inv.dueDate).toLocaleString('vi-VN')}). Vui lòng liên hệ hỗ trợ nếu cần khiếu nại.`,
+          ref: 'bnpl_permanent_locked'
+        });
+      }catch(_){}
+      try{ global._io?.to(`customer_${uid}`).emit('bnplLocked', { locked:true, reason, permanent:true }); }catch(_){}
+      console.log(`[BNPL PermanentLock] User ${uid} khóa vĩnh viễn do trễ hóa đơn ${inv._id} quá 1h`);
+    }
+  }catch(e){ console.error('[BNPL PermanentLock] error', e.message); }
+}
+// Helper cho 1 user: kiểm tra đồng bộ trước khi trả về eligibility/summary (để khóa ngay sau 1h, không đợi cron 5p)
+async function enforcePermanentLockForUser(userId){
+  try{
+    const now = new Date();
+    const grace = BNPL_PERMANENT_LOCK_GRACE_MS;
+    const user = await User.findById(userId).select('bnplLocked').lean();
+    if(!user || user.bnplLocked) return false;
+    const invs = await BNPLInvoice.find({ userId, status: { $in: ['issued','overdue','installment'] } }).lean();
+    for(const inv of invs){
+      const termDue = (inv.status === 'installment' && inv.isInstallment) ? getTermDueDate(inv) : inv.dueDate;
+      if(!termDue) continue;
+      if(now - new Date(termDue) >= grace){
+        const reason = 'Bảo mật - Trễ thanh toán quá 1 giờ sau hạn';
+        await User.findByIdAndUpdate(userId, { bnplLocked: true, bnplLockedReason: reason, bnplLockedAt: now });
+        try{ await Notification.create({ ownerType:'user', ownerId:userId, type:'system', title:'🔒 Ví Trả Sau đã bị khóa vĩnh viễn', body:`Ví Trả Sau bị khóa vĩnh viễn vì trễ hóa đơn #${String(inv._id).slice(-6)} quá 1 giờ sau hạn.`, ref:'bnpl_permanent_locked' }); }catch(_){}
+        try{ global._io?.to(`customer_${userId}`).emit('bnplLocked', { locked:true, reason, permanent:true }); }catch(_){}
+        console.log(`[BNPL PermanentLock][sync] User ${userId} khóa vĩnh viễn`);
+        return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+// Chạy định kỳ mỗi 5 phút + chạy ngay sau khi server sẵn sàng
+setInterval(enforcePermanentBnplLock, 5*60*1000);
+setTimeout(enforcePermanentBnplLock, 30*1000);
 
 // POST /api/bnpl/invoice/:id/pay — khách tự trả hoá đơn bằng ví CRABOR | SePay QR | PayOS
 app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
