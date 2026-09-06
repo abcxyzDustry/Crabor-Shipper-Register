@@ -2335,8 +2335,8 @@ app.post("/api/shipper/fee/payos/create", async (req, res) => {
       orderCode,
       amount,
       description: desc,
-      returnUrl: process.env.PAYOS_RETURN_URL || "https://crabor-shipper-register.onrender.com/payment-success",
-      cancelUrl: process.env.PAYOS_CANCEL_URL || "https://crabor-shipper-register.onrender.com/payment-cancel",
+      returnUrl: process.env.PAYOS_RETURN_URL || "https://crabor.asia/payment-success",
+      cancelUrl: process.env.PAYOS_CANCEL_URL || "https://crabor.asia/payment-cancel",
     };
     let link;
     if (typeof payOS.paymentRequests?.create === 'function') link = await payOS.paymentRequests.create(paymentData);
@@ -5755,8 +5755,8 @@ app.post("/api/bnpl/invoice/:id/pay", async (req,res) => {
       orderCode,
       amount: Math.round(dueNow),
       description: ('BNPL ' + inv._id.toString().slice(-6)).replace(/[^a-zA-Z0-9 ]/g,'').slice(0,25),
-      returnUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/success`,
-      cancelUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/cancel`,
+      returnUrl: `${process.env.BASE_URL || "https://crabor.asia"}/payment/success`,
+      cancelUrl: `${process.env.BASE_URL || "https://crabor.asia"}/payment/cancel`,
       items: [{ name: 'Hoa don tra sau CRABOR'.slice(0,40), quantity:1, price: Math.round(dueNow) }],
     };
     let paymentLink;
@@ -8040,7 +8040,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     const expiry  = Date.now() + 3600000; // 1h
     await User.findByIdAndUpdate(user._id, { resetToken:token, resetExpiry:expiry });
 
-    const resetUrl = (process.env.BASE_URL || "https://crabor-shipper-register.onrender.com")
+    const resetUrl = (process.env.BASE_URL || "https://crabor.asia")
       + "/reset-password?token=" + token;
 
     const transporter = createEmailTransporter();
@@ -12096,8 +12096,8 @@ app.post("/api/payment/payos/create", async (req, res) => {
       orderCode,
       amount:      Math.round(amount),
       description: (description || "").replace(/[^a-zA-Z0-9 ]/g,"").slice(0, 25) || "Thanh toan", // PayOS giới hạn 25 ký tự
-      returnUrl:   returnUrl  || `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/success?orderId=${orderId}`,
-      cancelUrl:   cancelUrl  || `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/cancel?orderId=${orderId}`,
+      returnUrl:   returnUrl  || `${process.env.BASE_URL || "https://crabor.asia"}/payment/success?orderId=${orderId}`,
+      cancelUrl:   cancelUrl  || `${process.env.BASE_URL || "https://crabor.asia"}/payment/cancel?orderId=${orderId}`,
       // PayOS bắt buộc có items — fallback nếu client không gửi
       items:       (Array.isArray(items) && items.length > 0)
                     ? items
@@ -15423,8 +15423,8 @@ app.post("/api/shipper/cash-settlement/payos/create", async (req, res) => {
     const paymentData = {
       orderCode, amount: payAmount, description,
       items: [{ name: "Chuyển tiền mặt về công ty", quantity: 1, price: payAmount }],
-      returnUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/success?type=cash_settlement`,
-      cancelUrl: `${process.env.BASE_URL || "https://crabor-shipper-register.onrender.com"}/payment/cancel`,
+      returnUrl: `${process.env.BASE_URL || "https://crabor.asia"}/payment/success?type=cash_settlement`,
+      cancelUrl: `${process.env.BASE_URL || "https://crabor.asia"}/payment/cancel`,
     };
     let link;
     if (typeof payOS.paymentRequests?.create === 'function') link = await payOS.paymentRequests.create(paymentData);
@@ -16891,8 +16891,8 @@ app.post("/api/partner/fee/prepare", async (req, res) => {
       orderCode,
       amount,
       description: `Phi DV CRABOR`,
-      returnUrl: `${process.env.BASE_URL || 'https://crabor-shipper-register.onrender.com'}/payment/success`,
-      cancelUrl:  `${process.env.BASE_URL || 'https://crabor-shipper-register.onrender.com'}/payment/cancel`,
+      returnUrl: `${process.env.BASE_URL || 'https://crabor.asia'}/payment/success`,
+      cancelUrl:  `${process.env.BASE_URL || 'https://crabor.asia'}/payment/cancel`,
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });

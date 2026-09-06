@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://crabor-shipper-register.onrender.com/sitemap.xml
+Sitemap: https://crabor.asia/sitemap.xml
