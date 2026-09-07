@@ -5081,6 +5081,85 @@ app.get("/api/wallet/shipper", async (req, res) => {
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
+// ── NGÂN HÀNG: VietQR lookup ──
+let _bankCache = null;
+let _bankCacheAt = 0;
+async function fetchVietQRBanks(){
+  if(_bankCache && Date.now() - _bankCacheAt < 24*60*60*1000) return _bankCache;
+  try{
+    const r = await axios.get('https://api.vietqr.io/v2/banks', { timeout: 8000 });
+    const list = r.data?.data || r.data || [];
+    if(Array.isArray(list) && list.length){
+      _bankCache = list; _bankCacheAt = Date.now();
+      return list;
+    }
+  }catch(e){ console.warn('[VietQR banks] fetch failed', e.message); }
+  return _bankCache || [];
+}
+// GET /api/banks — danh sách ngân hàng VN (proxy VietQR)
+app.get("/api/banks", async (req,res)=>{
+  try{
+    const banks = await fetchVietQRBanks();
+    if(banks.length) return res.json({ success:true, data: banks });
+    // fallback cứng nếu VietQR lỗi
+    res.json({ success:true, data:[
+      {id:970436,name:'Vietcombank',code:'VCB',bin:'970436',shortName:'Vietcombank'},
+      {id:970422,name:'MB Bank',code:'MB',bin:'970422',shortName:'MB'},
+      {id:970407,name:'Techcombank',code:'TCB',bin:'970407',shortName:'Techcombank'},
+      {id:970405,name:'Agribank',code:'AGB',bin:'970405',shortName:'Agribank'},
+      {id:970418,name:'BIDV',code:'BIDV',bin:'970418',shortName:'BIDV'},
+      {id:970415,name:'VietinBank',code:'CTG',bin:'970415',shortName:'VietinBank'},
+      {id:970423,name:'TPBank',code:'TPB',bin:'970423',shortName:'TPBank'},
+      {id:970432,name:'VPBank',code:'VPB',bin:'970432',shortName:'VPBank'},
+      {id:970441,name:'VIB',code:'VIB',bin:'970441',shortName:'VIB'},
+      {id:970443,name:'SHB',code:'SHB',bin:'970443',shortName:'SHB'},
+      {id:970440,name:'HDBank',code:'HDB',bin:'970440',shortName:'HDBank'},
+      {id:970448,name:'OCB',code:'OCB',bin:'970448',shortName:'OCB'},
+      {id:970437,name:'SCB',code:'SCB',bin:'970437',shortName:'SCB'},
+      {id:970421,name:'VIB',code:'VIB',bin:'970441',shortName:'VIB'},
+      {id:970458,name:'KienLongBank',code:'KLB',bin:'970458',shortName:'KienLongBank'},
+    ]});
+  }catch(e){ res.status(500).json({success:false, message:e.message}); }
+});
+// POST /api/bank/lookup — tra cứu tên chủ TK (VietQR)
+app.post("/api/bank/lookup", async (req,res)=>{
+  try{
+    const { bankBin, bankCode, accountNo, bankName } = req.body;
+    const acc = String(accountNo||'').replace(/\s/g,'').trim();
+    if(!acc || acc.length < 6 || acc.length > 20) return res.status(400).json({success:false, message:'Số tài khoản 6-20 số'});
+    let bin = String(bankBin||'').trim();
+    if(!bin && bankCode){
+      const banks = await fetchVietQRBanks();
+      const f = banks.find(b=> b.code===bankCode || b.bin===bankCode || b.shortName?.toLowerCase()===String(bankCode).toLowerCase() || b.name?.toLowerCase()===String(bankCode).toLowerCase());
+      if(f) bin = f.bin;
+    }
+    if(!bin && bankName){
+      const banks = await fetchVietQRBanks();
+      const f = banks.find(b=> b.name?.toLowerCase().includes(String(bankName).toLowerCase()) || b.shortName?.toLowerCase()===String(bankName).toLowerCase());
+      if(f) bin = f.bin;
+    }
+    if(!bin) return res.status(400).json({success:false, message:'Thiếu mã ngân hàng (BIN). Chọn ngân hàng từ danh sách'});
+    // Gọi VietQR lookup nếu có key, không thì trả về cần nhập tay
+    const clientId = process.env.VIETQR_CLIENT_ID || '';
+    const apiKey   = process.env.VIETQR_API_KEY || '';
+    if(!clientId || !apiKey){
+      return res.json({ success:true, verified:false, accountName:'', message:'Chưa cấu hình VietQR API Key — vui lòng nhập tên chủ TK thủ công. Liên hệ admin để cấu hình VIETQR_CLIENT_ID/VIETQR_API_KEY để tra cứu tự động.' });
+    }
+    const r = await axios.post('https://api.vietqr.io/v2/lookup', { bank: bin, accountNumber: acc }, {
+      headers:{ 'x-client-id': clientId, 'x-api-key': apiKey, 'Content-Type':'application/json' }, timeout: 12000
+    });
+    const data = r.data?.data;
+    if(r.data?.code === '00' && data?.accountName){
+      return res.json({ success:true, verified:true, accountName: String(data.accountName).trim().toUpperCase(), bankBin: bin });
+    }
+    return res.status(400).json({ success:false, message: r.data?.desc || r.data?.message || 'Không tìm thấy tài khoản hoặc ngân hàng không hỗ trợ tra cứu' });
+  }catch(e){
+    const msg = e.response?.data?.desc || e.response?.data?.message || e.message;
+    console.warn('[bank/lookup]', msg);
+    res.status(500).json({success:false, message: 'Lỗi tra cứu: '+msg});
+  }
+});
+
 // POST /api/wallet/withdraw — rút tiền (200k–50tr)
 app.post("/api/wallet/withdraw", async (req, res) => {
   try {
