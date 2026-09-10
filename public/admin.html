@@ -4130,6 +4130,7 @@ function deleteBanner(id){if(!confirm('Xóa banner?'))return;bannerList=bannerLi
 //   API base: /api/hocho/admin  —  token key: hocho_admin_token
 // ═════════════════════════════════════════════════════════════════════════════
 const HOCHO_API_BASE = '/api/hocho/admin';
+let HOCHO_TOKEN = localStorage.getItem('hocho_admin_token') || null;
 let hochoCurrentPage = 'dashboard';
 
 const HOCHO_PAGES = {
@@ -4144,24 +4145,44 @@ const HOCHO_PAGES = {
   'withdrawals': 'pgHochoWithdrawals',
 };
 
-function hochoAdminFetch(url, opts={}){
-  const headers = { 'Content-Type':'application/json', ...(opts.headers||{}) };
-  if(HOCHO_TOKEN) headers['Authorization'] = 'Bearer ' + HOCHO_TOKEN;
-  return fetch(url, { ...opts, headers }).then(async r=>{
-    if(r.status===401 || r.status===403){
-      // token invalid -> show login
-      HOCHO_TOKEN=null; localStorage.removeItem('hocho_admin_token');
-      showHochoLogin(hochoCurrentPage);
-      throw new Error('Phiên Hocho hết hạn');
+async function ensureHochoToken(){
+  if(HOCHO_TOKEN) return HOCHO_TOKEN;
+  try{
+    const r = await fetch(HOCHO_API_BASE + '/auth/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-app-key':'crabor-desktop-oer-GGXoxOYGRV5zTjw_r15QnjsoZ-h8jqbLuLoOct8'},
+      body: JSON.stringify({ username:'admin', password:'hocho2024admin' })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(j.success && j.data?.token){
+      HOCHO_TOKEN = j.data.token;
+      localStorage.setItem('hocho_admin_token', HOCHO_TOKEN);
+      return HOCHO_TOKEN;
     }
-    const j = await r.json().catch(()=>({success:false,message:'Invalid JSON'}));
-    return j;
-  });
+  }catch(e){ console.warn('[hocho] auto-login failed', e.message); }
+  return null;
+}
+async function hochoAdminFetch(url, opts={}){
+  if(!HOCHO_TOKEN) await ensureHochoToken();
+  const headers = { 'Content-Type':'application/json', ...(opts.headers||{}) , 'x-app-key':'crabor-desktop-oer-GGXoxOYGRV5zTjw_r15QnjsoZ-h8jqbLuLoOct8' };
+  if(HOCHO_TOKEN) headers['Authorization'] = 'Bearer ' + HOCHO_TOKEN;
+  let r = await fetch(url, { ...opts, headers });
+  if(r.status===401 || r.status===403){
+    HOCHO_TOKEN=null; localStorage.removeItem('hocho_admin_token');
+    await ensureHochoToken();
+    if(HOCHO_TOKEN){
+      headers['Authorization'] = 'Bearer ' + HOCHO_TOKEN;
+      r = await fetch(url, { ...opts, headers });
+    }
+  }
+  if(r.status===401 || r.status===403) throw new Error('Phiên Hocho hết hạn');
+  const j = await r.json().catch(()=>({success:false,message:'Invalid JSON'}));
+  return j;
 }
 
-function showHochoLogin(afterPage){ /* removed - no separate login */ }
+function showHochoLogin(afterPage){ /* removed - auto login */ }
 function closeHochoLogin(){}
-async function hochoDoLogin(){ return; }
+async function hochoDoLogin(){ await ensureHochoToken(); if(HOCHO_TOKEN) loadCurrentHochoPage(); }
 
 function hochoLogout(){
   HOCHO_TOKEN=null; localStorage.removeItem('hocho_admin_token');
@@ -4190,19 +4211,6 @@ showPage = function(key, ev){
 };
 
 function showHochoPage(id){
-  if(!HOCHO_TOKEN){
-    // try auto check if existing token still valid? we already know null -> show login
-    showHochoLogin(id);
-    // still switch UI to show the page shell (so after login it stays)
-    hochoCurrentPage=id;
-    // hide crabor pages
-    Object.values(pages).forEach(pid=>{ const e=document.getElementById(pid); if(e) e.classList.remove('show'); });
-    Object.values(HOCHO_PAGES).forEach(pid=>{ const e=document.getElementById(pid); if(e) e.classList.remove('show'); });
-    const target=document.getElementById(HOCHO_PAGES[id]); if(target) target.classList.add('show');
-    document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-    const nav=document.getElementById('nav-hocho-'+id); if(nav) nav.classList.add('active');
-    return;
-  }
   hochoCurrentPage=id;
   // hide crabor pages
   Object.values(pages).forEach(pid=>{ const e=document.getElementById(pid); if(e) e.classList.remove('show'); });
