@@ -17257,6 +17257,20 @@ try {
     app.use('/api/hocho/cron',     cr.default);
     app.use('/api/hocho/discord',  di.default);
     console.log('[Hocho] ✅ API mounted tại /api/hocho/* (customer/partner/order/chat/admin/upload/chatbot)');
+    // Đảm bảo tài khoản admin Hocho tồn tại (auto-fix lỗi Không tìm thấy tài khoản admin)
+    try{
+      const AdminMod = await import('./hocho/models/Admin.js');
+      const { hashPassword } = await import('./hocho/utils/auth.js');
+      const Admin = AdminMod.default;
+      let adm = await Admin.findOne({ username:'admin' });
+      if(!adm){
+        adm = await Admin.create({ username:'admin', email:'admin@hocho.com', password_hash: await hashPassword('hocho2024admin'), role:'admin', is_active:true });
+        console.log('[Hocho] ✅ Đã tạo admin mặc định admin/hocho2024admin');
+      } else if(!adm.is_active){
+        adm.is_active = true; adm.password_hash = await hashPassword('hocho2024admin'); await adm.save();
+        console.log('[Hocho] ✅ Đã kích hoạt lại admin hocho');
+      }
+    }catch(e){ console.warn('[Hocho] ensure admin failed', e.message); }
   } catch (e) {
     console.error('[Hocho] ❌ mount lỗi:', e.message);
   }
