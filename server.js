@@ -1017,7 +1017,7 @@ const rideDriverSchema = new mongoose.Schema({
   district:     { type: String, trim: true },
   dob:          { type: String, trim: true },
   cccd:         { type: String, trim: true },
-  vehicleType:  { type: String, enum: ["motorbike","car",""], default: "motorbike" },
+  vehicleType:  { type: String, enum: ["motorbike","car","car4","car7",""], default: "motorbike" },
   vehicleBrand: { type: String, trim: true },
   vehiclePlate: { type: String, trim: true, uppercase: true },
   vehicleYear:  { type: Number, min: 1990 },
