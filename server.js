@@ -272,17 +272,15 @@ app.use((req, res, next) => {
 });
 
 // Session (dùng cho app core: customer / shipper / partner interfaces)
-const isProd = process.env.NODE_ENV === 'production';
 app.use(session({
   secret: process.env.SESSION_SECRET || "crabor-session-secret-2025",
-  resave: false,
+  resave: true,
   saveUninitialized: false,
   store: MongoStore.create({ mongoUrl: MONGODB_URI, dbName: 'crabor', collectionName: 'sessions', ttl: 7 * 24 * 60 * 60 }),
-  name: 'crabor.sid',
   cookie: {
-    secure: isProd,          // true trên https (crabor.asia / onrender)
+    secure: false,
     httpOnly: true,
-    sameSite: isProd ? 'none' : 'lax',
+    sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
   }
 }));
