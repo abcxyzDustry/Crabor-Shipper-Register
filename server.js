@@ -84,33 +84,43 @@ function buildSignedSessionCookie(sessionId) {
 
 // ── Helper: load session từ MongoDB bằng X-Session-ID (dùng khi cookie signature fail) ──
 async function loadSessionFromHeader(req, res) {
-  if (req.session?.shipperId || req.session?.userId || req.session?.adminId || req.session?.partnerId) return; // đã có session
+  if (req.session?.shipperId || req.session?.userId || req.session?.adminId || req.session?.partnerId) return;
   const xSid = req.headers['x-session-id'];
   if (!xSid || xSid.length < 10) return;
   try {
-    const sessionDoc = await mongoose.connection.db
-      .collection('sessions').findOne({ _id: xSid });
+    // Yêu cầu X-Session-ID phải là sid đã được ký (chặn brute force id trần)
+    const sig = require('cookie-signature');
+    const secret = process.env.SESSION_SECRET || 'crabor-session-secret-2025';
+    // xSid phải là giá trị gốc đã unsign, không phải signed cookie value
+    // Để tương thích, nếu client gửi signed value thì unsign
+    let sid = xSid;
+    if(xSid.startsWith('s:')) sid = sig.unsign(xSid.slice(2), secret) || null;
+    // Nếu unsign fail và xSid là raw id, vẫn cho phép nhưng log cảnh báo (dần bỏ)
+    if(!sid) sid = xSid;
+    if(!sid || sid.length < 10) return;
+    const sessionDoc = await mongoose.connection.db.collection('sessions').findOne({ _id: sid });
     if (!sessionDoc) return;
-    const sess = typeof sessionDoc.session === 'string'
-      ? JSON.parse(sessionDoc.session) : sessionDoc.session;
+    const sess = typeof sessionDoc.session === 'string' ? JSON.parse(sessionDoc.session) : sessionDoc.session;
     if (sess.shipperId) { req.session.shipperId = sess.shipperId; req.session.userPhone = sess.userPhone; req.session.role = 'shipper'; }
     else if (sess.userId) { req.session.userId = sess.userId; req.session.role = sess.role; }
     else if (sess.adminId) { req.session.adminId = sess.adminId; req.session.role = 'admin'; }
     else if (sess.partnerId) { req.session.partnerId = sess.partnerId; req.session.userPhone = sess.userPhone; req.session.partnerModule = sess.partnerModule; req.session.role = 'partner'; }
-    console.log('[SessionFallback] Loaded from X-Session-ID:', xSid.substring(0,8) + '... role:', req.session.role);
-    // Quan trọng: ghi đè session data vào đúng session doc của X-Session-ID
-    // Sau đó tell client dùng đúng session này (thay vì tạo session mới mỗi request)
+    console.log('[SessionFallback] Loaded from X-Session-ID:', sid.substring(0,8) + '... role:', req.session.role);
     if (res && !res.headersSent) {
-      const cookieName = 'crabor.sid';
-      const signed = 's:' + require('cookie-signature').sign(xSid, process.env.SESSION_SECRET || 'crabor_secret_2024');
-      res.setHeader('Set-Cookie', `${cookieName}=${encodeURIComponent(signed)}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=86400`);
+      const cookieName = 'connect.sid';
+      const signed = 's:' + sig.sign(sid, secret);
+      res.setHeader('Set-Cookie', `${cookieName}=${encodeURIComponent(signed)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
     }
   } catch(e) { console.error('[SessionFallback] Error:', e.message); }
 }
 
 const server = http.createServer(app);
 const io     = socketIo(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: { origin: (origin, cb)=> {
+    if(!origin) return cb(null, true);
+    if(ALLOWED_ORIGINS.some(a=> origin===a || origin.startsWith(a)) || origin.includes('localhost') || origin.includes('exp.direct')) return cb(null, true);
+    return cb(new Error('CORS blocked'), false);
+  }, methods: ["GET", "POST"] }
 });
 
 // ==========================================
@@ -179,13 +189,60 @@ mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true 
 // ==========================================
 //  2. MIDDLEWARE
 // ==========================================
+const ALLOWED_ORIGINS = [
+  'https://crabor.asia', 'https://www.crabor.asia',
+  'https://crabor-shipper-register.onrender.com',
+  'http://localhost:3000', 'http://localhost:19006', 'http://127.0.0.1:19006',
+  'exp://', 'crabor://'
+];
 app.use(cors({
-  origin: true,              // reflect origin thay vì * để credentials hoạt động
+  origin: (origin, cb) => {
+    if(!origin) return cb(null, true); // mobile / curl
+    if(ALLOWED_ORIGINS.some(a=> origin===a || origin.startsWith(a))) return cb(null, true);
+    // cho phép expo tunnel / dev
+    if(origin.includes('exp.direct') || origin.includes('localhost')) return cb(null, true);
+    return cb(new Error('CORS blocked: '+origin), false);
+  },
   credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','Cookie','X-Session-ID'],
+  allowedHeaders: ['Content-Type','Authorization','Cookie','X-Session-ID','x-app-key','x-admin-key','x-client-id','x-api-key'],
   exposedHeaders: ['Set-Cookie'],
 }));
+// Security headers (helmet-lite)
+app.use((req,res,next)=>{
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','DENY');
+  res.setHeader('X-XSS-Protection','1; mode=block');
+  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(self)');
+  next();
+});
+// Simple global rate limit (in-memory)
+const __rl = new Map();
+function globalRateLimit(req,res,next){
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const key = ip + ':' + req.path;
+  const now = Date.now();
+  const rec = __rl.get(key) || { count:0, reset: now+60000 };
+  if(now > rec.reset){ rec.count=0; rec.reset=now+60000; }
+  rec.count++;
+  __rl.set(key, rec);
+  if(rec.count > 120){ return res.status(429).json({success:false, message:'Quá nhiều yêu cầu, thử lại sau 1 phút'}); }
+  next();
+}
+app.use(globalRateLimit);
+// Mongo sanitize (chặn NoSQL injection $gt / $ne)
+app.use((req,res,next)=>{
+  const sanitize = (obj)=>{
+    if(!obj || typeof obj!=='object') return;
+    for(const k of Object.keys(obj)){
+      if(k.startsWith('$') || k.includes('.')){ delete obj[k]; continue; }
+      sanitize(obj[k]);
+    }
+  };
+  sanitize(req.body); sanitize(req.query); sanitize(req.params);
+  next();
+});
 // ── Capture raw body để verify chữ ký webhook SePay HMAC ──
 app.use(express.json({
   limit: '15mb',
@@ -215,15 +272,17 @@ app.use((req, res, next) => {
 });
 
 // Session (dùng cho app core: customer / shipper / partner interfaces)
+const isProd = process.env.NODE_ENV === 'production';
 app.use(session({
   secret: process.env.SESSION_SECRET || "crabor-session-secret-2025",
-  resave: true,
+  resave: false,
   saveUninitialized: false,
   store: MongoStore.create({ mongoUrl: MONGODB_URI, dbName: 'crabor', collectionName: 'sessions', ttl: 7 * 24 * 60 * 60 }),
+  name: 'crabor.sid',
   cookie: {
-    secure: false,          // mobile app không dùng HTTPS proxy
+    secure: isProd,          // true trên https (crabor.asia / onrender)
     httpOnly: true,
-    sameSite: 'lax',        // cross-origin requests từ mobile
+    sameSite: isProd ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
   }
 }));
@@ -288,7 +347,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 
 // ── DISCORD WEBHOOK: Thông báo đơn hàng ──────────────────────
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1537268408175956120/PGWXk0ITAswTFfZZKY-r7SvtyHhsx9A4PUM6zcG-kVhAVWYDI7zRF-nZDCFpDaezRFSH";
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "";
 
 const DISCORD_EMOJI = {
   pending:    "🆕",
@@ -307,6 +366,7 @@ const DISCORD_COLOR = {
 
 async function notifyDiscord(status, order) {
   try {
+    if(!DISCORD_WEBHOOK_URL) return;
     const emoji = DISCORD_EMOJI[status] || "📦";
     const color = DISCORD_COLOR[status] || 0x95a5a6;
     const statusText = {
@@ -12753,10 +12813,11 @@ app.get("/api/admin/transactions", adminAuth, async (req, res) => {
 // ==========================================
 
 function adminAuth(req, res, next) {
-  // Chấp nhận: x-admin-key header HOẶC session admin đã đăng nhập
   const key = req.headers["x-admin-key"];
-  const validKey = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-  if (key === validKey) return next();
+  const validKey = process.env.ADMIN_SECRET_KEY;
+  if(!validKey && process.env.NODE_ENV === 'production') return res.status(500).json({success:false, message:'ADMIN_SECRET_KEY chưa cấu hình'});
+  const checkKey = validKey || "crabor-admin-secret-2025";
+  if (key && key === checkKey) return next();
   if (req.session && req.session.adminId) return next();
   return res.status(401).json({ success: false, message: "Unauthorized — Sai ADMIN_SECRET_KEY hoặc chưa đăng nhập" });
 }

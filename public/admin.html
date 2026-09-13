@@ -2147,6 +2147,9 @@ let _aiBannerHistory = [];
 // ─────────────────────────────────────────────────────────────────────────────
 //   UTILITIES
 // ─────────────────────────────────────────────────────────────────────────────
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(d){ try{ return new Date(d).toLocaleDateString('vi-VN'); }catch{ return ''; } }
+function fmtMoney(n){ return (Number(n)||0).toLocaleString('vi-VN')+'đ'; }
 async function apiFetch(url, method = 'GET', body) {
   const opts = { method, headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY } };
   if (body) opts.body = JSON.stringify(body);
@@ -2512,12 +2515,12 @@ async function loadTable(type, page) {
       if (!r.success) return;
       if(document.getElementById('shipperTotal')) document.getElementById('shipperTotal').textContent = `${r.total} hồ sơ`;
       const tbody = document.getElementById('shipperTbody');
-      if(tbody) tbody.innerHTML = r.data.map(s => `<tr id="row_${s._id}">
-        <td><span style="font-family:var(--font-mono);color:var(--coral)">${s.registerId}</span></td>
-        <td>${s.fullName||'—'}</td>
-        <td><span style="font-family:var(--font-mono)">${s.phone}</span></td>
-        <td>${s.district||'—'}</td>
-        <td>${s.vehicle||'—'}</td>
+      if(tbody) tbody.innerHTML = r.data.map(s => `<tr id="row_${esc(s._id)}">
+        <td><span style="font-family:var(--font-mono);color:var(--coral)">${esc(s.registerId)}</span></td>
+        <td>${esc(s.fullName)||'—'}</td>
+        <td><span style="font-family:var(--font-mono)">${esc(s.phone)}</span></td>
+        <td>${esc(s.district)||'—'}</td>
+        <td>${esc(s.vehicle)||'—'}</td>
         <td><span class="badge ${s.plan==='early_bird'?'delta-new':''}">${s.plan==='early_bird'?'⚡ Early Bird':'Standard'}</span></td>
         <td><span class="badge b-${s.status}">${statusText(s.status)}</span></td>
         <td style="font-family:var(--font-mono);color:var(--muted)">${fmtDate(s.registeredAt)}</td>
@@ -2559,13 +2562,13 @@ async function loadTable(type, page) {
         if (typeKey === 'food_partner') extraInfo = (p.categories||[]).slice(0,2).join(', ') || '—';
         if (typeKey === 'ride_driver') extraInfo = p.vehicleType === 'car' ? '🚗 Ô tô' : p.vehicleType === 'motorbike' ? '🛵 Xe máy' : (p.vehicleType||'—');
         const registeredAt = p.registeredAt || p.createdAt;
-        return `<tr id="row_${p._id}">
-          <td><span style="font-family:var(--font-mono);color:var(--coral)">${p.registerId||'—'}</span></td>
-          <td>${modIcon[typeKey]||'🤝'} ${p.fullName || ((p.lastName||'')+(p.firstName?' '+p.firstName:'')).trim() || '—'}</td>
-          <td>${displayName}</td>
-          <td><span style="font-family:var(--font-mono)">${p.phone}</span></td>
-          <td>${p.district||'—'}</td>
-          <td style="font-size:12px;color:var(--muted)">${extraInfo}</td>
+        return `<tr id="row_${esc(p._id)}">
+          <td><span style="font-family:var(--font-mono);color:var(--coral)">${esc(p.registerId)||'—'}</span></td>
+          <td>${modIcon[typeKey]||'🤝'} ${esc(p.fullName || ((p.lastName||'')+(p.firstName?' '+p.firstName:'')).trim() || '—')}</td>
+          <td>${esc(displayName)}</td>
+          <td><span style="font-family:var(--font-mono)">${esc(p.phone)}</span></td>
+          <td>${esc(p.district)||'—'}</td>
+          <td style="font-size:12px;color:var(--muted)">${esc(extraInfo)}</td>
           <td><span class="badge b-${p.status}">${statusText(p.status)}</span></td>
           <td style="font-family:var(--font-mono);color:var(--muted)">${fmtDate(registeredAt)}</td>
           <td><div style="display:flex;gap:6px;"><button class="act-btn" onclick="viewRecord('${p._id}','${typeKey}')">Xem</button>

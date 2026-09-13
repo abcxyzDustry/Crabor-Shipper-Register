@@ -1,9 +1,15 @@
 node_modules/
 *.log
 .DS_Store
+.env
+.env.*
+!.env.example
 # Visa Developer keys - NEVER COMMIT
 keys/
 *.pem
 *.crt
 visa-test.js
 visa-probe.js
+hocho-reset-admin.js
+check_elig2.js
+db-check.js
