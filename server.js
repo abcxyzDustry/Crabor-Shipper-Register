@@ -14741,7 +14741,15 @@ app.post("/api/ride/:orderId/complete", async (req, res) => {
 
     order.status = "delivered";
     order.deliveredAt = new Date();
-    order.paymentStatus = "paid";
+    // FIX SePay/PayOS: TIỀN VỀ SAU khi hoàn thành chuyến → không được ghi paid ở đây,
+    // nếu không webhook/polling tới sẽ không khớp (chỉ khớp unpaid/pending_review)
+    // và shipper không bao giờ nhận được event sepay_payment_confirmed.
+    const pmComplete = order.paymentMethod || "cash";
+    if (pmComplete === "wallet" || pmComplete === "cash") {
+      order.paymentStatus = "paid";
+    } else {
+      order.paymentStatus = "pending_review"; // chờ SePay/PayOS xác nhận tiền về
+    }
     order.statusHistory.push({ status: "delivered", by: "shipper" });
     // Tích điểm loyalty (1/10 giá trị đơn) — chỉ 1 lần
     order.loyaltyPointsGranted = true;
