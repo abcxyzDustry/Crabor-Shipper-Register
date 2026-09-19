@@ -14281,6 +14281,10 @@ app.patch("/api/orders/:id/status", async (req, res) => {
     const _ak = req.headers["x-admin-key"];
     const _vk = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
     const _isAdm = (_ak === _vk) || !!req.session?.adminId;
+    // Không có role nào (session chết/hết hạn) → 401 để app tự đăng nhập lại,
+    // thay vì 403 gây hiểu lầm "không có quyền"
+    if (!isShipper && !isPartner && !isCustomer && !_isAdm)
+      return res.status(401).json({ success: false, message: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
     if (!allowed[status] && !_isAdm)
       return res.status(403).json({ success: false, message: `Không có quyền set status ${status}` });
 
