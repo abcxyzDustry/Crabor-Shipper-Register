@@ -8930,7 +8930,7 @@ app.patch("/api/partner/profile", async (req, res) => {
   try {
     const phone = req.session.userPhone;
     if (!phone) return res.status(401).json({ success: false, message: "Chưa xác thực" });
-    const { avatar, coverImage, bizName, description, openTime, closeTime } = req.body;
+    const { avatar, coverImage, bizName, description, openTime, closeTime, email } = req.body;
 
     const models = [
       { model: GiatLa, module: "giat_la" },
@@ -8954,6 +8954,12 @@ app.patch("/api/partner/profile", async (req, res) => {
     if (description !== undefined) update.description = description;
     if (openTime !== undefined) update.openTime = openTime;
     if (closeTime !== undefined) update.closeTime = closeTime;
+    if (email !== undefined) {
+      const em = String(email).trim().toLowerCase();
+      if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))
+        return res.status(400).json({ success: false, message: "Email không hợp lệ" });
+      update.email = em;
+    }
 
     if (Object.keys(update).length === 0)
       return res.status(400).json({ success: false, message: "Không có gì để cập nhật" });
@@ -9091,15 +9097,26 @@ app.post("/api/admin/shipper/verify-identity", async (req, res) => {
 app.patch("/api/shipper/profile", async (req, res) => {
   try {
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa xác thực" });
-    const { avatar } = req.body;
-    if (!avatar) return res.status(400).json({ success: false, message: "Thiếu avatar" });
-    const v = validateImageSpec(avatar, 'avatar');
-    if (!v.ok) return res.status(400).json({ success: false, message: v.msg });
-    const avatarUp = await uploadImageToCloudinary(avatar, "avatar");
-    const shipper = await Shipper.findByIdAndUpdate(req.session.shipperId, { $set: { avatar: avatarUp } }, { new: true })
-      .select("fullName phone avatar vehiclePlate");
+    const { avatar, email } = req.body;
+    const update = {};
+    // Email: cho phép cập nhật độc lập (không cần avatar)
+    if (email !== undefined) {
+      const em = String(email).trim().toLowerCase();
+      if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))
+        return res.status(400).json({ success: false, message: "Email không hợp lệ" });
+      update.email = em;
+    }
+    if (avatar) {
+      const v = validateImageSpec(avatar, 'avatar');
+      if (!v.ok) return res.status(400).json({ success: false, message: v.msg });
+      update.avatar = await uploadImageToCloudinary(avatar, "avatar");
+    }
+    if (Object.keys(update).length === 0)
+      return res.status(400).json({ success: false, message: "Không có gì để cập nhật" });
+    const shipper = await Shipper.findByIdAndUpdate(req.session.shipperId, { $set: update }, { new: true })
+      .select("fullName phone email avatar vehiclePlate");
     if (!shipper) return res.status(404).json({ success: false });
-    console.log('[PATCH /shipper/profile] avatar updated for', shipper.phone);
+    console.log('[PATCH /shipper/profile] updated for', shipper.phone, Object.keys(update));
     res.json({ success: true, shipper });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
