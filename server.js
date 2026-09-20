@@ -4077,9 +4077,9 @@ app.post("/api/support/order", async (req, res) => {
     // 1) Tra đơn (nếu khách chọn đơn)
     let orderRef = null;
     if (orderId) {
-      orderRef = await Order.findOne({
-        $or: [{ orderId: String(orderId) }, mongoose.isValidObjectId(orderId) ? { _id: orderId } : null],
-      }).lean();
+      const orConds = [{ orderId: String(orderId) }];
+      if (mongoose.isValidObjectId(orderId)) orConds.push({ _id: orderId });
+      orderRef = await Order.findOne({ $or: orConds }).lean();
     }
 
     // Lưu ticket đơn hàng
