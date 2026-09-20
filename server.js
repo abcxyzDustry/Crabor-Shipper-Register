@@ -1199,6 +1199,9 @@ const supportTicketSchema = new mongoose.Schema({
   status:     { type: String, enum: ['open','in_progress','resolved'], default: 'open' },
   priority:   { type: String, enum: ['low','medium','high','urgent'], default: 'medium' },
   adminNote:  { type: String, trim: true },
+  // Coco AI tự xử lý: phán quyết + cảnh cáo đã gửi
+  aiReply:    { type: String, trim: true },
+  warnings:   { type: Array, default: [] },
   resolvedAt: Date,
 }, { timestamps: true });
 const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
@@ -4093,35 +4096,70 @@ app.post("/api/support/order", async (req, res) => {
       priority: /mất|hỏng|thiu|kém|không|giao sai|muộn|còn|thiếu/i.test(text) ? "urgent" : "high",
     });
 
-    // 2) Coco AI phân tích (backend = Cloudflare, retry 3 lần qua cocoThink)
+    // 2) Coco AI phân tích + PHÁN QUYẾT có cấu trúc (điều khiển auto xử lý bên dưới)
     let aiReply = "";
+    let verdict = { partner: false, shipper: false, severity: 'low', summary: '' };
     try {
       const { cocoThink } = require("./coco-brain");
-      const prompt = `Khách hàng gửi hỗ trợ về đơn hàng (danh mục: ${categoryLabel}).\nNội dung: "${text}"\n\nHãy đánh giá trong 3-5 câu tiếng Việt:\na) Có phàn nàn về QUÁN / đối tác không? (chất lượng kém, đồ thiu, sai món, ít đồ, đồ nguội...)\nb) Có phàn nàn về SHIPPER không? (thái độ tệ, giao chậm, giao sai, làm rơi, mất đồ...)\nc) đề xuất hướng xử lý phù hợp cho CRABOR. Nếu không phải khiếu nại ai thì xác nhận đã ghi nhận.`;
+      const prompt = `Khách hàng gửi hỗ trợ về đơn hàng (danh mục: ${categoryLabel}).\nNội dung: "${text}"\n\nTrả lời 2 phần:\nPHAN_QUYET_JSON: {"partner": true/false (có phàn nàn về QUÁN/đối tác: chất lượng kém, đồ thiu, sai món, ít đồ...), "shipper": true/false (có phàn nàn về SHIPPER/tài xế: thái độ, giao chậm, giao sai, mất đồ...), "severity": "low|medium|high" (mức độ nghiêm trọng), "summary": "1 câu tóm tắt"}\nTRA_LOI_KHACH: 3-5 câu tiếng Việt: đánh giá khiếu nại + đề xuất hướng xử lý. Nếu không phải khiếu nại ai thì xác nhận đã ghi nhận.`;
       const r = await cocoThink([{ role: "user", content: prompt }], {
-        task: "complaint", backend: "cloudflare", temperature: 0.4, maxTokens: 450,
+        task: "complaint", backend: "cloudflare", temperature: 0.3, maxTokens: 550,
       });
-      aiReply = (r && r.text) ? String(r.text).trim() : "";
+      const full = (r && r.text) ? String(r.text).trim() : "";
+      const jm = full.match(/\{[\s\S]*?"partner"[\s\S]*?\}/);
+      if (jm) {
+        try {
+          const v = JSON.parse(jm[0]);
+          verdict.partner = !!v.partner;
+          verdict.shipper = !!v.shipper;
+          if (['low','medium','high'].includes(v.severity)) verdict.severity = v.severity;
+          if (v.summary) verdict.summary = String(v.summary).slice(0, 200);
+        } catch (_) {}
+      }
+      const replyPart = full.split(/TRA_LOI_KHACH\s*:/i)[1] || full.replace(/PHAN_QUYET_JSON\s*:[\s\S]*?(?=TRA_LOI_KHACH|$)/i, '');
+      aiReply = replyPart.trim();
     } catch (e) { console.warn("[Support Order] cocoThink:", e.message); }
     if (!aiReply) aiReply = `Coco đã ghi nhận hỗ trợ thuộc danh mục "${categoryLabel}". Đội ngũ CRABOR sẽ phản hồi trong 1-2 giờ.`;
 
-    // 3) Xác định đối tượng bị khiếu nại
+    // 3) Xác định đối tượng bị khiếu nại: verdict của Coco là chính, regex là fallback
     const textLower = text.toLowerCase();
     const COMPLAINT_PARTNER_RE = /quán|nhà hàng|tiệm|partner|chất lượng|thiu|hỏng|sai món|ít đồ|đồ nguội|khai vị|giá chênh|không ngon|dở/;
     const COMPLAINT_SHIPPER_RE = /shipper|tài xế|giao chậm|giao sai|mất đồ|làm rơi|thái độ|quẳng|vứt|nói khó|điện thoại không nghe/;
-    const complaintPartner = COMPLAINT_PARTNER_RE.test(textLower);
-    const complaintShipper = COMPLAINT_SHIPPER_RE.test(textLower);
+    const complaintPartner = verdict.partner || COMPLAINT_PARTNER_RE.test(textLower);
+    const complaintShipper = verdict.shipper || COMPLAINT_SHIPPER_RE.test(textLower);
     const warnings = [];
     const cleanCode = (s) => String(s || "").replace(/[^\w@.\-]/g, "").trim();
 
-    // ── Cảnh cáo PARTNER ──
+    // ── Tìm partner mọi module (đồ ăn / giặt là / giúp việc / china shop) ──
+    const PARTNER_MODELS = [
+      { model: FoodPartner, label: 'Nhà hàng' },
+      ...(typeof GiatLa !== 'undefined' ? [{ model: GiatLa, label: 'Giặt là' }] : []),
+      ...(typeof GiupViec !== 'undefined' ? [{ model: GiupViec, label: 'Giúp việc' }] : []),
+      ...(typeof ChinaShop !== 'undefined' ? [{ model: ChinaShop, label: 'China Shop' }] : []),
+    ].filter(x => x.model);
+    async function findPartnerAny(idOrCode, phone) {
+      for (const { model } of PARTNER_MODELS) {
+        try {
+          let p = null;
+          if (idOrCode && mongoose.isValidObjectId(idOrCode)) p = await model.findById(idOrCode).lean();
+          if (!p && idOrCode) {
+            const c = new RegExp(`^${cleanCode(idOrCode)}$`, 'i');
+            p = await model.findOne({ $or: [{ registerId: c }, { phone: c }] }).lean();
+          }
+          if (!p && phone) p = await model.findOne({ phone: String(phone).trim() }).lean();
+          if (p) return p;
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    // ── Cảnh cáo PARTNER (mọi module) ──
     if (complaintPartner) {
       let partnerTarget = null;
-      if (orderRef?.partnerId) partnerTarget = await FoodPartner.findById(orderRef.partnerId).lean();
-      if (!partnerTarget && partnerCode) {
-        const c = new RegExp(`^${cleanCode(partnerCode)}$`, 'i');
-        partnerTarget = await FoodPartner.findOne({ $or: [{ registerId: c }, { phone: c }] }).lean();
+      if (orderRef?.partnerId) {
+        try { partnerTarget = await findPartnerAny(String(orderRef.partnerId)); } catch (_) {}
       }
+      if (!partnerTarget && partnerCode) partnerTarget = await findPartnerAny(partnerCode);
       if (partnerTarget) {
         await notifyUser("partner", partnerTarget._id, {
           type: "warning",
@@ -4130,7 +4168,7 @@ app.post("/api/support/order", async (req, res) => {
           ref: orderRef?.orderId || "",
           refModule: String(orderRef?.module || categoryLabel),
         });
-        warnings.push({ target: "partner", name: partnerTarget.bizName, code: partnerTarget.registerId, _id: partnerTarget._id });
+        warnings.push({ target: "partner", name: partnerTarget.bizName || partnerTarget.fullName, code: partnerTarget.registerId, _id: partnerTarget._id });
       } else {
         warnings.push({ target: "partner", name: partnerCode || "đối tác (không tìm thấy mã)", code: partnerCode || "", unresolved: true });
       }
@@ -4159,13 +4197,35 @@ app.post("/api/support/order", async (req, res) => {
     }
 
     req.io && req.io.to("admin").emit("newSupportTicket", {
-      id: ticket._id, type: "order", role: "customer", message: `[${categoryLabel}] ${text.slice(0, 80)}`, priority: ticket.priority,
+      id: ticket._id, type: "order_issue", role: "customer", message: `[${categoryLabel}] ${text.slice(0, 80)}`, priority: ticket.priority,
     });
 
+    // 4) Coco AUTO XỬ LÝ ticket: lưu phán quyết + cảnh cáo, tự chuyển trạng thái
     const reply = buildSupportAiReply(aiReply, warnings);
+    const autoNote = `Coco auto: ${verdict.summary || categoryLabel} (partner:${verdict.partner?'có':'không'}, shipper:${verdict.shipper?'có':'không'}, mức:${verdict.severity})`
+      + (warnings.length ? ` → đã cảnh cáo ${warnings.filter(w=>!w.unresolved).length}/${warnings.length}` : ' → không có khiếu nại cụ thể');
+    const autoStatus = warnings.some(w => !w.unresolved) ? "in_progress" : "resolved";
+    const autoPriority = verdict.severity === 'high' ? 'urgent' : ticket.priority;
+    await SupportTicket.findByIdAndUpdate(ticket._id, {
+      aiReply: reply, warnings,
+      status: autoStatus, priority: autoPriority, adminNote: autoNote,
+      ...(autoStatus === "resolved" ? { resolvedAt: new Date() } : {}),
+    }).catch(e => console.warn('[Support Order] auto-update:', e.message));
+
+    // Báo cho khách ngay trong app
+    if (req.session?.userId) {
+      await notifyUser('user', req.session.userId, {
+        type: 'support', title: warnings.length ? '⚖️ Coco đã xử lý khiếu nại' : '✅ Đã ghi nhận hỗ trợ',
+        body: (verdict.summary ? verdict.summary + '. ' : '') +
+          (warnings.length ? `Đã gửi cảnh cáo tới ${warnings.filter(w=>!w.unresolved).length} tài khoản liên quan.` : 'Cảm ơn phản hồi của bạn.'),
+        ref: orderRef?.orderId || String(ticket._id), refModule: 'support',
+      }).catch(() => {});
+    }
+
     res.json({
       success: true, ticketId: ticket._id, aiReply: reply, warnings,
-      message: "Đã gửi hỗ trợ. " + (warnings.length ? `Đã gửi cảnh cáo tới ${warnings.length} tài khoản liên quan.` : ""),
+      autoStatus,
+      message: "Đã gửi hỗ trợ. " + (warnings.length ? `Coco đã tự gửi cảnh cáo tới ${warnings.filter(w=>!w.unresolved).length} tài khoản liên quan.` : "Coco đã ghi nhận, CS 24/7 sẽ theo dõi."),
     });
   } catch (err) {
     console.error("[Support Order]", err.message);
