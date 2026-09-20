@@ -64,17 +64,15 @@ const { DispatchAI, PricingAI, FraudAI, GrowthAI, LearningEngine, AutoApproveAI,
 const app    = express();
 
 // ── Helper: build signed session cookie (đúng format express-session) ──────
-// express-session dùng cookie-signature: s:<id>.<base64url(hmac-sha256(id,secret))>
-// Thiếu signature → server reject cookie → 401 ngay sau login
+// express-session verify bằng cookie-signature.unsign trên sid KHÔNG prefix:
+//   unsign('s:<sid>.<mac>') → HMAC(secret, '<sid>')
+// → phải ký đúng bằng lib, KHÔNG tự HMAC('s:'+sid) (sai này làm mọi cookie
+// login tạo ra đều bị reject → client rớt phiên liên tục).
 function buildSignedSessionCookie(sessionId) {
   try {
-    const crypto = require('crypto');
+    const sig = require('cookie-signature');
     const secret = process.env.SESSION_SECRET || 'crabor-session-secret-2025';
-    // FIX: phải hash 's:' + sessionId (đúng theo cookie-signature module)
-    // Sai cũ: hmac(sessionId) → signature không khớp → session bị reject → 401
-    const val = 's:' + sessionId;
-    const sig = crypto.createHmac('sha256', secret).update(val).digest('base64').replace(/=+$/g, '');
-    const signed = val + '.' + sig;
+    const signed = 's:' + sig.sign(sessionId, secret);
     return 'connect.sid=' + encodeURIComponent(signed);
   } catch(e) {
     console.error('[buildSignedSessionCookie] Error:', e);
@@ -251,22 +249,32 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // ── Middleware: mobile client gửi X-Session-ID header → inject vào cookie ──
-// Giải pháp bền vững: không phụ thuộc vào client tự build signed cookie
+// Dùng cookie-signature lib (khớp express-session). Nếu cookie hiện tại CHỮ KÝ
+// SAI (cookie cũ build tay) mà có X-Session-ID → thay bằng cookie ký đúng để
+// tự hồi phục phiên, khỏi bắt user đăng nhập lại.
 app.use((req, res, next) => {
-  const xSessionId = req.headers['x-session-id'];
-  if (xSessionId && xSessionId.length > 10 && !req.headers.cookie?.includes('connect.sid')) {
-    try {
-      const crypto = require('crypto');
-      const secret = process.env.SESSION_SECRET || 'crabor-session-secret-2025';
-      const val = 's:' + xSessionId;
-      const sig = crypto.createHmac('sha256', secret).update(val).digest('base64').replace(/=+$/g, '');
-      const signed = val + '.' + sig;
-      const cookieStr = 'connect.sid=' + encodeURIComponent(signed);
-      req.headers.cookie = (req.headers.cookie ? req.headers.cookie + '; ' : '') + cookieStr;
-      console.log('[XSession] Injected session from X-Session-ID:', xSessionId.substring(0, 8) + '...');
-    } catch(e) {
-      console.error('[XSession] Error:', e.message);
+  try {
+    const sig = require('cookie-signature');
+    const secret = process.env.SESSION_SECRET || 'crabor-session-secret-2025';
+    const ck = req.headers.cookie || '';
+    const m = ck.match(/connect\.sid=([^;]+)/);
+    let valid = false;
+    if (m) {
+      try { valid = !!sig.unsign(decodeURIComponent(m[1]), secret); } catch (_) { valid = false; }
     }
+    const xSessionId = req.headers['x-session-id'];
+    if (!valid && xSessionId && xSessionId.length > 10) {
+      let sid = String(xSessionId);
+      if (sid.startsWith('s:')) sid = sig.unsign(sid.slice(2), secret) || sid;
+      sid = sid.split('.')[0];
+      const signed = 's:' + sig.sign(sid, secret);
+      const cookieStr = 'connect.sid=' + encodeURIComponent(signed);
+      req.headers.cookie = m
+        ? ck.replace(/connect\.sid=[^;]*/, cookieStr)
+        : (ck ? ck + '; ' + cookieStr : cookieStr);
+    }
+  } catch(e) {
+    console.error('[XSession] Error:', e.message);
   }
   next();
 });
