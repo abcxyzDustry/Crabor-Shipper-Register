@@ -4087,7 +4087,7 @@ app.post("/api/support/order", async (req, res) => {
       userId: req.session.userId || null,
       role: "customer",
       orderId: orderRef?.orderId || String(orderId || ""),
-      type: "order",
+      type: "order_issue",
       category: categoryLabel,
       message: `[${categoryLabel}] ${text}`,
       priority: /mất|hỏng|thiu|kém|không|giao sai|muộn|còn|thiếu/i.test(text) ? "urgent" : "high",
