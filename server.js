@@ -10751,6 +10751,55 @@ app.post("/api/cleaning/order", async (req, res) => {
       await walletDebit(customerId, "user", amt, "debit", order.orderId, `Thanh toán đơn dọn nhà ${order.orderId} bằng ví CRABOR`);
       req.io.to(`customer_${customerId}`).emit("walletDebited", { amount: amt, orderId: order.orderId });
     }
+    // ── VÍ TRẢ SAU (BNPL) cho đơn dọn nhà: check điều kiện + hạn mức, ghi nợ trả sau ──
+    if (pmCleaning === "bnpl") {
+      const bnplAmt = Math.max(0, order.finalTotal ?? finalPrice);
+      const bnplUser = await User.findById(customerId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt bnplLocked bnplLockedReason");
+      const failBnpl = async (status, extra) => {
+        await CleaningOrder.findByIdAndDelete(order._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: customerId } }).catch(() => {});
+        return res.status(status).json({ success: false, ...extra });
+      };
+      if (bnplUser?.bnplLocked) {
+        return failBnpl(403, { bnplLocked: true, message: `Rất tiếc Ví Trả Sau của bạn đã bị khóa với lý do: ${bnplUser.bnplLockedReason||"bảo mật"} — Vui lòng liên hệ hỗ trợ. Phương thức Ví Trả Sau đã bị vô hiệu hóa.` });
+      }
+      const bnplSpecial   = bnplUser?.isAdmin || bnplUser?.creditBnplEnabled;
+      const bnplActivated = bnplUser?.bnplActivationStatus === 'approved';
+      const bnplEligible  = bnplSpecial || (bnplActivated && (bnplUser?.totalSpent||0) >= 5000000 && (bnplUser?.trustScore ?? 60) >= TRUST_MIN_UNLOCK && !isCancelLocked(bnplUser));
+      if (!bnplEligible) {
+        return failBnpl(403, { bnplNotEligible: true, message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Vui lòng mở khóa (ký hợp đồng), đạt ≥5.000.000đ chi tiêu, điểm tin cậy ≥ 50 và không hủy đơn nhiều." });
+      }
+      if (await hasOverdueBnpl(customerId)) {
+        return failBnpl(403, { bnplLocked: true, message: "Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa." });
+      }
+      const bnplLimit = bnplSpecial ? Math.max(2000000, getBnplLimit(bnplUser?.bnplOnTimePaid||0, bnplUser?.bnplLimitLevel)) : getBnplLimit(bnplUser?.bnplOnTimePaid||0, bnplUser?.bnplLimitLevel);
+      const bnplMonth = getCurrentBillingMonth();
+      const bnplTxs = await BNPLTx.find({ userId: customerId, billingMonth: bnplMonth, status:{$in:['pending_bill','billed']} });
+      const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
+      if (bnplUsed + bnplAmt + bnplFeeOf(bnplAmt) > bnplLimit) {
+        return failBnpl(400, { bnplLimitExceeded: true, message: `Vượt hạn mức Ví Trả Sau. Hạn mức: ${bnplLimit.toLocaleString("vi-VN")}đ, còn lại: ${Math.max(0, bnplLimit-bnplUsed).toLocaleString("vi-VN")}đ, cần: ${bnplAmt.toLocaleString("vi-VN")}đ.` });
+      }
+      order.paymentStatus = "paid";
+      order.paidAt = new Date();
+      await order.save();
+      try {
+        await BNPLTx.create({
+          userId: customerId,
+          orderId: order.orderId,
+          baseAmount: bnplAmt,
+          fee: bnplFeeOf(bnplAmt),
+          amount: bnplAmt + bnplFeeOf(bnplAmt),
+          serviceType: "cleaning",
+          billingMonth: bnplMonth,
+        });
+        req.io.to(`customer_${customerId}`).emit("bnplUsed", {
+          amount: bnplAmt, orderId: order.orderId,
+          message: `Đơn dọn nhà ${order.orderId} đã vào Ví Trả Sau — thanh toán trước ngày 15 tháng sau`,
+        });
+      } catch (bnplErr) {
+        console.error('[BNPL] tạo BNPLTx cleaning lỗi:', bnplErr.message);
+      }
+    }
     let nearbyShippers = [];
     try {
       // Dọn nhà: ưu tiên shipper online + đã mở khoá/nhận đơn dọn nhà
@@ -11487,6 +11536,56 @@ app.post("/api/laundry/order", async (req, res) => {
       await order.save();
       await walletDebit(req.session.userId, "user", amt, "debit", order.orderId, `Thanh toán đơn giặt ${order.orderId} bằng ví CRABOR`);
       req.io.to(`customer_${req.session.userId}`).emit("walletDebited", { amount: amt, orderId: order.orderId });
+    }
+
+    // ── VÍ TRẢ SAU (BNPL) cho đơn giặt: check điều kiện + hạn mức, ghi nợ trả sau ──
+    if ((paymentMethod || "cash") === "bnpl") {
+      const bnplAmt = Math.max(0, order.finalTotal ?? (estimatedTotal + shipFee - discount));
+      const bnplUser = await User.findById(req.session.userId).select("totalSpent isAdmin creditBnplEnabled trustScore cancelCount bnplOnTimePaid bnplActivationStatus bnplLimitLevel bnplLastReviewAt bnplLocked bnplLockedReason");
+      const failBnpl = async (status, extra) => {
+        await LaundryOrder.findByIdAndDelete(order._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
+        return res.status(status).json({ success: false, ...extra });
+      };
+      if (bnplUser?.bnplLocked) {
+        return failBnpl(403, { bnplLocked: true, message: `Rất tiếc Ví Trả Sau của bạn đã bị khóa với lý do: ${bnplUser.bnplLockedReason||"bảo mật"} — Vui lòng liên hệ hỗ trợ. Phương thức Ví Trả Sau đã bị vô hiệu hóa.` });
+      }
+      const bnplSpecial   = bnplUser?.isAdmin || bnplUser?.creditBnplEnabled;
+      const bnplActivated = bnplUser?.bnplActivationStatus === 'approved';
+      const bnplEligible  = bnplSpecial || (bnplActivated && (bnplUser?.totalSpent||0) >= 5000000 && (bnplUser?.trustScore ?? 60) >= TRUST_MIN_UNLOCK && !isCancelLocked(bnplUser));
+      if (!bnplEligible) {
+        return failBnpl(403, { bnplNotEligible: true, message: "Bạn chưa đủ điều kiện dùng Ví Trả Sau. Vui lòng mở khóa (ký hợp đồng), đạt ≥5.000.000đ chi tiêu, điểm tin cậy ≥ 50 và không hủy đơn nhiều." });
+      }
+      if (await hasOverdueBnpl(req.session.userId)) {
+        return failBnpl(403, { bnplLocked: true, message: "Ví Trả Sau đã bị khóa do còn hóa đơn quá hạn chưa thanh toán. Vui lòng thanh toán để mở khóa." });
+      }
+      const bnplLimit = bnplSpecial ? Math.max(2000000, getBnplLimit(bnplUser?.bnplOnTimePaid||0, bnplUser?.bnplLimitLevel)) : getBnplLimit(bnplUser?.bnplOnTimePaid||0, bnplUser?.bnplLimitLevel);
+      const bnplMonth = getCurrentBillingMonth();
+      const bnplTxs = await BNPLTx.find({ userId: req.session.userId, billingMonth: bnplMonth, status:{$in:['pending_bill','billed']} });
+      const bnplUsed = bnplTxs.reduce((s,t)=>s+t.amount,0);
+      if (bnplUsed + bnplAmt + bnplFeeOf(bnplAmt) > bnplLimit) {
+        return failBnpl(400, { bnplLimitExceeded: true, message: `Vượt hạn mức Ví Trả Sau. Hạn mức: ${bnplLimit.toLocaleString("vi-VN")}đ, còn lại: ${Math.max(0, bnplLimit-bnplUsed).toLocaleString("vi-VN")}đ, cần: ${bnplAmt.toLocaleString("vi-VN")}đ.` });
+      }
+      order.paymentStatus = "paid";
+      order.paidAt = new Date();
+      await order.save();
+      try {
+        await BNPLTx.create({
+          userId: req.session.userId,
+          orderId: order.orderId,
+          baseAmount: bnplAmt,
+          fee: bnplFeeOf(bnplAmt),
+          amount: bnplAmt + bnplFeeOf(bnplAmt),
+          serviceType: "laundry",
+          billingMonth: bnplMonth,
+        });
+        req.io.to(`customer_${req.session.userId}`).emit("bnplUsed", {
+          amount: bnplAmt, orderId: order.orderId,
+          message: `Đơn giặt ${order.orderId} đã vào Ví Trả Sau — thanh toán trước ngày 15 tháng sau`,
+        });
+      } catch (bnplErr) {
+        console.error('[BNPL] tạo BNPLTx laundry lỗi:', bnplErr.message);
+      }
     }
 
     // Thông báo partner
