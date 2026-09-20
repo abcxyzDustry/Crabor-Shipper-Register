@@ -288,10 +288,16 @@ app.use(session({
 // Session logging middleware (for debugging shipper auth)
 app.use((req, res, next) => {
   if (req.path.includes('/api/shipper/')) {
-    console.log('[Session Debug] Path:', req.path);
-    console.log('[Session Debug] Session ID:', req.session?.id);
-    console.log('[Session Debug] ShipperId:', req.session?.shipperId);
-    console.log('[Session Debug] Role:', req.session?.role);
+    if (!req.session?.shipperId) {
+      // Chỉ log khi session THIẾU shipperId (case 401) + tín hiệu client gửi gì
+      const ck = req.headers.cookie || '';
+      const xs = req.headers['x-session-id'] || '';
+      console.log('[Session Debug] MISSING shipperId | Path:', req.path,
+        '| hasCookie:', ck.includes('connect.sid'),
+        '| cookieLen:', ck.length,
+        '| hasXSid:', xs.length > 10,
+        '| sidPrefix:', req.session?.id ? String(req.session.id).slice(0, 6) : 'none');
+    }
   }
   next();
 });
