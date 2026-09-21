@@ -7360,7 +7360,7 @@ Nội dung: ${message}` }],
 // POST /api/coco/chat — chat với Coco (role-aware + đọc DB realtime)
 app.post("/api/coco/chat", async (req, res) => {
   try {
-    const { text, message, sessionId } = req.body || {};
+    const { text, message, sessionId, persona } = req.body || {};
     const userInput = String(message || text || '').trim();
     if (!userInput) return res.status(400).json({ success:false, message:"Thiếu nội dung tin nhắn" });
 
@@ -7386,6 +7386,18 @@ app.post("/api/coco/chat", async (req, res) => {
     const sid = sessionId || `coco_${(req.session?.userId || req.session?.partnerId || req.session?.shipperId || 'anon').toString().slice(0,8)}_${Date.now()}`;
 
     // ── AI BRAIN — dùng DB context làm prompt ──
+    // persona 'shipper_finance': Coco là trợ lý tài chính + bạn đồng hành của shipper.
+    // Chỉ thêm vào input cho model (không lưu vào memory) để không ảnh hưởng luồng khác.
+    let modelInput = userInput;
+    if (persona === 'shipper_finance') {
+      modelInput = `[VAI TRÒ SAU CÓ ĐỘ ƯU TIÊN CAO NHẤT, ÁP DỤNG CHO MỌI CÂU TRẢ LỜI TRONG ĐOẠN CHAT NÀY]\n`
+        + `Bạn là Coco — trợ lý tài chính riêng và người bạn đồng hành thân thiết của anh tài xế shipper.\n`
+        + `- Xưng "Coco/em", gọi tài xế là "anh". Giọng ấm áp, động viên, hài hước nhẹ, như bạn bè.\n`
+        + `- Trả lời MỌI câu hỏi về số dư ví, thu nhập hôm nay/tuần/tháng, lịch sử đơn, đánh giá rating, khiếu nại/cảnh cáo — DỰA ĐÚNG SỐ LIỆU trong [SHIPPER INFO] và DB context, đọc số tiền cụ thể.\n`
+        + `- Khi tài xế mệt/nản/bị chê: an ủi + gợi ý cụ thể (giờ cao điểm nào đông đơn, giữ rating ra sao).\n`
+        + `- Trả lời ngắn gọn tiếng Việt, tối đa ~6 câu, có emoji vừa phải.\n\n`
+        + `Câu hỏi của anh tài xế: ${userInput}`;
+    }
     let response = null;
     try {
       const dbContextStr = CocoDb.buildContextString(ctx);
@@ -7394,7 +7406,7 @@ app.post("/api/coco/chat", async (req, res) => {
         _dbContext: dbContextStr + (smartExtra ? '\n\n[KẾT QUẢ TRA CỨU]\n' + smartExtra : ''),
       };
       const brainResult = await cocoThink(
-        [{ role:'user', content: userInput }],
+        [{ role:'user', content: modelInput }],
         { userContext: enriched, task:'chat', backend:'groq', maxTokens:500 }
       );
       if (brainResult.canReason && brainResult.text) {

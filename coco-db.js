@@ -290,6 +290,23 @@ async function buildShipperContext(shipperId) {
         time:   timeAgo(tx.createdAt),
       }));
     }
+
+    // Khiếu nại / cảnh cáo nhắm vào shipper này (để Coco trả lời "có ai chê tôi không")
+    try {
+      const ST = M('SupportTicket');
+      if (ST) {
+        const all = await ST.find({ warnings: { $exists: true, $ne: [] } })
+          .sort({ createdAt: -1 }).limit(60)
+          .select('message warnings createdAt status').lean();
+        const mine = all.filter(t => (t.warnings || []).some(w => String(w._id) === String(shipperId)));
+        ctx.complaintCount = mine.length;
+        ctx.recentComplaints = mine.slice(0, 3).map(t => ({
+          text: String(t.message || '').slice(0, 120),
+          time: timeAgo(t.createdAt),
+          status: t.status,
+        }));
+      }
+    } catch (_) {}
   } catch(err) {
     console.error('[CocoDb] buildShipperContext error:', err.message);
   }
@@ -609,6 +626,11 @@ function buildContextString(ctx) {
     if (ctx.rating)        lines.push(`• Rating: ${ctx.rating}⭐`);
     if (ctx.todayOrdersReal !== undefined) lines.push(`• Đơn hôm nay: ${ctx.todayOrdersReal}`);
     if (ctx.earnings !== undefined) lines.push(`• Ví shipper: ${vnd(ctx.earnings)}`);
+    if (ctx.complaintCount !== undefined) lines.push(`• Khiếu nại/cảnh cáo đã nhận: ${ctx.complaintCount}`);
+    if (ctx.recentComplaints?.length) {
+      lines.push(`• Khiếu nại gần nhất:`);
+      ctx.recentComplaints.forEach(c => lines.push(`  - ${c.text} (${c.time})`));
+    }
     if (ctx.activeDeliveries?.length) {
       lines.push(`• Đang giao ${ctx.activeDeliveries.length} đơn:`);
       ctx.activeDeliveries.forEach(d => lines.push(`  - ${d.orderId}: ${d.status} — ${d.address}`));
