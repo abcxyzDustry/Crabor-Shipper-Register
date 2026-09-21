@@ -2965,7 +2965,7 @@ async function loadWalletQueue() {
   } catch(e) { tbody.innerHTML = `<tr><td colspan="9" style="color:var(--coral);text-align:center;padding:16px">❌ ${e.message}</td></tr>`; }
 }
 async function approveWallet(id) { try { const r = await apiFetch(`/api/admin/wallet-queue/${id}/approve`, 'POST'); if (r.success) { showNotif('✅ Đã duyệt', r.message || 'Tiền đã vào ví', 'green'); loadWalletQueue(); loadStats(); } else showNotif('❌ Lỗi', r.message); } catch(e) { showNotif('❌ Lỗi', e.message); } }
-async function rejectWallet(id) { const reason = prompt('Lý do từ chối (bắt buộc):'); if (!reason) return; try { const r = await apiFetch(`/api/admin/wallet-queue/${id}/reject`, 'POST', { reason }); if (r.success) { showNotif('❌ Đã từ chối', 'Mục đã bị từ chối', 'coral'); loadWalletQueue(); } else showNotif('❌ Lỗi', r.message); } catch(e) { showNotif('❌ Lỗi', e.message); } }
+async function rejectWallet(id) { const reason = await promptModal('Lý do từ chối (bắt buộc):', '', { okText: 'Từ chối' }); if (!reason) return; try { const r = await apiFetch(`/api/admin/wallet-queue/${id}/reject`, 'POST', { reason }); if (r.success) { showNotif('❌ Đã từ chối', 'Mục đã bị từ chối', 'coral'); loadWalletQueue(); } else showNotif('❌ Lỗi', r.message); } catch(e) { showNotif('❌ Lỗi', e.message); } }
 async function approveAllPending() { if (!confirm('Duyệt TẤT CẢ các mục đang chờ? Hành động này không thể hoàn tác.')) return; try { const r = await apiFetch('/api/admin/wallet-queue/approve-all', 'POST'); if (r.success) { showNotif('✅ Đã duyệt tất cả', `${r.approved} mục — ${fmtMoney(r.totalAmount)}`, 'green'); loadWalletQueue(); loadStats(); } else showNotif('❌ Lỗi', r.message); } catch(e) { showNotif('❌ Lỗi', e.message); } }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3031,7 +3031,7 @@ function viewNoshow(id) {
 async function approveNoshow(id) {
   const x = _noshowList.find(v => String(v._id) === String(id));
   if (!x) return;
-  const note = prompt('Ghi chú duyệt (tùy chọn):', '') ?? '';
+  const note = await promptModal('Ghi chú duyệt (tùy chọn):', '');
   if (note === null) return;
   if (!confirm(`DUYỆT ĐÚNG khiếu nại ${x.reportId}?\n\n• Cộng tiền đơn vào ví shipper + partner\n• KHÓA VĨNH VIỄN ví CRABOR + Ví Trả Sau + tiền mặt của khách\n• Khách chỉ còn PayOS/SePay\n\nKhông thể hoàn tác!`)) return;
   try {
@@ -3044,7 +3044,7 @@ async function approveNoshow(id) {
   } catch(e) { showNotif('❌ Lỗi', e.message); }
 }
 async function rejectNoshow(id) {
-  const reason = prompt('Lý do từ chối (hiện cho shipper):');
+  const reason = await promptModal('Lý do từ chối (hiện cho shipper):', '', { okText: 'Từ chối' });
   if (!reason) return;
   try {
     const r = await apiFetch(`/api/admin/noshow/${id}/resolve`, 'POST', { action: 'reject', adminNote: reason });
@@ -3107,7 +3107,7 @@ async function approveFeatured(id) {
   else showNotif('❌ Lỗi', r.message || 'Không duyệt được');
 }
 async function rejectFeatured(id) {
-  const note = prompt('Lý do từ chối:'); if (note === null) return;
+  const note = await promptModal('Lý do từ chối:', '', { okText: 'Từ chối' }); if (note === null) return;
   try { const r = await apiFetch(`/api/admin/featured-requests/${id}/reject`, 'POST', { note }); if (r.success) { showNotif('❌ Đã từ chối', 'Yêu cầu đã bị từ chối', 'coral'); loadFeatured(); } else showNotif('❌ Lỗi', r.message); } catch(e) { showNotif('❌ Lỗi', e.message); }
 }
 
@@ -3266,7 +3266,7 @@ async function loadSupportTickets() {
     tbody.innerHTML = r.data.map(t=>`</td><td>${typeLabel[t.type]||t.type}</td><td style="font-size:.78rem">${t.phone||'–'}<br><span style="color:var(--muted)">${t.role}</span></td><td style="max-width:200px;font-size:.78rem">${t.message.slice(0,80)}${t.message.length>80?'...':''}</td><td style="font-size:.78rem;font-family:var(--font-mono)">${t.orderId||'–'}</td><td><span style="color:${priColor[t.priority]||'#aaa'};font-weight:900;font-size:.75rem">${t.priority?.toUpperCase()}</span></td><td><span class="status-pill ${t.status==='resolved'?'approved':t.status==='in_progress'?'reviewing':'pending'}">${t.status}</span></td><td style="display:flex;gap:4px">${t.status!=='resolved'?`<button class="act-btn" onclick="resolveTicket('${t._id}')" style="font-size:.72rem;padding:4px 8px">✅ Xử lý</button>`:''}${t.status==='open'?`<button class="act-btn" onclick="inProgressTicket('${t._id}')" style="font-size:.72rem;padding:4px 8px">🔄</button>`:''}</td></tr>`).join('');
   } catch(e) {}
 }
-async function resolveTicket(id) { const note = prompt('Ghi chú xử lý (không bắt buộc):') || ''; try { await apiFetch('/api/admin/support/'+id,'PATCH',{status:'resolved',adminNote:note}); showNotif('✅ Đã xử lý','Ticket đã được đóng'); loadSupportTickets(); } catch(e) {} }
+async function resolveTicket(id) { const note = await promptModal('Ghi chú xử lý (không bắt buộc):', '') || ''; try { await apiFetch('/api/admin/support/'+id,'PATCH',{status:'resolved',adminNote:note}); showNotif('✅ Đã xử lý','Ticket đã được đóng'); loadSupportTickets(); } catch(e) {} }
 async function inProgressTicket(id) { try { await apiFetch('/api/admin/support/'+id,'PATCH',{status:'in_progress'}); loadSupportTickets(); } catch(e) {} }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3863,7 +3863,7 @@ async function approveWithdraw(id) {
   } catch (e) { showNotif('Lỗi', e.message || 'Không duyệt được', 'coral'); }
 }
 async function rejectWithdraw(id) {
-  const note = prompt('Lý do từ chối (tiền sẽ được hoàn về ví):');
+  const note = await promptModal('Lý do từ chối (tiền sẽ được hoàn về ví):', '', { okText: 'Từ chối' });
   if (note === null) return;
   try {
     const r = await apiFetch('/api/admin/withdraws/' + id, 'PATCH', { status: 'rejected', adminNote: note || '' });
@@ -4093,7 +4093,7 @@ async function lockBnpl(userId, name, isLocked){
     if(!confirm(`Mở khóa Ví Trả Sau cho "${name}"?`)) return;
     try{ const r=await apiFetch('/api/admin/bnpl/lock/'+userId,'POST',{locked:false}); if(r.success) { showNotif('🔓 Đã mở khóa','Ví Trả Sau đã mở khóa','green'); loadCreditUsers(); } else showNotif('Lỗi',r.message,'coral'); }catch(e){ showNotif('Lỗi',e.message,'coral'); }
   } else {
-    const reason=prompt(`Nhập lý do khóa Ví Trả Sau cho "${name}" (mặc định: bảo mật):`,'bảo mật');
+    const reason = await promptModal(`Nhập lý do khóa Ví Trả Sau cho "${name}" (mặc định: bảo mật):`, 'bảo mật', { okText: 'Khóa' });
     if(reason===null) return;
     try{ const r=await apiFetch('/api/admin/bnpl/lock/'+userId,'POST',{locked:true, reason: reason||'bảo mật'}); if(r.success) { showNotif('🔒 Đã khóa','Ví Trả Sau đã bị khóa với lý do: '+(reason||'bảo mật'),'coral'); loadCreditUsers(); } else showNotif('Lỗi',r.message,'coral'); }catch(e){ showNotif('Lỗi',e.message,'coral'); }
   }
@@ -4106,7 +4106,7 @@ async function toggleCredit(userId, field, enabled){
   }catch(e){ showNotif('Lỗi', e.message,'coral'); }
 }
 async function adjustTrustScore(userId, current){
-  const input=prompt('Nhập điểm tin cậy mới (0-100):', current);
+  const input = await promptModal('Nhập điểm tin cậy mới (0-100):', current, { okText: 'Lưu điểm' });
   if(input===null) return;
   const score=Number(input);
   if(isNaN(score)){ showNotif('Lỗi','Điểm không hợp lệ','coral'); return; }
@@ -4247,7 +4247,7 @@ async function loadCreditLoans(page){
   }catch(e){ tbody.innerHTML='<tr><td colspan=8 style="text-align:center;color:var(--coral)">'+(e.message||'Lỗi')+'</td></tr>'; }
 }
 async function approveLoan(id){ if(!confirm('Duyệt khoản vay này? Tiền sẽ cộng vào ví khách.')) return; try{ const r=await apiFetch('/api/admin/loan/'+id,'PATCH',{status:'approved'}); if(r.success){ showNotif('✅ Đã duyệt','Khoản vay đã giải ngân','green'); loadCreditLoans(); loadCreditStats(); } else showNotif('Lỗi',r.message,'coral'); }catch(e){ showNotif('Lỗi',e.message,'coral'); } }
-async function rejectLoan(id){ const note=prompt('Lý do từ chối:')||''; if(note===null) return; try{ const r=await apiFetch('/api/admin/loan/'+id,'PATCH',{status:'rejected',note}); if(r.success){ showNotif('❌ Đã từ chối','Khoản vay bị từ chối','coral'); loadCreditLoans(); } else showNotif('Lỗi',r.message,'coral'); }catch(e){ showNotif('Lỗi',e.message,'coral'); } }
+async function rejectLoan(id){ const note = await promptModal('Lý do từ chối:', '', { okText: 'Từ chối' })||''; if(note===null) return; try{ const r=await apiFetch('/api/admin/loan/'+id,'PATCH',{status:'rejected',note}); if(r.success){ showNotif('❌ Đã từ chối','Khoản vay bị từ chối','coral'); loadCreditLoans(); } else showNotif('Lỗi',r.message,'coral'); }catch(e){ showNotif('Lỗi',e.message,'coral'); } }
 
 // Banner modal functions (legacy)
 
@@ -4595,7 +4595,7 @@ async function hochoApproveWithdrawal(id, name, amount){
   try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/approve-withdrawal', { method:'POST', body: JSON.stringify({ request_id: id, admin_note: 'Đã chuyển khoản' }) }); showNotif(d.success?'✅ Thành công':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success) loadHochoWithdrawals(document.getElementById('hochoWdFilter')?.value||''); }catch(e){}
 }
 async function hochoRejectWithdrawal(id, name){
-  const note=prompt(`Lý do từ chối yêu cầu của ${name}:`);
+  const note = await promptModal(`Lý do từ chối yêu cầu của ${name}:`, '', { okText: 'Từ chối' });
   if(note===null) return;
   try{ const d=await hochoAdminFetch(HOCHO_API_BASE + '/reject-withdrawal', { method:'POST', body: JSON.stringify({ request_id: id, admin_note: note||'Không hợp lệ' }) }); showNotif(d.success?'✅ Đã từ chối & hoàn số dư':'❌ Lỗi', d.message||'', d.success?'green':'coral'); if(d.success) loadHochoWithdrawals(document.getElementById('hochoWdFilter')?.value||''); }catch(e){}
 }
@@ -4636,6 +4636,44 @@ setInterval(() => { if (currentUser) loadStats(); }, 30000);
     <div class="bm-btns"><button class="bm-submit" onclick="saveBanner()">✅ Tạo banner</button><button class="bm-cancel" onclick="closeBannerModal()">Hủy</button></div>
   </div>
 </div>
+
+<!-- PROMPT MODAL (thay window.prompt — prompt chết trên Electron desktop) -->
+<div class="banner-modal-overlay" id="promptOverlay" onclick="if(event.target===this)promptModalCancel()">
+  <div class="banner-modal" style="max-width:480px">
+    <div class="bm-title" id="promptTitle">Nhập thông tin</div>
+    <div class="bm-field"><textarea id="promptInput" rows="3" placeholder="" style="resize:vertical"></textarea></div>
+    <div class="bm-btns"><button class="bm-submit" id="promptOkBtn" onclick="promptModalOk()">Xác nhận</button><button class="bm-cancel" onclick="promptModalCancel()">Hủy</button></div>
+  </div>
+</div>
+<script>
+let _promptResolve = null;
+function promptModal(title, def, opts) {
+  opts = opts || {};
+  return new Promise((resolve) => {
+    _promptResolve = resolve;
+    document.getElementById('promptTitle').textContent = title || 'Nhập thông tin';
+    const inp = document.getElementById('promptInput');
+    inp.value = (def === undefined || def === null) ? '' : String(def);
+    inp.placeholder = opts.placeholder || '';
+    document.getElementById('promptOkBtn').textContent = opts.okText || 'Xác nhận';
+    document.getElementById('promptOverlay').classList.add('show');
+    setTimeout(() => { try { inp.focus(); inp.select(); } catch (_) {} }, 60);
+  });
+}
+function promptModalOk() {
+  const v = document.getElementById('promptInput').value;
+  document.getElementById('promptOverlay').classList.remove('show');
+  if (_promptResolve) { _promptResolve(v); _promptResolve = null; }
+}
+function promptModalCancel() {
+  document.getElementById('promptOverlay').classList.remove('show');
+  if (_promptResolve) { _promptResolve(null); _promptResolve = null; }
+}
+document.addEventListener('keydown', (e) => {
+  const ov = document.getElementById('promptOverlay');
+  if (e.key === 'Escape' && ov && ov.classList.contains('show')) promptModalCancel();
+});
+</script>
 
 <style>
 .ai-banner-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
