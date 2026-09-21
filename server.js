@@ -662,6 +662,9 @@ const userSchema = new mongoose.Schema({
   bankAccount:     { bankName: String, accountNo: String, accountName: String },
   cancelCount:     { type: Number, default: 0, min: 0 }, // số lần hủy đơn
   cashBlocked:     { type: Boolean, default: false },      // bị khóa thanh toán tiền mặt
+  walletLocked:    { type: Boolean, default: false },      // bị khóa ví CRABOR vĩnh viễn (bùng đơn)
+  walletLockedReason: { type: String, trim: true },
+  walletLockedAt:  { type: Date },
 }, { timestamps: true });
 
 // Indexes
@@ -1232,6 +1235,30 @@ const supportTicketSchema = new mongoose.Schema({
   resolvedAt: Date,
 }, { timestamps: true });
 const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
+
+// ── NOSHOW REPORT — shipper khiếu nại khách bùng đơn tiền mặt ──
+// Admin duyệt evidence: cộng ví shipper+partner, ban vĩnh viễn ví/bnpl/cash của khách
+const noshowReportSchema = new mongoose.Schema({
+  reportId:    { type: String, unique: true, sparse: true },
+  orderId:     { type: String, required: true, index: true },
+  module:      { type: String, default: 'food' },
+  shipperId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Shipper', required: true },
+  customerId:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  reason:      { type: String, required: true, trim: true, maxlength: 500 },
+  evidence:    [{ type: String }], // URL/base64 ảnh bằng chứng (tối đa 3)
+  status:      { type: String, enum: ['pending','approved','rejected'], default: 'pending' },
+  adminNote:   { type: String, trim: true },
+  compensatedShipper: { type: Number, default: 0 },
+  compensatedPartner: { type: Number, default: 0 },
+  resolvedAt:  Date,
+  resolvedBy:  String,
+}, { timestamps: true });
+noshowReportSchema.index({ shipperId: 1, createdAt: -1 });
+noshowReportSchema.pre('save', function(next) {
+  if (!this.reportId) this.reportId = 'NSR-' + Date.now().toString(36).toUpperCase();
+  next();
+});
+const NoshowReport = mongoose.model('NoshowReport', noshowReportSchema);
 
 
 // ── WALLET TRANSACTION ────────────────────────────────────
@@ -10863,7 +10890,12 @@ app.post("/api/cleaning/order", async (req, res) => {
     // WALLET: trừ tiền ví CRABOR ngay khi đặt đơn dọn nhà (đã trừ discount)
     if (pmCleaning === "wallet") {
       const amt = order.finalTotal ?? finalPrice;
-      const userDoc = await User.findById(customerId).select("walletBalance");
+      const userDoc = await User.findById(customerId).select("walletBalance walletLocked");
+      if (userDoc?.walletLocked) {
+        await CleaningOrder.findByIdAndDelete(order._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: customerId } }).catch(() => {});
+        return res.status(403).json({ success: false, message: "Ví CRABOR của bạn đã bị khóa vĩnh viễn do bùng đơn. Vui lòng dùng PayOS hoặc SePay.", walletLocked: true });
+      }
       if (!userDoc || (userDoc.walletBalance||0) < amt) {
         await CleaningOrder.findByIdAndDelete(order._id);
         if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: customerId } }).catch(() => {});
@@ -11603,10 +11635,13 @@ app.post("/api/laundry/order", async (req, res) => {
     if (!providerId || !packageId || !turnaround || !pickupAddress)
       return res.status(400).json({ success: false, message: "Thiếu thông tin đặt đơn" });
 
-    const user     = await User.findById(req.session.userId).select("fullName phone");
+    const user     = await User.findById(req.session.userId).select("fullName phone cashBlocked walletLocked");
     const provider = await GiatLa.findById(providerId).select("bizName isAccepting lastLat lastLng");
     if (!provider) return res.status(404).json({ success: false, message: "Không tìm thấy cửa hàng" });
     if (!provider.isAccepting) return res.status(400).json({ success: false, message: "Cửa hàng đang tạm nghỉ" });
+    if ((paymentMethod || "cash") === "cash" && user?.cashBlocked) {
+      return res.status(403).json({ success: false, message: "Tiền mặt của bạn đã bị khóa vĩnh viễn do bùng đơn. Vui lòng dùng PayOS hoặc SePay.", cashBlocked: true });
+    }
 
     const kg           = estimatedKg || 2;
     const price        = pricePerKg  || 30000;
@@ -11649,7 +11684,12 @@ app.post("/api/laundry/order", async (req, res) => {
     // WALLET: trừ tiền ví CRABOR ngay khi đặt đơn giặt
     if ((paymentMethod || "cash") === "wallet") {
       const amt = order.finalTotal ?? Math.max(0, estimatedTotal + shipFee - discount);
-      const userDoc = await User.findById(req.session.userId).select("walletBalance");
+      const userDoc = await User.findById(req.session.userId).select("walletBalance walletLocked");
+      if (userDoc?.walletLocked) {
+        await LaundryOrder.findByIdAndDelete(order._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
+        return res.status(403).json({ success: false, message: "Ví CRABOR của bạn đã bị khóa vĩnh viễn do bùng đơn. Vui lòng dùng PayOS hoặc SePay.", walletLocked: true });
+      }
       if (!userDoc || (userDoc.walletBalance||0) < amt) {
         await LaundryOrder.findByIdAndDelete(order._id);
         if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
@@ -14191,12 +14231,16 @@ app.post("/api/order", async (req, res) => {
     if (!items?.length && !fromAddress) 
       return res.status(400).json({ success: false, message: "Thiếu thông tin đơn hàng" });
 
-    const user = await User.findById(req.session.userId).select("fullName phone cancelCount cashBlocked");
+    const user = await User.findById(req.session.userId).select("fullName phone cancelCount cashBlocked walletLocked walletLockedReason");
     
     // Block COD nếu bị khóa
     const pmMethod = req.body.paymentMethod || "cash";
     if (pmMethod === "cash" && user?.cashBlocked) {
       return res.status(403).json({ success: false, message: "Bạn đã hủy đơn quá 2 lần. Vui lòng dùng PayOS, SePay hoặc ví CRABOR.", cashBlocked: true });
+    }
+    // Block ví CRABOR nếu bị khóa vĩnh viễn (bùng đơn)
+    if (pmMethod === "wallet" && user?.walletLocked) {
+      return res.status(403).json({ success: false, message: "Ví CRABOR của bạn đã bị khóa vĩnh viễn do bùng đơn. Vui lòng dùng PayOS hoặc SePay.", walletLocked: true });
     }
     
     let order;
@@ -14279,7 +14323,10 @@ app.post("/api/order", async (req, res) => {
     const isWalletPay = (paymentMethod || "cash") === "wallet";
     if (isWalletPay) {
       const orderAmount = Math.max(0, (order.total||0) + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0));
-      const userDoc = await User.findById(req.session.userId).select("walletBalance");
+      const userDoc = await User.findById(req.session.userId).select("walletBalance walletLocked");
+      if (userDoc?.walletLocked) {
+        return res.status(403).json({ success: false, message: "Ví CRABOR của bạn đã bị khóa vĩnh viễn do bùng đơn. Vui lòng dùng PayOS hoặc SePay.", walletLocked: true });
+      }
       if (!userDoc || (userDoc.walletBalance||0) < orderAmount) {
         return res.status(400).json({
           success: false,
@@ -14761,7 +14808,15 @@ app.post("/api/ride/book", async (req, res) => {
     if (!vehicleType || !fromAddress || !toAddress || !fee)
       return res.status(400).json({ success: false, message: "Thiếu thông tin đặt xe" });
 
-    const user = await User.findById(req.session.userId).select("fullName phone");
+    const user = await User.findById(req.session.userId).select("fullName phone cashBlocked walletLocked");
+
+    // Khóa vĩnh viễn do bùng đơn: cấm cash + ví (chỉ còn PayOS/SePay)
+    if ((ridePayMethod || "cash") === "cash" && user?.cashBlocked) {
+      return res.status(403).json({ success: false, message: "Tiền mặt của bạn đã bị khóa vĩnh viễn do bùng đơn. Vui lòng dùng PayOS hoặc SePay.", cashBlocked: true });
+    }
+    if ((ridePayMethod || "cash") === "wallet" && user?.walletLocked) {
+      return res.status(403).json({ success: false, message: "Ví CRABOR của bạn đã bị khóa vĩnh viễn do bùng đơn. Vui lòng dùng PayOS hoặc SePay.", walletLocked: true });
+    }
 
     // Áp voucher (nếu có) — voucher giảm phí ship/giảm cước xe
     const { discount: rideDiscount, applied: appliedVoucher } = await applyVoucher(voucherCode, { order: fee, ship: fee }, req.session.userId, "ride");
@@ -14792,7 +14847,12 @@ app.post("/api/ride/book", async (req, res) => {
     // WALLET: trừ tiền ví CRABOR ngay khi đặt xe
     if ((ridePayMethod || "cash") === "wallet") {
       const amt = rideOrder.finalTotal ?? Math.max(0, fee + Math.round(fee * 0.1) - rideDiscount);
-      const userDoc = await User.findById(req.session.userId).select("walletBalance");
+      const userDoc = await User.findById(req.session.userId).select("walletBalance walletLocked");
+      if (userDoc?.walletLocked) {
+        await Order.findByIdAndDelete(rideOrder._id);
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
+        return res.status(403).json({ success: false, message: "Ví CRABOR của bạn đã bị khóa vĩnh viễn do bùng đơn. Vui lòng dùng PayOS hoặc SePay.", walletLocked: true });
+      }
       if (!userDoc || (userDoc.walletBalance||0) < amt) {
         await Order.findByIdAndDelete(rideOrder._id);
         if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
@@ -15080,7 +15140,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       .sort({ deliveredAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select("orderId module items address partnerAddress finalTotal total shipFee serviceFee discount voucherCode voucherDiscount voucherShipperBear status deliveredAt createdAt ratingShipper ratingComment customerName customerPhone customerLat customerLng partnerLat partnerLng fromAddress toAddress")
+      .select("orderId module items address partnerAddress finalTotal total shipFee serviceFee discount voucherCode voucherDiscount voucherShipperBear status deliveredAt createdAt ratingShipper ratingComment customerName customerPhone customerId paymentMethod customerLat customerLng partnerLat partnerLng fromAddress toAddress")
       .lean(),
       Order.countDocuments({ 
         shipperId: req.session.shipperId, 
@@ -15098,6 +15158,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       voucherCode: o.voucherCode || null,
       shipFee: o.shipFee || 0,
       serviceFee: o.serviceFee || 0,
+      paymentMethod: o.paymentMethod || 'cash',
       shipperEarn: shipperOrderEarnNet(o),
       address: o.address,
       partnerAddress: o.partnerAddress,
@@ -15116,6 +15177,71 @@ app.get("/api/shipper/order-history", async (req, res) => {
       page: parseInt(page),
       hasMore: skip + formatted.length < total
     });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  NOSHOW REPORT — shipper khiếu nại khách bùng đơn tiền mặt
+// ══════════════════════════════════════════════════════════════
+
+// POST /api/shipper/noshow/report — Shipper gửi khiếu nại kèm bằng chứng ảnh
+app.post("/api/shipper/noshow/report", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const { orderId, reason, evidence } = req.body || {};
+    if (!orderId) return res.status(400).json({ success: false, message: "Thiếu mã đơn" });
+    const cleanReason = String(reason || "").trim();
+    if (cleanReason.length < 10) return res.status(400).json({ success: false, message: "Nhập lý do rõ ràng (tối thiểu 10 ký tự)" });
+    const evList = Array.isArray(evidence) ? evidence.filter(e => typeof e === "string" && e.length > 0).slice(0, 3) : [];
+    if (!evList.length) return res.status(400).json({ success: false, message: "Cần ít nhất 1 ảnh bằng chứng" });
+
+    const order = await Order.findOne({ orderId: String(orderId), shipperId: req.session.shipperId });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn của bạn" });
+    if ((order.paymentMethod || "cash") !== "cash")
+      return res.status(400).json({ success: false, message: "Chỉ khiếu nại bùng đơn với đơn tiền mặt" });
+    const dup = await NoshowReport.findOne({ orderId: order.orderId, status: { $in: ["pending", "approved"] } });
+    if (dup) return res.status(400).json({ success: false, message: "Đơn này đã được gửi khiếu nại" });
+
+    // Upload ảnh bằng chứng (base64 → Cloudinary, fallback giữ nguyên)
+    const uploaded = [];
+    for (const img of evList) {
+      try {
+        if (typeof img === "string" && img.startsWith("data:image")) {
+          if (Buffer.byteLength(img, "utf8") > 4 * 1024 * 1024)
+            return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 4MB/ảnh)" });
+          uploaded.push(await uploadImageToCloudinary(img, "noshow"));
+        } else if (typeof img === "string" && img.startsWith("http")) {
+          uploaded.push(img);
+        }
+      } catch (e) { console.error("[Noshow] upload evidence:", e.message); }
+    }
+    if (!uploaded.length) return res.status(400).json({ success: false, message: "Ảnh bằng chứng không hợp lệ" });
+
+    const report = await NoshowReport.create({
+      orderId: order.orderId,
+      module: order.module || "food",
+      shipperId: req.session.shipperId,
+      customerId: order.customerId || null,
+      reason: cleanReason,
+      evidence: uploaded,
+    });
+    req.io?.to("admin").emit("noshow_pending", {
+      reportId: report.reportId, orderId: order.orderId,
+      message: `Khiếu nại bùng đơn mới: ${order.orderId}`,
+    });
+    res.json({ success: true, reportId: report.reportId, message: "Đã gửi khiếu nại. Admin sẽ xem bằng chứng và xử lý." });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// GET /api/shipper/noshow/my — Shipper xem khiếu nại của mình
+app.get("/api/shipper/noshow/my", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const list = await NoshowReport.find({ shipperId: req.session.shipperId })
+      .sort({ createdAt: -1 }).limit(50).lean();
+    res.json({ success: true, reports: list });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -15645,6 +15771,147 @@ app.post("/api/admin/wallet-queue/approve-all", async (req, res) => {
       approved++; totalAmount += item.amount;
     }
     res.json({ success: true, approved, totalAmount });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  NOSHOW ADMIN — duyệt khiếu nại bùng đơn tiền mặt
+// ══════════════════════════════════════════════════════════════
+function requireAdminNoshow(req) {
+  const k = req.headers["x-admin-key"];
+  const valid = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
+  return (k === valid) || !!req.session?.adminId;
+}
+
+// GET /api/admin/noshow — Admin xem khiếu nại (filter status)
+app.get("/api/admin/noshow", async (req, res) => {
+  try {
+    if (!requireAdminNoshow(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
+    const { status } = req.query;
+    const filter = status ? { status } : {};
+    const list = await NoshowReport.find(filter).sort({ createdAt: -1 }).limit(100).lean();
+    const pending = await NoshowReport.countDocuments({ status: "pending" });
+    res.json({ success: true, data: list, total: list.length, pending });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/admin/noshow/:id/resolve — Admin duyệt/từ chối
+// Duyệt đúng: cộng ví shipper + partner theo đơn, ban vĩnh viễn ví/bnpl/cash của khách
+app.post("/api/admin/noshow/:id/resolve", async (req, res) => {
+  try {
+    if (!requireAdminNoshow(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
+    const { action, adminNote } = req.body || {};
+    if (!["approve", "reject"].includes(action))
+      return res.status(400).json({ success: false, message: "action phải là approve/reject" });
+    const report = await NoshowReport.findById(req.params.id);
+    if (!report) return res.status(404).json({ success: false, message: "Không tìm thấy khiếu nại" });
+    if (report.status !== "pending")
+      return res.status(400).json({ success: false, message: "Khiếu nại đã được xử lý" });
+
+    const by = req.session?.adminId ? "admin:" + req.session.adminId : "admin_key";
+    if (action === "reject") {
+      report.status = "rejected";
+      report.adminNote = String(adminNote || "");
+      report.resolvedAt = new Date();
+      report.resolvedBy = by;
+      await report.save();
+      req.io?.to(`shipper_${report.shipperId}`).emit("noshow_resolved", {
+        reportId: report.reportId, orderId: report.orderId, approved: false,
+        message: `Khiếu nại đơn ${report.orderId} chưa đủ căn cứ. ${report.adminNote}`,
+      });
+      return res.json({ success: true, message: "Đã từ chối khiếu nại" });
+    }
+
+    // ── APPROVE ──
+    const order = await Order.findOne({ orderId: report.orderId });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+    const { shipperEarn, partnerEarn } = await calcEarnings(order);
+
+    // Cộng ví shipper
+    let paidShipper = 0;
+    if (order.shipperId && shipperEarn > 0) {
+      const already = await WalletQueue.findOne({
+        orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
+        amount: shipperEarn, status: "approved",
+      }).lean().catch(() => null);
+      if (!already) {
+        await creditWalletDirect(order.shipperId, "shipper", shipperEarn, order.orderId, `Bồi thường bùng đơn ${order.orderId}`);
+        await WalletQueue.create({
+          orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
+          amount: shipperEarn, paymentMethod: "cash_noshow",
+          note: `Bồi thường bùng đơn ${order.orderId}`, status: "approved",
+          approvedBy: "noshow_admin", approvedAt: new Date(),
+        });
+        paidShipper = shipperEarn;
+      }
+    }
+    // Cộng ví partner (nếu có)
+    let paidPartner = 0;
+    if (order.partnerId && partnerEarn > 0) {
+      const already = await WalletQueue.findOne({
+        orderId: order.orderId, recipientId: order.partnerId, recipientType: "partner",
+        amount: partnerEarn, status: "approved",
+      }).lean().catch(() => null);
+      if (!already) {
+        await creditWalletDirect(order.partnerId, "partner", partnerEarn, order.orderId, `Bồi thường bùng đơn ${order.orderId}`);
+        await WalletQueue.create({
+          orderId: order.orderId, recipientId: order.partnerId, recipientType: "partner",
+          amount: partnerEarn, paymentMethod: "cash_noshow",
+          note: `Bồi thường bùng đơn ${order.orderId}`, status: "approved",
+          approvedBy: "noshow_admin", approvedAt: new Date(),
+        });
+        paidPartner = partnerEarn;
+      }
+    }
+
+    // Ban vĩnh viễn khách bùng đơn: ví CRABOR + ví trả sau + tiền mặt (chỉ còn PayOS/SePay)
+    const BAN_REASON = `Bùng đơn tiền mặt ${order.orderId} (xác minh bằng chứng)`;
+    if (order.customerId) {
+      await User.findByIdAndUpdate(order.customerId, {
+        $set: {
+          cashBlocked: true,
+          bnplLocked: true, bnplLockedReason: BAN_REASON, bnplLockedAt: new Date(),
+          walletLocked: true, walletLockedReason: BAN_REASON, walletLockedAt: new Date(),
+        },
+      }).catch(e => console.error("[Noshow] ban customer:", e.message));
+    }
+
+    report.status = "approved";
+    report.adminNote = String(adminNote || "");
+    report.compensatedShipper = paidShipper;
+    report.compensatedPartner = paidPartner;
+    report.resolvedAt = new Date();
+    report.resolvedBy = by;
+    await report.save();
+
+    // Thông báo xin lỗi + đã cộng tiền
+    if (order.shipperId) {
+      req.io?.to(`shipper_${order.shipperId}`).emit("noshow_resolved", {
+        reportId: report.reportId, orderId: order.orderId, approved: true,
+        message: `Admin đã xác minh bằng chứng. Xin lỗi bạn! +${paidShipper.toLocaleString("vi-VN")}đ bồi thường đã vào ví.`,
+      });
+      await notifyUser("shipper", order.shipperId, {
+        type: "income", title: "✅ Bồi thường bùng đơn",
+        body: `Đơn ${order.orderId} đã được xác minh. Xin lỗi bạn! +${paidShipper.toLocaleString("vi-VN")}đ đã vào ví.`,
+        ref: order.orderId, refModule: order.module || "food",
+      }).catch(() => {});
+    }
+    if (order.partnerId) {
+      await notifyUser("partner", order.partnerId, {
+        type: "income", title: "✅ Bồi thường bùng đơn",
+        body: `Đơn ${order.orderId} đã được xác minh. Xin lỗi quán! +${paidPartner.toLocaleString("vi-VN")}đ đã vào ví.`,
+        ref: order.orderId, refModule: order.module || "food",
+      }).catch(() => {});
+    }
+    if (order.customerId) {
+      await notifyUser("user", order.customerId, {
+        type: "warning", title: "⛔ Tài khoản bị hạn chế vĩnh viễn",
+        body: `Do bùng đơn tiền mặt ${order.orderId}, ví CRABOR + Ví Trả Sau + tiền mặt của bạn bị khóa vĩnh viễn. Bạn chỉ còn thanh toán PayOS/SePay.`,
+        ref: order.orderId, refModule: order.module || "food",
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, message: "Đã duyệt bồi thường + ban khách", paidShipper, paidPartner });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 

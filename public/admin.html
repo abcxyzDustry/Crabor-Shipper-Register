@@ -522,6 +522,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <span class="ico">💰</span> Duyệt ví
         <span class="nav-badge" id="walletBadge" style="display:none;background:#FFD84D;color:#000"></span>
       </div>
+      <div class="nav-item" onclick="showPage('noshow')">
+        <span class="ico">🚨</span> Bùng đơn
+        <span class="nav-badge" id="noshowBadge" style="display:none;background:#e74c3c;color:#fff">0</span>
+      </div>
       <div class="nav-item" onclick="showPage('credit')">
         <span class="ico">💳</span> Tín dụng
         <span class="nav-badge" id="creditBadge" style="display:none;background:#3aaa5c;color:#fff">0</span>
@@ -1472,6 +1476,49 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <div class="pager" id="wqPager"></div>
       </div>
     </section>
+
+    <!-- ── NOSHOW PAGE — Khiếu nại khách bùng đơn tiền mặt ── -->
+    <section id="pgNoshow" class="page-section">
+      <div class="page-header">
+        <div class="page-title">🚨 Bùng đơn tiền mặt <small>shipper khiếu nại kèm bằng chứng</small></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="filter-select" id="nsStatus" onchange="loadNoshow()">
+            <option value="pending">⏳ Chờ duyệt</option>
+            <option value="approved">✅ Đã duyệt</option>
+            <option value="rejected">❌ Từ chối</option>
+            <option value="">Tất cả</option>
+          </select>
+          <button class="filter-btn" onclick="loadNoshow()">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>Mã KN</th><th>Đơn hàng</th><th>Shipper</th><th>Lý do</th>
+                <th>Bằng chứng</th><th>Trạng thái</th><th>Ngày gửi</th><th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="nsTbody">
+              <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Evidence modal -->
+    <div class="overlay" id="nsOverlay">
+      <div class="modal" style="width:640px">
+        <div class="modal-head">
+          <h2 id="nsModalTitle">Bằng chứng bùng đơn</h2>
+          <button class="modal-close" onclick="document.getElementById('nsOverlay').classList.remove('show')">×</button>
+        </div>
+        <div class="modal-body" id="nsModalBody"></div>
+        <div class="modal-foot" id="nsModalFoot" style="display:flex;gap:8px;justify-content:flex-end"></div>
+      </div>
+    </div>
 
     <!-- ── CREDIT PAGE — Ví trả sau & Vay nhanh ── -->
     <section id="pgCredit" class="page-section">
@@ -2922,6 +2969,94 @@ async function rejectWallet(id) { const reason = prompt('Lý do từ chối (b�
 async function approveAllPending() { if (!confirm('Duyệt TẤT CẢ các mục đang chờ? Hành động này không thể hoàn tác.')) return; try { const r = await apiFetch('/api/admin/wallet-queue/approve-all', 'POST'); if (r.success) { showNotif('✅ Đã duyệt tất cả', `${r.approved} mục — ${fmtMoney(r.totalAmount)}`, 'green'); loadWalletQueue(); loadStats(); } else showNotif('❌ Lỗi', r.message); } catch(e) { showNotif('❌ Lỗi', e.message); } }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//   NOSHOW — Khiếu nại bùng đơn tiền mặt
+// ─────────────────────────────────────────────────────────────────────────────
+let _noshowList = [];
+async function loadNoshow() {
+  const tbody = document.getElementById('nsTbody');
+  const status = document.getElementById('nsStatus')?.value ?? 'pending';
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
+  try {
+    const r = await apiFetch('/api/admin/noshow' + (status ? `?status=${status}` : ''));
+    if (!r.success) throw new Error(r.message || 'Lỗi tải');
+    _noshowList = r.data || [];
+    const badge = document.getElementById('noshowBadge');
+    if (badge) { badge.style.display = r.pending ? '' : 'none'; badge.textContent = r.pending || 0; }
+    if (!_noshowList.length) { tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">${status === 'pending' ? '✅ Không có khiếu nại nào chờ duyệt' : 'Không có dữ liệu'}</td></tr>`; return; }
+    const esc = (s) => String(s ?? '—').replace(/</g, '&lt;');
+    tbody.innerHTML = _noshowList.map(x => {
+      const isPending = x.status === 'pending';
+      const stBadge = isPending ? '<span class="badge b-pending">⏳ Chờ duyệt</span>' : x.status === 'approved' ? '<span class="badge b-approved">✅ Đã duyệt</span>' : '<span class="badge b-rejected">❌ Từ chối</span>';
+      const evCount = (x.evidence || []).length;
+      const when = x.createdAt ? new Date(x.createdAt).toLocaleString('vi-VN') : '—';
+      return `<tr>
+        <td style="font-family:var(--font-mono);font-size:.78rem;color:var(--coral)">${esc(x.reportId)}</td>
+        <td style="font-size:.8rem">${esc(String(x.orderId || '').slice(-8))}<br><span style="color:var(--muted);font-size:.72rem">${esc(x.module || '')}</span></td>
+        <td style="font-size:.78rem">${esc(String(x.shipperId || '').slice(-6))}</td>
+        <td style="font-size:.78rem;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${esc(x.reason)}">${esc(x.reason)}</td>
+        <td><button class="act-btn" onclick="viewNoshow('${x._id}')">🖼️ ${evCount} ảnh</button></td>
+        <td>${stBadge}</td>
+        <td style="font-size:.75rem;color:var(--muted)">${when}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap">${isPending
+          ? `<button class="act-btn" onclick="viewNoshow('${x._id}')">Xem & duyệt</button>`
+          : `<span style="font-size:.72rem;color:var(--muted)">${esc(x.resolvedBy || '')}</span>`}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="8" style="color:var(--coral);text-align:center;padding:16px">❌ ${e.message}</td></tr>`; }
+}
+function viewNoshow(id) {
+  const x = _noshowList.find(v => String(v._id) === String(id));
+  if (!x) return;
+  const esc = (s) => String(s ?? '—').replace(/</g, '&lt;');
+  document.getElementById('nsModalTitle').textContent = `KN ${x.reportId} — Đơn ${String(x.orderId || '').slice(-8)}`;
+  const imgs = (x.evidence || []).map((u, i) => `<a href="${u}" target="_blank"><img src="${u}" style="width:100%;border-radius:12px;margin-bottom:10px" alt="Bằng chứng ${i+1}" /></a>`).join('') || '<p style="color:var(--muted)">Không có ảnh</p>';
+  document.getElementById('nsModalBody').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-item"><label>Mã đơn</label><div class="val mono">${esc(x.orderId)}</div></div>
+      <div class="detail-item"><label>Module</label><div class="val">${esc(x.module)}</div></div>
+      <div class="detail-item full"><label>Lý do shipper</label><div class="val">${esc(x.reason)}</div></div>
+      ${x.status !== 'pending' ? `<div class="detail-item full"><label>Kết quả</label><div class="val">${esc(x.status)}${x.adminNote ? ' — ' + esc(x.adminNote) : ''}${x.compensatedShipper ? ` · +${Number(x.compensatedShipper).toLocaleString('vi-VN')}đ shipper` : ''}${x.compensatedPartner ? ` · +${Number(x.compensatedPartner).toLocaleString('vi-VN')}đ partner` : ''}</div></div>` : ''}
+    </div>
+    <span class="modal-label">Ảnh bằng chứng (bấm để phóng to)</span>
+    ${imgs}`;
+  const foot = document.getElementById('nsModalFoot');
+  foot.innerHTML = x.status === 'pending'
+    ? `<button class="modal-cancel" onclick="document.getElementById('nsOverlay').classList.remove('show')">Đóng</button>
+       <button class="modal-delete" onclick="rejectNoshow('${x._id}')">❌ Từ chối</button>
+       <button class="modal-save" onclick="approveNoshow('${x._id}')">✅ Duyệt đúng — bồi thường + ban khách</button>`
+    : `<button class="modal-cancel" onclick="document.getElementById('nsOverlay').classList.remove('show')">Đóng</button>`;
+  document.getElementById('nsOverlay').classList.add('show');
+}
+async function approveNoshow(id) {
+  const x = _noshowList.find(v => String(v._id) === String(id));
+  if (!x) return;
+  const note = prompt('Ghi chú duyệt (tùy chọn):', '') ?? '';
+  if (note === null) return;
+  if (!confirm(`DUYỆT ĐÚNG khiếu nại ${x.reportId}?\n\n• Cộng tiền đơn vào ví shipper + partner\n• KHÓA VĨNH VIỄN ví CRABOR + Ví Trả Sau + tiền mặt của khách\n• Khách chỉ còn PayOS/SePay\n\nKhông thể hoàn tác!`)) return;
+  try {
+    const r = await apiFetch(`/api/admin/noshow/${id}/resolve`, 'POST', { action: 'approve', adminNote: note });
+    if (r.success) {
+      showNotif('✅ Đã duyệt', `+${(r.paidShipper||0).toLocaleString('vi-VN')}đ shipper · +${(r.paidPartner||0).toLocaleString('vi-VN')}đ partner · đã ban khách`, 'green');
+      document.getElementById('nsOverlay').classList.remove('show');
+      loadNoshow(); loadStats();
+    } else showNotif('❌ Lỗi', r.message);
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
+async function rejectNoshow(id) {
+  const reason = prompt('Lý do từ chối (hiện cho shipper):');
+  if (!reason) return;
+  try {
+    const r = await apiFetch(`/api/admin/noshow/${id}/resolve`, 'POST', { action: 'reject', adminNote: reason });
+    if (r.success) {
+      showNotif('Đã từ chối', 'Khiếu nại đã bị từ chối', 'coral');
+      document.getElementById('nsOverlay').classList.remove('show');
+      loadNoshow();
+    } else showNotif('❌ Lỗi', r.message);
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //   FEATURED RESTAURANTS
 // ─────────────────────────────────────────────────────────────────────────────
 async function loadFeatured() {
@@ -3471,7 +3606,7 @@ async function deleteBannerAdmin(id) { if (!confirm('Xóa banner này?')) return
 // ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', credit:'pgCredit', featured:'pgFeatured', social:'pgSocial', menus:'pgMenus', settings:'pgSettings' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', noshow:'pgNoshow', credit:'pgCredit', featured:'pgFeatured', social:'pgSocial', menus:'pgMenus', settings:'pgSettings' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -3484,6 +3619,7 @@ function showPage(key, ev) {
   if (key === 'sales') loadSales();
   if (key === 'vouchers') loadVouchers();
   if (key === 'wallet') loadWalletQueue();
+  if (key === 'noshow') loadNoshow();
   if (key === 'featured') loadFeatured();
   if (key === 'analytics') loadAdvAnalytics();
   if (key === 'support') loadSupportTickets();
