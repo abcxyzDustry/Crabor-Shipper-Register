@@ -4104,19 +4104,44 @@ app.post("/api/support/order", async (req, res) => {
     if (!text) return res.status(400).json({ success:false, message:"Thiếu nội dung hỗ trợ" });
     const categoryLabel = String(category || 'chung');
 
-    // 1) Tra đơn (nếu khách chọn đơn)
+    // 1) Tra đơn (nếu khách chọn đơn) — food/ride + giặt là + dọn nhà
     let orderRef = null;
     if (orderId) {
       const orConds = [{ orderId: String(orderId) }];
       if (mongoose.isValidObjectId(orderId)) orConds.push({ _id: orderId });
       orderRef = await Order.findOne({ $or: orConds }).lean();
+      if (!orderRef) {
+        try {
+          orderRef = await mongoose.models.LaundryOrder?.findOne({ orderId: String(orderId) }).lean() || null;
+        } catch (_) {}
+      }
+      if (!orderRef) {
+        try {
+          orderRef = await mongoose.models.CleaningOrder?.findOne({ orderId: String(orderId) }).lean() || null;
+        } catch (_) {}
+      }
+    }
+    const resolvedOrderId = orderRef?.orderId || String(orderId || "");
+
+    // 1b) Giới hạn: chỉ hỗ trợ đơn trong 7 ngày + tối đa 2 lượt/đơn
+    if (orderRef?.createdAt) {
+      const ageDays = (Date.now() - new Date(orderRef.createdAt).getTime()) / 86400000;
+      if (ageDays > 7) {
+        return res.status(400).json({ success: false, message: "Chỉ hỗ trợ các đơn trong 7 ngày gần nhất." });
+      }
+    }
+    if (resolvedOrderId) {
+      const sentCount = await SupportTicket.countDocuments({ orderId: resolvedOrderId });
+      if (sentCount >= 2) {
+        return res.status(400).json({ success: false, message: "Đơn này đã gửi hỗ trợ 2 lần, vui lòng chờ CS xử lý." });
+      }
     }
 
     // Lưu ticket đơn hàng
     const ticket = await SupportTicket.create({
       userId: req.session.userId || null,
       role: "customer",
-      orderId: orderRef?.orderId || String(orderId || ""),
+      orderId: resolvedOrderId,
       type: "order_issue",
       category: categoryLabel,
       message: `[${categoryLabel}] ${text}`,
