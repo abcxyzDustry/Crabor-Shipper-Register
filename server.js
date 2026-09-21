@@ -250,22 +250,35 @@ app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // ── Middleware: mobile client gửi X-Session-ID header → inject vào cookie ──
 // Dùng cookie-signature lib (khớp express-session). Nếu cookie hiện tại CHỮ KÝ
-// SAI (cookie cũ build tay) mà có X-Session-ID → thay bằng cookie ký đúng để
-// tự hồi phục phiên, khỏi bắt user đăng nhập lại.
+// SAI theo đúng chuẩn express-session (cắt 's:' rồi unsign) mà có X-Session-ID
+// → thay bằng cookie ký đúng để tự hồi phục phiên, khỏi bắt user đăng nhập lại.
+// (Lưu ý: unsign cả chuỗi 's:...' luôn đúng về mặt toán học nên PHẢI cắt prefix
+// trước, y hệt express-session, nếu không sẽ tưởng cookie hỏng là còn tốt.)
 app.use((req, res, next) => {
   try {
     const sig = require('cookie-signature');
     const secret = process.env.SESSION_SECRET || 'crabor-session-secret-2025';
+    // Mô phỏng đúng express-session getcookie: cắt 's:' rồi mới unsign
+    const expressSid = (raw) => {
+      if (!raw || raw.substr(0, 2) !== 's:') return false;
+      try {
+        const v = sig.unsign(raw.slice(2), secret);
+        return v === false ? false : v;
+      } catch (_) { return false; }
+    };
     const ck = req.headers.cookie || '';
     const m = ck.match(/connect\.sid=([^;]+)/);
-    let valid = false;
+    let validSid = false;
     if (m) {
-      try { valid = !!sig.unsign(decodeURIComponent(m[1]), secret); } catch (_) { valid = false; }
+      try { validSid = expressSid(decodeURIComponent(m[1])); } catch (_) { validSid = false; }
     }
     const xSessionId = req.headers['x-session-id'];
-    if (!valid && xSessionId && xSessionId.length > 10) {
+    if (!validSid && xSessionId && xSessionId.length > 10) {
       let sid = String(xSessionId);
-      if (sid.startsWith('s:')) sid = sig.unsign(sid.slice(2), secret) || sid;
+      if (sid.startsWith('s:')) {
+        const u = expressSid(sid);
+        sid = u || sid.slice(2);
+      }
       sid = sid.split('.')[0];
       const signed = 's:' + sig.sign(sid, secret);
       const cookieStr = 'connect.sid=' + encodeURIComponent(signed);
