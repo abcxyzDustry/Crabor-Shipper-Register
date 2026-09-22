@@ -718,6 +718,8 @@ const orderSchema = new mongoose.Schema({
   address:      { type: String, required: true, trim: true },
   addressLat:   { type: Number, default: null },
   addressLng:   { type: Number, default: null },
+  fromAddress:  { type: String, trim: true },
+  toAddress:    { type: String, trim: true },
   fromLat:       { type: Number, default: null },
   fromLng:       { type: Number, default: null },
   toLat:         { type: Number, default: null },
@@ -14481,6 +14483,15 @@ app.post("/api/order", async (req, res) => {
     const nearbyShippers = await findNearbyShippers(pickupLat, pickupLng, 5, 10);
     
     if (nearbyShippers.length > 0) {
+      // Ride đi đường generic không có fromAddress riêng trong DB cũ —
+      // tách từ items[0].name dạng "Xe <loại> — <đón> → <đến>" để app khỏi fallback "Địa chỉ quán".
+      let rideFrom = order.fromAddress || null, rideTo = order.toAddress || null;
+      if (order.module === 'ride' && (!rideFrom || !rideTo)) {
+        try {
+          const m = String(order.items?.[0]?.name || '').match(/Xe\s+(.*?)\s+—\s+(.*?)\s+→\s+(.*)/);
+          if (m) { if (!rideFrom) rideFrom = m[2]?.trim() || null; if (!rideTo) rideTo = m[3]?.trim() || null; }
+        } catch (_) {}
+      }
       const payload = {
         type: "order_request",
         orderId: order.orderId,
@@ -14494,7 +14505,11 @@ app.post("/api/order", async (req, res) => {
           voucherCode: order.voucherCode,
           voucherDiscount: order.voucherDiscount,
           shipFee: order.shipFee,
-          pickupAddress: order.partnerAddress || "Địa chỉ quán",
+          fromAddress: rideFrom,
+          toAddress: rideTo || order.address,
+          fromLat: order.fromLat ?? null, fromLng: order.fromLng ?? null,
+          toLat: order.toLat ?? order.addressLat ?? null, toLng: order.toLng ?? order.addressLng ?? null,
+          pickupAddress: order.module === 'ride' ? (rideFrom || "Điểm đón khách") : (order.partnerAddress || "Địa chỉ quán"),
           pickupLat,
           pickupLng,
           deliveryAddress: order.address,
@@ -14822,11 +14837,13 @@ app.post("/api/ride/book", async (req, res) => {
     const { discount: rideDiscount, applied: appliedVoucher } = await applyVoucher(voucherCode, { order: fee, ship: fee }, req.session.userId, "ride");
 
     // Tạo ride order
+    // (lưu cả fromAddress/toAddress chữ để dispatch generic + app hiển thị điểm đón)
     const rideOrder = new Order({
       module: "ride",
       customerId: req.session.userId,
       customerPhone: user?.phone || "",
       items: [{ name: `Xe ${vehicleType} — ${fromAddress} → ${toAddress}`, qty: 1, price: fee }],
+      fromAddress, toAddress,
       address: toAddress,
       fromLat: parseFloat(fromLat) || null, fromLng: parseFloat(fromLng) || null,
       toLat: parseFloat(toLat) || null, toLng: parseFloat(toLng) || null,
