@@ -14938,6 +14938,7 @@ app.post("/api/ride/book", async (req, res) => {
     }
 
     // Gửi ride request đến các shipper gần nhất
+    // (gửi đủ breakdown để app hiển thị: tổng cước / voucher / phí sàn / thực nhận)
     const ridePayload = {
       type: "ride_request",
       orderId: rideOrder.orderId,
@@ -14945,6 +14946,10 @@ app.post("/api/ride/book", async (req, res) => {
       fromAddress, fromLat, fromLng,
       toAddress, toLat, toLng,
       fee,
+      total: fee,
+      discount: rideDiscount || 0,
+      voucherCode: voucherCode || null,
+      serviceFee: Math.round(fee * 0.1),
       note,
       customerName: user?.fullName || "Khách hàng",
       customerPhone: user?.phone || "",
