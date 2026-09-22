@@ -619,7 +619,7 @@ body { padding-top: 36px; }
         <span class="module-badge">🇨🇳 Hoa hồng 20%</span>
       </div>
       <div class="welcome-module-btn sp" onclick="startRegistration('sp')">
-        <span class="module-icon">🛵</span>
+        <span class="module-icon" style="padding:0;overflow:hidden;border-radius:18px;display:inline-block;line-height:0"><img src="/shipper-card.png" alt="Shipper" style="width:64px;height:64px;object-fit:cover;display:block"></span>
         <span class="module-name">Shipper</span>
         <span class="module-desc">Trở thành tài xế giao hàng CRABOR<br>Thu nhập 20k–50k/đơn</span>
         <span class="module-badge" id="spEarlyBadge">⚡ Early Bird · Đang tải...</span>
@@ -682,6 +682,7 @@ body { padding-top: 36px; }
     <div class="head-top">
       <div class="logo-sm logo-gl" id="logoSm">
         <svg id="logoSvg" width="50" height="50" viewBox="0 0 140 140" fill="none"></svg>
+        <img id="logoImg" alt="Shipper CRABOR" style="display:none;width:50px;height:50px;border-radius:12px;object-fit:cover">
       </div>
       <div class="brand">
         <strong>CRABOR</strong>
@@ -1310,12 +1311,17 @@ function switchModule(m) {
 
   // Logo SVG
   const sv = document.getElementById('logoSvg');
+  const lgImg = document.getElementById('logoImg');
   if (m==='gl') sv.innerHTML=`<rect x="22" y="22" width="96" height="96" rx="14" fill="#F5F0DC"/><rect x="22" y="22" width="96" height="28" rx="14" fill="#6495ed" opacity=".8"/><rect x="22" y="42" width="96" height="8" fill="#6495ed" opacity=".8"/><circle cx="70" cy="88" r="30" fill="#6495ed" opacity=".35"/><circle cx="70" cy="88" r="22" fill="#F5F0DC"/><circle cx="70" cy="88" r="14" fill="#6495ed" opacity=".3"/><circle cx="38" cy="34" r="6" fill="#E8504A"/><circle cx="56" cy="34" r="6" fill="#FFD84D"/>`;
   if (m==='gv') sv.innerHTML=`<rect x="56" y="15" width="14" height="70" rx="7" fill="#F5F0DC"/><path d="M30 85 Q70 72 110 85 L104 112 Q70 122 36 112Z" fill="#F5F0DC"/><circle cx="28" cy="48" r="6" fill="#FFD84D" opacity=".9"/><circle cx="112" cy="42" r="5" fill="#FFD84D" opacity=".7"/><circle cx="105" cy="65" r="7" fill="#3aaa5c" opacity=".8"/><circle cx="22" cy="70" r="5" fill="#3aaa5c" opacity=".7"/>`;
   if (m==='cs') sv.innerHTML=`<rect x="22" y="48" width="96" height="76" rx="10" fill="#F5F0DC"/><rect x="22" y="48" width="96" height="24" rx="10" fill="#FFD84D"/><rect x="22" y="62" width="96" height="10" fill="#FFD84D"/><rect x="60" y="20" width="14" height="80" rx="5" fill="#E8504A" opacity=".55"/><path d="M46 48 Q46 28 70 28 Q94 28 94 48" stroke="#F5F0DC" stroke-width="6" fill="none" stroke-linecap="round"/>`;
   if (m==='sp') sv.innerHTML=`<path d="M28 85 Q28 44 70 44 Q112 44 112 85" fill="#F5F0DC"/><ellipse cx="70" cy="86" rx="43" ry="31" fill="#F5F0DC"/><circle cx="56" cy="51" r="10" fill="#F5F0DC"/><circle cx="56" cy="51" r="7" fill="#E8504A"/><circle cx="54" cy="49" r="2.5" fill="#F5F0DC"/><circle cx="84" cy="51" r="10" fill="#F5F0DC"/><circle cx="84" cy="51" r="7" fill="#E8504A"/><circle cx="82" cy="49" r="2.5" fill="#F5F0DC"/><path d="M28 73 Q8 60 7 47 Q17 33 27 43 Q21 52 28 61Z" fill="#F5F0DC"/><path d="M112 73 Q132 60 133 47 Q123 33 113 43 Q119 52 112 61Z" fill="#F5F0DC"/><path d="M57 96 Q70 107 83 96" stroke="#E8504A" stroke-width="3.5" stroke-linecap="round" fill="none"/>`;
   if (m==='fd') sv.innerHTML=`<ellipse cx="70" cy="90" rx="44" ry="22" fill="#F5F0DC"/><rect x="50" y="40" width="40" height="52" rx="8" fill="#F5F0DC" opacity=".9"/><path d="M55 62 Q70 50 85 62" stroke="#E8504A" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="70" cy="35" r="12" fill="#FFD84D"/><circle cx="70" cy="35" r="7" fill="#E8504A" opacity=".7"/><rect x="40" y="100" width="60" height="10" rx="5" fill="#E8504A" opacity=".4"/>`;
   if (m==='rx') sv.innerHTML=`<rect x="18" y="68" width="104" height="44" rx="14" fill="#F5F0DC"/><rect x="38" y="44" width="64" height="34" rx="10" fill="#F5F0DC" opacity=".9"/><circle cx="38" cy="112" r="16" fill="#E8504A" opacity=".3"/><circle cx="38" cy="112" r="10" fill="#F5F0DC"/><circle cx="38" cy="112" r="5" fill="#E8504A"/><circle cx="102" cy="112" r="16" fill="#E8504A" opacity=".3"/><circle cx="102" cy="112" r="10" fill="#F5F0DC"/><circle cx="102" cy="112" r="5" fill="#E8504A"/><rect x="46" y="56" width="48" height="18" rx="6" fill="#6495ed" opacity=".4"/>`;
+
+  // Shipper Early Bird: dùng ảnh shipper mới thay logo vẽ
+  if (m==='sp') { sv.style.display='none'; lgImg.src='/shipper-card.png'; lgImg.style.display='block'; }
+  else { sv.style.display=''; lgImg.style.display='none'; }
 
   document.querySelectorAll('.btn-next').forEach(b => b.className = 'btn-next ' + cfg.btnClass);
   document.getElementById('moduleInfoBox').className = 'info-box ' + cfg.infoClass;
