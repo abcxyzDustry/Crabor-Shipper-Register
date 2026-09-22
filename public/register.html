@@ -601,19 +601,19 @@ body { padding-top: 36px; }
     </div>
     <div class="welcome-modules">
       <div class="welcome-module-btn gl" onclick="startRegistration('gl')">
-        <span class="module-icon">👕</span>
+        <span class="module-icon" style="padding:0;overflow:hidden;border-radius:18px;display:inline-block;line-height:0"><img src="/laundry-card.png" alt="Giat La" style="width:64px;height:64px;object-fit:cover;display:block"></span>
         <span class="module-name">Giặt Là</span>
         <span class="module-desc">Đăng ký tiệm giặt là hợp tác với CRABOR<br>Hoa hồng 30%/đơn</span>
         <span class="module-badge">🚀 Miễn phí đăng ký</span>
       </div>
       <div class="welcome-module-btn gv" onclick="startRegistration('gv')">
-        <span class="module-icon">🧹</span>
+        <span class="module-icon" style="padding:0;overflow:hidden;border-radius:18px;display:inline-block;line-height:0"><img src="/cleaning-card.png" alt="Giup Viec" style="width:64px;height:64px;object-fit:cover;display:block"></span>
         <span class="module-name">Giúp Việc</span>
         <span class="module-desc">Đăng ký làm người giúp việc chuyên nghiệp<br>Thu nhập 200k–350k/ca</span>
         <span class="module-badge">✨ Miễn phí 100%</span>
       </div>
       <div class="welcome-module-btn cs" onclick="startRegistration('cs')">
-        <span class="module-icon">🛒</span>
+        <span class="module-icon" style="padding:0;overflow:hidden;border-radius:18px;display:inline-block;line-height:0"><img src="/china-card.png" alt="China Shop" style="width:64px;height:64px;object-fit:cover;display:block"></span>
         <span class="module-name">China Shop</span>
         <span class="module-desc">Bán hàng nội địa Trung trên CRABOR<br>Phí gian hàng 500k/năm</span>
         <span class="module-badge">🇨🇳 Hoa hồng 20%</span>
@@ -625,7 +625,7 @@ body { padding-top: 36px; }
         <span class="module-badge" id="spEarlyBadge">⚡ Early Bird · Đang tải...</span>
       </div>
       <div class="welcome-module-btn fd" onclick="startRegistration('fd')">
-        <span class="module-icon">🍜</span>
+        <span class="module-icon" style="padding:0;overflow:hidden;border-radius:18px;display:inline-block;line-height:0"><img src="/partner-card.png" alt="Nha hang" style="width:64px;height:64px;object-fit:cover;display:block"></span>
         <span class="module-name">Nhà hàng</span>
         <span class="module-desc">Đăng ký quán ăn lên nền tảng CRABOR<br>Hoa hồng 20%/đơn</span>
         <span class="module-badge">🍜 Đối tác Giao Đồ Ăn</span>
@@ -1319,8 +1319,9 @@ function switchModule(m) {
   if (m==='fd') sv.innerHTML=`<ellipse cx="70" cy="90" rx="44" ry="22" fill="#F5F0DC"/><rect x="50" y="40" width="40" height="52" rx="8" fill="#F5F0DC" opacity=".9"/><path d="M55 62 Q70 50 85 62" stroke="#E8504A" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="70" cy="35" r="12" fill="#FFD84D"/><circle cx="70" cy="35" r="7" fill="#E8504A" opacity=".7"/><rect x="40" y="100" width="60" height="10" rx="5" fill="#E8504A" opacity=".4"/>`;
   if (m==='rx') sv.innerHTML=`<rect x="18" y="68" width="104" height="44" rx="14" fill="#F5F0DC"/><rect x="38" y="44" width="64" height="34" rx="10" fill="#F5F0DC" opacity=".9"/><circle cx="38" cy="112" r="16" fill="#E8504A" opacity=".3"/><circle cx="38" cy="112" r="10" fill="#F5F0DC"/><circle cx="38" cy="112" r="5" fill="#E8504A"/><circle cx="102" cy="112" r="16" fill="#E8504A" opacity=".3"/><circle cx="102" cy="112" r="10" fill="#F5F0DC"/><circle cx="102" cy="112" r="5" fill="#E8504A"/><rect x="46" y="56" width="48" height="18" rx="6" fill="#6495ed" opacity=".4"/>`;
 
-  // Shipper Early Bird: dùng ảnh shipper mới thay logo vẽ
-  if (m==='sp') { sv.style.display='none'; lgImg.src='/shipper-card.png'; lgImg.style.display='block'; }
+  // Dùng ảnh mới thay logo vẽ cho từng module
+  const _logoMap = { sp:'/shipper-card.png', gl:'/laundry-card.png', gv:'/cleaning-card.png', cs:'/china-card.png', fd:'/partner-card.png' };
+  if (_logoMap[m]) { sv.style.display='none'; lgImg.src=_logoMap[m]; lgImg.style.display='block'; }
   else { sv.style.display=''; lgImg.style.display='none'; }
 
   document.querySelectorAll('.btn-next').forEach(b => b.className = 'btn-next ' + cfg.btnClass);
