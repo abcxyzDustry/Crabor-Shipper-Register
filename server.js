@@ -10357,6 +10357,7 @@ app.patch("/api/partner/orders/:id", async (req, res) => {
 
           const nearbyShippers = await findNearbyShippers(pickupLat, pickupLng, 10, 10);
           if (nearbyShippers.length > 0) {
+            const _ra = resolveRideAddresses(order);
             const payload = {
               type: "order_request",
               orderId: order.orderId,
@@ -10371,7 +10372,11 @@ app.patch("/api/partner/orders/:id", async (req, res) => {
                 voucherDiscount: order.voucherDiscount || 0,
                 shipFee: order.shipFee || 0,
                 serviceFee: order.serviceFee || 0,
-                pickupAddress: order.partnerAddress || "Địa chỉ quán",
+                fromAddress: _ra.from,
+                toAddress: _ra.to || order.address,
+                fromLat: order.fromLat ?? null, fromLng: order.fromLng ?? null,
+                toLat: order.toLat ?? order.addressLat ?? null, toLng: order.toLng ?? order.addressLng ?? null,
+                pickupAddress: order.module === 'ride' ? (_ra.from || "Điểm đón khách") : (order.partnerAddress || "Địa chỉ quán"),
                 pickupLat, pickupLng,
                 deliveryAddress: order.address,
                 deliveryLat: order.addressLat || null,
@@ -14096,6 +14101,33 @@ function broadcastOrderCancelled(io, order, { ride = false } = {}) {
   } catch (e) { console.error('[broadcastOrderCancelled]', e.message); }
 }
 
+// ── Helper: tách địa chỉ đón/trả cuốc xe từ tên item ───────────
+// Tên item dạng "Xe <loại> — <đón> → <đến>", nhưng thực tế separator lẫn lộn
+// (—, –, -, →, >, ->) nên parse chịu mọi biến thể. Đơn cũ không lưu
+// fromAddress riêng → đây là cứu cánh để popup shipper hiện điểm đón.
+function parseRideItemName(name) {
+  const s = String(name || '');
+  const m = s.match(/^Xe\s+(.*?)\s+[—–-]\s+(.*)$/);
+  if (!m) return {};
+  const parts = m[2].split(/\s*(?:→|–|->|>)\s*/);
+  if (parts.length < 2) return { vehicle: (m[1] || '').trim() };
+  return { vehicle: (m[1] || '').trim(), from: (parts[0] || '').trim(), to: parts.slice(1).join(' ').trim() };
+}
+// Gom địa chỉ xe cho payload dispatch: ưu tiên field DB, fallback parse tên item.
+function resolveRideAddresses(order) {
+  const o = order || {};
+  let from = o.fromAddress || null, to = o.toAddress || null, vehicle = o.vehicleType || null;
+  if ((!from || !to) && o.module === 'ride') {
+    try {
+      const p = parseRideItemName(o.items?.[0]?.name);
+      if (!from && p.from) from = p.from;
+      if (!to && p.to) to = p.to;
+      if (!vehicle && p.vehicle) vehicle = p.vehicle;
+    } catch (_) {}
+  }
+  return { from, to, vehicle };
+}
+
 // ── Helper: dispatch order đến shipper online gần nhất ────────
 async function dispatchToShippers(order, io) {
   try {
@@ -14112,6 +14144,7 @@ async function dispatchToShippers(order, io) {
     const nearby = await findNearbyShippers(pickupLat, pickupLng, 8, 10);
     if (!nearby.length) return false;
 
+    const _ra = resolveRideAddresses(order);
     const payload = {
       type: "new_order_request",
       orderId: order.orderId,
@@ -14125,7 +14158,11 @@ async function dispatchToShippers(order, io) {
         voucherCode: order.voucherCode,
         shipFee: order.shipFee,
         serviceFee: order.serviceFee,
-        pickupAddress: order.partnerAddress || "Địa chỉ quán",
+        fromAddress: _ra.from,
+        toAddress: _ra.to || order.address,
+        fromLat: order.fromLat ?? null, fromLng: order.fromLng ?? null,
+        toLat: order.toLat ?? order.addressLat ?? null, toLng: order.toLng ?? order.addressLng ?? null,
+        pickupAddress: order.module === 'ride' ? (_ra.from || "Điểm đón khách") : (order.partnerAddress || "Địa chỉ quán"),
         pickupLat, pickupLng,
         deliveryAddress: order.address,
         note: order.note,
@@ -14193,6 +14230,7 @@ async function dispatchOrderToNearbyShippers(order, io) {
 
     console.log('[Dispatch] Found', nearbyShippers.length, 'nearby shippers');
 
+    const _ra = resolveRideAddresses(order);
     const payload = {
       type: "order_request",
       orderId: order.orderId,
@@ -14207,7 +14245,12 @@ async function dispatchOrderToNearbyShippers(order, io) {
         voucherDiscount: order.voucherDiscount || 0,
         shipFee: order.shipFee,
         serviceFee: order.serviceFee || 0,
-        pickupAddress: order.partnerAddress || "Địa chỉ quán",
+        fromAddress: _ra.from,
+        toAddress: _ra.to || order.address,
+        fromLat: order.fromLat ?? null, fromLng: order.fromLng ?? null,
+        toLat: order.toLat ?? order.addressLat ?? order.deliveryLat ?? order.lat ?? null,
+        toLng: order.toLng ?? order.addressLng ?? order.deliveryLng ?? order.lng ?? null,
+        pickupAddress: order.module === 'ride' ? (_ra.from || "Điểm đón khách") : (order.partnerAddress || "Địa chỉ quán"),
         pickupLat,
         pickupLng,
         deliveryAddress: order.address,
@@ -14531,15 +14574,7 @@ app.post("/api/order", async (req, res) => {
     const nearbyShippers = await findNearbyShippers(pickupLat, pickupLng, 5, 10);
     
     if (nearbyShippers.length > 0) {
-      // Ride đi đường generic không có fromAddress riêng trong DB cũ —
-      // tách từ items[0].name dạng "Xe <loại> — <đón> → <đến>" để app khỏi fallback "Địa chỉ quán".
-      let rideFrom = order.fromAddress || null, rideTo = order.toAddress || null;
-      if (order.module === 'ride' && (!rideFrom || !rideTo)) {
-        try {
-          const m = String(order.items?.[0]?.name || '').match(/Xe\s+(.*?)\s+—\s+(.*?)\s+→\s+(.*)/);
-          if (m) { if (!rideFrom) rideFrom = m[2]?.trim() || null; if (!rideTo) rideTo = m[3]?.trim() || null; }
-        } catch (_) {}
-      }
+      const { from: rideFrom, to: rideTo } = resolveRideAddresses(order);
       const payload = {
         type: "order_request",
         orderId: order.orderId,
@@ -16573,6 +16608,7 @@ setInterval(async () => {
       const nearbyShippers = await findNearbyShippers(pickupLat, pickupLng, 5, 10);
       
       if (nearbyShippers.length > 0) {
+        const _ra = resolveRideAddresses(order);
         const payload = {
           type: "order_request",
           orderId: order.orderId,
@@ -16582,7 +16618,11 @@ setInterval(async () => {
             items: order.items,
             total: order.finalTotal || order.total,
             shipFee: order.shipFee,
-            pickupAddress: order.partnerAddress || "Địa chỉ quán",
+            fromAddress: _ra.from,
+            toAddress: _ra.to || order.address,
+            fromLat: order.fromLat ?? null, fromLng: order.fromLng ?? null,
+            toLat: order.toLat ?? order.addressLat ?? null, toLng: order.toLng ?? order.addressLng ?? null,
+            pickupAddress: order.module === 'ride' ? (_ra.from || "Điểm đón khách") : (order.partnerAddress || "Địa chỉ quán"),
             pickupLat,
             pickupLng,
             deliveryAddress: order.address,
