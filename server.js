@@ -1279,6 +1279,7 @@ const sosReportSchema = new mongoose.Schema({
   adminNote:  { type: String, trim: true },
   // Coco auto phán quyết: admin nhập đánh giá trước, Coco đề xuất, admin duyệt mới thành phán quyết cuối
   adminEval:   { type: String, trim: true },
+  compensatedShipper: { type: Number, default: 0 },
   cocoVerdict: { type: String, trim: true },
   cocoDecision:{ type: String, enum: ['shipper_right','customer_right','need_more','undecided'], default: 'undecided' },
   cocoAuto:    { type: Boolean, default: false },
@@ -15498,15 +15499,68 @@ app.post("/api/admin/sos/:id/resolve", async (req, res) => {
     report.resolvedBy = String(req.session.adminId);
     await report.save();
     const order = await Order.findOne({ orderId: report.orderId });
+    let paidShipper = 0, orderCancelled = false;
     if (order) {
       order.sosPausedUntil = null;
       order.sosStatus = 'resolved';
       order.statusHistory = order.statusHistory || [];
-      order.statusHistory.push({ status: approved ? 'sos_resolved_approve' : 'sos_resolved_reject', time: new Date(), by: 'admin' });
-      await order.save();
-      req.io?.to(`shipper_${report.shipperId}`).emit("sos_resolved", { reportId: report.reportId, orderId: report.orderId, approved, message: approved ? `CRABOR đã chấp nhận SOS đơn ${report.orderId}. ${report.adminNote}` : `SOS đơn ${report.orderId} chưa đủ căn cứ. ${report.adminNote}` });
+      if (approved) {
+        // Shipper ĐÚNG: hủy đơn lập tức + cộng tiền shipper + khóa ví/BNPL/tiền mặt của khách
+        order.status = 'cancelled';
+        order.cancelReason = `SOS ${report.reportId} (${report.category}): ${report.adminNote || 'shipper đúng'}`;
+        orderCancelled = true;
+        order.statusHistory.push({ status: 'cancelled', time: new Date(), by: 'admin_sos' });
+        try {
+          const { shipperEarn } = await calcEarnings(order);
+          if (order.shipperId && shipperEarn > 0) {
+            const already = await WalletQueue.findOne({
+              orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
+              amount: shipperEarn, status: "approved",
+            }).lean().catch(() => null);
+            if (!already) {
+              await creditWalletDirect(order.shipperId, "shipper", shipperEarn, order.orderId, `Bồi thường SOS ${order.orderId} (shipper đúng)`);
+              await WalletQueue.create({
+                orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
+                amount: shipperEarn, paymentMethod: order.paymentMethod || "sos",
+                note: `Bồi thường SOS ${order.orderId}`, status: "approved",
+                approvedBy: "sos_admin", approvedAt: new Date(),
+              });
+              paidShipper = shipperEarn;
+            }
+          }
+        } catch (e) { console.error("[SOS] compensate shipper:", e.message); }
+        // Khóa ngay ví CRABOR + ví trả sau + tiền mặt của khách (chỉ còn PayOS/SePay)
+        if (order.customerId) {
+          const BAN_REASON = `SOS ${report.reportId} đơn ${order.orderId} (shipper đúng, xác minh bằng chứng)`;
+          await User.findByIdAndUpdate(order.customerId, {
+            $set: {
+              cashBlocked: true,
+              bnplLocked: true, bnplLockedReason: BAN_REASON, bnplLockedAt: new Date(),
+              walletLocked: true, walletLockedReason: BAN_REASON, walletLockedAt: new Date(),
+            },
+          }).catch(e => console.error("[SOS] ban customer:", e.message));
+        }
+        report.compensatedShipper = paidShipper;
+        await report.save();
+        await order.save();
+        try { req.io?.to(`shipper_${report.shipperId}`).emit("wallet_credited", { amount: paidShipper, orderId: order.orderId, message: `+${paidShipper.toLocaleString("vi-VN")}đ bồi thường SOS đơn ${order.orderId} đã vào ví!` }); } catch (_) {}
+        req.io?.to(`shipper_${report.shipperId}`).emit("sos_resolved", { reportId: report.reportId, orderId: order.orderId, approved: true, orderCancelled: true, paidShipper, message: `CRABOR: shipper ĐÚNG. Đơn ${order.orderId} đã HỦY lập tức. +${paidShipper.toLocaleString("vi-VN")}đ đã vào ví. Ví CRABOR/ví trả sau/tiền mặt của khách đã bị khóa.` });
+        req.io?.to(`order_${order.orderId}`).emit("order_cancelled", { orderId: order.orderId, cancelReason: order.cancelReason });
+        if (order.shipperId) {
+          await notifyUser("shipper", order.shipperId, {
+            type: "income", title: "✅ SOS đúng — đơn đã hủy + cộng tiền",
+            body: `Đơn ${order.orderId} đã hủy. +${paidShipper.toLocaleString("vi-VN")}đ bồi thường đã vào ví. Cảm ơn bạn đã báo cáo trung thực!`,
+            ref: order.orderId, refModule: order.module || "food",
+          }).catch(() => {});
+        }
+      } else {
+        // Không có gì bất thường: gỡ pause, đơn tiếp tục bình thường
+        order.statusHistory.push({ status: 'sos_resolved_reject', time: new Date(), by: 'admin' });
+        await order.save();
+        req.io?.to(`shipper_${report.shipperId}`).emit("sos_resolved", { reportId: report.reportId, orderId: report.orderId, approved: false, orderCancelled: false, message: `SOS đơn ${order.orderId} chưa đủ căn cứ. Đơn TIẾP TỤC bình thường — vui lòng thực hiện bước tiếp theo. ${report.adminNote}` });
+      }
     }
-    res.json({ success: true, message: approved ? "Đã chấp nhận SOS" : "Đã từ chối SOS" });
+    res.json({ success: true, orderCancelled, paidShipper, message: approved ? `Đã duyệt SOS — đơn đã HỦY, +${paidShipper.toLocaleString("vi-VN")}đ cho shipper, đã khóa ví/BNPL/COD khách.` : "Đã từ chối SOS — đơn tiếp tục bình thường." });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
