@@ -9222,10 +9222,7 @@ app.get("/api/shipper/verify-identity", async (req, res) => {
 // POST /api/admin/shipper/verify-identity — Admin duyệt/từ chối xác minh
 app.post("/api/admin/shipper/verify-identity", async (req, res) => {
   try {
-    const _adminKey = req.headers["x-admin-key"];
-    const _validKey = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-    const _isAdmin = (_adminKey === _validKey) || !!req.session?.adminId;
-    if (!_isAdmin) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!isAdminRequest(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
     const { shipperId, action, note } = req.body || {};
     if (!shipperId || !['approve','reject'].includes(action))
       return res.status(400).json({ success: false, message: "Thiếu shipperId hoặc action" });
@@ -13114,14 +13111,18 @@ app.get("/api/admin/transactions", adminAuth, async (req, res) => {
 //  14. API: ADMIN
 // ==========================================
 
+// Xác thực admin DUY NHẤT qua 2 đường: ADMIN_SECRET_KEY (env) hoặc session adminId.
+// KHÔNG có key mặc định — key cũ 'crabor-admin-secret-2025' đã lộ nên bị vô hiệu
+// hoàn toàn (thiếu env = 401, fail closed). Dùng cho mọi endpoint /api/admin/*.
+function isAdminRequest(req) {
+  const validKey = process.env.ADMIN_SECRET_KEY || "";
+  if (validKey && req.headers["x-admin-key"] === validKey) return true;
+  if (req.session && req.session.adminId) return true;
+  return false;
+}
 function adminAuth(req, res, next) {
-  const key = req.headers["x-admin-key"];
-  const validKey = process.env.ADMIN_SECRET_KEY;
-  if(!validKey && process.env.NODE_ENV === 'production') return res.status(500).json({success:false, message:'ADMIN_SECRET_KEY chưa cấu hình'});
-  const checkKey = validKey || "crabor-admin-secret-2025";
-  if (key && key === checkKey) return next();
-  if (req.session && req.session.adminId) return next();
-  return res.status(401).json({ success: false, message: "Unauthorized — Sai ADMIN_SECRET_KEY hoặc chưa đăng nhập" });
+  if (isAdminRequest(req)) return next();
+  return res.status(401).json({ success: false, message: "Unauthorized" });
 }
 
 // GET /api/admin/stats — dashboard stats
@@ -14629,9 +14630,7 @@ app.patch("/api/orders/:id/status", async (req, res) => {
       cancelled:   isCustomer && ["pending","confirmed","preparing","shipper_accepted"].includes(order.status), // Customer hủy được trước khi shipper đến lấy hàng
     };
 
-    const _ak = req.headers["x-admin-key"];
-    const _vk = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-    const _isAdm = (_ak === _vk) || !!req.session?.adminId;
+    const _isAdm = isAdminRequest(req);
     // Không có role nào (session chết/hết hạn) → 401 để app tự đăng nhập lại,
     // thay vì 403 gây hiểu lầm "không có quyền"
     if (!isShipper && !isPartner && !isCustomer && !_isAdm)
@@ -15697,10 +15696,7 @@ app.get("/api/shipper/active-orders", async (req, res) => {
 // GET /api/admin/wallet-queue — Xem danh sách pending với filter
 app.get("/api/admin/wallet-queue", async (req, res) => {
   try {
-    const _adminKey = req.headers["x-admin-key"];
-    const _validKey = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-    const _isAdmin = (_adminKey === _validKey) || !!req.session?.adminId;
-    if (!_isAdmin) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!isAdminRequest(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
     const { status = "pending", page = 1, limit = 30, recipientType } = req.query;
     const filter = { status };
     if (recipientType) filter.recipientType = recipientType;
@@ -15715,10 +15711,7 @@ app.get("/api/admin/wallet-queue", async (req, res) => {
 // POST /api/admin/wallet-queue/:id/approve — Admin duyệt → cộng vào ví
 app.post("/api/admin/wallet-queue/:id/approve", async (req, res) => {
   try {
-    const _adminKey = req.headers["x-admin-key"];
-    const _validKey = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-    const _isAdmin = (_adminKey === _validKey) || !!req.session?.adminId;
-    if (!_isAdmin) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!isAdminRequest(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
 
     const item = await WalletQueue.findById(req.params.id);
     if (!item) return res.status(404).json({ success: false });
@@ -15771,10 +15764,7 @@ app.post("/api/admin/wallet-queue/:id/approve", async (req, res) => {
 // POST /api/admin/wallet-queue/:id/reject — Admin từ chối
 app.post("/api/admin/wallet-queue/:id/reject", async (req, res) => {
   try {
-    const _adminKey = req.headers["x-admin-key"];
-    const _validKey = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-    const _isAdmin = (_adminKey === _validKey) || !!req.session?.adminId;
-    if (!_isAdmin) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!isAdminRequest(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
     const { reason } = req.body;
     const item = await WalletQueue.findById(req.params.id);
     if (!item || item.status !== "pending")
@@ -15789,10 +15779,7 @@ app.post("/api/admin/wallet-queue/:id/reject", async (req, res) => {
 // GET /api/admin/wallet-queue/stats — Thống kê mở rộng
 app.get("/api/admin/wallet-queue/stats", async (req, res) => {
   try {
-    const _adminKey = req.headers["x-admin-key"];
-    const _validKey = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-    const _isAdmin = (_adminKey === _validKey) || !!req.session?.adminId;
-    if (!_isAdmin) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!isAdminRequest(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
 
     const [pending, approved, totalPendingAgg, approvedTodayAgg, customerWalletAgg, partnerWalletAggs] = await Promise.all([
@@ -15831,10 +15818,7 @@ app.get("/api/admin/wallet-queue/stats", async (req, res) => {
 // POST /api/admin/wallet-queue/approve-all — Duyệt tất cả pending
 app.post("/api/admin/wallet-queue/approve-all", async (req, res) => {
   try {
-    const _adminKey = req.headers["x-admin-key"];
-    const _validKey = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-    const _isAdmin = (_adminKey === _validKey) || !!req.session?.adminId;
-    if (!_isAdmin) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!isAdminRequest(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
     const items = await WalletQueue.find({ status: "pending" });
     let approved = 0, totalAmount = 0;
     for (const item of items) {
@@ -15866,9 +15850,7 @@ app.post("/api/admin/wallet-queue/approve-all", async (req, res) => {
 //  NOSHOW ADMIN — duyệt khiếu nại bùng đơn tiền mặt
 // ══════════════════════════════════════════════════════════════
 function requireAdminNoshow(req) {
-  const k = req.headers["x-admin-key"];
-  const valid = process.env.ADMIN_SECRET_KEY || "crabor-admin-secret-2025";
-  return (k === valid) || !!req.session?.adminId;
+  return isAdminRequest(req);
 }
 
 // GET /api/admin/noshow — Admin xem khiếu nại (filter status)

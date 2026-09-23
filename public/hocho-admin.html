@@ -275,8 +275,8 @@ tr:hover td{background:rgba(22,163,74,.04)}
 
 <script>
 const API_BASE = '';
-const ADMIN_KEY = 'crabor-admin-secret-2025';
-let ADMIN_TOKEN = 'crabor-admin-key'; // tự động xác thực qua key
+// KHÔNG key mặc định — đăng nhập để lấy JWT (Bearer), token cache ở localStorage.
+let ADMIN_TOKEN = localStorage.getItem('hocho_admin_token') || null;
 let allPartners = [], allOrders = [];
 
 // ── LOGIN ──
@@ -317,11 +317,21 @@ function enterApp() {
   loadDashboard();
 }
 
-// Bỏ login — tự động vào dashboard
-window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('appWrap').style.display = 'flex';
-  loadDashboard();
+// Yêu cầu đăng nhập — KHÔNG tự động vào dashboard
+window.addEventListener('DOMContentLoaded', async () => {
+  if (ADMIN_TOKEN) {
+    try {
+      const r = await fetch(`${API_BASE}/api/hocho/admin/dashboard`, {
+        headers: { 'Authorization': 'Bearer ' + ADMIN_TOKEN }
+      });
+      const d = await r.json().catch(() => ({}));
+      if (d && d.success) { enterApp(); return; }
+    } catch (_) {}
+    ADMIN_TOKEN = null;
+    localStorage.removeItem('hocho_admin_token');
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appWrap').style.display = 'none';
 });
 
 function logout() {
@@ -346,10 +356,16 @@ async function changePassword() {
 }
 
 async function adminFetch(url, opts={}) {
-  const res = await fetch(url, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY, ...(opts.headers||{}) }
-  });
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers||{}) };
+  if (ADMIN_TOKEN) headers['Authorization'] = 'Bearer ' + ADMIN_TOKEN;
+  const res = await fetch(url, { ...opts, headers });
+  if (res.status === 401) {
+    ADMIN_TOKEN = null;
+    localStorage.removeItem('hocho_admin_token');
+    document.getElementById('appWrap').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    throw new Error('Phiên hết hạn — đăng nhập lại');
+  }
   return res.json();
 }
 

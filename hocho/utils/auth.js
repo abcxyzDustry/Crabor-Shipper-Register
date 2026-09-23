@@ -69,10 +69,10 @@ export const authEither = (req, res, next) => {
 // Middleware xác thực ADMIN — JWT hoặc x-admin-key từ CRABOR admin
 export const authAdmin = (req, res, next) => {
   try {
-    // Nhận x-admin-key từ CRABOR admin (iframe nhúng)
+    // Nhận x-admin-key từ CRABOR admin (iframe nhúng) — env-only, không key mặc định
     const craborKey = req.headers['x-admin-key'];
-    const validKey = process.env.ADMIN_SECRET_KEY || 'crabor-admin-secret-2025';
-    if (craborKey === validKey) {
+    const validKey = process.env.ADMIN_SECRET_KEY || '';
+    if (validKey && craborKey === validKey) {
       req.adminId = 'crabor_admin';
       return next();
     }
