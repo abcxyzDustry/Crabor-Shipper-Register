@@ -15451,6 +15451,16 @@ app.post("/api/shipper/sos/report", async (req, res) => {
     await order.save();
     req.io?.to("admin").emit("sos_pending", { reportId: report.reportId, orderId: order.orderId, category: cat, message: `SOS mới: ${order.orderId} [${cat}]` });
     req.io?.to(`shipper_${req.session.shipperId}`).emit("sos_paused", { orderId: order.orderId, pausedUntil, message: `Đơn ${order.orderId} tạm ngưng 1h chờ CRABOR phán quyết` });
+    // Đồng bộ customer: báo đơn tạm ngưng + chuông
+    if (order.customerId) {
+      try { req.io?.to(`customer_${order.customerId}`).emit("sos_paused", { orderId: order.orderId, pausedUntil, message: `Đơn ${order.orderId} tạm ngưng 1h để CRABOR xác minh (shipper báo cáo dấu hiệu bất thường). Vui lòng giữ liên lạc.` }); } catch (_) {}
+      try { req.io?.to(`order_${order.orderId}`).emit("order_status_update", { orderId: order.orderId, status: order.status, sosPaused: true, sosPausedUntil: pausedUntil }); } catch (_) {}
+      await notifyUser("user", order.customerId, {
+        type: "system", title: "⏸️ Đơn tạm ngưng 1h",
+        body: `Đơn ${order.orderId} tạm ngưng để CRABOR xác minh. Vui lòng giữ liên lạc — kết quả sẽ báo ngay.`,
+        ref: order.orderId, refModule: order.module || "food",
+      }).catch(() => {});
+    }
     res.json({ success: true, reportId: report.reportId, pausedUntil, message: "Đã gửi SOS. Đơn TẠM NGƯNG 1h chờ phán quyết cuối của CRABOR. Báo cáo trung thực được bảo vệ, không tính vi phạm." });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -15553,11 +15563,33 @@ app.post("/api/admin/sos/:id/resolve", async (req, res) => {
             ref: order.orderId, refModule: order.module || "food",
           }).catch(() => {});
         }
+        // Đồng bộ customer: hủy đơn + khóa ví/BNPL/COD + chuông
+        if (order.customerId) {
+          try { req.io?.to(`customer_${order.customerId}`).emit("order_cancelled", { orderId: order.orderId, cancelReason: order.cancelReason }); } catch (_) {}
+          try { req.io?.to(`customer_${order.customerId}`).emit("sos_resolved", { reportId: report.reportId, orderId: order.orderId, approved: true, orderCancelled: true, message: `CRABOR: đơn ${order.orderId} đã HỦY do vi phạm (xác minh SOS). Ví CRABOR/ví trả sau/tiền mặt của bạn đã bị khóa — chỉ còn PayOS/SePay. Khiếu nại trong 05 ngày (mục Hỗ trợ).` }); } catch (_) {}
+          try { req.io?.to(`customer_${order.customerId}`).emit("order_status_update", { orderId: order.orderId, status: 'cancelled' }); } catch (_) {}
+          try { req.io?.to(`customer_${order.customerId}`).emit("bnplLocked", { locked: true, reason: `SOS ${report.reportId} đơn ${order.orderId}`, permanent: true }); } catch (_) {}
+          await notifyUser("user", order.customerId, {
+            type: "system", title: "❌ Đơn đã HỦY do vi phạm",
+            body: `Đơn ${order.orderId} đã hủy sau xác minh SOS. Ví CRABOR/ví trả sau/tiền mặt của bạn đã bị khóa — chỉ còn PayOS/SePay. Bạn có quyền khiếu nại trong 05 ngày.`,
+            ref: order.orderId, refModule: order.module || "food",
+          }).catch(() => {});
+        }
       } else {
         // Không có gì bất thường: gỡ pause, đơn tiếp tục bình thường
         order.statusHistory.push({ status: 'sos_resolved_reject', time: new Date(), by: 'admin' });
         await order.save();
         req.io?.to(`shipper_${report.shipperId}`).emit("sos_resolved", { reportId: report.reportId, orderId: report.orderId, approved: false, orderCancelled: false, message: `SOS đơn ${order.orderId} chưa đủ căn cứ. Đơn TIẾP TỤC bình thường — vui lòng thực hiện bước tiếp theo. ${report.adminNote}` });
+        // Đồng bộ customer: đơn tiếp tục
+        if (order.customerId) {
+          try { req.io?.to(`customer_${order.customerId}`).emit("sos_resolved", { reportId: report.reportId, orderId: order.orderId, approved: false, orderCancelled: false, message: `Đơn ${order.orderId} đã được xác minh — không có gì bất thường. Đơn TIẾP TỤC giao bình thường.` }); } catch (_) {}
+          try { req.io?.to(`customer_${order.customerId}`).emit("order_status_update", { orderId: order.orderId, status: order.status }); } catch (_) {}
+          await notifyUser("user", order.customerId, {
+            type: "system", title: "▶️ Đơn tiếp tục giao",
+            body: `Đơn ${order.orderId} đã xác minh xong — tiếp tục giao bình thường. Cảm ơn bạn đã chờ!`,
+            ref: order.orderId, refModule: order.module || "food",
+          }).catch(() => {});
+        }
       }
     }
     res.json({ success: true, orderCancelled, paidShipper, message: approved ? `Đã duyệt SOS — đơn đã HỦY, +${paidShipper.toLocaleString("vi-VN")}đ cho shipper, đã khóa ví/BNPL/COD khách.` : "Đã từ chối SOS — đơn tiếp tục bình thường." });
