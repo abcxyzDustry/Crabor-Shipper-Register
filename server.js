@@ -329,7 +329,9 @@ app.use((req,res,next)=>{ res.on("finish",()=>SystemHealth.recordRequest(res.sta
 function requireApp(req, res, next) {
   const key = process.env.ADMIN_APP_KEY || "";
   if (!key) return next();
-  const got = (req.headers["x-app-key"] || req.query.app || req.query["app"] || "").toString();
+  // CHỈ nhận header (app desktop tự gắn) — không nhận ?app= qua URL để key
+  // không lọt vào history/log/referer trình duyệt.
+  const got = (req.headers["x-app-key"] || "").toString();
   if (got !== key) {
     return res.status(403).json({ success: false, error: "Invalid app key - admin desktop only" });
   }
@@ -339,19 +341,14 @@ function requireApp(req, res, next) {
 // Admin app key guard: admin pages/APIs require ADMIN_APP_KEY (desktop app only)
 const ADMIN_APP_KEY = process.env.ADMIN_APP_KEY || "";
 if (ADMIN_APP_KEY) {
+  const hasAppHeader = (req) => (req.headers["x-app-key"] || "").toString() === ADMIN_APP_KEY;
   app.get("/admin.html", (req, res) => {
-    const appKey =
-      (req.headers["x-app-key"] || "") === ADMIN_APP_KEY ||
-      (req.query && req.query.app === ADMIN_APP_KEY);
-    if (!appKey) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
+    if (!hasAppHeader(req)) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
     const html = fs.readFileSync(path.join(__dirname, "public", "admin.html"), "utf8");
     return res.send(html);
   });
   app.get("/admin", (req, res) => {
-    const appKey =
-      (req.headers["x-app-key"] || "") === ADMIN_APP_KEY ||
-      (req.query && req.query.app === ADMIN_APP_KEY);
-    if (!appKey) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
+    if (!hasAppHeader(req)) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
     const html = fs.readFileSync(path.join(__dirname, "public", "admin.html"), "utf8");
     return res.send(html);
   });
@@ -359,12 +356,13 @@ if (ADMIN_APP_KEY) {
   app.use((req, res, next) => {
     const pth = req.path || "";
     if (pth === "/admin" || pth === "/admin.html" || pth.startsWith("/admin/") || pth.startsWith("/admin.html")) {
-      const got = (req.headers["x-app-key"] || req.query.app || "").toString();
-      if (got !== ADMIN_APP_KEY) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
+      if (!hasAppHeader(req)) return res.status(403).type("html").send("Blocked: admin access requires the desktop app.");
     }
     next();
   });
   app.use("/api/admin", requireApp);
+  // Login admin cũng chỉ cho app desktop gọi (tránh dò mật khẩu từ web)
+  app.use("/api/auth/admin-login", requireApp);
 }
 
 // Static files
