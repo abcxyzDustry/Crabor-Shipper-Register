@@ -5528,7 +5528,7 @@ app.post("/api/bnpl/use", async (req,res) => {
 });
 
 // ── MỞ KHÓA VÍ TRẢ SAU (BNPL activation) — ký hợp đồng để dùng ──
-// POST /api/bnpl/activation — đăng ký mở khóa Ví Trả Sau (tự động duyệt nếu đủ điều kiện)
+// POST /api/bnpl/activation — đăng ký mở khóa Ví Trả Sau (gửi hồ sơ chờ admin duyệt)
 app.post("/api/bnpl/activation", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
@@ -5562,12 +5562,8 @@ app.post("/api/bnpl/activation", async (req, res) => {
       return res.status(400).json({ success:false, message:'Mật khẩu giao dịch không đúng' });
     if (!acceptContract)
       return res.status(400).json({ success:false, message:'Bạn cần đồng ý với điều khoản hợp đồng Ví Trả Sau.' });
-    // TỰ ĐỘNG DUYỆT: hồ sơ đã qua đủ mọi cổng máy kiểm được (chi tiêu ≥5M,
-    // trust ≥50, không hay hủy, không nợ quá hạn, đủ KYC + MKGD + hợp đồng)
-    // → mở khóa ngay để dùng BNPL cho cả 4 dịch vụ, không chờ admin.
-    // Admin vẫn hậu kiểm qua danh sách activations (từ chối → thu hồi).
     await User.findByIdAndUpdate(req.session.userId, {
-      bnplActivationStatus: 'approved',
+      bnplActivationStatus: 'pending',
       kyc: {
         selfie: facePhoto, cccdFront, cccdBack,
         emergencyContact,
@@ -5575,17 +5571,8 @@ app.post("/api/bnpl/activation", async (req, res) => {
       },
       kycStatus: 'pending',
     });
-    try {
-      await Notification.create({
-        ownerType: 'user', ownerId: req.session.userId,
-        type: 'system', title: '🎉 Ví Trả Sau đã được phê duyệt!',
-        body: 'Chúc mừng bạn đã được CRABOR phê duyệt Ví Trả Sau với hạn mức 2.000.000đ. Hãy khám phá ngay!',
-        ref: 'bnpl_approved'
-      });
-    } catch(e) { console.warn('BNPL auto-approve notify', e.message); }
-    req.io.to(`customer_${req.session.userId}`).emit('bnplActivationUpdated', { status: 'approved' });
-    req.io.to('admin').emit('newBnplActivation', { userId: req.session.userId, autoApproved: true });
-    res.json({ success:true, autoApproved:true, message:'Chúc mừng! Ví Trả Sau đã được tự động phê duyệt với hạn mức 2.000.000đ.' });
+    req.io.to('admin').emit('newBnplActivation', { userId: req.session.userId });
+    res.json({ success:true, message:'Đã gửi hồ sơ mở khóa Ví Trả Sau. Admin sẽ xét duyệt trong 24h.' });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -11166,7 +11153,16 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
       }
       const { shipperEarn } = await calcEarnings(order);
       const WalletQueue = mongoose.models.WalletQueue;
-      if (WalletQueue) {
+      if ((order.paymentMethod || "cash") === "bnpl") {
+        // VÍ TRẢ SAU: tiền đã được công ty bảo đảm (BNPLTx ghi nợ lúc đặt)
+        // → auto-credit ngay, không chờ admin duyệt queue
+        order.paymentStatus = "paid";
+        await autoCreditOrderEarnings(order, shipperEarn, 0, "bnpl", `Dọn nhà ${order.orderId} — ví trả sau`);
+        req.io.to(`shipper_${shipperId}`).emit("sepay_payment_confirmed", {
+          orderId: order.orderId,
+          message: `Khách đã thanh toán qua ví trả sau — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
+        });
+      } else if (WalletQueue) {
         await addToWalletQueue(
           order.orderId, shipperId, "shipper", shipperEarn, order.paymentMethod,
           `Dọn nhà ${order.orderId}`,
@@ -12078,13 +12074,14 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
         req.io.to("admin").emit("cash_settlement_pending", {
           orderId: order.orderId, shipperEarn, partnerEarn, amount: finalTotal, dueAt,
         });
-      } else if (pm === "wallet") {
+      } else if (pm === "wallet" || pm === "bnpl") {
+        // Ví CRABOR / VÍ TRẢ SAU: tiền đã được công ty bảo đảm → auto-credit ngay
         order.paymentStatus = "paid";
-        await autoCreditOrderEarnings(order, shipperEarn, partnerEarn, "wallet", `Giặt là ${order.orderId} — ví CRABOR`);
+        await autoCreditOrderEarnings(order, shipperEarn, partnerEarn, pm, `Giặt là ${order.orderId} — ${pm === "bnpl" ? "ví trả sau" : "ví CRABOR"}`);
         if (order.shipperId) {
           req.io.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
             orderId: order.orderId, amount: order.finalTotal,
-            message: `Khách đã thanh toán qua ví CRABOR — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
+            message: `Khách đã thanh toán qua ${pm === "bnpl" ? "ví trả sau" : "ví CRABOR"} — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
           });
         }
       } else {
@@ -15152,12 +15149,14 @@ app.post("/api/ride/:orderId/complete", async (req, res) => {
     // Tính tiền shipper theo commission DB (mặc định ride=10%, shipper giữ 90%)
     const { shipperEarn } = await calcEarnings(order);
 
-    if ((order.paymentMethod || "cash") === "wallet") {
-      // Ví CRABOR: auto-credit ngay
-      await autoCreditOrderEarnings(order, shipperEarn, 0, "wallet", `Cuốc xe ${order.orderId} — ví CRABOR`);
+    if ((order.paymentMethod || "cash") === "wallet" || (order.paymentMethod || "cash") === "bnpl") {
+      // Ví CRABOR / VÍ TRẢ SAU: tiền đã được công ty bảo đảm (BNPL ghi nợ BNPLTx lúc đặt)
+      // → auto-credit ngay, không chờ admin duyệt queue
+      const _pm = order.paymentMethod || "cash";
+      await autoCreditOrderEarnings(order, shipperEarn, 0, _pm, `Cuốc xe ${order.orderId} — ${_pm === "bnpl" ? "ví trả sau" : "ví CRABOR"}`);
       req.io.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
         orderId: order.orderId, amount: order.finalTotal,
-        message: `Khách đã thanh toán qua ví CRABOR — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
+        message: `Khách đã thanh toán qua ${_pm === "bnpl" ? "ví trả sau" : "ví CRABOR"} — ${(shipperEarn||0).toLocaleString("vi-VN")}đ đã vào ví bạn`,
       });
     } else if ((order.paymentMethod || "cash") === "cash") {
       // Tiền mặt: ghi nợ công ty
