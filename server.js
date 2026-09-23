@@ -9843,14 +9843,9 @@ app.patch("/api/orders/:id/cancel", async (req, res) => {
     // Hoàn tiền ví / gỡ ví trả sau khi khách hủy
     try { await refundOnCancel(order); } catch(e) { console.error('[Cancel] refundOnCancel lỗi:', e.message); }
 
-    // Notify shipper nếu đã assigned
-    if (order.shipperId) {
-      req.io.to(`shipper_${order.shipperId}`).emit("order_cancelled", {
-        orderId: order.orderId,
-        message: "Khách hàng đã hủy đơn hàng",
-        cancelReason: order.cancelReason || null,
-      });
-    }
+    // Notify MỌI shipper từng thấy popup (assigned + dispatchedTo + broadcast)
+    // để popup đơn mới tự tắt, không kéo nhận được nữa
+    broadcastOrderCancelled(req.io, order);
     // Notify partner
     if (order.partnerId) {
       req.io.to(`partner_${order.partnerId}`).emit("order_status_update", {
@@ -10802,12 +10797,8 @@ app.patch("/api/ride/:id/cancel", async (req, res) => {
     // Hoàn tiền ví / gỡ ví trả sau khi khách huỷ chuyến
     try { await refundOnCancel(order); } catch(e) { console.error('[Cancel Ride] refundOnCancel lỗi:', e.message); }
 
-    if (order.shipperId) {
-      req.io.to(`shipper_${order.shipperId}`).emit("ride_cancelled", {
-        orderId: order.orderId,
-        message: "Khách hàng đã huỷ chuyến",
-      });
-    }
+    // Báo MỌI shipper từng thấy popup để tắt màn đơn mới (kể cả lúc chưa assign)
+    broadcastOrderCancelled(req.io, order, { ride: true });
 
     res.json({ success: true, message: "Đã huỷ chuyến thành công" });
   } catch (err) {
@@ -11058,6 +11049,8 @@ app.patch("/api/cleaning/orders/:id/cancel", async (req, res) => {
     await order.save();
     // Hoàn tiền ví / gỡ ví trả sau khi khách hủy
     try { await refundOnCancel(order); } catch(e) { console.error('[Cancel Cleaning] refundOnCancel lỗi:', e.message); }
+    // Báo shipper để tắt popup đơn mới
+    broadcastOrderCancelled(req.io, order);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -11074,6 +11067,10 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
     const { status } = req.body;
     const order = await CleaningOrder.findOne({ orderId: req.params.id });
     if (!order) return res.status(404).json({ success: false });
+    // Đơn đã huỷ / xong thì từ chối ngay — tránh kéo nhận sau khi khách huỷ làm đơn sống lại
+    if (["cancelled", "completed"].includes(order.status)) {
+      return res.status(410).json({ success: false, cancelled: true, message: "Khách hàng đã hủy đơn này" });
+    }
     if (order.shipperId && order.shipperId.toString() !== shipperId.toString()) {
       // ── 2 SHIPPER CÙNG BẤM: giữ lại người GẦN KHÁCH HÀNG hơn ──
       // Chỉ áp dụng khi người giữ hiện tại chưa bắt đầu làm gì (pending/accepted)
@@ -11833,6 +11830,10 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
 
     // ── Shipper nhận đơn: gán shipperId / shipperReturnId ──
     if (isShipper) {
+      // Đơn đã huỷ / xong thì từ chối ngay — tránh kéo nhận sau khi khách huỷ làm đơn sống lại
+      if ((status === "shipper_picking" || status === "shipper_returning") && ["cancelled", "delivered"].includes(order.status)) {
+        return res.status(410).json({ success: false, cancelled: true, message: "Khách hàng đã hủy đơn này" });
+      }
       // Chặn nếu shipper nợ tiền mặt quá hạn
       if ((status === "shipper_picking" && !order.shipperId) || (status === "shipper_returning" && !order.shipperReturnId)) {
         if (await isShipperCashBlocked(req.session.shipperId)) {
@@ -12111,6 +12112,9 @@ app.patch("/api/laundry/orders/:id/cancel", async (req, res) => {
     // Hoàn tiền ví / gỡ ví trả sau khi khách hủy
     try { await refundOnCancel(order); } catch(e) { console.error('[Laundry Cancel] refundOnCancel lỗi:', e.message); }
 
+    // Báo MỌI shipper từng thấy popup để tắt màn đơn mới
+    // (kể cả shipperReturnId ở chiều trả đồ)
+    broadcastOrderCancelled(req.io, order);
     // Notify partner
     if (order.partnerId) {
       req.io.to(`partner_${order.partnerId}`).emit("laundry_order_cancelled", {
@@ -14050,6 +14054,31 @@ async function findNearbyShippers(lat, lng, radiusKm = 5, limit = 5, requireLaun
   return withDistance.sort((a, b) => a.distKm - b.distKm).slice(0, limit);
 }
 
+// ── Helper: báo huỷ đơn tới MỌI shipper từng thấy popup ────────
+// Khách huỷ lúc đơn còn "finding driver" (chưa assign shipperId) thì code cũ
+// chỉ emit cho shipperId (= null) → popup các máy vẫn mở, kéo nhận được là
+// đơn sống lại, khách phải huỷ thêm lần nữa. Hàm này gửi tới: shipper đã
+// assign + từng shipper trong dispatchedTo + phòng broadcast (lưới an toàn).
+function broadcastOrderCancelled(io, order, { ride = false } = {}) {
+  try {
+    const payload = {
+      orderId: order.orderId,
+      message: "Khách hàng đã hủy đơn hàng",
+      cancelReason: order.cancelReason || null,
+    };
+    const rooms = new Set();
+    if (order.shipperId) rooms.add(`shipper_${order.shipperId}`);
+    if (order.shipperReturnId) rooms.add(`shipper_${order.shipperReturnId}`);
+    for (const sid of (order.dispatchedTo || [])) { if (sid) rooms.add(`shipper_${sid}`); }
+    for (const r of rooms) {
+      io.to(r).emit("order_cancelled", payload);
+      if (ride) io.to(r).emit("ride_cancelled", payload);
+    }
+    io.to("shipper_broadcast").emit("order_cancelled", payload);
+    if (ride) io.to("shipper_broadcast").emit("ride_cancelled", payload);
+  } catch (e) { console.error('[broadcastOrderCancelled]', e.message); }
+}
+
 // ── Helper: dispatch order đến shipper online gần nhất ────────
 async function dispatchToShippers(order, io) {
   try {
@@ -14594,15 +14623,9 @@ app.patch("/api/orders/:id/status", async (req, res) => {
     order.cancelReason = (status === "cancelled" && req.body.reason) ? req.body.reason : order.cancelReason;
     order.statusHistory.push({ status, by: isShipper ? "shipper" : isPartner ? "partner" : "customer", time: new Date() });
 
-    // ── Khi customer hủy → thông báo shipper (nếu đã assign) ──
+    // ── Khi customer hủy → thông báo MỌI shipper từng thấy popup ──
     if (status === "cancelled" && isCustomer) {
-      if (order.shipperId) {
-        req.io.to(`shipper_${order.shipperId}`).emit("order_cancelled", {
-          orderId: order.orderId,
-          message: "Khách hàng đã hủy đơn hàng",
-          cancelReason: order.cancelReason || null,
-        });
-      }
+      broadcastOrderCancelled(req.io, order, { ride: order.module === 'ride' });
       req.io.to(`partner_${order.partnerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "cancelled",
         message: "Khách hàng đã hủy đơn hàng",
@@ -14624,6 +14647,10 @@ app.patch("/api/orders/:id/status", async (req, res) => {
 
     // ── Khi shipper nhận cuốc ──
     if (status === "shipper_accepted") {
+      // Đơn đã huỷ / xong thì từ chối ngay — tránh kéo nhận sau khi khách huỷ làm đơn sống lại
+      if (["cancelled", "delivered", "refunded"].includes(order.status)) {
+        return res.status(410).json({ success: false, cancelled: true, message: "Khách hàng đã hủy đơn này" });
+      }
       // Chặn nếu shipper nợ tiền mặt quá hạn
       if (req.session.shipperId && await isShipperCashBlocked(req.session.shipperId)) {
         req.io.to(`shipper_${req.session.shipperId}`).emit("cash_settlement_blocked", {
@@ -14654,12 +14681,18 @@ app.patch("/api/orders/:id/status", async (req, res) => {
         }
       }
       // ── CHỐT ĐƠN: chỉ DUY NHẤT 1 shipper được nhận (atomic claim) ──
+      // Kèm điều kiện status để request đua (khách huỷ vs shipper nhận) thì huỷ thắng
       const _claimFood = await Order.findOneAndUpdate(
-        { _id: order._id, $or: [{ shipperId: null }, { shipperId: { $exists: false } }] },
+        { _id: order._id, status: { $nin: ["cancelled", "delivered", "refunded"] }, $or: [{ shipperId: null }, { shipperId: { $exists: false } }] },
         { $set: { shipperId: req.session.shipperId } },
         { new: true }
       );
       if (!_claimFood) {
+        // Phân biệt đơn huỷ vs đơn đã có người nhận
+        const _freshF = await Order.findById(order._id).select("status").lean().catch(() => null);
+        if (_freshF && ["cancelled", "delivered", "refunded"].includes(_freshF.status)) {
+          return res.status(410).json({ success: false, cancelled: true, message: "Khách hàng đã hủy đơn này" });
+        }
         // Shipper khác đã nhận trước đó
         req.io.to(`shipper_${req.session.shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Đơn hàng đã có người nhận" });
         return res.status(409).json({ success: false, taken: true, message: "Đơn hàng đã có người nhận" });
@@ -15011,6 +15044,10 @@ app.post("/api/ride/:orderId/accept", async (req, res) => {
 
     const order = await Order.findOne({ orderId: req.params.orderId, module: "ride" });
     if (!order) return res.status(404).json({ success: false });
+    // Đơn đã huỷ / hoàn thành thì từ chối ngay — tránh kéo nhận sau khi khách huỷ làm đơn sống lại
+    if (["cancelled", "delivered", "refunded"].includes(order.status)) {
+      return res.status(410).json({ success: false, cancelled: true, message: "Khách hàng đã hủy chuyến này" });
+    }
     if (order.shipperId) return res.status(409).json({ success: false, message: "Cuốc đã được tài xế khác nhận" });
 
     // Chặn nếu shipper nợ tiền mặt quá hạn
@@ -15021,12 +15058,17 @@ app.post("/api/ride/:orderId/accept", async (req, res) => {
     const shipper = await Shipper.findById(req.session.shipperId).select("fullName phone vehiclePlate location");
 
     // ── CHỐT CUỐC: chỉ DUY NHẤT 1 tài xế được nhận (atomic claim) ──
+    // Kèm điều kiện status để 2 request đua (khách huỷ vs shipper nhận) thì huỷ thắng
     const _claimRide = await Order.findOneAndUpdate(
-      { _id: order._id, $or: [{ shipperId: null }, { shipperId: { $exists: false } }] },
+      { _id: order._id, status: { $nin: ["cancelled", "delivered", "refunded"] }, $or: [{ shipperId: null }, { shipperId: { $exists: false } }] },
       { $set: { shipperId: req.session.shipperId } },
       { new: true }
     );
     if (!_claimRide) {
+      const _fresh = await Order.findById(order._id).select("status shipperId").lean().catch(() => null);
+      if (_fresh && ["cancelled", "delivered", "refunded"].includes(_fresh.status)) {
+        return res.status(410).json({ success: false, cancelled: true, message: "Khách hàng đã hủy chuyến này" });
+      }
       req.io.to(`shipper_${req.session.shipperId}`).emit("order_taken", { orderId: order.orderId, message: "Cuốc xe đã có người nhận" });
       return res.status(409).json({ success: false, taken: true, message: "Cuốc xe đã có người nhận" });
     }
