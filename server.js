@@ -1473,6 +1473,16 @@ function getCurrentBillingMonth() {
 // Phí giao dịch trả sau = 3% trên tổng đơn hàng (tách riêng trên hóa đơn)
 const BNPL_FEE_RATE = 0.03;
 const bnplFeeOf = (base) => Math.round((Number(base) || 0) * BNPL_FEE_RATE);
+// Ghi nợ BNPL: KHÔNG bao giờ được fail im lặng — từng gây mất nợ đơn ride 9/2026
+// (đơn paid-bnpl nhưng không có BNPLTx). Helper này ném lỗi để endpoint gọi
+// xóa đơn + trả 500, khách đặt lại thay vì nợ chìm.
+async function createBNPLTxStrict({ userId, orderId, baseAmount, serviceType, billingMonth }) {
+  const fee = bnplFeeOf(baseAmount);
+  return BNPLTx.create({
+    userId, orderId, baseAmount, fee,
+    amount: baseAmount + fee, serviceType, billingMonth,
+  });
+}
 // Phí phạt quá hạn = 1% mỗi ngày trên tổng hóa đơn (gốc + phí trả sau), không chồng lãi.
 const BNPL_PENALTY_RATE = 0.01;
 // Phí dịch vụ cố định 30.000đ/tháng khi có phát sinh giao dịch trả sau trong tháng
@@ -5518,7 +5528,7 @@ app.post("/api/bnpl/use", async (req,res) => {
 });
 
 // ── MỞ KHÓA VÍ TRẢ SAU (BNPL activation) — ký hợp đồng để dùng ──
-// POST /api/bnpl/activation — đăng ký mở khóa Ví Trả Sau (gửi hồ sơ chờ admin duyệt)
+// POST /api/bnpl/activation — đăng ký mở khóa Ví Trả Sau (tự động duyệt nếu đủ điều kiện)
 app.post("/api/bnpl/activation", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
@@ -5552,8 +5562,12 @@ app.post("/api/bnpl/activation", async (req, res) => {
       return res.status(400).json({ success:false, message:'Mật khẩu giao dịch không đúng' });
     if (!acceptContract)
       return res.status(400).json({ success:false, message:'Bạn cần đồng ý với điều khoản hợp đồng Ví Trả Sau.' });
+    // TỰ ĐỘNG DUYỆT: hồ sơ đã qua đủ mọi cổng máy kiểm được (chi tiêu ≥5M,
+    // trust ≥50, không hay hủy, không nợ quá hạn, đủ KYC + MKGD + hợp đồng)
+    // → mở khóa ngay để dùng BNPL cho cả 4 dịch vụ, không chờ admin.
+    // Admin vẫn hậu kiểm qua danh sách activations (từ chối → thu hồi).
     await User.findByIdAndUpdate(req.session.userId, {
-      bnplActivationStatus: 'pending',
+      bnplActivationStatus: 'approved',
       kyc: {
         selfie: facePhoto, cccdFront, cccdBack,
         emergencyContact,
@@ -5561,8 +5575,17 @@ app.post("/api/bnpl/activation", async (req, res) => {
       },
       kycStatus: 'pending',
     });
-    req.io.to('admin').emit('newBnplActivation', { userId: req.session.userId });
-    res.json({ success:true, message:'Đã gửi hồ sơ mở khóa Ví Trả Sau. Admin sẽ xét duyệt trong 24h.' });
+    try {
+      await Notification.create({
+        ownerType: 'user', ownerId: req.session.userId,
+        type: 'system', title: '🎉 Ví Trả Sau đã được phê duyệt!',
+        body: 'Chúc mừng bạn đã được CRABOR phê duyệt Ví Trả Sau với hạn mức 2.000.000đ. Hãy khám phá ngay!',
+        ref: 'bnpl_approved'
+      });
+    } catch(e) { console.warn('BNPL auto-approve notify', e.message); }
+    req.io.to(`customer_${req.session.userId}`).emit('bnplActivationUpdated', { status: 'approved' });
+    req.io.to('admin').emit('newBnplActivation', { userId: req.session.userId, autoApproved: true });
+    res.json({ success:true, autoApproved:true, message:'Chúc mừng! Ví Trả Sau đã được tự động phê duyệt với hạn mức 2.000.000đ.' });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });
 
@@ -10932,12 +10955,10 @@ app.post("/api/cleaning/order", async (req, res) => {
       order.paidAt = new Date();
       await order.save();
       try {
-        await BNPLTx.create({
+        await createBNPLTxStrict({
           userId: customerId,
           orderId: order.orderId,
           baseAmount: bnplAmt,
-          fee: bnplFeeOf(bnplAmt),
-          amount: bnplAmt + bnplFeeOf(bnplAmt),
           serviceType: "cleaning",
           billingMonth: bnplMonth,
         });
@@ -10947,6 +10968,7 @@ app.post("/api/cleaning/order", async (req, res) => {
         });
       } catch (bnplErr) {
         console.error('[BNPL] tạo BNPLTx cleaning lỗi:', bnplErr.message);
+        return failBnpl(500, { message: "Không ghi nhận được giao dịch trả sau. Đơn chưa thanh toán — vui lòng đặt lại." });
       }
     }
     let nearbyShippers = [];
@@ -11733,12 +11755,10 @@ app.post("/api/laundry/order", async (req, res) => {
       order.paidAt = new Date();
       await order.save();
       try {
-        await BNPLTx.create({
+        await createBNPLTxStrict({
           userId: req.session.userId,
           orderId: order.orderId,
           baseAmount: bnplAmt,
-          fee: bnplFeeOf(bnplAmt),
-          amount: bnplAmt + bnplFeeOf(bnplAmt),
           serviceType: "laundry",
           billingMonth: bnplMonth,
         });
@@ -11748,6 +11768,7 @@ app.post("/api/laundry/order", async (req, res) => {
         });
       } catch (bnplErr) {
         console.error('[BNPL] tạo BNPLTx laundry lỗi:', bnplErr.message);
+        return failBnpl(500, { message: "Không ghi nhận được giao dịch trả sau. Đơn chưa thanh toán — vui lòng đặt lại." });
       }
     }
 
@@ -14431,12 +14452,10 @@ app.post("/api/order", async (req, res) => {
     // ── VÍ TRẢ SAU: lập tức ghi giao dịch trả sau (lên hóa đơn kỳ này) ──
     if (isBnplPay) {
       try {
-        await BNPLTx.create({
+        await createBNPLTxStrict({
           userId: req.session.userId,
           orderId: order.orderId,
           baseAmount: bnplOrderAmount,
-          fee: bnplFeeOf(bnplOrderAmount),
-          amount: bnplOrderAmount + bnplFeeOf(bnplOrderAmount),
           serviceType: order.module || 'food',
           billingMonth: bnplBillingMonth,
         });
@@ -14445,7 +14464,11 @@ app.post("/api/order", async (req, res) => {
           message: `Đơn ${order.orderId} đã vào Ví Trả Sau — thanh toán trước ngày 15 tháng sau`,
         });
       } catch (bnplErr) {
+        // Ghi nợ thất bại → xóa đơn + báo lỗi, KHÔNG để đơn paid-bnpl mà mất nợ
         console.error('[BNPL] tạo BNPLTx lỗi:', bnplErr.message);
+        await Order.findByIdAndDelete(order._id).catch(() => {});
+        if (order.voucherCode) await Voucher.updateOne({ code: order.voucherCode }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
+        return res.status(500).json({ success: false, message: "Không ghi nhận được giao dịch trả sau. Đơn chưa thanh toán — vui lòng đặt lại." });
       }
     }
 
@@ -14955,12 +14978,10 @@ app.post("/api/ride/book", async (req, res) => {
       rideOrder.paidAt = new Date();
       await rideOrder.save();
       try {
-        await BNPLTx.create({
+        await createBNPLTxStrict({
           userId: req.session.userId,
           orderId: rideOrder.orderId,
           baseAmount: bnplRideAmount,
-          fee: bnplFeeOf(bnplRideAmount),
-          amount: bnplRideAmount + bnplFeeOf(bnplRideAmount),
           serviceType: "ride",
           billingMonth: bnplRideMonth,
         });
@@ -14969,7 +14990,11 @@ app.post("/api/ride/book", async (req, res) => {
           message: `Cuốc xe ${rideOrder.orderId} đã vào Ví Trả Sau — thanh toán trước ngày 15 tháng sau`,
         });
       } catch (bnplErr) {
+        // Ghi nợ thất bại → xóa đơn + báo lỗi, KHÔNG để đơn paid-bnpl mà mất nợ
         console.error('[BNPL] tạo BNPLTx ride lỗi:', bnplErr.message);
+        await Order.findByIdAndDelete(rideOrder._id).catch(() => {});
+        if (appliedVoucher) await Voucher.updateOne({ _id: appliedVoucher._id }, { $inc: { usedCount: -1 }, $pull: { usedBy: req.session.userId } }).catch(() => {});
+        return res.status(500).json({ success: false, message: "Không ghi nhận được giao dịch trả sau. Đơn chưa thanh toán — vui lòng đặt lại." });
       }
     }
 
