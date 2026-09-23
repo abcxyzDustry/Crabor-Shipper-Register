@@ -770,6 +770,9 @@ const orderSchema = new mongoose.Schema({
   }],
   // Reorder
   reorderFrom: { type: String },   // orderId của đơn gốc
+  // SOS bất thường (Phần IV Điều 8): tạm ngưng 1h chờ CRABOR phán quyết
+  sosPausedUntil: { type: Date, default: null },
+  sosStatus: { type: String, enum: ['none','paused','resolved'], default: 'none' },
 }, { timestamps: true });
 
 orderSchema.index({ customerId: 1, createdAt: -1 });   // customer history
@@ -1259,6 +1262,36 @@ noshowReportSchema.pre('save', function(next) {
   next();
 });
 const NoshowReport = mongoose.model('NoshowReport', noshowReportSchema);
+
+// ── SOS ABNORMAL REPORT (Phần IV Điều 8 + Phần VIII Điều 4) ──
+// Shipper báo cáo dấu hiệu bất thường -> đơn tạm ngưng 1h chờ CRABOR phán quyết
+const sosReportSchema = new mongoose.Schema({
+  reportId:   { type: String, unique: true, sparse: true },
+  orderId:    { type: String, required: true, index: true },
+  module:     { type: String, default: 'food' },
+  shipperId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Shipper', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  category:   { type: String, enum: ['prohibited_goods','fake_address','threat_harass','bom_order','cod_issue','other'], default: 'other' },
+  reason:     { type: String, required: true, trim: true, maxlength: 1000 },
+  evidence:   [{ type: String }],
+  status:     { type: String, enum: ['pending','approved','rejected'], default: 'pending' },
+  pausedUntil:{ type: Date, required: true },
+  adminNote:  { type: String, trim: true },
+  // Coco auto phán quyết: admin nhập đánh giá trước, Coco đề xuất, admin duyệt mới thành phán quyết cuối
+  adminEval:   { type: String, trim: true },
+  cocoVerdict: { type: String, trim: true },
+  cocoDecision:{ type: String, enum: ['shipper_right','customer_right','need_more','undecided'], default: 'undecided' },
+  cocoAuto:    { type: Boolean, default: false },
+  resolvedAt: Date,
+  resolvedBy: String,
+}, { timestamps: true });
+sosReportSchema.index({ shipperId: 1, createdAt: -1 });
+sosReportSchema.index({ orderId: 1, status: 1 });
+sosReportSchema.pre('save', function(next) {
+  if (!this.reportId) this.reportId = 'SOS-' + Date.now().toString(36).toUpperCase();
+  next();
+});
+const SosReport = mongoose.model('SosReport', sosReportSchema);
 
 
 // ── WALLET TRANSACTION ────────────────────────────────────
@@ -15362,6 +15395,179 @@ app.get("/api/shipper/noshow/my", async (req, res) => {
     const list = await NoshowReport.find({ shipperId: req.session.shipperId })
       .sort({ createdAt: -1 }).limit(50).lean();
     res.json({ success: true, reports: list });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ── SOS ABNORMAL (Phần IV Điều 8 + Phần VIII Điều 4) ──
+// POST /api/shipper/sos/report — Shipper gửi SOS, đơn tạm ngưng 1h chờ CRABOR
+app.post("/api/shipper/sos/report", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const { orderId, category, reason, evidence } = req.body || {};
+    if (!orderId) return res.status(400).json({ success: false, message: "Thiếu mã đơn" });
+    const cleanReason = String(reason || "").trim();
+    if (cleanReason.length < 10) return res.status(400).json({ success: false, message: "Mô tả rõ lý do (tối thiểu 10 ký tự)" });
+    const evList = Array.isArray(evidence) ? evidence.filter(e => typeof e === "string" && e.length > 0).slice(0, 3) : [];
+    if (!evList.length) return res.status(400).json({ success: false, message: "Cần ít nhất 1 ảnh bằng chứng (Phần VIII Điều 4: ngưỡng bằng chứng bắt buộc)" });
+    const allowedCat = ['prohibited_goods','fake_address','threat_harass','bom_order','cod_issue','other'];
+    const cat = allowedCat.includes(category) ? category : 'other';
+
+    const order = await Order.findOne({ orderId: String(orderId), shipperId: req.session.shipperId });
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn của bạn" });
+    const dup = await SosReport.findOne({ orderId: order.orderId, status: 'pending' });
+    if (dup && dup.pausedUntil && new Date(dup.pausedUntil).getTime() > Date.now())
+      return res.status(400).json({ success: false, message: "Đơn này đang tạm ngưng chờ CRABOR xử lý" });
+
+    const uploaded = [];
+    for (const img of evList) {
+      try {
+        if (typeof img === "string" && img.startsWith("data:image")) {
+          if (Buffer.byteLength(img, "utf8") > 4 * 1024 * 1024)
+            return res.status(413).json({ success: false, message: "Ảnh quá lớn (tối đa 4MB/ảnh)" });
+          uploaded.push(await uploadImageToCloudinary(img, "sos"));
+        } else if (typeof img === "string" && img.startsWith("http")) uploaded.push(img);
+      } catch (e) { console.error("[SOS] upload evidence:", e.message); }
+    }
+    if (!uploaded.length) return res.status(400).json({ success: false, message: "Ảnh bằng chứng không hợp lệ" });
+
+    const pausedUntil = new Date(Date.now() + 60 * 60 * 1000);
+    const report = await SosReport.create({
+      orderId: order.orderId,
+      module: order.module || "food",
+      shipperId: req.session.shipperId,
+      customerId: order.customerId || null,
+      category: cat,
+      reason: cleanReason,
+      evidence: uploaded,
+      pausedUntil,
+    });
+    // Tạm ngưng đơn 1h — shipper báo cáo trung thực không bị tính vi phạm (Điều 8)
+    order.sosPausedUntil = pausedUntil;
+    order.sosStatus = 'paused';
+    order.statusHistory = order.statusHistory || [];
+    order.statusHistory.push({ status: 'sos_paused', time: new Date(), by: 'shipper_sos' });
+    await order.save();
+    req.io?.to("admin").emit("sos_pending", { reportId: report.reportId, orderId: order.orderId, category: cat, message: `SOS mới: ${order.orderId} [${cat}]` });
+    req.io?.to(`shipper_${req.session.shipperId}`).emit("sos_paused", { orderId: order.orderId, pausedUntil, message: `Đơn ${order.orderId} tạm ngưng 1h chờ CRABOR phán quyết` });
+    res.json({ success: true, reportId: report.reportId, pausedUntil, message: "Đã gửi SOS. Đơn TẠM NGƯNG 1h chờ phán quyết cuối của CRABOR. Báo cáo trung thực được bảo vệ, không tính vi phạm." });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// GET /api/shipper/sos/my — Shipper xem SOS của mình
+app.get("/api/shipper/sos/my", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.shipperId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    const list = await SosReport.find({ shipperId: req.session.shipperId }).sort({ createdAt: -1 }).limit(50).lean();
+    res.json({ success: true, reports: list });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// GET /api/admin/sos — Admin xem SOS chờ xử lý
+app.get("/api/admin/sos", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
+    const { status } = req.query || {};
+    const q = status ? { status } : {};
+    const list = await SosReport.find(q).sort({ createdAt: -1 }).limit(100).lean();
+    res.json({ success: true, data: list });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/admin/sos/:id/resolve — Admin phán quyết cuối (CRABOR)
+// action: approve (duyệt tay) | approve_coco (duyệt theo Coco — yêu cầu đã có cocoVerdict + adminEval) | reject
+app.post("/api/admin/sos/:id/resolve", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
+    const { action, adminNote, adminEval } = req.body || {};
+    const report = await SosReport.findById(req.params.id);
+    if (!report) return res.status(404).json({ success: false, message: "Không tìm thấy báo cáo" });
+    if (report.status !== 'pending') return res.status(400).json({ success: false, message: "Báo cáo đã xử lý" });
+    if (adminEval && String(adminEval).trim().length >= 10) report.adminEval = String(adminEval).trim();
+    if (action === 'approve_coco') {
+      if (!report.cocoVerdict) return res.status(400).json({ success: false, message: "Chưa có phán quyết Coco — bấm 'Coco phân tích' trước" });
+      if (!report.adminEval || report.adminEval.length < 10) return res.status(400).json({ success: false, message: "Cần nhập đánh giá Admin trước khi duyệt theo Coco" });
+    }
+    const approved = action === 'approve' || action === 'approve_coco';
+    report.status = approved ? 'approved' : 'rejected';
+    report.adminNote = String(adminNote || '').trim();
+    report.resolvedAt = new Date();
+    report.resolvedBy = String(req.session.adminId);
+    await report.save();
+    const order = await Order.findOne({ orderId: report.orderId });
+    if (order) {
+      order.sosPausedUntil = null;
+      order.sosStatus = 'resolved';
+      order.statusHistory = order.statusHistory || [];
+      order.statusHistory.push({ status: approved ? 'sos_resolved_approve' : 'sos_resolved_reject', time: new Date(), by: 'admin' });
+      await order.save();
+      req.io?.to(`shipper_${report.shipperId}`).emit("sos_resolved", { reportId: report.reportId, orderId: report.orderId, approved, message: approved ? `CRABOR đã chấp nhận SOS đơn ${report.orderId}. ${report.adminNote}` : `SOS đơn ${report.orderId} chưa đủ căn cứ. ${report.adminNote}` });
+    }
+    res.json({ success: true, message: approved ? "Đã chấp nhận SOS" : "Đã từ chối SOS" });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ── SOS COCO SETTINGS (in-memory + env, đủ dùng cho admin bật/tắt) ──
+let _sosCocoSettings = { auto: false, updatedAt: new Date(), updatedBy: '' };
+// GET /api/admin/sos/coco-settings — xem cài đặt Coco auto phán quyết
+app.get("/api/admin/sos/coco-settings", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
+    res.json({ success: true, data: _sosCocoSettings });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+// POST /api/admin/sos/coco-settings — bật/tắt Coco auto (admin)
+app.post("/api/admin/sos/coco-settings", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
+    _sosCocoSettings = { auto: !!req.body?.auto, updatedAt: new Date(), updatedBy: String(req.session.adminId) };
+    res.json({ success: true, data: _sosCocoSettings, message: _sosCocoSettings.auto ? "Đã BẬT Coco auto phán quyết" : "Đã TẮT Coco auto phán quyết" });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/admin/sos/:id/coco-analyze — Coco đưa ra phán quyết đề xuất (cần adminEval trước)
+app.post("/api/admin/sos/:id/coco-analyze", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
+    const report = await SosReport.findById(req.params.id);
+    if (!report) return res.status(404).json({ success: false, message: "Không tìm thấy báo cáo" });
+    const adminEval = String(req.body?.adminEval || "").trim();
+    if (adminEval.length < 10) return res.status(400).json({ success: false, message: "Admin cần nhập đánh giá (tối thiểu 10 ký tự) trước khi nhờ Coco phán quyết" });
+    report.adminEval = adminEval;
+    const order = await Order.findOne({ orderId: report.orderId }).lean();
+    const prompt =
+      "Bạn là Coco AI — trọng tài SOS của CRABOR (Phần IV Điều 8 + Phần VIII Điều 4). " +
+      "Đưa ra phán quyết đề xuất: ai đúng/sai và hướng xử lý tiền (Ví CRABOR không hoàn / PayOS-SePay về Tài xế / COD hạn chế tài khoản). " +
+      "Trả về JSON thuần: {\"decision\": \"shipper_right|customer_right|need_more\", \"verdict\": \"...tiếng Việt, ngắn gọn...\"}.\n" +
+      `Category: ${report.category}\nShipper báo cáo: ${report.reason}\n` +
+      `Đánh giá của Admin: ${adminEval}\n` +
+      `Đơn: module=${order?.module || report.module} total=${order?.finalTotal || order?.total || ''} pay=${order?.paymentMethod || ''} addr=${order?.address || ''}`;
+    try {
+      const r = await cocoThink([{ role: "user", content: prompt }], { task: 'complaint', agentType: 'coco', temperature: 0.3, maxTokens: 600 });
+      const text = (r?.text || "").trim();
+      let decision = 'undecided', verdict = text;
+      try {
+        const m = text.match(/\{[\s\S]*\}/);
+        if (m) { const j = JSON.parse(m[0]); if (j.decision) decision = j.decision; if (j.verdict) verdict = j.verdict; }
+      } catch (_) {}
+      if (!['shipper_right','customer_right','need_more'].includes(decision)) {
+        decision = /shipper.*đúng|đúng.*shipper|chấp nhận/i.test(text) ? 'shipper_right'
+          : /khách.*đúng|chưa đủ|cần thêm|từ chối/i.test(text) ? 'customer_right' : 'need_more';
+      }
+      report.cocoVerdict = verdict.slice(0, 2000);
+      report.cocoDecision = decision;
+      report.cocoAuto = !!_sosCocoSettings.auto;
+      await report.save();
+      res.json({ success: true, decision, verdict: report.cocoVerdict, auto: report.cocoAuto, message: "Coco đã đưa ra phán quyết đề xuất. Admin xem lại rồi bấm Duyệt mới thành quyết định cuối." });
+    } catch (e) {
+      res.status(500).json({ success: false, message: "Coco phân tích thất bại: " + e.message });
+    }
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 

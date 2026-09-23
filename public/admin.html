@@ -526,6 +526,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         <span class="ico">🚨</span> Bùng đơn
         <span class="nav-badge" id="noshowBadge" style="display:none;background:#e74c3c;color:#fff">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('sosticket')">
+        <span class="ico">🎫</span> Shipper Ticket
+        <span class="nav-badge" id="sosBadge" style="display:none;background:#8e44ad;color:#fff">0</span>
+      </div>
       <div class="nav-item" onclick="showPage('credit')">
         <span class="ico">💳</span> Tín dụng
         <span class="nav-badge" id="creditBadge" style="display:none;background:#3aaa5c;color:#fff">0</span>
@@ -1507,6 +1511,54 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
         </div>
       </div>
     </section>
+
+    <!-- ── SOS SHIPPER TICKET — đơn + bằng chứng shipper gửi (P.IV Đ8 + P.VIII Đ4) ── -->
+    <section id="pgSosTicket" class="page-section">
+      <div class="page-header">
+        <div class="page-title">🎫 Shipper Ticket <small>SOS bất thường · đơn tạm ngưng 1h chờ CRABOR</small></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select class="filter-select" id="sosStatus" onchange="loadSosTickets()">
+            <option value="pending">⏳ Chờ xử lý</option>
+            <option value="approved">✅ Đã duyệt</option>
+            <option value="rejected">❌ Từ chối</option>
+            <option value="">Tất cả</option>
+          </select>
+          <button class="filter-btn" id="sosCocoBtn" onclick="toggleSosCoco()" title="Coco AI tự đưa ra phán quyết đề xuất — admin vẫn phải nhập đánh giá rồi duyệt mới thành quyết định cuối">🤖 Coco auto: ...</button>
+          <button class="filter-btn" onclick="loadSosTickets()">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="panel" style="margin-bottom:12px;padding:12px 16px;font-size:.8rem;color:var(--muted)">
+        🤖 <b>Coco auto phán quyết:</b> khi BẬT, Coco tự phân tích ticket mới và đề xuất ai đúng/sai + hướng xử lý tiền (Ví CRABOR → không hoàn · PayOS/SePay → về Tài xế · COD → hạn chế TK).
+        <b>Trước khi Coco phán quyết cuối, Admin bắt buộc nhập đánh giá</b> rồi bấm <i>Duyệt theo Coco</i> mới có hiệu lực.
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>Mã SOS</th><th>Đơn hàng</th><th>Shipper</th><th>Loại</th><th>Lý do</th>
+                <th>Bằng chứng</th><th>Tạm ngưng đến</th><th>Coco</th><th>Trạng thái</th><th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="sosTbody">
+              <tr><td colspan="10" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SOS detail modal -->
+    <div class="overlay" id="sosOverlay">
+      <div class="modal" style="width:680px">
+        <div class="modal-head">
+          <h2 id="sosModalTitle">Ticket SOS</h2>
+          <button class="modal-close" onclick="document.getElementById('sosOverlay').classList.remove('show')">×</button>
+        </div>
+        <div class="modal-body" id="sosModalBody"></div>
+        <div class="modal-foot" id="sosModalFoot" style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"></div>
+      </div>
+    </div>
 
     <!-- Evidence modal -->
     <div class="overlay" id="nsOverlay">
@@ -3065,6 +3117,153 @@ async function rejectNoshow(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//   SOS SHIPPER TICKET + COCO AUTO PHÁN QUYẾT
+//   Luồng: shipper gửi SOS (tạm ngưng 1h) → admin nhập đánh giá → Coco phân tích
+//   → admin duyệt (tay / theo Coco) mới thành phán quyết cuối
+// ─────────────────────────────────────────────────────────────────────────────
+let _sosList = [];
+let _sosCocoAuto = false;
+const SOS_CAT = { prohibited_goods:'⛔ Hàng cấm/giả', fake_address:'📍 Địa chỉ ảo', threat_harass:'🚨 Đe dọa/lừa đảo', bom_order:'📦 Bom hàng', cod_issue:'💵 COD bất thường', other:'📝 Khác' };
+async function loadSosCocoSettings() {
+  try {
+    const r = await apiFetch('/api/admin/sos/coco-settings');
+    if (r.success) { _sosCocoAuto = !!r.data?.auto; paintSosCocoBtn(); }
+  } catch(e) {}
+}
+function paintSosCocoBtn() {
+  const b = document.getElementById('sosCocoBtn');
+  if (!b) return;
+  b.textContent = _sosCocoAuto ? '🤖 Coco auto: BẬT' : '🤖 Coco auto: TẮT';
+  b.style.background = _sosCocoAuto ? '#8e44ad' : '';
+  b.style.color = _sosCocoAuto ? '#fff' : '';
+}
+async function toggleSosCoco() {
+  try {
+    const r = await apiFetch('/api/admin/sos/coco-settings', 'POST', { auto: !_sosCocoAuto });
+    if (r.success) { _sosCocoAuto = !!r.data?.auto; paintSosCocoBtn(); showNotif('🤖 Coco auto', r.message, _sosCocoAuto ? 'green' : 'coral'); }
+    else showNotif('❌ Lỗi', r.message);
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
+async function loadSosTickets() {
+  const tbody = document.getElementById('sosTbody');
+  const status = document.getElementById('sosStatus')?.value ?? 'pending';
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
+  try {
+    const r = await apiFetch('/api/admin/sos' + (status ? `?status=${status}` : ''));
+    if (!r.success) throw new Error(r.message || 'Lỗi tải');
+    _sosList = r.data || [];
+    const pending = _sosList.filter(x => x.status === 'pending').length;
+    const badge = document.getElementById('sosBadge');
+    if (badge) { badge.style.display = pending ? '' : 'none'; badge.textContent = pending || 0; }
+    if (!_sosList.length) { tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted)">${status === 'pending' ? '✅ Không có ticket SOS nào chờ xử lý' : 'Không có dữ liệu'}</td></tr>`; return; }
+    const esc = (s) => String(s ?? '—').replace(/</g, '&lt;');
+    tbody.innerHTML = _sosList.map(x => {
+      const isPending = x.status === 'pending';
+      const stBadge = isPending ? '<span class="badge b-pending">⏳ Chờ (tạm ngưng 1h)</span>' : x.status === 'approved' ? '<span class="badge b-approved">✅ Đã phán quyết</span>' : '<span class="badge b-rejected">❌ Từ chối</span>';
+      const evCount = (x.evidence || []).length;
+      const when = x.createdAt ? new Date(x.createdAt).toLocaleString('vi-VN') : '—';
+      const pause = x.pausedUntil ? new Date(x.pausedUntil).toLocaleString('vi-VN') : '—';
+      const coco = x.cocoVerdict ? (x.cocoDecision === 'shipper_right' ? '🟢 Shipper đúng' : x.cocoDecision === 'customer_right' ? '🔴 Khách đúng' : '🟡 ' + esc(String(x.cocoDecision))) : '<span style="color:var(--muted)">—</span>';
+      return `<tr>
+        <td style="font-family:var(--font-mono);font-size:.78rem;color:#8e44ad">${esc(x.reportId)}</td>
+        <td style="font-size:.8rem">${esc(String(x.orderId || '').slice(-8))}<br><span style="color:var(--muted);font-size:.72rem">${esc(x.module || '')}</span></td>
+        <td style="font-size:.78rem">${esc(String(x.shipperId || '').slice(-6))}</td>
+        <td style="font-size:.78rem">${esc(SOS_CAT[x.category] || x.category || '—')}</td>
+        <td style="font-size:.78rem;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${esc(x.reason)}">${esc(x.reason)}</td>
+        <td><button class="act-btn" onclick="viewSos('${x._id}')">🖼️ ${evCount} ảnh</button></td>
+        <td style="font-size:.75rem;color:var(--muted)">${pause}</td>
+        <td style="font-size:.75rem">${coco}</td>
+        <td>${stBadge}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap">${isPending
+          ? `<button class="act-btn" onclick="viewSos('${x._id}')">Xem & xử lý</button>`
+          : `<span style="font-size:.72rem;color:var(--muted)">${esc(x.resolvedBy || '')}</span>`}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="10" style="color:var(--coral);text-align:center;padding:16px">❌ ${e.message}</td></tr>`; }
+}
+function viewSos(id) {
+  const x = _sosList.find(v => String(v._id) === String(id));
+  if (!x) return;
+  const esc = (s) => String(s ?? '—').replace(/</g, '&lt;');
+  document.getElementById('sosModalTitle').textContent = `SOS ${x.reportId} — Đơn ${String(x.orderId || '').slice(-8)}`;
+  const imgs = (x.evidence || []).map((u, i) => `<a href="${u}" target="_blank"><img src="${u}" style="width:100%;border-radius:12px;margin-bottom:10px" alt="Bằng chứng ${i+1}" /></a>`).join('') || '<p style="color:var(--muted)">Không có ảnh</p>';
+  const pauseTxt = x.pausedUntil ? new Date(x.pausedUntil).toLocaleString('vi-VN') : '—';
+  document.getElementById('sosModalBody').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-item"><label>Mã đơn</label><div class="val mono">${esc(x.orderId)}</div></div>
+      <div class="detail-item"><label>Loại (P.IV Đ8 / P.VIII Đ4)</label><div class="val">${esc(SOS_CAT[x.category] || x.category)}</div></div>
+      <div class="detail-item full"><label>Shipper báo cáo</label><div class="val">${esc(x.reason)}</div></div>
+      <div class="detail-item"><label>Tạm ngưng đến</label><div class="val">${esc(pauseTxt)}</div></div>
+      <div class="detail-item"><label>Trạng thái</label><div class="val">${esc(x.status)}</div></div>
+      <div class="detail-item full"><label>1️⃣ Đánh giá của Admin (bắt buộc trước khi Coco phán quyết)</label>
+        <textarea id="sosAdminEval" rows="3" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px;font-size:.85rem" placeholder="VD: đã gọi shipper + kiểm GPS tại điểm giao, ảnh trùng địa chỉ, khách không nghe máy 3 cuộc...">${esc(x.adminEval || '')}</textarea></div>
+      <div class="detail-item full"><label>2️⃣ Phán quyết Coco AI ${x.cocoVerdict ? `(${(x.cocoDecision || '').replace(/_/g, ' ')})` : '(chưa có)'}</label>
+        <div class="val" id="sosCocoBox" style="white-space:pre-wrap">${esc(x.cocoVerdict || '— Bấm “Coco phân tích” sau khi nhập đánh giá —')}</div></div>
+      ${x.adminNote ? `<div class="detail-item full"><label>Ghi chú quyết định cuối</label><div class="val">${esc(x.adminNote)}</div></div>` : ''}
+    </div>
+    <span class="modal-label">Ảnh bằng chứng shipper gửi (bấm để phóng to)</span>
+    ${imgs}`;
+  const foot = document.getElementById('sosModalFoot');
+  foot.innerHTML = x.status === 'pending'
+    ? `<button class="modal-cancel" onclick="document.getElementById('sosOverlay').classList.remove('show')">Đóng</button>
+       <button class="modal-save" style="background:#8e44ad" onclick="cocoAnalyzeSos('${x._id}')">🤖 Coco phân tích</button>
+       <button class="modal-delete" onclick="rejectSos('${x._id}')">❌ Từ chối SOS</button>
+       <button class="modal-save" style="background:#8e44ad" onclick="approveSosCoco('${x._id}')">✅ Duyệt theo Coco</button>
+       <button class="modal-save" onclick="approveSos('${x._id}')">✅ Duyệt tay (shipper đúng)</button>`
+    : `<button class="modal-cancel" onclick="document.getElementById('sosOverlay').classList.remove('show')">Đóng</button>`;
+  document.getElementById('sosOverlay').classList.add('show');
+}
+function _sosEvalVal() { return (document.getElementById('sosAdminEval')?.value || '').trim(); }
+async function cocoAnalyzeSos(id) {
+  const adminEval = _sosEvalVal();
+  if (adminEval.length < 10) { showNotif('⚠️ Thiếu đánh giá', 'Admin nhập đánh giá (≥10 ký tự) trước khi nhờ Coco', 'coral'); return; }
+  try {
+    showNotif('🤖 Coco đang phân tích', 'Vui lòng chờ...', 'green');
+    const r = await apiFetch(`/api/admin/sos/${id}/coco-analyze`, 'POST', { adminEval });
+    if (r.success) {
+      const x = _sosList.find(v => String(v._id) === String(id));
+      if (x) { x.adminEval = adminEval; x.cocoVerdict = r.verdict; x.cocoDecision = r.decision; x.cocoAuto = r.auto; }
+      showNotif('🤖 Coco xong', r.decision === 'shipper_right' ? 'Đề xuất: SHIPPER ĐÚNG' : r.decision === 'customer_right' ? 'Đề xuất: KHÁCH ĐÚNG' : 'Đề xuất: CẦN THÊM BẰNG CHỨNG', 'green');
+      viewSos(id); loadSosTickets();
+    } else showNotif('❌ Lỗi', r.message);
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
+async function approveSos(id) {
+  const evalV = _sosEvalVal();
+  const note = await promptModal('Ghi chú phán quyết cuối (hiện cho shipper):', '');
+  if (note === null) return;
+  if (!confirm(`DUYỆT TAY SOS — shipper đúng?\nĐơn hết tạm ngưng, shipper được bảo vệ không tính vi phạm.\n\nKhông thể hoàn tác!`)) return;
+  try {
+    const r = await apiFetch(`/api/admin/sos/${id}/resolve`, 'POST', { action: 'approve', adminNote: note, adminEval: evalV });
+    if (r.success) { showNotif('✅ Đã phán quyết', 'SOS được chấp nhận', 'green'); document.getElementById('sosOverlay').classList.remove('show'); loadSosTickets(); }
+    else showNotif('❌ Lỗi', r.message);
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
+async function approveSosCoco(id) {
+  const evalV = _sosEvalVal();
+  if (evalV.length < 10) { showNotif('⚠️ Thiếu đánh giá', 'Nhập đánh giá Admin trước khi duyệt theo Coco', 'coral'); return; }
+  const x = _sosList.find(v => String(v._id) === String(id));
+  if (!x?.cocoVerdict) { showNotif('⚠️ Chưa có Coco', 'Bấm “Coco phân tích” trước', 'coral'); return; }
+  if (!confirm(`DUYỆT THEO COCO?\nCoco: ${(x.cocoDecision || '').replace(/_/g, ' ')}\n\nDuyệt xong thành phán quyết cuối của CRABOR. Không thể hoàn tác!`)) return;
+  try {
+    const r = await apiFetch(`/api/admin/sos/${id}/resolve`, 'POST', { action: 'approve_coco', adminNote: `Theo Coco (${x.cocoDecision}): ${x.cocoVerdict}`.slice(0, 500), adminEval: evalV });
+    if (r.success) { showNotif('✅ Đã duyệt theo Coco', 'Phán quyết cuối đã ghi nhận', 'green'); document.getElementById('sosOverlay').classList.remove('show'); loadSosTickets(); }
+    else showNotif('❌ Lỗi', r.message);
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
+async function rejectSos(id) {
+  const evalV = _sosEvalVal();
+  const reason = await promptModal('Lý do từ chối (hiện cho shipper):', '', { okText: 'Từ chối' });
+  if (!reason) return;
+  try {
+    const r = await apiFetch(`/api/admin/sos/${id}/resolve`, 'POST', { action: 'reject', adminNote: reason, adminEval: evalV });
+    if (r.success) { showNotif('Đã từ chối SOS', 'Ticket đã bị từ chối', 'coral'); document.getElementById('sosOverlay').classList.remove('show'); loadSosTickets(); }
+    else showNotif('❌ Lỗi', r.message);
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //   FEATURED RESTAURANTS
 // ─────────────────────────────────────────────────────────────────────────────
 async function loadFeatured() {
@@ -3614,7 +3813,7 @@ async function deleteBannerAdmin(id) { if (!confirm('Xóa banner này?')) return
 // ─────────────────────────────────────────────────────────────────────────────
 //   PAGE NAVIGATION & SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
-const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', noshow:'pgNoshow', credit:'pgCredit', featured:'pgFeatured', social:'pgSocial', menus:'pgMenus', settings:'pgSettings' };
+const pages = { dashboard:'pgDashboard', live:'pgLive', shippers:'pgShippers', partners:'pgPartners', orders:'pgOrders', users:'pgUsers', sales:'pgSales', finance:'pgFinance', withdraws:'pgWithdraws', vouchers:'pgVouchers', analytics:'pgAnalytics', support:'pgSupport', leaderboard:'pgLeaderboard', banners:'pgBanners', wallet:'pgWallet', noshow:'pgNoshow', sosticket:'pgSosTicket', credit:'pgCredit', featured:'pgFeatured', social:'pgSocial', menus:'pgMenus', settings:'pgSettings' };
 function showPage(key, ev) {
   Object.values(pages).forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); });
   const targetPage = document.getElementById(pages[key]); if(targetPage) targetPage.classList.add('show');
@@ -3628,6 +3827,7 @@ function showPage(key, ev) {
   if (key === 'vouchers') loadVouchers();
   if (key === 'wallet') loadWalletQueue();
   if (key === 'noshow') loadNoshow();
+  if (key === 'sosticket') { loadSosTickets(); loadSosCocoSettings(); }
   if (key === 'featured') loadFeatured();
   if (key === 'analytics') loadAdvAnalytics();
   if (key === 'support') loadSupportTickets();
