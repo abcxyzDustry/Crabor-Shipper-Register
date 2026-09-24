@@ -6947,6 +6947,14 @@ async function processSePayPayment(payload, ioRef, force = false) {
       console.log(`[SEPAY] Order payment confirmed: ${order.orderId} — ${amount.toLocaleString("vi-VN")}đ`);
       handled = true;
     }
+    // Tìm thấy đơn nhưng thiếu tiền → ghi chú để admin tra cứu (VD giặt là cân lại tăng tiền sau khi khách CK theo QR cũ)
+    if (!handled && order && txId) {
+      const need = Math.round(order.finalTotal || order.total || 0);
+      if (amount < need - 1000) {
+        await SePayTx.updateOne({ txId }, { $set: { note: `short: ${order.orderId} need ${need} got ${amount}` } }).catch(() => {});
+        console.log(`[SEPAY] Short: ${rawRef} need ${need} got ${amount} (${order.orderId})`);
+      }
+    }
   }
 
   // ── 6b. Laundry delivery payment (CRLAU) ─────────────────
@@ -7021,6 +7029,14 @@ async function processSePayPayment(payload, ioRef, force = false) {
       }
       console.log(`[SEPAY] Laundry payment confirmed: ${lau.orderId} — ${amount.toLocaleString("vi-VN")}đ`);
       handled = true;
+    }
+    // Tìm thấy đơn giặt nhưng thiếu tiền → ghi chú để admin tra cứu
+    if (!handled && lau && txId) {
+      const need = Math.round(lau.finalTotal || lau.estimatedTotal || 0);
+      if (amount < need - 1000) {
+        await SePayTx.updateOne({ txId }, { $set: { note: `short: ${lau.orderId} need ${need} got ${amount}` } }).catch(() => {});
+        console.log(`[SEPAY] Short: ${rawRef} need ${need} got ${amount} (${lau.orderId})`);
+      }
     }
   }
 
@@ -7213,6 +7229,32 @@ app.get("/api/sepay/testpay/status/:ref", async (req, res) => {
     if (!tp) return res.status(404).json({ success:false, message:"Không tìm thấy giao dịch test" });
     res.json({ success:true, status: tp.status, amount: tp.amount, paidAmount: tp.paidAmount, paidAt: tp.paidAt });
   } catch(err){ res.status(500).json({ success:false, message:err.message }); }
+});
+
+// ── ADMIN: giao dịch SePay chưa khớp (tìm đơn chưa khớp tiền về) ──
+// GET /api/admin/sepay/txs?filter=unmatched&limit=50
+app.get("/api/admin/sepay/txs", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
+    const limit = Math.min(parseInt(req.query?.limit) || 50, 200);
+    const q = req.query?.filter === 'unmatched' ? { $or: [{ handled: false }, { note: 'unmatched' }, { note: /^short:/ }] } : {};
+    const list = await SePayTx.find(q).sort({ createdAt: -1 }).limit(limit).lean();
+    const unmatched = await SePayTx.countDocuments({ $or: [{ handled: false }, { note: 'unmatched' }, { note: /^short:/ }] });
+    res.json({ success: true, data: list, unmatched });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST /api/admin/sepay/txs/:id/retry — thử khớp lại 1 giao dịch
+app.post("/api/admin/sepay/txs/:id/retry", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
+    const tx = await SePayTx.findById(req.params.id);
+    if (!tx) return res.status(404).json({ success: false, message: "Không tìm thấy giao dịch" });
+    const r = await processSePayPayment({ id: tx.txId, content: tx.rawContent || tx.ref, transferAmount: tx.amount, transferType: 'in' }, req.io, true);
+    res.json({ success: true, handled: !!r?.handled, message: r?.handled ? "Đã khớp!" : "Vẫn chưa khớp — kiểm tra nội dung/số tiền." });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // ── PAYMENT 1 CHẠM — chuẩn bị (khi có tài khoản DN) ─────────

@@ -1127,6 +1127,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           <div style="font-size:.72rem;color:#aaa;margin-top:4px">Hoa hồng + Phí dịch vụ</div>
         </div>
       </div>
+      <!-- SePay chưa khớp -->
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center">
+          <span class="panel-title">🏦 SePay chưa khớp <span class="nav-badge" id="sepayUnmatchedBadge" style="display:none;background:#e74c3c;color:#fff">0</span></span>
+          <button class="filter-btn" onclick="loadSepayUnmatched()">↻ Kiểm tra</button>
+        </div>
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Tiền đã về TK nhưng chưa khớp đơn (sai nội dung / thiếu tiền / đơn đã thanh toán). Bấm Thử lại sau khi khách bổ sung.</div>
+        <div class="table-wrap">
+          <table class="reg-table">
+            <thead><tr><th>Thời gian</th><th>Nội dung CK</th><th>Số tiền</th><th>Lý do chưa khớp</th><th>Thao tác</th></tr></thead>
+            <tbody id="sepayUnmatchedTbody">
+              <tr><td colspan="5" style="text-align:center;padding:16px;color:var(--muted)">Bấm “Kiểm tra” để tải</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
       <!-- Doanh thu theo module -->
       <div class="panel" style="margin-bottom:20px">
         <div style="font-size:.85rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:16px">Phân tích theo module</div>
@@ -3380,6 +3396,44 @@ async function loadFinance() {
   loadTransactions();
 }
 function renderModuleBars() { document.querySelectorAll('.module-bar-row').forEach(r => { r.innerHTML=`<div class="bar-label">${r.dataset.module}</div><div class="bar-track"><div class="bar-fill" style="width:${r.dataset.pct}%;background:${r.dataset.color}"></div></div><div class="bar-pct">${r.dataset.pct}%</div>`; }); }
+// ── SePay chưa khớp ──
+async function loadSepayUnmatched() {
+  const tb = document.getElementById('sepayUnmatchedTbody');
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--muted)">⏳ Đang tải...</td></tr>';
+  try {
+    const r = await apiFetch('/api/admin/sepay/txs?filter=unmatched&limit=50');
+    if (!r.success) throw new Error(r.message || 'Lỗi tải');
+    const list = r.data || [];
+    const badge = document.getElementById('sepayUnmatchedBadge');
+    if (badge) { badge.style.display = list.length ? '' : 'none'; badge.textContent = list.length; }
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">✅ Không có giao dịch nào chưa khớp</td></tr>'; return; }
+    const esc = (s) => String(s ?? '—').replace(/</g, '&lt;');
+    const fmt = (n) => Number(n || 0).toLocaleString('vi-VN') + 'đ';
+    tb.innerHTML = list.map(x => {
+      let note = esc(x.note || (x.handled ? 'Đã khớp' : 'Không rõ đơn (sai/thiếu nội dung)'));
+      if (String(x.note || '').startsWith('short:')) {
+        const m = String(x.note).match(/short:\s*(\S+)\s+need\s+(\d+)\s+got\s+(\d+)/);
+        note = m ? `⚠️ Thiếu tiền: đơn ${esc(m[1])} cần ${fmt(m[2])} nhưng chỉ về ${fmt(m[3])}` : esc(x.note);
+      }
+      const when = x.createdAt ? new Date(x.createdAt).toLocaleString('vi-VN') : '—';
+      return `<tr>
+        <td style="font-size:.75rem;color:var(--muted)">${when}</td>
+        <td style="font-family:var(--font-mono);font-size:.78rem">${esc(x.ref || x.rawContent)}</td>
+        <td style="font-weight:800">${fmt(x.amount)}</td>
+        <td style="font-size:.78rem">${note}</td>
+        <td><button class="act-btn" onclick="retrySepayTx('${x._id}')">🔁 Thử lại</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e) { tb.innerHTML = `<tr><td colspan="5" style="color:var(--coral);text-align:center;padding:16px">❌ ${e.message}</td></tr>`; }
+}
+async function retrySepayTx(id) {
+  try {
+    const r = await apiFetch(`/api/admin/sepay/txs/${id}/retry`, 'POST', {});
+    showNotif(r.handled ? '✅ Đã khớp' : '⚠️ Vẫn chưa khớp', r.message, r.handled ? 'green' : 'coral');
+    loadSepayUnmatched();
+  } catch(e) { showNotif('❌ Lỗi', e.message); }
+}
 function renderModuleBarsFromData(modules) {
   const container = document.querySelector('#moduleRevenueChart > div');
   if (!container || !modules.length) { renderModuleBars(); return; }
@@ -3835,7 +3889,7 @@ function showPage(key, ev) {
   if (key === 'banners') loadActiveBanners();
   if (key === 'users') loadCustomers();
   if (key === 'dashboard') loadStats();
-  if (key === 'finance') loadFinance();
+  if (key === 'finance') { loadFinance(); loadSepayUnmatched(); }
   if (key === 'withdraws') loadWithdraws();
   if (key === 'settings') { loadSettings(); }
   if (key === 'credit') loadCredit();
