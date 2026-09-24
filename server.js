@@ -11937,11 +11937,12 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
       // Partner nhận đơn → tìm shipper gần nhất đến địa chỉ khách (5km, mở rộng dần)
       const dispatchLat = order.pickupLat || 21.0285;   // Hà Nội fallback nếu chưa có GPS
       const dispatchLng = order.pickupLng || 105.8542;
-      // Lấy toạ độ cửa hàng để shipper biết điểm trả sau khi lấy đồ
-      let partnerLat = null, partnerLng = null;
+      // Lấy toạ độ + địa chỉ thật của cửa hàng để shipper biết điểm trả sau khi lấy đồ
+      let partnerLat = null, partnerLng = null, partnerAddr = null;
       if (order.partnerId) {
-        const g = await GiatLa.findById(order.partnerId).select("lastLat lastLng").catch(() => null);
+        const g = await GiatLa.findById(order.partnerId).select("lastLat lastLng address bizName").catch(() => null);
         if (g?.lastLat) { partnerLat = g.lastLat; partnerLng = g.lastLng; }
+        if (g?.address) partnerAddr = g.address;
       }
       const nearby = await findLaundryShippers(dispatchLat, dispatchLng, 5);
       if (nearby.length) {
@@ -11950,7 +11951,8 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
           orderId: order.orderId,
           pickupAddress: order.pickupAddress,
           pickupLat: dispatchLat, pickupLng: dispatchLng,
-          partnerAddress: `${order.partnerName}`,
+          partnerName: order.partnerName,
+          partnerAddress: partnerAddr || order.partnerName,
           partnerLat, partnerLng,
           customerName: order.customerName,
           customerPhone: order.customerPhone || "",
@@ -12027,10 +12029,18 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
         order.estimatedKg = finalKg;
       }
       // Ưu tiên shipper đã lấy đồ (đang chờ) trả; không có thì tìm shipper khác
+      // Lấy địa chỉ thật của quán để shipper đến lấy đồ sạch
+      let returnShopAddr = null;
+      if (order.partnerId) {
+        const gRet = await GiatLa.findById(order.partnerId).select("address").catch(() => null);
+        if (gRet?.address) returnShopAddr = gRet.address;
+      }
       const returnPayload = {
         type: "laundry_return_request",
         orderId: order.orderId,
-        pickupAddress: `${order.partnerName} — Lấy đồ đã giặt`,
+        pickupAddress: returnShopAddr ? `${order.partnerName} — ${returnShopAddr}` : `${order.partnerName} — Lấy đồ đã giặt`,
+        partnerName: order.partnerName,
+        partnerAddress: returnShopAddr || order.partnerName,
         deliveryAddress: order.pickupAddress,
         deliveryLat: order.pickupLat, deliveryLng: order.pickupLng,
         customerName: order.customerName,
@@ -15933,7 +15943,7 @@ app.get("/api/shipper/active-orders", async (req, res) => {
     // Lấy toạ độ cửa hàng giặt (partner) để shipper vẽ lộ trình theo workflow giặt
     const laundryPartnerIds = [...new Set(laundryOrders.map(o => String(o.partnerId)).filter(Boolean))];
     const laundryPartners = laundryPartnerIds.length
-      ? await GiatLa.find({ _id: { $in: laundryPartnerIds } }).select("lastLat lastLng businessLat businessLng baseLat baseLng").lean().catch(() => [])
+      ? await GiatLa.find({ _id: { $in: laundryPartnerIds } }).select("lastLat lastLng businessLat businessLng baseLat baseLng address bizName").lean().catch(() => [])
       : [];
     const laundryPartnerMap = new Map(laundryPartners.map(p => [String(p._id), p]));
     const mappedLaundry = laundryOrders.map(o => {
@@ -15952,7 +15962,7 @@ app.get("/api/shipper/active-orders", async (req, res) => {
         deliveryAddress: o.pickupAddress,
         deliveryLat: o.pickupLat, deliveryLng: o.pickupLng,
         pickupLat: o.pickupLat, pickupLng: o.pickupLng,
-        partnerAddress: o.partnerName,
+        partnerAddress: p?.address || o.partnerName,
         partnerLat, partnerLng,
         finalTotal: o.finalTotal || o.estimatedTotal || 0,
         total: o.finalTotal || o.estimatedTotal || 0,
@@ -16955,10 +16965,11 @@ setInterval(async () => {
     for (const order of pendingLaundry) {
       const dispatchLat = order.pickupLat || 21.0285;
       const dispatchLng = order.pickupLng || 105.8542;
-      let partnerLat = null, partnerLng = null;
+      let partnerLat = null, partnerLng = null, partnerAddr2 = null;
       if (order.partnerId) {
-        const g = await GiatLa.findById(order.partnerId).select("lastLat lastLng").catch(() => null);
+        const g = await GiatLa.findById(order.partnerId).select("lastLat lastLng address").catch(() => null);
         if (g?.lastLat) { partnerLat = g.lastLat; partnerLng = g.lastLng; }
+        if (g?.address) partnerAddr2 = g.address;
       }
       const nearby = await findLaundryShippers(dispatchLat, dispatchLng, 5);
       if (nearby.length > 0) {
@@ -16967,7 +16978,8 @@ setInterval(async () => {
           orderId: order.orderId,
           pickupAddress: order.pickupAddress,
           pickupLat: dispatchLat, pickupLng: dispatchLng,
-          partnerAddress: `${order.partnerName}`,
+          partnerName: order.partnerName,
+          partnerAddress: partnerAddr2 || order.partnerName,
           partnerLat, partnerLng,
           customerName: order.customerName,
           customerPhone: order.customerPhone || "",
