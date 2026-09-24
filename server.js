@@ -15462,7 +15462,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       .sort({ deliveredAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(lim)
-      .select("orderId partnerName partnerId packageName pickupAddress finalTotal estimatedTotal shipFee discount voucherCode status deliveredAt createdAt customerName customerPhone customerId paymentMethod ratingShipper ratingComment")
+      .select("orderId partnerName partnerId packageName pickupAddress finalTotal estimatedTotal shipFee discount voucherCode voucherShipperBear status deliveredAt createdAt customerName customerPhone customerId paymentMethod ratingShipper ratingComment")
       .lean().catch(() => []) : Promise.resolve([]),
       LaundryOrderM ? LaundryOrderM.countDocuments({
         $or: [{ shipperId: sid }, { shipperReturnId: sid }],
@@ -15476,7 +15476,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       .sort({ completedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(lim)
-      .select("orderId serviceName address price discount voucherCode finalTotal status completedAt createdAt customerName customerPhone customerId paymentMethod rating ratingComment")
+      .select("orderId serviceName address price discount voucherCode voucherShipperBear finalTotal status completedAt createdAt customerName customerPhone customerId paymentMethod rating ratingComment")
       .lean().catch(() => []) : Promise.resolve([]),
       CleaningOrderM ? CleaningOrderM.countDocuments({
         shipperId: sid,
@@ -15497,7 +15497,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
         shipFee: o.shipFee || 0,
         serviceFee: 0,
         paymentMethod: o.paymentMethod || 'cash',
-        shipperEarn: 0,
+        shipperEarn: shipperOrderEarnNet({ ...o, module: 'laundry' }),
         address: o.pickupAddress,
         partnerAddress: o.partnerName,
         partnerName: o.partnerName,
@@ -15523,7 +15523,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
         shipFee: 0,
         serviceFee: 0,
         paymentMethod: o.paymentMethod || 'cash',
-        shipperEarn: 0,
+        shipperEarn: shipperOrderEarnNet({ ...o, module: 'cleaning' }),
         address: o.address,
         partnerAddress: null,
         partnerName: o.serviceName || 'Dọn nhà',
