@@ -6980,7 +6980,7 @@ async function processSePayPayment(payload, ioRef, force = false) {
           handled = true;
         } else {
           await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dup.orderId} already paid` } }).catch(() => {});
-          console.log(`[SEPAY] Duplicate: ${rawRef} (${dup.orderId} already paid)`);
+          console.log(`[SEPAY] Duplicate: ${rawRef} (${dup.orderId} already paid) sePayRef=${dup.sePayRef || 'EMPTY'} otherMatched=${otherMatched?.txId || 'none'}`);
         }
       }
     }
@@ -7089,7 +7089,7 @@ async function processSePayPayment(payload, ioRef, force = false) {
           handled = true;
         } else {
           await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dupL.orderId} already paid` } }).catch(() => {});
-          console.log(`[SEPAY] Duplicate: ${rawRef} (${dupL.orderId} already paid)`);
+          console.log(`[SEPAY] Duplicate: ${rawRef} (${dupL.orderId} already paid) sePayRef=${dupL.sePayRef || 'EMPTY'} otherMatched=${otherMatched?.txId || 'none'}`);
         }
       }
     }
