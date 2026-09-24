@@ -1049,11 +1049,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
             <input class="filter-select" id="vcExpiry" type="datetime-local" style="width:100%">
           </div>
           <div>
-            <div style="font-size:.75rem;color:var(--muted);font-weight:800;margin-bottom:4px">Module</div>
+            <div style="font-size:.75rem;color:var(--muted);font-weight:800;margin-bottom:4px">Dịch vụ *</div>
             <select class="filter-select" id="vcModule" style="width:100%">
-              <option value="all">Tất cả</option>
-              <option value="food">🍜 Đồ ăn</option>
-              <option value="laundry">👕 Giặt là</option>
+              <option value="food">🍜 Đồ ăn (quán chịu)</option>
+              <option value="ride">🚗 Xe công nghệ (shipper chịu)</option>
+              <option value="laundry">👕 Giặt là (tiệm chịu)</option>
+              <option value="cleaning">🧹 Dọn nhà (đối tác dọn chịu)</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:.75rem;color:var(--muted);font-weight:800;margin-bottom:4px">Giảm vào</div>
+            <select class="filter-select" id="vcTarget" style="width:100%">
+              <option value="order">Giá trị đơn (đối tác chịu)</option>
+              <option value="ship">Phí giao hàng (shipper chịu)</option>
             </select>
           </div>
         </div>
@@ -1070,7 +1078,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-hei
           <table class="reg-table">
             <thead>
               <tr>
-                <th>Mã</th><th>Loại</th><th>Giá trị</th><th>Đã dùng</th><th>Hết hạn</th><th>Module</th><th>Trạng thái</th><th>Thao tác</th>
+                <th>Mã</th><th>Loại</th><th>Giá trị</th><th>Đã dùng</th><th>Hết hạn</th><th>Module</th><th>Ai chịu</th><th>Trạng thái</th><th>Thao tác</th>
               </tr>
             </thead>
             <tbody id="voucherTbody">
@@ -2999,11 +3007,12 @@ async function createVoucher() {
   const maxDiscount = Number(document.getElementById('vcMaxDiscount')?.value)||0;
   const usageLimit = Number(document.getElementById('vcLimit')?.value)||100;
   const expiresAt = document.getElementById('vcExpiry')?.value;
-  const module = document.getElementById('vcModule')?.value||'all';
+  const module = document.getElementById('vcModule')?.value||'food';
+  const target = document.getElementById('vcTarget')?.value||'order';
   const description = document.getElementById('vcDesc')?.value?.trim();
   if (!code||!value||!expiresAt) { showNotif('⚠️ Thiếu thông tin','Nhập đầy đủ mã, giá trị, hạn sử dụng'); return; }
   try {
-    const r = await apiFetch('/api/vouchers','POST',{code,type,value,minOrder,maxDiscount,usageLimit,expiresAt:new Date(expiresAt),module,description,active:true});
+    const r = await apiFetch('/api/vouchers','POST',{code,type,value,minOrder,maxDiscount,usageLimit,expiresAt:new Date(expiresAt),module,target,description,active:true});
     if (r.success) { showNotif('✅ Đã tạo voucher','Mã '+code+' đã được tạo'); const p=document.getElementById('createVoucherPanel'); if(p) p.style.display='none'; loadVouchers(); }
     else showNotif('❌ Lỗi',r.message);
   } catch(e) { showNotif('❌ Lỗi',e.message); }
@@ -3011,12 +3020,21 @@ async function createVoucher() {
 async function loadVouchers() {
   const tbody = document.getElementById('voucherTbody');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">⏳ Đang tải...</td></tr>';
   try {
     const r = await apiFetch('/api/admin/vouchers');
-    if (!r.success||!r.data.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Chưa có voucher nào</td></tr>'; return; }
-    tbody.innerHTML = r.data.map(v => { const expired = new Date(v.expiresAt) < new Date(); const valStr = v.type==='percent' ? v.value+'%' : v.value.toLocaleString('vi-VN')+'đ'; return `<tr><td><span style="font-family:var(--font-mono);font-weight:900;color:var(--coral)">${v.code}</span></td><td>${v.type==='percent'?'%':'Cố định'}</td><td><strong>${valStr}</strong>${v.minOrder?`<br><span style="font-size:.7rem;color:var(--muted)">Tối thiểu ${v.minOrder.toLocaleString('vi-VN')}đ</span>`:''}</td><td>${v.usedCount||0}/${v.usageLimit}</td><td style="font-size:.78rem">${new Date(v.expiresAt).toLocaleDateString('vi-VN')}${expired?'<br><span style="color:var(--coral);font-weight:900">HẾT HẠN</span>':''}</td><td>${v.module==='all'?'Tất cả':v.module}</td><td><span class="status-pill ${v.active&&!expired?'approved':'rejected'}">${v.active&&!expired?'✅ Active':'❌ Off'}</span></td><td style="display:flex;gap:4px"><button class="act-btn ${v.active?'reject':''}" onclick="toggleVoucher('${v._id}',${v.active})" style="font-size:.72rem;padding:4px 8px">${v.active?'Tắt':'Bật'}</button><button class="act-btn reject" onclick="deleteVoucher('${v._id}','${v.code}')" style="font-size:.72rem;padding:4px 8px">🗑️</button></td></tr>`; }).join('');
-  } catch(e) { tbody.innerHTML = '<tr><td colspan="8" style="color:var(--coral);text-align:center;padding:16px">❌ '+e.message+'</td></tr>'; }
+    if (!r.success||!r.data.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">Chưa có voucher nào</td></tr>'; return; }
+    const bearerOf = (v) => {
+      if ((v.target||'order') === 'ship') return '🛵 Shipper (giảm phí ship)';
+      if (v.module === 'food') return '🏪 Đối tác food';
+      if (v.module === 'laundry') return '👕 Tiệm giặt';
+      if (v.module === 'cleaning') return '🧹 Đối tác dọn';
+      if (v.module === 'ride') return '🛵 Shipper';
+      return 'Chung (cũ)';
+    };
+    const modLabel = { food:'🍜 Đồ ăn', ride:'🚗 Xe', laundry:'👕 Giặt là', cleaning:'🧹 Dọn nhà', all:'Tất cả (cũ)' };
+    tbody.innerHTML = r.data.map(v => { const expired = new Date(v.expiresAt) < new Date(); const valStr = v.type==='percent' ? v.value+'%' : v.value.toLocaleString('vi-VN')+'đ'; return `<tr><td><span style="font-family:var(--font-mono);font-weight:900;color:var(--coral)">${v.code}</span></td><td>${v.type==='percent'?'%':'Cố định'}</td><td><strong>${valStr}</strong>${v.minOrder?`<br><span style="font-size:.7rem;color:var(--muted)">Tối thiểu ${v.minOrder.toLocaleString('vi-VN')}đ</span>`:''}</td><td>${v.usedCount||0}/${v.usageLimit}</td><td style="font-size:.78rem">${new Date(v.expiresAt).toLocaleDateString('vi-VN')}${expired?'<br><span style="color:var(--coral);font-weight:900">HẾT HẠN</span>':''}</td><td>${modLabel[v.module]||v.module||'—'}</td><td style="font-size:.78rem;font-weight:700">${bearerOf(v)}</td><td><span class="status-pill ${v.active&&!expired?'approved':'rejected'}">${v.active&&!expired?'✅ Active':'❌ Off'}</span></td><td style="display:flex;gap:4px"><button class="act-btn ${v.active?'reject':''}" onclick="toggleVoucher('${v._id}',${v.active})" style="font-size:.72rem;padding:4px 8px">${v.active?'Tắt':'Bật'}</button><button class="act-btn reject" onclick="deleteVoucher('${v._id}','${v.code}')" style="font-size:.72rem;padding:4px 8px">🗑️</button></td></tr>`; }).join('');
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="9" style="color:var(--coral);text-align:center;padding:16px">❌ '+e.message+'</td></tr>'; }
 }
 async function toggleVoucher(id, active) { try { await apiFetch('/api/admin/vouchers/'+id,'PATCH',{active:!active}); loadVouchers(); } catch(e) {} }
 async function deleteVoucher(id, code) { if (!confirm('Xóa voucher '+code+'?')) return; try { await apiFetch('/api/admin/vouchers/'+id,'DELETE'); showNotif('🗑️ Đã xóa','Voucher '+code+' đã bị xóa','coral'); loadVouchers(); } catch(e) {} }

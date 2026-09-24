@@ -3459,6 +3459,9 @@ app.get("/api/vouchers/validate", async (req, res) => {
 // POST /api/vouchers — Admin tạo voucher mới
 app.post("/api/vouchers", adminAuth, async (req, res) => {
   try {
+    // Voucher phải gắn đúng 1 dịch vụ (food/ride/laundry/cleaning) — không tạo loại chung chung 'all'
+    const mod = String(req.body?.module || 'all');
+    if (mod === 'all') return res.status(400).json({ success: false, message: "Voucher phải chọn dịch vụ cụ thể (food/ride/laundry/cleaning), không dùng chung 'all'" });
     const v = await Voucher.create({ ...req.body, code: (req.body.code||"").toUpperCase() });
     // Broadcast voucher mới đến tất cả customer đang online
     req.io.emit("new_voucher", {
@@ -3523,14 +3526,18 @@ async function generateWeeklyVoucher() {
   }
 }
 
-// Check & tạo voucher tuần mới: lúc khởi động + mỗi 3 giờ
-setTimeout(generateWeeklyVoucher, 15000);
-setInterval(generateWeeklyVoucher, 3 * 3600 * 1000);
+// ĐÃ TẮT voucher tuần tự động (module 'all' chung chung) — chuyển sang voucher theo từng dịch vụ.
+// Xoá 1 lần các voucher tuần chung còn sót (giữ nguyên discount đã lưu trên đơn cũ,
+// giữ lại voucher loyalty user đổi điểm — loại đó dùng cách chia tỷ lệ cũ).
+Voucher.deleteMany({ weekly: { $exists: true, $ne: "" } }).then(r => {
+  if (r?.deletedCount) console.log(`[Voucher] Đã xoá ${r.deletedCount} voucher tuần chung (WEEKLY-*)`);
+}).catch(() => {});
 
-// GET /api/admin/weekly-voucher — Thông tin voucher tuần cho trang quản trị
+// GET /api/admin/weekly-voucher — ĐÃ NGỪNG voucher tuần chung (module all), dùng voucher theo dịch vụ
 app.get("/api/admin/weekly-voucher", adminAuth, async (req, res) => {
   try {
-    const v = await generateWeeklyVoucher();
+    const v = await Voucher.findOne({ weekly: { $exists: true, $ne: "" } }).sort({ createdAt: -1 }).lean();
+    if (!v) return res.json({ success: true, disabled: true, message: "Voucher tuần chung đã ngừng — hãy tạo voucher theo từng dịch vụ (food/ride/laundry/cleaning)" });
     if (!v) return res.status(500).json({ success: false, message: "Không tạo được voucher tuần" });
     const [usedCount, turnover] = await Promise.all([
       Order.countDocuments({ voucherCode: v.code, status: { $nin: ["cancelled", "expired"] } }),
@@ -13952,26 +13959,47 @@ async function calcEarnings(order) {
   const partnerBase = Math.max(0, originalTotal);
   const partnerEarnRaw = isCleaning ? 0 : Math.round(partnerBase * (1 - commissionPct / 100));
 
-  // ── PHÂN BỔ VOUCHER ──
-  // CRABOR chỉ là trung gian → KHÔNG chịu voucher. Mặc định shipper + đối tác
-  // cùng gánh theo đúng TỶ LỆ THU NHẬP THỰC NHẬN của họ; đơn không có đối tác
-  // (xe công nghệ, dọn nhà) → shipper gánh 100%.
-  // Chỉ khi cả shipper VÀ đối tác đạt ≥100 đơn/tháng thì CRABOR chịu toàn bộ.
+  // ── PHÂN BỔ VOUCHER (ai gánh theo LOẠI voucher, không chia chung chung) ──
+  // - milestone ≥100 đơn/tháng (cả 2 phía) → CRABOR chịu
+  // - voucher giảm PHÍ SHIP (target 'ship') → shipper chịu 100%
+  // - voucher food → đối tác food chịu 100% (shipper 0đ)
+  // - voucher ride → shipper chịu 100%
+  // - voucher giặt là → tiệm giặt chịu 100%
+  // - voucher dọn nhà → đối tác dọn chịu 100% (đơn chưa gắn partner → shipper)
+  // - voucher cũ không còn doc (generic đã xoá) → giữ cách chia tỷ lệ cũ để khớp số đã cộng ví
   let voucherShipperBear = 0, voucherPartnerBear = 0, voucherCraborBear = 0;
   if (discount > 0) {
-    const hasPartner = !isCleaning && !!(order.partnerId && String(order.partnerId) !== "0");
+    const hasPartner = !isCleaning && !!(order.partnerId && String(order.partnerId) !== "0" && String(order.partnerId) !== "null");
+    let vdoc = order._voucherDoc || null;
+    if (!vdoc && order.voucherCode) {
+      vdoc = await Voucher.findOne({ code: String(order.voucherCode).toUpperCase().trim() }).select("module target").lean().catch(() => null);
+    }
+    const ratioSplit = () => {
+      if (!hasPartner) return { s: discount, p: 0 };
+      const earnSum12 = shipperEarnRaw + partnerEarnRaw;
+      if (earnSum12 <= 0) return { s: discount, p: 0 };
+      const s = Math.round(discount * shipperEarnRaw / earnSum12);
+      return { s, p: discount - s };
+    };
     if (await voucherBorneByCrabor(order)) {
       voucherCraborBear = discount;
-    } else if (hasPartner) {
-      const earnSum12 = shipperEarnRaw + partnerEarnRaw;
-      if (earnSum12 > 0) {
-        voucherShipperBear = Math.round(discount * shipperEarnRaw / earnSum12);
-        voucherPartnerBear = discount - voucherShipperBear;
-      } else {
+    } else if (vdoc) {
+      const scope = String(vdoc.module || 'all');
+      const target = String(vdoc.target || 'order');
+      if (target === 'ship') {
         voucherShipperBear = discount;
+      } else if (scope === 'food' || scope === 'laundry' || scope === 'cleaning') {
+        if (hasPartner) voucherPartnerBear = discount;
+        else voucherShipperBear = discount;
+      } else if (scope === 'ride') {
+        voucherShipperBear = discount;
+      } else {
+        const r = ratioSplit();
+        voucherShipperBear = r.s; voucherPartnerBear = r.p;
       }
     } else {
-      voucherShipperBear = discount; // ride/dọn nhà: shipper gánh 100%
+      const r = ratioSplit();
+      voucherShipperBear = r.s; voucherPartnerBear = r.p;
     }
   }
 
@@ -15490,12 +15518,9 @@ app.get("/api/shipper/order-history", async (req, res) => {
       }).catch(() => 0) : Promise.resolve(0),
     ]);
 
-    // Dùng calcEarnings đã fix (không dùng bear lưu cũ — đơn giặt cũ lưu sai 100% về shipper)
+    // Hiển thị đúng số ĐÃ CỘNG ví (bear lưu lúc duyệt đơn)
     const lauDocs = (lauOrders || []);
-    const lauEarns = await Promise.all(lauDocs.map(o =>
-      calcEarnings({ ...o, module: 'laundry' }).catch(() => ({ shipperEarn: shipperOrderEarnNet({ ...o, module: 'laundry' }) }))
-    ));
-    const formattedLaundry = lauDocs.map((o, idx) => {
+    const formattedLaundry = lauDocs.map((o) => {
       const finalTotal = o.finalTotal ?? o.estimatedTotal ?? 0;
       return {
         orderId: o.orderId,
@@ -15508,7 +15533,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
         shipFee: o.shipFee || 0,
         serviceFee: 0,
         paymentMethod: o.paymentMethod || 'cash',
-        shipperEarn: lauEarns[idx]?.shipperEarn ?? 0,
+        shipperEarn: shipperOrderEarnNet({ ...o, module: 'laundry' }),
         address: o.pickupAddress,
         partnerAddress: o.partnerName,
         partnerName: o.partnerName,
@@ -15522,10 +15547,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
       };
     });
     const clnDocs = (clnOrders || []);
-    const clnEarns = await Promise.all(clnDocs.map(o =>
-      calcEarnings({ ...o, module: 'cleaning' }).catch(() => ({ shipperEarn: shipperOrderEarnNet({ ...o, module: 'cleaning' }) }))
-    ));
-    const formattedCleaning = clnDocs.map((o, idx) => {
+    const formattedCleaning = clnDocs.map((o) => {
       const finalTotal = o.finalTotal ?? Math.max(0, (o.price || 0) - (o.discount || 0));
       return {
         orderId: o.orderId,
@@ -15538,7 +15560,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
         shipFee: 0,
         serviceFee: 0,
         paymentMethod: o.paymentMethod || 'cash',
-        shipperEarn: clnEarns[idx]?.shipperEarn ?? 0,
+        shipperEarn: shipperOrderEarnNet({ ...o, module: 'cleaning' }),
         address: o.address,
         partnerAddress: null,
         partnerName: o.serviceName || 'Dọn nhà',
