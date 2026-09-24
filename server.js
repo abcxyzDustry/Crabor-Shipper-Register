@@ -6955,6 +6955,19 @@ async function processSePayPayment(payload, ioRef, force = false) {
         console.log(`[SEPAY] Short: ${rawRef} need ${need} got ${amount} (${order.orderId})`);
       }
     }
+    // Không còn đơn unpaid nhưng mã khớp đơn đã paid → khách CK 2 lần, cần hoàn thủ công
+    if (!handled && !order && txId) {
+      const dup = await Order.findOne({
+        $or: [
+          { sePayRef: { $regex: suffix, $options: "i" } },
+          { orderId: { $regex: orderIdPat } },
+        ],
+      }).select("orderId paymentStatus").lean().catch(() => null);
+      if (dup && dup.paymentStatus === "paid") {
+        await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dup.orderId} already paid` } }).catch(() => {});
+        console.log(`[SEPAY] Duplicate: ${rawRef} (${dup.orderId} already paid)`);
+      }
+    }
   }
 
   // ── 6b. Laundry delivery payment (CRLAU) ─────────────────
@@ -7036,6 +7049,19 @@ async function processSePayPayment(payload, ioRef, force = false) {
       if (amount < need - 1000) {
         await SePayTx.updateOne({ txId }, { $set: { note: `short: ${lau.orderId} need ${need} got ${amount}` } }).catch(() => {});
         console.log(`[SEPAY] Short: ${rawRef} need ${need} got ${amount} (${lau.orderId})`);
+      }
+    }
+    // Không còn đơn giặt unpaid nhưng mã khớp đơn đã paid → khách CK 2 lần, cần hoàn thủ công
+    if (!handled && !lau && txId) {
+      const dupL = await LaundryOrder.findOne({
+        $or: [
+          { sePayRef: { $regex: suffix, $options: "i" } },
+          { orderId: { $regex: lauIdPat } },
+        ],
+      }).select("orderId paymentStatus").lean().catch(() => null);
+      if (dupL && dupL.paymentStatus === "paid") {
+        await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dupL.orderId} already paid` } }).catch(() => {});
+        console.log(`[SEPAY] Duplicate: ${rawRef} (${dupL.orderId} already paid)`);
       }
     }
   }

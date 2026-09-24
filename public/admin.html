@@ -3416,6 +3416,10 @@ async function loadSepayUnmatched() {
         const m = String(x.note).match(/short:\s*(\S+)\s+need\s+(\d+)\s+got\s+(\d+)/);
         note = m ? `⚠️ Thiếu tiền: đơn ${esc(m[1])} cần ${fmt(m[2])} nhưng chỉ về ${fmt(m[3])}` : esc(x.note);
       }
+      if (String(x.note || '').startsWith('duplicate:')) {
+        const m2 = String(x.note).match(/duplicate:\s*(\S+)/);
+        note = `💰 Khách CK 2 lần: đơn ${esc(m2 ? m2[1] : '')} đã thanh toán rồi — cần hoàn tiền thủ công, KHÔNG bấm Thử lại`;
+      }
       const when = x.createdAt ? new Date(x.createdAt).toLocaleString('vi-VN') : '—';
       return `<tr>
         <td style="font-size:.75rem;color:var(--muted)">${when}</td>
