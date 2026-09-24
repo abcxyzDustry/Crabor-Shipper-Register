@@ -3482,11 +3482,19 @@ app.post("/api/vouchers", adminAuth, async (req, res) => {
   }
 });
 
-// ── Weekly Voucher (voucher tuần — tự tạo đầu mỗi tuần, giảm phí giao) ──
-const WEEKLY_VOUCHER_CFG = {
-  type: "percent", value: 50, maxDiscount: 25000, minOrder: 50000,
-  target: "ship", module: "all", days: 7,
-  description: "Voucher tuần: Giảm 50% phí giao hàng (tối đa 25.000đ) — áp dụng mọi dịch vụ",
+// ── Weekly Voucher theo dịch vụ ──
+// Mỗi tuần random 2/4 dịch vụ (food/ride/laundry/cleaning) để đẻ voucher:
+// giảm 10% (tối đa 30.000đ), HSD 7 ngày. Ai gánh theo loại (food→quán,
+// ride→shipper, giặt→tiệm, dọn→đối tác) như quy tắc trong calcEarnings.
+const WEEKLY_SERVICE_POOL = [
+  { module: 'food',     tag: 'FOOD',  label: 'Đồ ăn' },
+  { module: 'ride',     tag: 'RIDE',  label: 'Xe công nghệ' },
+  { module: 'laundry',  tag: 'LAU',   label: 'Giặt là' },
+  { module: 'cleaning', tag: 'CLEAN', label: 'Dọn nhà' },
+];
+const WEEKLY_SERVICE_CFG = {
+  type: "percent", value: 10, maxDiscount: 30000, minOrder: 20000,
+  target: "order", days: 7, usageLimit: 10000,
 };
 
 function isoWeekKey(d = new Date()) {
@@ -3498,59 +3506,82 @@ function isoWeekKey(d = new Date()) {
   return `${date.getUTCFullYear()}W${String(week).padStart(2, "0")}`;
 }
 
-async function generateWeeklyVoucher() {
+// Random 2/4 dịch vụ mỗi tuần để đẻ voucher: giảm 10% (tối đa 30k), HSD 7 ngày.
+// Mã: <TAG>10-<YY>W<WW> (VD FOOD10-26W39). Idempotent theo tuần (weekly key).
+async function generateWeeklyServiceVouchers() {
   try {
     const key = isoWeekKey(new Date());
-    const existing = await Voucher.findOne({ weekly: { $exists: true, $ne: "" } }).lean().catch(() => null);
-    if (existing && existing.weekly === key) return existing;
-    const code = "WEEKLY-" + key.replace("W", "");
-    const v = await Voucher.create({
-      code,
-      type: WEEKLY_VOUCHER_CFG.type,
-      value: WEEKLY_VOUCHER_CFG.value,
-      minOrder: WEEKLY_VOUCHER_CFG.minOrder,
-      maxDiscount: WEEKLY_VOUCHER_CFG.maxDiscount,
-      usageLimit: 100000,
-      expiresAt: new Date(Date.now() + WEEKLY_VOUCHER_CFG.days * 24 * 3600 * 1000),
-      description: WEEKLY_VOUCHER_CFG.description,
-      module: WEEKLY_VOUCHER_CFG.module,
-      target: WEEKLY_VOUCHER_CFG.target,
-      weekly: key,
-      active: true,
-    });
-    console.log(`[WeeklyVoucher] Đã tạo voucher tuần mới: ${code} (${key})`);
-    return v;
+    const existed = await Voucher.find({ weekly: key }).select("code module").lean().catch(() => []);
+    if (existed && existed.length >= 2) return existed;
+    const pool = [...WEEKLY_SERVICE_POOL];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const picked = pool.slice(0, 2);
+    const shortKey = key.replace("W", ""); // 2026W39 -> 202639
+    const out = [];
+    for (const svc of picked) {
+      const code = `${svc.tag}10-${shortKey}`;
+      try {
+        const v = await Voucher.create({
+          code,
+          type: WEEKLY_SERVICE_CFG.type,
+          value: WEEKLY_SERVICE_CFG.value,
+          minOrder: WEEKLY_SERVICE_CFG.minOrder,
+          maxDiscount: WEEKLY_SERVICE_CFG.maxDiscount,
+          usageLimit: WEEKLY_SERVICE_CFG.usageLimit,
+          expiresAt: new Date(Date.now() + WEEKLY_SERVICE_CFG.days * 24 * 3600 * 1000),
+          description: `Voucher tuần: Giảm 10% ${svc.label} (tối đa 30.000đ) — HSD 7 ngày`,
+          module: svc.module,
+          target: WEEKLY_SERVICE_CFG.target,
+          weekly: key,
+          active: true,
+        });
+        console.log(`[WeeklyVoucher] Đã tạo voucher tuần: ${code} (${svc.label}, ${key})`);
+        out.push(v);
+      } catch (e) {
+        if (e?.code === 11000) {
+          const dup = await Voucher.findOne({ code }).lean().catch(() => null);
+          if (dup) out.push(dup);
+        } else console.error("[WeeklyVoucher] Tạo voucher thất bại:", e.message);
+      }
+    }
+    return out;
   } catch (e) {
     console.error("[WeeklyVoucher] Tạo voucher thất bại:", e.message);
-    return null;
+    return [];
   }
 }
 
-// ĐÃ TẮT voucher tuần tự động (module 'all' chung chung) — chuyển sang voucher theo từng dịch vụ.
-// Xoá 1 lần các voucher tuần chung còn sót (giữ nguyên discount đã lưu trên đơn cũ,
-// giữ lại voucher loyalty user đổi điểm — loại đó dùng cách chia tỷ lệ cũ).
-Voucher.deleteMany({ weekly: { $exists: true, $ne: "" } }).then(r => {
-  if (r?.deletedCount) console.log(`[Voucher] Đã xoá ${r.deletedCount} voucher tuần chung (WEEKLY-*)`);
+// Chạy 00:05 thứ 2 hàng tuần (giờ VN) + đảm bảo ngay khi khởi động (idempotent theo tuần)
+try { cron.schedule("5 0 * * 1", () => generateWeeklyServiceVouchers(), { timezone: "Asia/Ho_Chi_Minh" }); } catch (e) {}
+setTimeout(() => generateWeeklyServiceVouchers(), 20000);
+
+// Xoá 1 lần các voucher tuần chung CŨ (WEEKLY-*, module all) còn sót
+// (giữ nguyên discount đã lưu trên đơn cũ, giữ voucher loyalty user đổi điểm).
+Voucher.deleteMany({ code: /^WEEKLY-/ }).then(r => {
+  if (r?.deletedCount) console.log(`[Voucher] Đã xoá ${r.deletedCount} voucher tuần chung cũ (WEEKLY-*)`);
 }).catch(() => {});
 
-// GET /api/admin/weekly-voucher — ĐÃ NGỪNG voucher tuần chung (module all), dùng voucher theo dịch vụ
+// GET /api/admin/weekly-voucher — Voucher tuần này (2 dịch vụ random) + lượt dùng
 app.get("/api/admin/weekly-voucher", adminAuth, async (req, res) => {
   try {
-    const v = await Voucher.findOne({ weekly: { $exists: true, $ne: "" } }).sort({ createdAt: -1 }).lean();
-    if (!v) return res.json({ success: true, disabled: true, message: "Voucher tuần chung đã ngừng — hãy tạo voucher theo từng dịch vụ (food/ride/laundry/cleaning)" });
-    if (!v) return res.status(500).json({ success: false, message: "Không tạo được voucher tuần" });
+    const key = isoWeekKey(new Date());
+    const list = await generateWeeklyServiceVouchers();
+    const codes = list.map(v => v.code);
     const [usedCount, turnover] = await Promise.all([
-      Order.countDocuments({ voucherCode: v.code, status: { $nin: ["cancelled", "expired"] } }),
+      Order.countDocuments({ voucherCode: { $in: codes }, status: { $nin: ["cancelled", "expired"] } }),
       Order.aggregate([
-        { $match: { voucherCode: v.code, status: "delivered" } },
+        { $match: { voucherCode: { $in: codes }, status: "delivered" } },
         { $group: { _id: null, t: { $sum: { $ifNull: ["$finalTotal", 0] } } } },
       ]),
     ]);
     res.json({
       success: true,
-      voucher: v,
+      vouchers: list,
       stats: {
-        week: v.weekly,
+        week: key,
         usedCount,
         turnover: turnover[0]?.t || 0,
       },
