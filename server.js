@@ -11265,6 +11265,7 @@ app.patch("/api/cleaning/orders/:id/cancel", async (req, res) => {
     try { await refundOnCancel(order); } catch(e) { console.error('[Cancel Cleaning] refundOnCancel lỗi:', e.message); }
     // Báo shipper để tắt popup đơn mới
     broadcastOrderCancelled(req.io, order);
+    req.io.to(`order_${order.orderId}`).emit("order_cancelled", { orderId: order.orderId, cancelReason: "Khách hàng đã hủy đơn dọn nhà" });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -11349,6 +11350,10 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
       message: status === "accepted" ? "Shipper đã nhận đơn dọn nhà!" :
                status === "in_progress" ? "Shipper đang dọn nhà!" :
                status === "completed" ? "Dọn nhà hoàn thành! 🧹" : status,
+    });
+    // Đồng bộ room đơn (tracking/detail join room này — trước đây dọn nhà không emit nên mù)
+    req.io.to(`order_${order.orderId}`).emit("orderStatusChanged", {
+      orderId: order.orderId, status,
     });
     if (status === "completed") {
       order.completedAt = new Date();
@@ -11809,6 +11814,9 @@ const laundryOrderSchema = new mongoose.Schema({
   note:          String,
   dispatchedTo:  [mongoose.Schema.Types.ObjectId], // shipper đã được dispatch
   dispatchedAt:  Date,                            // lần dispatch gần nhất
+  // SOS bất thường: tạm ngưng 1h chờ CRABOR phán quyết (đồng bộ 3 app)
+  sosPausedUntil: { type: Date, default: null },
+  sosStatus: { type: String, enum: ['none','paused','resolved'], default: 'none' },
 }, { timestamps: true });
 
 laundryOrderSchema.pre("save", function(next) {
@@ -12197,6 +12205,23 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
         deadline: order.deadline,
         message: `Đang giặt! Xong trước ${order.deadline?.toLocaleString("vi-VN")}`,
       });
+      req.io.to(`order_${order.orderId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "countdown",
+      });
+    }
+
+    if (status === "washing") {
+      // Trước đây silent hoàn toàn → customer + partner đều mù
+      req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "washing",
+        message: "Tiệm đang giặt đồ của bạn!",
+      });
+      req.io.to(`partner_${order.partnerId}`).emit("laundry_washing", {
+        orderId: order.orderId, message: "Đang giặt",
+      });
+      req.io.to(`order_${order.orderId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "washing",
+      });
     }
 
     if (status === "ready_return") {
@@ -12252,12 +12277,27 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
         orderId: order.orderId, status: "ready_return",
         message: "Đồ đã sạch! Đang tìm shipper trả đồ về cho bạn...",
       });
+      req.io.to(`partner_${order.partnerId}`).emit("laundry_ready_return", {
+        orderId: order.orderId, shipperReturnId: order.shipperReturnId || null,
+        finalTotal: order.finalTotal || order.estimatedTotal || 0,
+        message: "Đồ đã sạch — đang tìm shipper trả đồ",
+      });
+      req.io.to(`order_${order.orderId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "ready_return",
+      });
     }
 
     if (status === "shipper_returning") {
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "shipper_returning",
         message: "Shipper đang mang đồ sạch về cho bạn!",
+      });
+      req.io.to(`partner_${order.partnerId}`).emit("laundry_shipper_returning", {
+        orderId: order.orderId, shipperId: order.shipperId || null,
+        message: "Shipper đang trả đồ cho khách",
+      });
+      req.io.to(`order_${order.orderId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "shipper_returning",
       });
     }
 
@@ -12313,6 +12353,13 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "delivered",
         message: "Đồ đã được trả! Cảm ơn bạn đã dùng CRABOR Giặt là 👕",
+      });
+      req.io.to(`partner_${order.partnerId}`).emit("laundry_delivered", {
+        orderId: order.orderId, finalTotal: order.finalTotal || order.estimatedTotal || 0,
+        message: "Đơn giặt hoàn thành",
+      });
+      req.io.to(`order_${order.orderId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "delivered",
       });
     }
 
@@ -15028,6 +15075,25 @@ app.patch("/api/orders/:id/status", async (req, res) => {
       });
     }
 
+    // ── preparing / picking_up / delivering: trước đây chỉ vào room order_*
+    // → customer (màn chi tiết) + partner (màn quán) đều mù. Bổ sung emit trực tiếp.
+    if (status === "preparing" || status === "picking_up" || status === "delivering") {
+      const pickMsg = {
+        preparing: "Quán đang chuẩn bị món cho bạn!",
+        picking_up: "Shipper đang đến lấy hàng!",
+        delivering: "Shipper đang giao hàng đến bạn!",
+      };
+      req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
+        orderId: order.orderId, status,
+        message: pickMsg[status],
+      });
+      req.io.to(`partner_${order.partnerId}`).emit("order_status_update", {
+        orderId: order.orderId, status,
+        total: order.total, finalTotal: order.finalTotal,
+        discount: order.discount || 0, voucherCode: order.voucherCode,
+      });
+    }
+
     // ── Khi shipper đã lấy hàng (picked_up) → partner + customer biết ──
     if (status === "picked_up") {
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
@@ -15113,6 +15179,12 @@ app.patch("/api/orders/:id/status", async (req, res) => {
       req.io.to(`customer_${order.customerId}`).emit("order_status_update", {
         orderId: order.orderId, status: "delivered",
         message: "Đơn hàng đã được giao thành công! Cảm ơn bạn đã dùng CRABOR 🦀",
+      });
+      // Thông báo partner (trước đây thiếu → app quán không biết đơn xong)
+      req.io.to(`partner_${order.partnerId}`).emit("order_status_update", {
+        orderId: order.orderId, status: "delivered",
+        total: order.total, finalTotal: order.finalTotal,
+        discount: order.discount || 0, voucherCode: order.voucherCode,
       });
 
       // Thông báo admin để duyệt wallet
@@ -15721,8 +15793,22 @@ app.post("/api/shipper/sos/report", async (req, res) => {
     const allowedCat = ['prohibited_goods','fake_address','threat_harass','bom_order','cod_issue','other'];
     const cat = allowedCat.includes(category) ? category : 'other';
 
-    const order = await Order.findOne({ orderId: String(orderId), shipperId: req.session.shipperId });
+    // Tìm đơn ở cả 3 module (food/ride + giặt là + dọn nhà) — trước đây chỉ tìm Order nên SOS đơn giặt/dọn 404
+    const sid = req.session.shipperId;
+    const LaundryOrderM = mongoose.models.LaundryOrder;
+    const CleaningOrderM = mongoose.models.CleaningOrder;
+    let order = await Order.findOne({ orderId: String(orderId), shipperId: sid });
+    let orderModule = order?.module || null;
+    if (!order && LaundryOrderM) {
+      order = await LaundryOrderM.findOne({ orderId: String(orderId), $or: [{ shipperId: sid }, { shipperReturnId: sid }] });
+      if (order) orderModule = 'laundry';
+    }
+    if (!order && CleaningOrderM) {
+      order = await CleaningOrderM.findOne({ orderId: String(orderId), shipperId: sid });
+      if (order) orderModule = 'cleaning';
+    }
     if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn của bạn" });
+    orderModule = orderModule || order.module || 'food';
     const dup = await SosReport.findOne({ orderId: order.orderId, status: 'pending' });
     if (dup && dup.pausedUntil && new Date(dup.pausedUntil).getTime() > Date.now())
       return res.status(400).json({ success: false, message: "Đơn này đang tạm ngưng chờ CRABOR xử lý" });
@@ -15742,7 +15828,7 @@ app.post("/api/shipper/sos/report", async (req, res) => {
     const pausedUntil = new Date(Date.now() + 60 * 60 * 1000);
     const report = await SosReport.create({
       orderId: order.orderId,
-      module: order.module || "food",
+      module: orderModule,
       shipperId: req.session.shipperId,
       customerId: order.customerId || null,
       category: cat,
@@ -15758,6 +15844,15 @@ app.post("/api/shipper/sos/report", async (req, res) => {
     await order.save();
     req.io?.to("admin").emit("sos_pending", { reportId: report.reportId, orderId: order.orderId, category: cat, message: `SOS mới: ${order.orderId} [${cat}]` });
     req.io?.to(`shipper_${req.session.shipperId}`).emit("sos_paused", { orderId: order.orderId, pausedUntil, message: `Đơn ${order.orderId} tạm ngưng 1h chờ CRABOR phán quyết` });
+    // Đồng bộ partner (nếu đơn có quán): báo tạm ngưng để ngừng chuẩn bị/giặt
+    if (order.partnerId) {
+      try { req.io?.to(`partner_${order.partnerId}`).emit("sos_paused", { orderId: order.orderId, pausedUntil, message: `Đơn ${order.orderId} tạm ngưng 1h chờ CRABOR xác minh (shipper báo cáo bất thường). Tạm dừng chuẩn bị đơn này.` }); } catch (_) {}
+      await notifyUser("partner", order.partnerId, {
+        type: "system", title: "⏸️ Đơn tạm ngưng 1h",
+        body: `Đơn ${order.orderId} tạm ngưng để CRABOR xác minh. Tạm dừng chuẩn bị đơn này.`,
+        ref: order.orderId, refModule: orderModule,
+      }).catch(() => {});
+    }
     // Đồng bộ customer: báo đơn tạm ngưng + chuông
     if (order.customerId) {
       try { req.io?.to(`customer_${order.customerId}`).emit("sos_paused", { orderId: order.orderId, pausedUntil, message: `Đơn ${order.orderId} tạm ngưng 1h để CRABOR xác minh (shipper báo cáo dấu hiệu bất thường). Vui lòng giữ liên lạc.` }); } catch (_) {}
@@ -15765,7 +15860,7 @@ app.post("/api/shipper/sos/report", async (req, res) => {
       await notifyUser("user", order.customerId, {
         type: "system", title: "⏸️ Đơn tạm ngưng 1h",
         body: `Đơn ${order.orderId} tạm ngưng để CRABOR xác minh. Vui lòng giữ liên lạc — kết quả sẽ báo ngay.`,
-        ref: order.orderId, refModule: order.module || "food",
+        ref: order.orderId, refModule: orderModule,
       }).catch(() => {});
     }
     res.json({ success: true, reportId: report.reportId, pausedUntil, message: "Đã gửi SOS. Đơn TẠM NGƯNG 1h chờ phán quyết cuối của CRABOR. Báo cáo trung thực được bảo vệ, không tính vi phạm." });
@@ -15815,7 +15910,14 @@ app.post("/api/admin/sos/:id/resolve", async (req, res) => {
     report.resolvedAt = new Date();
     report.resolvedBy = String(req.session.adminId);
     await report.save();
-    const order = await Order.findOne({ orderId: report.orderId });
+    // Tìm đơn ở cả 3 module (food/ride + giặt là + dọn nhà)
+    let order = await Order.findOne({ orderId: report.orderId });
+    if (!order && mongoose.models.LaundryOrder) {
+      order = await mongoose.models.LaundryOrder.findOne({ orderId: report.orderId });
+    }
+    if (!order && mongoose.models.CleaningOrder) {
+      order = await mongoose.models.CleaningOrder.findOne({ orderId: report.orderId });
+    }
     let paidShipper = 0, orderCancelled = false;
     if (order) {
       order.sosPausedUntil = null;
@@ -15829,15 +15931,17 @@ app.post("/api/admin/sos/:id/resolve", async (req, res) => {
         order.statusHistory.push({ status: 'cancelled', time: new Date(), by: 'admin_sos' });
         try {
           const { shipperEarn } = await calcEarnings(order);
-          if (order.shipperId && shipperEarn > 0) {
+          // Cộng cho shipper BÁO CÁO (chiều trả giặt có thể khác shipper chiều lấy)
+          const creditShipperId = report.shipperId || order.shipperId;
+          if (creditShipperId && shipperEarn > 0) {
             const already = await WalletQueue.findOne({
-              orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
+              orderId: order.orderId, recipientId: creditShipperId, recipientType: "shipper",
               amount: shipperEarn, status: "approved",
             }).lean().catch(() => null);
             if (!already) {
-              await creditWalletDirect(order.shipperId, "shipper", shipperEarn, order.orderId, `Bồi thường SOS ${order.orderId} (shipper đúng)`);
+              await creditWalletDirect(creditShipperId, "shipper", shipperEarn, order.orderId, `Bồi thường SOS ${order.orderId} (shipper đúng)`);
               await WalletQueue.create({
-                orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
+                orderId: order.orderId, recipientId: creditShipperId, recipientType: "shipper",
                 amount: shipperEarn, paymentMethod: order.paymentMethod || "sos",
                 note: `Bồi thường SOS ${order.orderId}`, status: "approved",
                 approvedBy: "sos_admin", approvedAt: new Date(),
@@ -15863,10 +15967,20 @@ app.post("/api/admin/sos/:id/resolve", async (req, res) => {
         try { req.io?.to(`shipper_${report.shipperId}`).emit("wallet_credited", { amount: paidShipper, orderId: order.orderId, message: `+${paidShipper.toLocaleString("vi-VN")}đ bồi thường SOS đơn ${order.orderId} đã vào ví!` }); } catch (_) {}
         req.io?.to(`shipper_${report.shipperId}`).emit("sos_resolved", { reportId: report.reportId, orderId: order.orderId, approved: true, orderCancelled: true, paidShipper, message: `CRABOR: shipper ĐÚNG. Đơn ${order.orderId} đã HỦY lập tức. +${paidShipper.toLocaleString("vi-VN")}đ đã vào ví. Ví CRABOR/ví trả sau/tiền mặt của khách đã bị khóa.` });
         req.io?.to(`order_${order.orderId}`).emit("order_cancelled", { orderId: order.orderId, cancelReason: order.cancelReason });
-        if (order.shipperId) {
-          await notifyUser("shipper", order.shipperId, {
+        if (report.shipperId || order.shipperId) {
+          await notifyUser("shipper", report.shipperId || order.shipperId, {
             type: "income", title: "✅ SOS đúng — đơn đã hủy + cộng tiền",
             body: `Đơn ${order.orderId} đã hủy. +${paidShipper.toLocaleString("vi-VN")}đ bồi thường đã vào ví. Cảm ơn bạn đã báo cáo trung thực!`,
+            ref: order.orderId, refModule: order.module || "food",
+          }).catch(() => {});
+        }
+        // Đồng bộ partner: đơn hủy / tiếp tục
+        if (order.partnerId) {
+          try { req.io?.to(`partner_${order.partnerId}`).emit("sos_resolved", { reportId: report.reportId, orderId: order.orderId, approved: true, orderCancelled: true, message: `CRABOR: SOS đúng — đơn ${order.orderId} đã HỦY. Dừng chuẩn bị đơn này.` }); } catch (_) {}
+          try { req.io?.to(`partner_${order.partnerId}`).emit("order_status_update", { orderId: order.orderId, status: "cancelled" }); } catch (_) {}
+          await notifyUser("partner", order.partnerId, {
+            type: "system", title: "❌ Đơn đã HỦY (SOS)",
+            body: `Đơn ${order.orderId} đã hủy sau xác minh SOS. Dừng chuẩn bị đơn này.`,
             ref: order.orderId, refModule: order.module || "food",
           }).catch(() => {});
         }
@@ -15887,6 +16001,11 @@ app.post("/api/admin/sos/:id/resolve", async (req, res) => {
         order.statusHistory.push({ status: 'sos_resolved_reject', time: new Date(), by: 'admin' });
         await order.save();
         req.io?.to(`shipper_${report.shipperId}`).emit("sos_resolved", { reportId: report.reportId, orderId: report.orderId, approved: false, orderCancelled: false, message: `SOS đơn ${order.orderId} chưa đủ căn cứ. Đơn TIẾP TỤC bình thường — vui lòng thực hiện bước tiếp theo. ${report.adminNote}` });
+        // Đồng bộ partner: đơn tiếp tục
+        if (order.partnerId) {
+          try { req.io?.to(`partner_${order.partnerId}`).emit("sos_resolved", { reportId: report.reportId, orderId: order.orderId, approved: false, orderCancelled: false, message: `Đơn ${order.orderId} đã xác minh — không có gì bất thường. Đơn TIẾP TỤC bình thường.` }); } catch (_) {}
+          try { req.io?.to(`partner_${order.partnerId}`).emit("order_status_update", { orderId: order.orderId, status: order.status }); } catch (_) {}
+        }
         // Đồng bộ customer: đơn tiếp tục
         if (order.customerId) {
           try { req.io?.to(`customer_${order.customerId}`).emit("sos_resolved", { reportId: report.reportId, orderId: order.orderId, approved: false, orderCancelled: false, message: `Đơn ${order.orderId} đã được xác minh — không có gì bất thường. Đơn TIẾP TỤC giao bình thường.` }); } catch (_) {}
@@ -17696,6 +17815,9 @@ const cleaningOrderSchema = new mongoose.Schema({
   },
   statusHistory: [{ status: String, by: String, time: Date }],
   completedAt:   Date,
+  // SOS bất thường: tạm ngưng 1h chờ CRABOR phán quyết (đồng bộ 3 app)
+  sosPausedUntil: { type: Date, default: null },
+  sosStatus: { type: String, enum: ['none','paused','resolved'], default: 'none' },
   dispatchedAt:  Date,   // lần phát đơn gần nhất (cron AutoDispatch ping lại mỗi 35s)
   rating:        { type: Number, min: 1, max: 5 },
   ratingComment: String,
