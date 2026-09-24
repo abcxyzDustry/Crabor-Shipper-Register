@@ -13928,7 +13928,13 @@ function shipperOrderEarnNet(o) {
 async function calcEarnings(order) {
   // Dọn nhà là cleaning order: earnings base = price, không có partner
   const isCleaning = !!(order && (order.module === 'cleaning' || order.serviceType));
-  const originalTotal = isCleaning ? (order.price || 0) : (order.total || 0);
+  // Giặt là KHÔNG có field `total` (chỉ estimatedTotal/finalTotal) → base tiền giặt
+  // = finalTotal − shipFee + discount (giá trị hàng trước voucher). Không có dòng này
+  // partnerBase = 0 → tiệm được cộng 0đ và shipper gánh 100% voucher (bug đơn LAU-MUG1JFIW).
+  const isLaundry = !isCleaning && order && (order.module === 'laundry' || order.estimatedTotal != null);
+  const originalTotal = isCleaning ? (order.price || 0)
+    : isLaundry ? Math.max(0, (order.finalTotal ?? order.estimatedTotal ?? 0) - (order.shipFee || 0) + (order.discount || 0))
+    : (order.total || 0);
   const finalTotal = isCleaning
     ? Math.max(0, (order.price || 0) - (order.discount || 0))
     : (order.finalTotal || (originalTotal + (order.shipFee||0) + (order.serviceFee||0) - (order.discount||0)));
@@ -15484,7 +15490,12 @@ app.get("/api/shipper/order-history", async (req, res) => {
       }).catch(() => 0) : Promise.resolve(0),
     ]);
 
-    const formattedLaundry = (lauOrders || []).map(o => {
+    // Dùng calcEarnings đã fix (không dùng bear lưu cũ — đơn giặt cũ lưu sai 100% về shipper)
+    const lauDocs = (lauOrders || []);
+    const lauEarns = await Promise.all(lauDocs.map(o =>
+      calcEarnings({ ...o, module: 'laundry' }).catch(() => ({ shipperEarn: shipperOrderEarnNet({ ...o, module: 'laundry' }) }))
+    ));
+    const formattedLaundry = lauDocs.map((o, idx) => {
       const finalTotal = o.finalTotal ?? o.estimatedTotal ?? 0;
       return {
         orderId: o.orderId,
@@ -15497,7 +15508,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
         shipFee: o.shipFee || 0,
         serviceFee: 0,
         paymentMethod: o.paymentMethod || 'cash',
-        shipperEarn: shipperOrderEarnNet({ ...o, module: 'laundry' }),
+        shipperEarn: lauEarns[idx]?.shipperEarn ?? 0,
         address: o.pickupAddress,
         partnerAddress: o.partnerName,
         partnerName: o.partnerName,
@@ -15510,7 +15521,11 @@ app.get("/api/shipper/order-history", async (req, res) => {
         date: o.deliveredAt || o.createdAt,
       };
     });
-    const formattedCleaning = (clnOrders || []).map(o => {
+    const clnDocs = (clnOrders || []);
+    const clnEarns = await Promise.all(clnDocs.map(o =>
+      calcEarnings({ ...o, module: 'cleaning' }).catch(() => ({ shipperEarn: shipperOrderEarnNet({ ...o, module: 'cleaning' }) }))
+    ));
+    const formattedCleaning = clnDocs.map((o, idx) => {
       const finalTotal = o.finalTotal ?? Math.max(0, (o.price || 0) - (o.discount || 0));
       return {
         orderId: o.orderId,
@@ -15523,7 +15538,7 @@ app.get("/api/shipper/order-history", async (req, res) => {
         shipFee: 0,
         serviceFee: 0,
         paymentMethod: o.paymentMethod || 'cash',
-        shipperEarn: shipperOrderEarnNet({ ...o, module: 'cleaning' }),
+        shipperEarn: clnEarns[idx]?.shipperEarn ?? 0,
         address: o.address,
         partnerAddress: null,
         partnerName: o.serviceName || 'Dọn nhà',
