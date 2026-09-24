@@ -3114,7 +3114,8 @@ app.get("/api/health", async (req, res) => {
     ]);
     res.json({ status: "ok", db: dbState,
       counts: { users, shippers, partners: gl+gv+cs+fp+rx, orders },
-      uptime: Math.floor(process.uptime()) + "s" });
+      uptime: Math.floor(process.uptime()) + "s",
+      now: new Date().toISOString() });
   } catch(e) { res.status(500).json({ status: "error", message: e.message }); }
 });
 
