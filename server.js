@@ -6955,17 +6955,28 @@ async function processSePayPayment(payload, ioRef, force = false) {
         console.log(`[SEPAY] Short: ${rawRef} need ${need} got ${amount} (${order.orderId})`);
       }
     }
-    // Không còn đơn unpaid nhưng mã khớp đơn đã paid → khách CK 2 lần, cần hoàn thủ công
+    // Không còn đơn unpaid nhưng mã khớp đơn đã paid → phân biệt 2 trường hợp:
+    //  - chính tx này đã khớp trước đó (đơn lưu sePayRef trùng nội dung tx) → gắn lại 'matched'
+    //    (xảy ra khi poll retry đua với webhook làm mất nhãn)
+    //  - tx khác cùng nội dung → khách CK 2 lần, cần hoàn thủ công
     if (!handled && !order && txId) {
       const dup = await Order.findOne({
         $or: [
           { sePayRef: { $regex: suffix, $options: "i" } },
           { orderId: { $regex: orderIdPat } },
         ],
-      }).select("orderId paymentStatus").lean().catch(() => null);
+      }).select("orderId paymentStatus sePayRef").lean().catch(() => null);
       if (dup && dup.paymentStatus === "paid") {
-        await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dup.orderId} already paid` } }).catch(() => {});
-        console.log(`[SEPAY] Duplicate: ${rawRef} (${dup.orderId} already paid)`);
+        const txDoc = await SePayTx.findOne({ txId }).select("ref rawContent").lean().catch(() => null);
+        const sameTx = txDoc && dup.sePayRef && (dup.sePayRef === txDoc.rawContent || dup.sePayRef === txDoc.ref);
+        if (sameTx) {
+          await SePayTx.updateOne({ txId }, { $set: { handled: true, note: 'matched' } }).catch(() => {});
+          console.log(`[SEPAY] Re-mark matched: ${rawRef} (${dup.orderId})`);
+          handled = true;
+        } else {
+          await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dup.orderId} already paid` } }).catch(() => {});
+          console.log(`[SEPAY] Duplicate: ${rawRef} (${dup.orderId} already paid)`);
+        }
       }
     }
   }
@@ -7051,17 +7062,27 @@ async function processSePayPayment(payload, ioRef, force = false) {
         console.log(`[SEPAY] Short: ${rawRef} need ${need} got ${amount} (${lau.orderId})`);
       }
     }
-    // Không còn đơn giặt unpaid nhưng mã khớp đơn đã paid → khách CK 2 lần, cần hoàn thủ công
+    // Không còn đơn giặt unpaid nhưng mã khớp đơn đã paid → phân biệt:
+    //  - chính tx này đã khớp (đơn lưu sePayRef trùng nội dung tx) → gắn lại 'matched'
+    //  - tx khác cùng nội dung → khách CK 2 lần, cần hoàn thủ công
     if (!handled && !lau && txId) {
       const dupL = await LaundryOrder.findOne({
         $or: [
           { sePayRef: { $regex: suffix, $options: "i" } },
           { orderId: { $regex: lauIdPat } },
         ],
-      }).select("orderId paymentStatus").lean().catch(() => null);
+      }).select("orderId paymentStatus sePayRef").lean().catch(() => null);
       if (dupL && dupL.paymentStatus === "paid") {
-        await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dupL.orderId} already paid` } }).catch(() => {});
-        console.log(`[SEPAY] Duplicate: ${rawRef} (${dupL.orderId} already paid)`);
+        const txDoc = await SePayTx.findOne({ txId }).select("ref rawContent").lean().catch(() => null);
+        const sameTx = txDoc && dupL.sePayRef && (dupL.sePayRef === txDoc.rawContent || dupL.sePayRef === txDoc.ref);
+        if (sameTx) {
+          await SePayTx.updateOne({ txId }, { $set: { handled: true, note: 'matched' } }).catch(() => {});
+          console.log(`[SEPAY] Re-mark matched: ${rawRef} (${dupL.orderId})`);
+          handled = true;
+        } else {
+          await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dupL.orderId} already paid` } }).catch(() => {});
+          console.log(`[SEPAY] Duplicate: ${rawRef} (${dupL.orderId} already paid)`);
+        }
       }
     }
   }
@@ -7106,8 +7127,18 @@ async function processSePayPayment(payload, ioRef, force = false) {
     }
   }
 
-  // Đánh dấu đã xử lý
-  if (txId) await SePayTx.updateOne({ txId }, { handled: true, note: handled ? 'matched' : 'unmatched' }).catch(() => {});
+  // Đánh dấu đã xử lý — KHÔNG ghi đè các nhãn đã khớp (tránh poll retry đua với webhook
+  // làm mất nhãn 'matched'/'short:'/'duplicate:' đã ghi trước đó)
+  if (txId) {
+    if (handled) {
+      await SePayTx.updateOne({ txId }, { $set: { handled: true, note: 'matched' } }).catch(() => {});
+    } else {
+      await SePayTx.updateOne(
+        { txId, note: { $nin: ['matched', /^short:/, /^duplicate:/] } },
+        { $set: { handled: true, note: 'unmatched' } }
+      ).catch(() => {});
+    }
+  }
 
   if (!handled && process.env.SEPAY_DEBUG === '1') {
     console.log(`[SEPAY] Unmatched: ${rawRef} ${amount}đ — logged only`);
