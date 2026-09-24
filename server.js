@@ -6978,6 +6978,17 @@ async function processSePayPayment(payload, ioRef, force = false) {
           await SePayTx.updateOne({ txId }, { $set: { handled: true, note: 'matched' } }).catch(() => {});
           console.log(`[SEPAY] Re-mark matched: ${rawRef} (${dup.orderId})`);
           handled = true;
+        } else if (otherMatched) {
+          const om = await SePayTx.findOne({ txId: otherMatched.txId }).select("ref rawContent amount").lean().catch(() => null);
+          const sameMoney = om && rawRef && om.ref && (rawRef === om.ref || (om.rawContent && rawRef.includes(om.rawContent)) || (om.ref && om.ref.includes(rawRef)));
+          if (sameMoney) {
+            await SePayTx.updateOne({ txId }, { $set: { handled: true, note: `dup-record: same money as ${otherMatched.txId}` } }).catch(() => {});
+            console.log(`[SEPAY] Dup-record (same money): ${rawRef} — already matched via ${otherMatched.txId}`);
+            handled = true;
+          } else {
+            await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dup.orderId} already paid` } }).catch(() => {});
+            console.log(`[SEPAY] Duplicate: ${rawRef} (${dup.orderId} already paid) sePayRef=${dup.sePayRef || 'EMPTY'} otherMatched=${otherMatched?.txId || 'none'}`);
+          }
         } else {
           await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dup.orderId} already paid` } }).catch(() => {});
           console.log(`[SEPAY] Duplicate: ${rawRef} (${dup.orderId} already paid) sePayRef=${dup.sePayRef || 'EMPTY'} otherMatched=${otherMatched?.txId || 'none'}`);
@@ -7087,6 +7098,19 @@ async function processSePayPayment(payload, ioRef, force = false) {
           await SePayTx.updateOne({ txId }, { $set: { handled: true, note: 'matched' } }).catch(() => {});
           console.log(`[SEPAY] Re-mark matched: ${rawRef} (${dupL.orderId})`);
           handled = true;
+        } else if (otherMatched) {
+          // Đã có bản ghi khác khớp đơn này → kiểm tra cùng 1 món tiền hay CK 2 lần thật:
+          // cùng nội dung bank (cùng mã GD ngân hàng) = webhook+poll thấy trùng 1 món tiền → ẩn khỏi unmatched
+          const om = await SePayTx.findOne({ txId: otherMatched.txId }).select("ref rawContent amount").lean().catch(() => null);
+          const sameMoney = om && rawRef && om.ref && (rawRef === om.ref || (om.rawContent && rawRef.includes(om.rawContent)) || (om.ref && om.ref.includes(rawRef)));
+          if (sameMoney) {
+            await SePayTx.updateOne({ txId }, { $set: { handled: true, note: `dup-record: same money as ${otherMatched.txId}` } }).catch(() => {});
+            console.log(`[SEPAY] Dup-record (same money): ${rawRef} — already matched via ${otherMatched.txId}`);
+            handled = true;
+          } else {
+            await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dupL.orderId} already paid` } }).catch(() => {});
+            console.log(`[SEPAY] Duplicate: ${rawRef} (${dupL.orderId} already paid) sePayRef=${dupL.sePayRef || 'EMPTY'} otherMatched=${otherMatched?.txId || 'none'}`);
+          }
         } else {
           await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dupL.orderId} already paid` } }).catch(() => {});
           console.log(`[SEPAY] Duplicate: ${rawRef} (${dupL.orderId} already paid) sePayRef=${dupL.sePayRef || 'EMPTY'} otherMatched=${otherMatched?.txId || 'none'}`);
@@ -7303,9 +7327,10 @@ app.get("/api/admin/sepay/txs", async (req, res) => {
     await loadSessionFromHeader(req, res);
     if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
     const limit = Math.min(parseInt(req.query?.limit) || 50, 200);
-    const q = req.query?.filter === 'unmatched' ? { $or: [{ handled: false }, { note: 'unmatched' }, { note: /^short:/ }] } : {};
+    // dup-record (webhook+poll thấy trùng 1 món tiền) và matched không cần xử lý → ẩn
+    const q = req.query?.filter === 'unmatched' ? { $or: [{ handled: false }, { note: 'unmatched' }, { note: /^short:/ }, { note: /^duplicate:/ }] } : {};
     const list = await SePayTx.find(q).sort({ createdAt: -1 }).limit(limit).lean();
-    const unmatched = await SePayTx.countDocuments({ $or: [{ handled: false }, { note: 'unmatched' }, { note: /^short:/ }] });
+    const unmatched = await SePayTx.countDocuments({ $or: [{ handled: false }, { note: 'unmatched' }, { note: /^short:/ }, { note: /^duplicate:/ }] });
     res.json({ success: true, data: list, unmatched });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
