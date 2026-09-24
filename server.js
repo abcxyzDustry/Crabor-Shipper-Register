@@ -15421,30 +15421,114 @@ app.post("/api/ride/:orderId/decline", async (req, res) => {
 //  SHIPPER — Online/Offline + Socket Room Registration
 // ══════════════════════════════════════════════════════════════
 
-// GET /api/shipper/order-history — Lịch sử đơn đã hoàn thành
+// GET /api/shipper/order-history — Lịch sử đơn đã hoàn thành (food/ride + giặt là + dọn nhà)
 app.get("/api/shipper/order-history", async (req, res) => {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
     const { page = 1, limit = 20 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const [orders, total] = await Promise.all([
-      Order.find({ 
-        shipperId: req.session.shipperId, 
+    const pg = parseInt(page), lim = parseInt(limit);
+    const skip = (pg - 1) * lim;
+    const sid = req.session.shipperId;
+    const LaundryOrderM = mongoose.models.LaundryOrder;
+    const CleaningOrderM = mongoose.models.CleaningOrder;
+
+    const [orders, total, lauOrders, lauTotal, clnOrders, clnTotal] = await Promise.all([
+      Order.find({
+        shipperId: sid,
         status: { $in: ["delivered", "cancelled", "completed"] }
       })
       .sort({ deliveredAt: -1, createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit))
+      .limit(lim)
       .select("orderId module items address partnerAddress finalTotal total shipFee serviceFee discount voucherCode voucherDiscount voucherShipperBear status deliveredAt createdAt ratingShipper ratingComment customerName customerPhone customerId paymentMethod customerLat customerLng partnerLat partnerLng fromAddress toAddress")
       .lean(),
-      Order.countDocuments({ 
-        shipperId: req.session.shipperId, 
+      Order.countDocuments({
+        shipperId: sid,
         status: { $in: ["delivered", "cancelled", "completed"] }
+      }),
+      // Giặt là: shipper lấy HOẶC shipper trả (2 người khác nhau đều thấy lịch sử)
+      LaundryOrderM ? LaundryOrderM.find({
+        $or: [{ shipperId: sid }, { shipperReturnId: sid }],
+        status: { $in: ["delivered", "cancelled"] }
       })
+      .sort({ deliveredAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(lim)
+      .select("orderId partnerName partnerId packageName pickupAddress finalTotal estimatedTotal shipFee discount voucherCode status deliveredAt createdAt customerName customerPhone customerId paymentMethod ratingShipper ratingComment")
+      .lean().catch(() => []) : Promise.resolve([]),
+      LaundryOrderM ? LaundryOrderM.countDocuments({
+        $or: [{ shipperId: sid }, { shipperReturnId: sid }],
+        status: { $in: ["delivered", "cancelled"] }
+      }).catch(() => 0) : Promise.resolve(0),
+      // Dọn nhà
+      CleaningOrderM ? CleaningOrderM.find({
+        shipperId: sid,
+        status: { $in: ["completed", "cancelled"] }
+      })
+      .sort({ completedAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(lim)
+      .select("orderId serviceName address price discount voucherCode finalTotal status completedAt createdAt customerName customerPhone customerId paymentMethod rating ratingComment")
+      .lean().catch(() => []) : Promise.resolve([]),
+      CleaningOrderM ? CleaningOrderM.countDocuments({
+        shipperId: sid,
+        status: { $in: ["completed", "cancelled"] }
+      }).catch(() => 0) : Promise.resolve(0),
     ]);
-    
+
+    const formattedLaundry = (lauOrders || []).map(o => {
+      const finalTotal = o.finalTotal ?? o.estimatedTotal ?? 0;
+      return {
+        orderId: o.orderId,
+        module: 'laundry',
+        status: o.status === 'cancelled' ? 'cancelled' : 'delivered',
+        total: finalTotal,
+        finalTotal,
+        discount: o.discount || 0,
+        voucherCode: o.voucherCode || null,
+        shipFee: o.shipFee || 0,
+        serviceFee: 0,
+        paymentMethod: o.paymentMethod || 'cash',
+        shipperEarn: 0,
+        address: o.pickupAddress,
+        partnerAddress: o.partnerName,
+        partnerName: o.partnerName,
+        packageName: o.packageName,
+        customerName: o.customerName || 'Khách hàng',
+        customerPhone: o.customerPhone || '',
+        items: [{ name: o.packageName || 'Giặt là', qty: 1, price: finalTotal }],
+        ratingShipper: o.ratingShipper || null,
+        ratingComment: o.ratingComment || null,
+        date: o.deliveredAt || o.createdAt,
+      };
+    });
+    const formattedCleaning = (clnOrders || []).map(o => {
+      const finalTotal = o.finalTotal ?? Math.max(0, (o.price || 0) - (o.discount || 0));
+      return {
+        orderId: o.orderId,
+        module: 'cleaning',
+        status: o.status === 'cancelled' ? 'cancelled' : 'completed',
+        total: finalTotal,
+        finalTotal,
+        discount: o.discount || 0,
+        voucherCode: o.voucherCode || null,
+        shipFee: 0,
+        serviceFee: 0,
+        paymentMethod: o.paymentMethod || 'cash',
+        shipperEarn: 0,
+        address: o.address,
+        partnerAddress: null,
+        partnerName: o.serviceName || 'Dọn nhà',
+        customerName: o.customerName || 'Khách hàng',
+        customerPhone: o.customerPhone || '',
+        items: [{ name: o.serviceName || 'Dọn nhà', qty: 1, price: finalTotal }],
+        ratingShipper: o.rating || null,
+        ratingComment: o.ratingComment || null,
+        date: o.completedAt || o.createdAt,
+      };
+    });
+
     const formatted = orders.map(o => ({
       orderId: o.orderId,
       module: o.module || 'food',
@@ -15467,12 +15551,17 @@ app.get("/api/shipper/order-history", async (req, res) => {
       date: o.deliveredAt || o.createdAt,
     }));
     
-    res.json({ 
-      success: true, 
-      orders: formatted, 
-      total, 
-      page: parseInt(page),
-      hasMore: skip + formatted.length < total
+    // Gộp 3 nguồn, sắp xếp mới nhất trước
+    const merged = [...formatted, ...formattedLaundry, ...formattedCleaning]
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const grandTotal = (total || 0) + (lauTotal || 0) + (clnTotal || 0);
+
+    res.json({
+      success: true,
+      orders: merged,
+      total: grandTotal,
+      page: pg,
+      hasMore: skip + merged.length < grandTotal
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
