@@ -11374,9 +11374,16 @@ app.get("/api/partner/wallet", async (req, res) => {
   try {
     if (!req.session.partnerId && !req.session.userPhone)
       return res.status(401).json({ success: false });
-    // FIX: Ưu tiên FoodPartner (tài khoản nhiều module) — Featured debit vào wallet FoodPartner
+    // FIX: Ưu tiên đúng module của session (VD giặt là) — trước đây luôn ưu tiên FoodPartner
+    // khiến partner giặt là thấy nhầm ví + lịch sử dòng tiền của quán đồ ăn cùng SĐT
+    const sessionMod = req.session.partnerModule;
+    const sessionModel = sessionMod ? getPartnerModel(sessionMod) : null;
     const foodPartner = await getSessionFoodPartner(req);
     const wallet = await (async () => {
+      if (sessionModel && req.session.partnerId) {
+        const p = await sessionModel.findById(req.session.partnerId).select("walletBalance walletHistory").catch(() => null);
+        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: p._id };
+      }
       if (foodPartner) {
         const p = await FoodPartner.findById(foodPartner._id).select("walletBalance walletHistory");
         if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: foodPartner._id };
