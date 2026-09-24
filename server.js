@@ -6967,9 +6967,14 @@ async function processSePayPayment(payload, ioRef, force = false) {
         ],
       }).select("orderId paymentStatus sePayRef").lean().catch(() => null);
       if (dup && dup.paymentStatus === "paid") {
-        const txDoc = await SePayTx.findOne({ txId }).select("ref rawContent").lean().catch(() => null);
-        const sameTx = txDoc && dup.sePayRef && (dup.sePayRef === txDoc.rawContent || dup.sePayRef === txDoc.ref);
-        if (sameTx) {
+        // Mã sạch đơn lưu (VD CRLAUMUG1JFIW, từ lúc tạo QR) nằm trong nội dung bank đầy đủ
+        const codeInTx = dup.sePayRef && rawRef && (rawRef.includes(dup.sePayRef) || dup.sePayRef.includes(rawRef));
+        // Đã có bản ghi KHÁC khớp đơn này → đây mới là lần CK thứ 2 thật (hoặc trùng kênh, cần đối chiếu bank ref)
+        let otherMatched = null;
+        if (codeInTx) {
+          otherMatched = await SePayTx.findOne({ txId: { $ne: String(txId) }, ref: { $regex: suffix, $options: "i" }, note: "matched" }).select("txId").lean().catch(() => null);
+        }
+        if (codeInTx && !otherMatched) {
           await SePayTx.updateOne({ txId }, { $set: { handled: true, note: 'matched' } }).catch(() => {});
           console.log(`[SEPAY] Re-mark matched: ${rawRef} (${dup.orderId})`);
           handled = true;
@@ -7073,9 +7078,12 @@ async function processSePayPayment(payload, ioRef, force = false) {
         ],
       }).select("orderId paymentStatus sePayRef").lean().catch(() => null);
       if (dupL && dupL.paymentStatus === "paid") {
-        const txDoc = await SePayTx.findOne({ txId }).select("ref rawContent").lean().catch(() => null);
-        const sameTx = txDoc && dupL.sePayRef && (dupL.sePayRef === txDoc.rawContent || dupL.sePayRef === txDoc.ref);
-        if (sameTx) {
+        const codeInTx = dupL.sePayRef && rawRef && (rawRef.includes(dupL.sePayRef) || dupL.sePayRef.includes(rawRef));
+        let otherMatched = null;
+        if (codeInTx) {
+          otherMatched = await SePayTx.findOne({ txId: { $ne: String(txId) }, ref: { $regex: suffix, $options: "i" }, note: "matched" }).select("txId").lean().catch(() => null);
+        }
+        if (codeInTx && !otherMatched) {
           await SePayTx.updateOne({ txId }, { $set: { handled: true, note: 'matched' } }).catch(() => {});
           console.log(`[SEPAY] Re-mark matched: ${rawRef} (${dupL.orderId})`);
           handled = true;
