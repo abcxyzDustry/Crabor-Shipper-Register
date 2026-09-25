@@ -12777,11 +12777,9 @@ app.patch("/api/laundry/orders/:id/status", async (req, res) => {
     }
 
     if (status === "ready_return") {
-      // Partner done → cân đồ, tính tiền, tìm shipper trả
-      if (finalKg) {
-        order.finalTotal = Math.round(finalKg * order.pricePerKg + order.shipFee - order.discount);
-        order.estimatedKg = finalKg;
-      }
+      // GIA CO DINH: giu nguyen finalTotal luc dat don, BO QUA finalKg.
+      // Partner nhap kg cao hon thuc te -> khach tra them ma khong bao truoc.
+      if (finalKg != null) console.log(`[Laundry] ${order.orderId} ready_return bo qua finalKg=${finalKg} (gia co dinh ${order.finalTotal || order.estimatedTotal})`);
       // Ưu tiên shipper đã lấy đồ (đang chờ) trả; không có thì tìm shipper khác
       // Lấy địa chỉ thật của quán để shipper đến lấy đồ sạch
       let returnShopAddr = null;
@@ -13384,13 +13382,17 @@ app.post("/api/payment/payos/create", async (req, res) => {
       ? paymentLink.data
       : paymentLink;
 
-    // Lưu mapping orderCode <-> orderId để webhook match (food + giặt-là)
+    // Lưu mapping orderCode <-> orderId để webhook match (food/ride + giặt-là + dọn-nhà)
     await require("mongoose").models.Order?.findOneAndUpdate(
       { orderId },
       { payosOrderCode: orderCode, payosCheckoutUrl: linkData?.checkoutUrl },
     );
     try {
       await require("mongoose").models.LaundryOrder?.findOneAndUpdate(
+        { orderId },
+        { payosOrderCode: orderCode, payosCheckoutUrl: linkData?.checkoutUrl },
+      );
+      await require("mongoose").models.CleaningOrder?.findOneAndUpdate(
         { orderId },
         { payosOrderCode: orderCode, payosCheckoutUrl: linkData?.checkoutUrl },
       );
@@ -13619,6 +13621,47 @@ app.post("/api/payment/payos/webhook", async (req, res) => {
           console.log(`[PayOS Webhook] Laundry ${lau.orderId} PAID — ${amount?.toLocaleString("vi-VN")}đ`);
         }
       } catch (lauErr) { console.error("[PayOS Webhook] laundry:", lauErr.message); }
+
+      // Don nha: truoc day khong co webhook -> PayOS khong bao gio xac nhan.
+      // Don nha khong co partner (shipper giu 70% gia ca).
+      try {
+        const CleaningOrderM = mongoose.models.CleaningOrder;
+        const cln = CleaningOrderM ? await CleaningOrderM.findOne({ payosOrderCode: String(orderCode) }).catch(() => null) : null;
+        if (cln && cln.paymentStatus !== "paid") {
+          cln.paymentStatus = "paid";
+          cln.paidAt = new Date();
+          cln.statusHistory.push({ status: "payment_confirmed_payos", by: "system" });
+          await cln.save();
+          const { shipperEarn: clnShip } = await calcEarnings(cln.toObject());
+          await WalletQueue.deleteMany({ orderId: cln.orderId, status: "pending" });
+          if (cln.shipperId && clnShip > 0) {
+            const already = await WalletQueue.findOne({
+              orderId: cln.orderId, recipientId: cln.shipperId, recipientType: "shipper",
+              amount: clnShip, status: "approved",
+            }).lean().catch(() => null);
+            if (!already) {
+              await creditWalletDirect(cln.shipperId, "shipper", clnShip, cln.orderId, `Don nha ${cln.orderId} — PayOS auto duyet`);
+              await WalletQueue.create({
+                orderId: cln.orderId, recipientId: cln.shipperId,
+                recipientType: "shipper", amount: clnShip,
+                paymentMethod: "payos",
+                note: `Dọn nhà ${cln.orderId} — PayOS auto duyệt`,
+                status: "approved", approvedBy: "payos_auto", approvedAt: new Date(),
+              });
+            }
+          }
+          if (cln.customerId) {
+            global._io?.to(`customer_${cln.customerId}`).emit("order_status_update", {
+              orderId: cln.orderId, status: "payment_confirmed",
+              message: "Thanh toán dọn nhà thành công qua PayOS! 🧹",
+            });
+          }
+          global._io?.to("admin").emit("wallet_pending_approval", {
+            orderId: cln.orderId, shipperEarn: clnShip, partnerEarn: 0, paymentMethod: "payos",
+          });
+          console.log(`[PayOS Webhook] Cleaning ${cln.orderId} PAID — ${amount?.toLocaleString("vi-VN")}đ`);
+        }
+      } catch (clnErr) { console.error("[PayOS Webhook] cleaning:", clnErr.message); }
     }
     res.json({ success: true });
   } catch(err) {
@@ -18468,6 +18511,9 @@ const cleaningOrderSchema = new mongoose.Schema({
   paymentMethod: { type: String, default: "cash" },
   paymentStatus: { type: String, default: "unpaid" },
   paidAt:        Date,
+  sePayRef:      String,
+  payosOrderCode: String,
+  payosCheckoutUrl: String,
   // Phân bổ chi phí voucher (CRABOR trung gian — shipper gánh 100%, trừ khi ≥100 đơn/tháng)
   voucherShipperBear: { type: Number, default: 0, min: 0 },
   voucherPartnerBear: { type: Number, default: 0, min: 0 },
