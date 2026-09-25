@@ -7385,6 +7385,68 @@ app.post("/api/admin/sepay/txs/:id/retry", async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// ── ADMIN: bù thiếu đối soát 1 đơn (idempotent) ──
+// Tính lại thu nhập đúng theo calcEarnings hiện tại, so với tổng đã cộng ví
+// (WalletTx credit theo ref=orderId), chỉ cộng phần còn thiếu + ghi WalletQueue.
+// Dùng cho đơn cũ bị tính sai trước khi fix (VD giặt là partnerBase=0 → tiệm 0đ).
+// POST /api/admin/orders/:orderId/compensate { dryRun?: true }
+app.post("/api/admin/orders/:orderId/compensate", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session?.adminId) return res.status(401).json({ success: false, message: "Chưa đăng nhập admin" });
+    const oid = String(req.params.orderId);
+    const dryRun = req.body?.dryRun !== false && req.query?.dryRun !== '0' && req.body?.confirm !== true;
+    let order = await Order.findOne({ orderId: oid });
+    let module = order?.module || null;
+    if (!order && mongoose.models.LaundryOrder) {
+      order = await mongoose.models.LaundryOrder.findOne({ orderId: oid });
+      if (order) module = 'laundry';
+    }
+    if (!order && mongoose.models.CleaningOrder) {
+      order = await mongoose.models.CleaningOrder.findOne({ orderId: oid });
+      if (order) module = 'cleaning';
+    }
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+    if (module) order.module = order.module || module;
+    const { shipperEarn, partnerEarn, voucherShipperBear, voucherPartnerBear } = await calcEarnings(order);
+    const credited = await WalletTx.aggregate([
+      { $match: { ref: oid, type: 'credit' } },
+      { $group: { _id: { ownerId: '$ownerId', ownerType: '$ownerType' }, total: { $sum: '$amount' } } },
+    ]).catch(() => []);
+    const sumOf = (id, type) => {
+      const row = credited.find(r => String(r._id.ownerId) === String(id) && r._id.ownerType === type);
+      return row ? row.total : 0;
+    };
+    const plan = [];
+    const shipperId = order.shipperId, partnerId = order.partnerId;
+    if (shipperId && shipperEarn > 0) {
+      const diff = Math.max(0, Math.round(shipperEarn) - sumOf(shipperId, 'shipper'));
+      plan.push({ ownerType: 'shipper', ownerId: String(shipperId), expected: Math.round(shipperEarn), credited: sumOf(shipperId, 'shipper'), diff });
+    }
+    if (partnerId && partnerEarn > 0) {
+      const diff = Math.max(0, Math.round(partnerEarn) - sumOf(partnerId, 'partner'));
+      plan.push({ ownerType: 'partner', ownerId: String(partnerId), expected: Math.round(partnerEarn), credited: sumOf(partnerId, 'partner'), diff });
+    }
+    if (dryRun) {
+      return res.json({ success: true, dryRun: true, orderId: oid, module: module || order.module, shipperEarn: Math.round(shipperEarn), partnerEarn: Math.round(partnerEarn), voucherShipperBear, voucherPartnerBear, plan });
+    }
+    const done = [];
+    for (const p of plan) {
+      if (!p.diff || p.diff <= 0) continue;
+      await creditWalletDirect(p.ownerId, p.ownerType, p.diff, oid, `Bù thiếu đối soát ${oid} (admin)`);
+      await WalletQueue.create({
+        orderId: oid, recipientId: p.ownerId, recipientType: p.ownerType,
+        amount: p.diff, paymentMethod: order.paymentMethod || "compensate",
+        note: `Bù thiếu đối soát ${oid}`, status: "approved",
+        approvedBy: String(req.session.adminId), approvedAt: new Date(),
+      });
+      done.push({ ...p });
+    }
+    try { req.io?.to("admin").emit("compensate_done", { orderId: oid, done }); } catch (_) {}
+    res.json({ success: true, dryRun: false, orderId: oid, done });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // ── PAYMENT 1 CHẠM — chuẩn bị (khi có tài khoản DN) ─────────
 // Các API này để trống đến khi tích hợp MoMo/ZaloPay/VNPay thật
 // Cấu trúc đã sẵn sàng — chỉ cần điền credentials
