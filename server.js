@@ -11897,6 +11897,93 @@ app.get("/api/partner/wallet", async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// GET /api/partner/wallet/debug — bang debug ngay man hinh Vi partner:
+// tung don gan nhat: du kien nhan / da vao vi / queue / ket luan (ok-pending-BUG-missing)
+app.get("/api/partner/wallet/debug", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!req.session.partnerId && !req.session.userPhone)
+      return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
+    // Gom id food + giat-la cung SDT
+    let foodId = null;
+    try {
+      const fp = await getSessionFoodPartner(req);
+      if (fp) foodId = fp._id;
+    } catch (_) {}
+    let lauIds = [];
+    try {
+      if (req.session.userPhone && mongoose.models.GiatLa) {
+        const rows = await mongoose.models.GiatLa.find({ phone: req.session.userPhone }).select("_id").lean();
+        lauIds = rows.map((r) => r._id);
+      }
+      if (!lauIds.length && req.session.partnerModule === "giat_la" && mongoose.isValidObjectId(String(req.session.partnerId || ""))) {
+        lauIds = [new mongoose.Types.ObjectId(String(req.session.partnerId))];
+      }
+    } catch (_) {}
+    const [foodOrders, lauOrders] = await Promise.all([
+      foodId ? Order.find({ partnerId: foodId }).sort({ createdAt: -1 }).limit(15).lean().catch(() => []) : Promise.resolve([]),
+      lauIds.length && mongoose.models.LaundryOrder
+        ? mongoose.models.LaundryOrder.find({ partnerId: { $in: lauIds } }).sort({ createdAt: -1 }).limit(15).lean().catch(() => [])
+        : Promise.resolve([]),
+    ]);
+    const merged = [
+      ...foodOrders.map((o) => ({ o, isLau: false })),
+      ...lauOrders.map((o) => ({ o, isLau: true })),
+    ].sort((a, b) => new Date(b.o.createdAt) - new Date(a.o.createdAt)).slice(0, 15);
+    const orderIds = merged.map((m) => m.o.orderId).filter(Boolean);
+    // Credit thuc te + queue theo ref (1 query cho ca loat)
+    const [credRows, qRows] = await Promise.all([
+      orderIds.length ? WalletTx.aggregate([
+        { $match: { ref: { $in: orderIds }, ownerType: "partner", type: { $in: ["credit", "refund", "topup"] } } },
+        { $group: { _id: "$ref", total: { $sum: "$amount" }, n: { $sum: 1 } } },
+      ]).catch(() => []) : Promise.resolve([]),
+      orderIds.length ? WalletQueue.find({ orderId: { $in: orderIds }, recipientType: "partner" }).sort({ createdAt: 1 }).lean().catch(() => []) : Promise.resolve([]),
+    ]);
+    const credOf = (oid) => { const r = credRows.find((x) => x._id === oid); return r ? r.total : 0; };
+    const queueOf = (oid) => qRows.filter((q) => q.orderId === oid)
+      .map((q) => ({ status: q.status, amount: q.amount, pm: q.paymentMethod || null, by: q.approvedBy || null }));
+    const rows = [];
+    for (const { o, isLau } of merged) {
+      const calc = await calcEarnings(isLau ? { ...o, module: "laundry" } : o).catch(() => null);
+      // Uu tien phan bo voucher da luu (khop so da cong vi)
+      const base = isLau
+        ? Math.max(0, (o.finalTotal ?? o.estimatedTotal ?? 0) - (o.shipFee || 0) + (o.discount || 0))
+        : Math.max(0, o.total || 0);
+      const pct = calc?.commissionPct ?? (isLau ? 30 : 20);
+      const raw = Math.round(base * (1 - pct / 100));
+      const bear = typeof o.voucherPartnerBear === "number" ? o.voucherPartnerBear : null;
+      const expected = bear != null ? Math.max(0, raw - bear) : Math.round(calc?.partnerEarn ?? raw);
+      const got = credOf(o.orderId);
+      const qs = queueOf(o.orderId);
+      const pend = qs.filter((q) => q.status === "pending");
+      const appr = qs.filter((q) => q.status === "approved");
+      let state, reason;
+      if (expected <= 0) { state = "zero"; reason = "Đơn này quán được 0đ theo công thức"; }
+      else if (got >= expected) { state = "ok"; reason = `Đã vào ví đủ ${got.toLocaleString("vi-VN")}đ`; }
+      else if (appr.length && got < expected) { state = "bug"; reason = `ĐÃ DUYỆT ${appr.map((q) => q.amount.toLocaleString("vi-VN") + "đ").join(",")} nhưng ví +${got.toLocaleString("vi-VN")}đ — báo admin bù`; }
+      else if (pend.length) {
+        const pm = String(o.paymentMethod || "");
+        const why = o.paymentStatus === "paid" ? "chờ duyệt (báo admin)"
+          : pm === "cash" ? "tiền mặt chờ đối soát"
+          : `khách chưa trả (${o.paymentStatus || "unpaid"})`;
+        state = "pending"; reason = `Chờ ${pend.map((q) => q.amount.toLocaleString("vi-VN") + "đ").join(",")}: ${why}`;
+      }
+      else if (got > 0) { state = "partial"; reason = `Mới vào ${got.toLocaleString("vi-VN")}/${expected.toLocaleString("vi-VN")}đ — báo admin bù phần thiếu`; }
+      else { state = "missing"; reason = "Chưa có queue/ví — webhook chưa chạy hoặc đơn chưa tới bước cộng tiền"; }
+      rows.push({
+        orderId: o.orderId, module: isLau ? "laundry" : (o.module || "food"),
+        status: o.status, pm: o.paymentMethod || null, paySt: o.paymentStatus || null,
+        total: o.finalTotal ?? o.estimatedTotal ?? o.total ?? 0,
+        expected, credited: got, queue: qs, state, reason,
+        createdAt: o.createdAt,
+      });
+    }
+    const states = {};
+    rows.forEach((r) => { states[r.state] = (states[r.state] || 0) + 1; });
+    res.json({ success: true, debug: rows, summary: { total: rows.length, states } });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // GET /api/partner/stats/payment-methods
 app.get("/api/partner/stats/payment-methods", async (req, res) => {
   try {
