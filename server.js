@@ -1068,6 +1068,15 @@ foodPartnerSchema.pre("save", function(next) {
 });
 const FoodPartner = mongoose.model("FoodPartner", foodPartnerSchema, "food_partners");
 
+// Alias tuong thich: model giat/giup-viec/china dang ky ten GiatLaPartner/
+// GiupViecPartner/ChinaShopPartner nhung nhieu endpoint (cron auto-approve,
+// admin approve, push-token, location, wallet, payment-methods) goi
+// mongoose.models.GiatLa/GiupViec/ChinaShop -> undefined -> SILENT SKIP:
+// queue approved nhung tien khong vao vi, khong co WalletTx. Gan alias 1 cho.
+mongoose.models.GiatLa = GiatLa;
+mongoose.models.GiupViec = GiupViec;
+mongoose.models.ChinaShop = ChinaShop;
+
 // ── FEATURED REQUEST — yêu cầu làm "quán nổi bật" ───────────
 const featuredRequestSchema = new mongoose.Schema({
   requestId:      { type: String, unique: true, sparse: true },
