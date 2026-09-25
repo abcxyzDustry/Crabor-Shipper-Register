@@ -11744,11 +11744,31 @@ app.get("/api/partner/wallet", async (req, res) => {
     const feePaid = (wallet.doc && (wallet.doc.feePaid || 0)) || 0;
     const feeStatus = (wallet.doc && wallet.doc.feeStatus) || "none";
     const feeOwed = Math.max(0, feeAmount - feePaid);
+    // Tien CHO VE: queue pending (don delivered nhung tien chua vao vi —
+    // VD payos/sepay chua thanh toan, cash chua doi soat). App hien muc rieng
+    // de quan thay don moi nhat, khong tuong vi mat tien.
+    let pending = [], pendingTotal = 0;
+    {
+      const oids = [...new Set(allDocs.map(d => String(d.partnerId)))].filter(id => mongoose.isValidObjectId(id)).map(id => new mongoose.Types.ObjectId(id));
+      if (oids.length) {
+        try {
+          const rows = await WalletQueue.find({ recipientId: { $in: oids }, recipientType: "partner", status: "pending" })
+            .sort({ createdAt: -1 }).limit(50).lean();
+          pending = rows.map(q => ({
+            _id: q._id, orderId: q.orderId || "", amount: q.amount || 0,
+            paymentMethod: q.paymentMethod || "", note: q.note || "",
+            createdAt: q.createdAt, releaseAt: q.releaseAt || null,
+          }));
+          pendingTotal = pending.reduce((s, q) => s + q.amount, 0);
+        } catch (_) {}
+      }
+    }
     // Map về tên field app partner đang đọc (WalletScreen.js): weeklyFeeAmount/weeklyFeeStatus
     // balance = gộp mọi quán cùng SĐT để không bị trắng khi session trỏ nhầm module
     res.json({ success: true, wallet: {
       balance: combinedBalance, history: wallet.history || [], transactions,
       totalEarned, totalSales,
+      pending, pendingTotal,
       bankName, bankAccount, bankOwner,
       feeAmount, feePaid, feeStatus, feeOwed,
       weeklyFeeAmount: feeOwed, weeklyFeeStatus: feeStatus === "paid" ? "paid" : (feeOwed > 0 ? "pending" : "none"),
@@ -14467,12 +14487,16 @@ async function calcEarnings(order) {
   // - voucher dọn nhà → đối tác dọn chịu 100% (đơn chưa gắn partner → shipper)
   // - voucher cũ không còn doc (generic đã xoá) → giữ cách chia tỷ lệ cũ để khớp số đã cộng ví
   let voucherShipperBear = 0, voucherPartnerBear = 0, voucherCraborBear = 0;
+  // Phuc vu dong bang phan bo: giu doc voucher live + ket qua milestone ngoai scope
+  let vdocLive = order && order._voucherDoc ? order._voucherDoc : null;
+  let craborBearsNow = false;
   if (discount > 0) {
     const hasPartner = !isCleaning && !!(order.partnerId && String(order.partnerId) !== "0" && String(order.partnerId) !== "null");
-    let vdoc = order._voucherDoc || null;
+    let vdoc = vdocLive;
     if (!vdoc && order.voucherCode) {
       vdoc = await Voucher.findOne({ code: String(order.voucherCode).toUpperCase().trim() }).select("module target").lean().catch(() => null);
     }
+    vdocLive = vdoc;
     const ratioSplit = () => {
       if (!hasPartner) return { s: discount, p: 0 };
       const earnSum12 = shipperEarnRaw + partnerEarnRaw;
@@ -14481,6 +14505,7 @@ async function calcEarnings(order) {
       return { s, p: discount - s };
     };
     if (await voucherBorneByCrabor(order)) {
+      craborBearsNow = true;
       voucherCraborBear = discount;
     } else if (vdoc) {
       const scope = String(vdoc.module || 'all');
@@ -14499,6 +14524,19 @@ async function calcEarnings(order) {
     } else {
       const r = ratioSplit();
       voucherShipperBear = r.s; voucherPartnerBear = r.p;
+    }
+  }
+
+  // DONG BANG phan bo DA LUU: voucher goc bi xoa doc thi tinh live lai chia ti le khac
+  // luc cong tien (VD don giat LAU-MUG1JFIW luu 15000/0 bi ghi de thanh 3571/11429),
+  // gay lech thong ke vs lich su vi. Tien da dich chuyen theo phan bo cu nen giu cu:
+  // chi dong bang khi phan bo cu da khop du discount (don moi 0/0/0 van ghi live lan dau).
+  if (discount > 0 && !craborBearsNow && !vdocLive) {
+    const storedSum = (order.voucherShipperBear || 0) + (order.voucherPartnerBear || 0) + (order.voucherCraborBear || 0);
+    if (storedSum === discount) {
+      voucherShipperBear = order.voucherShipperBear || 0;
+      voucherPartnerBear = order.voucherPartnerBear || 0;
+      voucherCraborBear  = order.voucherCraborBear || 0;
     }
   }
 
