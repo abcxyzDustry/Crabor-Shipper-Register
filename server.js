@@ -13447,6 +13447,114 @@ app.delete("/api/payment/payos/:orderCode/cancel", async (req, res) => {
   }
 });
 
+// ── PayOS helpers: hoi trang thai link + xac nhan auto-duyet (webhook + cron ra soat dung chung) ──
+async function getPayosLinkPaid(orderCode) {
+  try {
+    if (!payOS) return { paid: false, amount: 0 };
+    let info;
+    if (typeof payOS.getPaymentLinkInformation === 'function') {
+      info = await payOS.getPaymentLinkInformation(String(orderCode));
+    } else {
+      info = await payOS.paymentRequests?.getById?.({ id: String(orderCode) });
+    }
+    const raw = info?.data && typeof info.data === 'object' && !Array.isArray(info.data) ? info.data : info;
+    const st = raw?.status || info?.status;
+    const paid = st === 'PAID' || st === '00';
+    return { paid, amount: raw?.amountPaid || raw?.amount || 0, status: st };
+  } catch (e) { return { paid: false, amount: 0, error: e.message }; }
+}
+
+async function creditPayosRecipient(orderId, recipientId, recipientType, amount, label) {
+  if (!recipientId || !(amount > 0)) return false;
+  const already = await WalletQueue.findOne({
+    orderId, recipientId, recipientType, amount, status: "approved",
+  }).lean().catch(() => null);
+  if (already) return false;
+  await creditWalletDirect(recipientId, recipientType, amount, orderId, `${label} ${orderId} — PayOS auto duyet`);
+  await WalletQueue.create({
+    orderId, recipientId, recipientType, amount,
+    paymentMethod: "payos",
+    note: `${label} ${orderId} — PayOS auto duyệt`,
+    status: "approved", approvedBy: "payos_auto", approvedAt: new Date(),
+  });
+  return true;
+}
+
+// Xac nhan don food/ride (collection Order) da tra PayOS: mark paid + auto-duyet nhu SePay
+async function payosConfirmFoodOrder(order) {
+  if (!order || order.paymentStatus === "paid") return null;
+  order.paymentStatus = "paid";
+  order.paidAt        = new Date();
+  order.statusHistory.push({ status: "payment_confirmed_payos", by: "system" });
+  await order.save();
+  const { shipperEarn, partnerEarn } = await calcEarnings(order);
+  await WalletQueue.deleteMany({ orderId: order.orderId, status: "pending" });
+  if (order.shipperId && shipperEarn > 0) await creditPayosRecipient(order.orderId, order.shipperId, "shipper", shipperEarn, `Don`);
+  if (order.partnerId && partnerEarn > 0) await creditPayosRecipient(order.orderId, order.partnerId, "partner", partnerEarn, `Don`);
+  global._io?.to(`customer_${order.customerId}`).emit("order_status_update", {
+    orderId: order.orderId, status: "payment_confirmed",
+    message: "Thanh toán thành công qua PayOS! 🎉",
+  });
+  if (order.shipperId) {
+    global._io?.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
+      orderId: order.orderId, amount: order.finalTotal,
+      message: `Khách đã thanh toán ${Number(order.finalTotal || 0).toLocaleString("vi-VN")}đ qua PayOS!`,
+    });
+  }
+  global._io?.to("admin").emit("wallet_pending_approval", {
+    orderId: order.orderId, shipperEarn, partnerEarn, paymentMethod: "payos",
+  });
+  console.log(`[PayOS] Order ${order.orderId} PAID — shipper ${shipperEarn}, partner ${partnerEarn}`);
+  return { shipperEarn, partnerEarn };
+}
+
+// Xac nhan don giat-la da tra PayOS
+async function payosConfirmLaundryOrder(lau) {
+  if (!lau || lau.paymentStatus === "paid") return null;
+  lau.paymentStatus = "paid";
+  lau.paidAt = new Date();
+  lau.statusHistory.push({ status: "payment_confirmed_payos", by: "system" });
+  await lau.save();
+  const { shipperEarn: lauShip, partnerEarn: lauPart } = await calcEarnings({ ...lau.toObject(), module: "laundry" });
+  await WalletQueue.deleteMany({ orderId: lau.orderId, status: "pending" });
+  if (lau.shipperId && lauShip > 0) await creditPayosRecipient(lau.orderId, lau.shipperId, "shipper", lauShip, `Giat la`);
+  if (lau.partnerId && lauPart > 0) await creditPayosRecipient(lau.orderId, lau.partnerId, "partner", lauPart, `Giat la`);
+  if (lau.customerId) {
+    global._io?.to(`customer_${lau.customerId}`).emit("order_status_update", {
+      orderId: lau.orderId, status: "payment_confirmed",
+      message: "Thanh toán giặt là thành công qua PayOS! 🦀",
+    });
+  }
+  global._io?.to("admin").emit("wallet_pending_approval", {
+    orderId: lau.orderId, shipperEarn: lauShip, partnerEarn: lauPart, paymentMethod: "payos",
+  });
+  console.log(`[PayOS] Laundry ${lau.orderId} PAID — shipper ${lauShip}, partner ${lauPart}`);
+  return { shipperEarn: lauShip, partnerEarn: lauPart };
+}
+
+// Xac nhan don don-nha da tra PayOS (khong co partner, shipper giu 70% gia ca)
+async function payosConfirmCleaningOrder(cln) {
+  if (!cln || cln.paymentStatus === "paid") return null;
+  cln.paymentStatus = "paid";
+  cln.paidAt = new Date();
+  cln.statusHistory.push({ status: "payment_confirmed_payos", by: "system" });
+  await cln.save();
+  const { shipperEarn: clnShip } = await calcEarnings(cln.toObject());
+  await WalletQueue.deleteMany({ orderId: cln.orderId, status: "pending" });
+  if (cln.shipperId && clnShip > 0) await creditPayosRecipient(cln.orderId, cln.shipperId, "shipper", clnShip, `Don nha`);
+  if (cln.customerId) {
+    global._io?.to(`customer_${cln.customerId}`).emit("order_status_update", {
+      orderId: cln.orderId, status: "payment_confirmed",
+      message: "Thanh toán dọn nhà thành công qua PayOS! 🧹",
+    });
+  }
+  global._io?.to("admin").emit("wallet_pending_approval", {
+    orderId: cln.orderId, shipperEarn: clnShip, partnerEarn: 0, paymentMethod: "payos",
+  });
+  console.log(`[PayOS] Cleaning ${cln.orderId} PAID — shipper ${clnShip}`);
+  return { shipperEarn: clnShip, partnerEarn: 0 };
+}
+
 // POST /api/payment/payos/webhook — Webhook nhận kết quả từ PayOS
 app.post("/api/payment/payos/webhook", async (req, res) => {
   try {
@@ -13505,62 +13613,9 @@ app.post("/api/payment/payos/webhook", async (req, res) => {
       }
 
       if (order && order.paymentStatus !== "paid") {
-        order.paymentStatus = "paid";
-        order.paidAt        = new Date();
-        order.statusHistory.push({ status: "payment_confirmed_payos", by: "system" });
-        await order.save();
-
         // PayOS da auto-xac-thuc (verify chu ky + PAID) -> AUTO DUYET, cong thang vao vi nhu SePay.
         // Truoc day chi tao queue pending (releaseAt null) nen phai cho admin duyet tay.
-        const { shipperEarn, partnerEarn } = await calcEarnings(order);
-        await WalletQueue.deleteMany({ orderId: order.orderId, status: "pending" });
-        if (order.shipperId && shipperEarn > 0) {
-          const already = await WalletQueue.findOne({
-            orderId: order.orderId, recipientId: order.shipperId, recipientType: "shipper",
-            amount: shipperEarn, status: "approved",
-          }).lean().catch(() => null);
-          if (!already) {
-            await creditWalletDirect(order.shipperId, "shipper", shipperEarn, order.orderId, `Don ${order.orderId} — PayOS auto duyet`);
-            await WalletQueue.create({
-              orderId: order.orderId, recipientId: order.shipperId,
-              recipientType: "shipper", amount: shipperEarn,
-              paymentMethod: "payos",
-              note: `Đơn ${order.orderId} — PayOS auto duyệt`,
-              status: "approved", approvedBy: "payos_auto", approvedAt: new Date(),
-            });
-          }
-        }
-        if (order.partnerId && partnerEarn > 0) {
-          const already = await WalletQueue.findOne({
-            orderId: order.orderId, recipientId: order.partnerId, recipientType: "partner",
-            amount: partnerEarn, status: "approved",
-          }).lean().catch(() => null);
-          if (!already) {
-            await creditWalletDirect(order.partnerId, "partner", partnerEarn, order.orderId, `Don ${order.orderId} — PayOS auto duyet`);
-            await WalletQueue.create({
-              orderId: order.orderId, recipientId: order.partnerId,
-              recipientType: "partner", amount: partnerEarn,
-              paymentMethod: "payos",
-              note: `Đơn ${order.orderId} — PayOS auto duyệt`,
-              status: "approved", approvedBy: "payos_auto", approvedAt: new Date(),
-            });
-          }
-        }
-
-        // Notify qua socket
-        global._io?.to(`customer_${order.customerId}`).emit("order_status_update", {
-          orderId: order.orderId, status: "payment_confirmed",
-          message: "Thanh toán thành công qua PayOS! 🎉",
-        });
-        if (order.shipperId) {
-          global._io?.to(`shipper_${order.shipperId}`).emit("sepay_payment_confirmed", {
-            orderId: order.orderId, amount,
-            message: `Khách đã thanh toán ${amount?.toLocaleString("vi-VN")}đ qua PayOS!`,
-          });
-        }
-        global._io?.to("admin").emit("wallet_pending_approval", {
-          orderId: order.orderId, shipperEarn, partnerEarn, paymentMethod: "payos",
-        });
+        await payosConfirmFoodOrder(order);
         console.log(`[PayOS Webhook] Order ${order.orderId} PAID — ${amount?.toLocaleString("vi-VN")}đ`);
       }
 
@@ -13570,54 +13625,7 @@ app.post("/api/payment/payos/webhook", async (req, res) => {
         const LaundryOrderM = mongoose.models.LaundryOrder;
         const lau = LaundryOrderM ? await LaundryOrderM.findOne({ payosOrderCode: String(orderCode) }).catch(() => null) : null;
         if (lau && lau.paymentStatus !== "paid") {
-          lau.paymentStatus = "paid";
-          lau.paidAt = new Date();
-          lau.statusHistory.push({ status: "payment_confirmed_payos", by: "system" });
-          await lau.save();
-
-          const { shipperEarn: lauShip, partnerEarn: lauPart } = await calcEarnings({ ...lau.toObject(), module: "laundry" });
-          await WalletQueue.deleteMany({ orderId: lau.orderId, status: "pending" });
-          if (lau.shipperId && lauShip > 0) {
-            const already = await WalletQueue.findOne({
-              orderId: lau.orderId, recipientId: lau.shipperId, recipientType: "shipper",
-              amount: lauShip, status: "approved",
-            }).lean().catch(() => null);
-            if (!already) {
-              await creditWalletDirect(lau.shipperId, "shipper", lauShip, lau.orderId, `Giat la ${lau.orderId} — PayOS auto duyet`);
-              await WalletQueue.create({
-                orderId: lau.orderId, recipientId: lau.shipperId,
-                recipientType: "shipper", amount: lauShip,
-                paymentMethod: "payos",
-                note: `Giặt là ${lau.orderId} — PayOS auto duyệt`,
-                status: "approved", approvedBy: "payos_auto", approvedAt: new Date(),
-              });
-            }
-          }
-          if (lau.partnerId && lauPart > 0) {
-            const already = await WalletQueue.findOne({
-              orderId: lau.orderId, recipientId: lau.partnerId, recipientType: "partner",
-              amount: lauPart, status: "approved",
-            }).lean().catch(() => null);
-            if (!already) {
-              await creditWalletDirect(lau.partnerId, "partner", lauPart, lau.orderId, `Giat la ${lau.orderId} — PayOS auto duyet`);
-              await WalletQueue.create({
-                orderId: lau.orderId, recipientId: lau.partnerId,
-                recipientType: "partner", amount: lauPart,
-                paymentMethod: "payos",
-                note: `Giặt là ${lau.orderId} — PayOS auto duyệt`,
-                status: "approved", approvedBy: "payos_auto", approvedAt: new Date(),
-              });
-            }
-          }
-          if (lau.customerId) {
-            global._io?.to(`customer_${lau.customerId}`).emit("order_status_update", {
-              orderId: lau.orderId, status: "payment_confirmed",
-              message: "Thanh toán giặt là thành công qua PayOS! 🦀",
-            });
-          }
-          global._io?.to("admin").emit("wallet_pending_approval", {
-            orderId: lau.orderId, shipperEarn: lauShip, partnerEarn: lauPart, paymentMethod: "payos",
-          });
+          await payosConfirmLaundryOrder(lau);
           console.log(`[PayOS Webhook] Laundry ${lau.orderId} PAID — ${amount?.toLocaleString("vi-VN")}đ`);
         }
       } catch (lauErr) { console.error("[PayOS Webhook] laundry:", lauErr.message); }
@@ -13628,37 +13636,7 @@ app.post("/api/payment/payos/webhook", async (req, res) => {
         const CleaningOrderM = mongoose.models.CleaningOrder;
         const cln = CleaningOrderM ? await CleaningOrderM.findOne({ payosOrderCode: String(orderCode) }).catch(() => null) : null;
         if (cln && cln.paymentStatus !== "paid") {
-          cln.paymentStatus = "paid";
-          cln.paidAt = new Date();
-          cln.statusHistory.push({ status: "payment_confirmed_payos", by: "system" });
-          await cln.save();
-          const { shipperEarn: clnShip } = await calcEarnings(cln.toObject());
-          await WalletQueue.deleteMany({ orderId: cln.orderId, status: "pending" });
-          if (cln.shipperId && clnShip > 0) {
-            const already = await WalletQueue.findOne({
-              orderId: cln.orderId, recipientId: cln.shipperId, recipientType: "shipper",
-              amount: clnShip, status: "approved",
-            }).lean().catch(() => null);
-            if (!already) {
-              await creditWalletDirect(cln.shipperId, "shipper", clnShip, cln.orderId, `Don nha ${cln.orderId} — PayOS auto duyet`);
-              await WalletQueue.create({
-                orderId: cln.orderId, recipientId: cln.shipperId,
-                recipientType: "shipper", amount: clnShip,
-                paymentMethod: "payos",
-                note: `Dọn nhà ${cln.orderId} — PayOS auto duyệt`,
-                status: "approved", approvedBy: "payos_auto", approvedAt: new Date(),
-              });
-            }
-          }
-          if (cln.customerId) {
-            global._io?.to(`customer_${cln.customerId}`).emit("order_status_update", {
-              orderId: cln.orderId, status: "payment_confirmed",
-              message: "Thanh toán dọn nhà thành công qua PayOS! 🧹",
-            });
-          }
-          global._io?.to("admin").emit("wallet_pending_approval", {
-            orderId: cln.orderId, shipperEarn: clnShip, partnerEarn: 0, paymentMethod: "payos",
-          });
+          await payosConfirmCleaningOrder(cln);
           console.log(`[PayOS Webhook] Cleaning ${cln.orderId} PAID — ${amount?.toLocaleString("vi-VN")}đ`);
         }
       } catch (clnErr) { console.error("[PayOS Webhook] cleaning:", clnErr.message); }
@@ -13669,6 +13647,46 @@ app.post("/api/payment/payos/webhook", async (req, res) => {
     res.status(500).json({ success: false });
   }
 });
+
+// ── Cron: ra soat PayOS miss-webhook (moi 5 phut) ──
+// Webhook PayOS co the khong ve (chua gan URL tren dashboard, mang loi...).
+// Cron hoi thang PayOS cac don unpaid co payosOrderCode (7 ngay gan nhat);
+// don nao PAID thi xac nhan + cong vi y nhu webhook.
+setInterval(async () => {
+  try {
+    if (!payOS) return;
+    const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+    const baseQ = { payosOrderCode: { $exists: true, $ne: null }, paymentStatus: { $in: ["unpaid", "pending_review"] }, createdAt: { $gte: weekAgo } };
+    const [foodCands, lauCands, clnCands] = await Promise.all([
+      Order.find(baseQ).select("orderId payosOrderCode paymentStatus").limit(20).lean().catch(() => []),
+      mongoose.models.LaundryOrder ? mongoose.models.LaundryOrder.find(baseQ).select("orderId payosOrderCode paymentStatus").limit(20).lean().catch(() => []) : Promise.resolve([]),
+      mongoose.models.CleaningOrder ? mongoose.models.CleaningOrder.find(baseQ).select("orderId payosOrderCode paymentStatus").limit(20).lean().catch(() => []) : Promise.resolve([]),
+    ]);
+    let fixed = 0;
+    const sweep = async (cands, kind) => {
+      for (const c of cands) {
+        try {
+          const st = await getPayosLinkPaid(c.payosOrderCode);
+          if (!st.paid) continue;
+          if (kind === "food") {
+            const o = await Order.findOne({ orderId: c.orderId });
+            if (o && o.paymentStatus !== "paid") { await payosConfirmFoodOrder(o); fixed++; }
+          } else if (kind === "laundry") {
+            const o = await mongoose.models.LaundryOrder.findOne({ orderId: c.orderId });
+            if (o && o.paymentStatus !== "paid") { await payosConfirmLaundryOrder(o); fixed++; }
+          } else {
+            const o = await mongoose.models.CleaningOrder.findOne({ orderId: c.orderId });
+            if (o && o.paymentStatus !== "paid") { await payosConfirmCleaningOrder(o); fixed++; }
+          }
+        } catch (e) { console.error("[PayOS sweep]", c.orderId, e.message); }
+      }
+    };
+    await sweep(foodCands, "food");
+    await sweep(lauCands, "laundry");
+    await sweep(clnCands, "cleaning");
+    if (fixed > 0) console.log(`[PayOS sweep] Auto-confirmed ${fixed} orders missed by webhook`);
+  } catch (e) { console.error("[PayOS sweep]", e.message); }
+}, 5 * 60 * 1000);
 
 // GET /payment/success — Trang redirect sau thanh toán thành công (web)
 app.get("/payment/success", (req, res) => {
