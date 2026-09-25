@@ -735,6 +735,10 @@ const orderSchema = new mongoose.Schema({
   status:          { type: String, enum: ["pending","confirmed","preparing","shipper_accepted","picking_up","at_partner","picked_up","delivering","delivered","cancelled","refunded","payment_pending_review","payment_confirmed","payment_confirmed_payos","payment_confirmed_sepay","finding_driver","no_driver","partner_accepted","ready","ready_return"], default: "pending" },
   paymentMethod:{ type: String, enum: ["cash","momo","zalopay","bank","payos","sepay","bank_transfer","wallet","vnpay","bnpl"], default: "cash" },
   paymentStatus:{ type: String, enum: ["unpaid","paid","refunded","pending_review"], default: "unpaid" },
+  paidAt:        Date,
+  sePayRef:      String,   // ma CK SePay de webhook match (truoc day khong co field -> strict mode luoc bo, chi match duoc theo orderId)
+  payosOrderCode: String,  // ma link PayOS de webhook match (thieu field -> mapping mat, don food PayOS khong bao gio xac nhan)
+  payosCheckoutUrl: String,
   note:         { type: String, trim: true, maxlength: 500 },
   prepTime:     { type: Number, default: 15 }, // minutos de preparación estimado
   cancelReason: { type: String, trim: true },
