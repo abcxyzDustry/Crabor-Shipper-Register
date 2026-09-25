@@ -3220,14 +3220,35 @@ console.log(" [Bot] Auto-approve bot scheduled (partners: 1h, shipper/driver: on
 
 
 // ── WALLET HELPER ─────────────────────────────────────────
+async function findPartnerDoc(ownerId) {
+  const pModels = [FoodPartner, GiatLa, GiupViec, ChinaShop].filter(Boolean);
+  for (const m of pModels) {
+    try { const d = await m.findById(ownerId); if (d) return { doc: d, Model: m }; } catch (_) {}
+  }
+  return { doc: null, Model: null };
+}
 async function walletCredit(ownerId, ownerType, amount, ref, note) {
-  const Model = ownerType==='user' ? User : ownerType==='shipper' ? Shipper : FoodPartner;
+  if (ownerType === 'partner') {
+    const { doc, Model } = await findPartnerDoc(ownerId);
+    if (!doc) throw new Error('Không tìm thấy đối tác');
+    const upd = await Model.findByIdAndUpdate(ownerId, { $inc: { walletBalance: amount, walletEarned: amount } }, { new: true });
+    await WalletTx.create({ ownerId, ownerType, type:'credit', amount, balance: upd.walletBalance, ref, note });
+    return upd.walletBalance;
+  }
+  const Model = ownerType==='user' ? User : Shipper;
   const doc = await Model.findByIdAndUpdate(ownerId, { $inc: { walletBalance: amount, walletEarned: amount } }, { new: true });
   await WalletTx.create({ ownerId, ownerType, type:'credit', amount, balance: doc.walletBalance, ref, note });
   return doc.walletBalance;
 }
 async function walletDebit(ownerId, ownerType, amount, type='debit', ref, note) {
-  const Model = ownerType==='user' ? User : ownerType==='shipper' ? Shipper : FoodPartner;
+  if (ownerType === 'partner') {
+    const { doc, Model } = await findPartnerDoc(ownerId);
+    if (!doc || (doc.walletBalance||0) < amount) throw new Error('Số dư không đủ');
+    const updated = await Model.findByIdAndUpdate(ownerId, { $inc: { walletBalance: -amount } }, { new: true });
+    await WalletTx.create({ ownerId, ownerType, type, amount, balance: updated.walletBalance, ref, note });
+    return updated.walletBalance;
+  }
+  const Model = ownerType==='user' ? User : Shipper;
   const doc = await Model.findById(ownerId);
   if (!doc || (doc.walletBalance||0) < amount) throw new Error('Số dư không đủ');
   const updated = await Model.findByIdAndUpdate(ownerId, { $inc: { walletBalance: -amount } }, { new: true });
@@ -11477,21 +11498,23 @@ app.post("/api/cleaning/orders/:id/rate", async (req, res) => {
 // GET /api/partner/wallet — alias /api/wallet với partner session
 app.get("/api/partner/wallet", async (req, res) => {
   try {
+    await loadSessionFromHeader(req, res);
     if (!req.session.partnerId && !req.session.userPhone)
-      return res.status(401).json({ success: false });
+      return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
     // FIX: Ưu tiên đúng module của session (VD giặt là) — trước đây luôn ưu tiên FoodPartner
     // khiến partner giặt là thấy nhầm ví + lịch sử dòng tiền của quán đồ ăn cùng SĐT
     const sessionMod = req.session.partnerModule;
     const sessionModel = sessionMod ? getPartnerModel(sessionMod) : null;
     const foodPartner = await getSessionFoodPartner(req);
+    const FULL_SEL = "walletBalance walletEarned totalSales walletHistory feeAmount feePaid feeStatus feePercent";
     const wallet = await (async () => {
       if (sessionModel && req.session.partnerId) {
-        const p = await sessionModel.findById(req.session.partnerId).select("walletBalance walletHistory").catch(() => null);
-        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: p._id };
+        const p = await sessionModel.findById(req.session.partnerId).select(FULL_SEL).lean().catch(() => null);
+        if (p) return { doc: p, balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: p._id };
       }
       if (foodPartner) {
-        const p = await FoodPartner.findById(foodPartner._id).select("walletBalance walletHistory");
-        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: foodPartner._id };
+        const p = await FoodPartner.findById(foodPartner._id).select(FULL_SEL).lean();
+        if (p) return { doc: p, balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: foodPartner._id };
       }
       // Dùng partnerId hoặc userPhone để lấy wallet
       const models = [
@@ -11503,43 +11526,101 @@ app.get("/api/partner/wallet", async (req, res) => {
       for (const model of models) {
         if (!model) continue;
         const p = req.session.partnerId
-          ? await model.findById(req.session.partnerId).select("walletBalance walletHistory")
-          : await model.findOne({ phone: req.session.userPhone }).select("walletBalance walletHistory");
-        if (p) return { balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: p._id };
+          ? await model.findById(req.session.partnerId).select(FULL_SEL).lean().catch(() => null)
+          : await model.findOne({ phone: req.session.userPhone }).select(FULL_SEL).lean();
+        if (p) return { doc: p, balance: p.walletBalance || 0, history: p.walletHistory || [], partnerId: p._id };
       }
-      return { balance: 0, history: [], partnerId: null };
+      return { doc: null, balance: 0, history: [], partnerId: null };
     })();
     // Lịch sử dòng tiền thật từ WalletTx (credit/debit/withdraw/fee) thay vì walletHistory rỗng
     let transactions = [];
     if (wallet.partnerId) {
       const ids = new Set([String(wallet.partnerId)]);
       if (req.session.partnerId) ids.add(String(req.session.partnerId));
-      const txs = await WalletTx.find({ ownerId: { $in: [...ids].map(id => new mongoose.Types.ObjectId(id)) }, ownerType: "partner" })
-        .sort({ createdAt: -1 }).limit(100).lean();
-      transactions = txs.map(tx => ({
-        _id: tx._id, type: tx.type, amount: tx.amount, balance: tx.balance,
-        note: tx.note || "", ref: tx.ref || "", createdAt: tx.createdAt,
-        description: describeTx(tx),
-      }));
+      const oids = [...ids].filter(id => mongoose.isValidObjectId(id)).map(id => new mongoose.Types.ObjectId(id));
+      if (oids.length) {
+        const txs = await WalletTx.find({ ownerId: { $in: oids }, ownerType: "partner" })
+          .sort({ createdAt: -1 }).limit(100).lean();
+        transactions = txs.map(tx => ({
+          _id: tx._id, type: tx.type, amount: tx.amount, balance: tx.balance,
+          note: tx.note || "", ref: tx.ref || "", createdAt: tx.createdAt,
+          description: describeTx(tx),
+        }));
+      }
     }
-    res.json({ success: true, wallet: { balance: wallet.balance, history: wallet.history, transactions } });
+    // Tổng tích luỹ: ưu tiên walletEarned, fallback totalSales (partnerBase cộng dồn ở WalletQueue cron)
+    const totalEarned = (wallet.doc && (wallet.doc.walletEarned || wallet.doc.totalSales)) || 0;
+    // Bank info: schema partner không lưu bank -> lấy từ lần rút gần nhất
+    let bankName = "", bankAccount = "", bankOwner = "";
+    if (wallet.partnerId && mongoose.isValidObjectId(String(wallet.partnerId))) {
+      try {
+        const lastWr = await WithdrawRequest.findOne({ ownerId: wallet.partnerId, ownerType: "partner" })
+          .sort({ createdAt: -1 }).select("bankName accountNo accountName").lean();
+        if (lastWr) {
+          bankName = lastWr.bankName || ""; bankAccount = lastWr.accountNo || ""; bankOwner = lastWr.accountName || "";
+        }
+      } catch (_) {}
+    }
+    // Phí tuần: schema FoodPartner không khai báo feeAmount nhưng code /api/partner/fee vẫn dùng -> đọc lỏng
+    const feeAmount = (wallet.doc && (wallet.doc.feeAmount || 0)) || 0;
+    const feePaid = (wallet.doc && (wallet.doc.feePaid || 0)) || 0;
+    const feeStatus = (wallet.doc && wallet.doc.feeStatus) || "none";
+    const feeOwed = Math.max(0, feeAmount - feePaid);
+    // Map về tên field app partner đang đọc (WalletScreen.js): weeklyFeeAmount/weeklyFeeStatus
+    res.json({ success: true, wallet: {
+      balance: wallet.balance, history: wallet.history, transactions,
+      totalEarned, totalSales: (wallet.doc && wallet.doc.totalSales) || 0,
+      bankName, bankAccount, bankOwner,
+      feeAmount, feePaid, feeStatus, feeOwed,
+      weeklyFeeAmount: feeOwed, weeklyFeeStatus: feeStatus === "paid" ? "paid" : (feeOwed > 0 ? "pending" : "none"),
+    } });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // GET /api/partner/stats/payment-methods
 app.get("/api/partner/stats/payment-methods", async (req, res) => {
   try {
+    await loadSessionFromHeader(req, res);
     if (!req.session.partnerId && !req.session.userPhone)
-      return res.status(401).json({ success: false });
+      return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
     // Aggregate orders theo paymentMethod
     const Order = require("mongoose").models.Order;
-    if (!Order) return res.json({ success: true, stats: [] });
-    const match = req.session.partnerId ? { partnerId: req.session.partnerId } : {};
-    const stats = await Order.aggregate([
+    if (!Order) return res.json({ success: true, stats: { cash: { count: 0, amount: 0 }, transfer: { count: 0, amount: 0 }, wallet: { count: 0, amount: 0 } }, totalOrders: 0, totalToWallet: 0 });
+    // Gom mọi partnerId cùng SĐT (1 SĐT có thể đăng ký food + giặt là) để thống kê đủ
+    const pidSet = new Set();
+    if (req.session.partnerId && mongoose.isValidObjectId(String(req.session.partnerId))) pidSet.add(String(req.session.partnerId));
+    try {
+      const fp = await getSessionFoodPartner(req);
+      if (fp && fp._id) pidSet.add(String(fp._id));
+    } catch (_) {}
+    if (req.session.userPhone) {
+      const pModels = [require("mongoose").models.GiatLa, require("mongoose").models.GiupViec, require("mongoose").models.ChinaShop, require("mongoose").models.FoodPartner].filter(Boolean);
+      for (const m of pModels) {
+        try {
+          const rows = await m.find({ phone: req.session.userPhone }).select("_id").lean();
+          rows.forEach(r => pidSet.add(String(r._id)));
+        } catch (_) {}
+      }
+    }
+    const oids = [...pidSet].filter(id => mongoose.isValidObjectId(id)).map(id => new mongoose.Types.ObjectId(id));
+    const match = oids.length ? { partnerId: { $in: oids } } : {};
+    const raw = await Order.aggregate([
       { $match: { ...match, status: { $in: ["delivered", "completed"] } } },
       { $group: { _id: "$paymentMethod", count: { $sum: 1 }, total: { $sum: "$total" } } },
     ]);
-    res.json({ success: true, stats });
+    // Map về format app partner đang đọc (WalletScreen.js): {cash, transfer, wallet}
+    // Order.paymentMethod enum: cash|momo|zalopay|bank|payos|sepay|bank_transfer|wallet|vnpay|bnpl
+    const stats = { cash: { count: 0, amount: 0 }, transfer: { count: 0, amount: 0 }, wallet: { count: 0, amount: 0 } };
+    for (const r of raw) {
+      const m = String(r._id || "cash").toLowerCase();
+      const c = r.count || 0, a = r.total || 0;
+      if (m === "cash") { stats.cash.count += c; stats.cash.amount += a; }
+      else if (m === "wallet") { stats.wallet.count += c; stats.wallet.amount += a; }
+      else { stats.transfer.count += c; stats.transfer.amount += a; }
+    }
+    const totalOrders = stats.cash.count + stats.transfer.count + stats.wallet.count;
+    const totalToWallet = stats.transfer.amount + stats.wallet.amount;
+    res.json({ success: true, stats, totalOrders, totalToWallet, byMethod: raw });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -18403,6 +18484,7 @@ app.get("/api/partner/fee", async (req, res) => {
 // POST /api/partner/fee/pay-wallet — Trả phí bằng ví
 app.post("/api/partner/fee/pay-wallet", async (req, res) => {
   try {
+    await loadSessionFromHeader(req, res);
     if (!req.session.partnerId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
     const models = [
       mongoose.models.FoodPartner,
@@ -18424,7 +18506,10 @@ app.post("/api/partner/fee/pay-wallet", async (req, res) => {
       $inc: { walletBalance: -feeOwed, feePaid: feeOwed },
       feeStatus: 'paid',
     });
-    res.json({ success: true, message: `Đã thanh toán phí ${feeOwed.toLocaleString()}đ từ ví` });
+    try {
+      await WalletTx.create({ ownerId: req.session.partnerId, ownerType: "partner", type: "debit", amount: feeOwed, balance: (partner.walletBalance || 0) - feeOwed, note: "Thanh toán phí dịch vụ CRABOR" });
+    } catch (_) {}
+    res.json({ success: true, feeAmount: feeOwed, message: `Đã thanh toán phí ${feeOwed.toLocaleString()}đ từ ví` });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -18527,6 +18612,7 @@ app.post("/api/order/dispatch", async (req, res) => {
 // POST /api/partner/wallet/withdraw — alias cho partner rút tiền
 app.post("/api/partner/wallet/withdraw", async (req, res) => {
   // Alias → /api/wallet/withdraw
+  await loadSessionFromHeader(req, res);
   if (!req.session.partnerId) return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
   const { amount, bankName, accountNo, accountName } = req.body;
   const amt = Number(amount);
