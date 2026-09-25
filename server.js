@@ -7552,6 +7552,117 @@ app.post("/api/admin/orders/:orderId/compensate", async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// ── DEBUG MONEY TRAIL — bang debug truy vet dong tien 1 don ──
+// Tra loi: don nay ai duoc bao nhieu, tien dang nam o dau (vi/pending/missing),
+// tai sao vi chua hien. GET /api/admin/order-money/:orderId
+app.get("/api/admin/order-money/:orderId", async (req, res) => {
+  try {
+    await loadSessionFromHeader(req, res);
+    if (!isAdminRequest(req)) return res.status(401).json({ success: false, message: "Unauthorized" });
+    const oid = String(req.params.orderId);
+    // 1. Tim don (food -> giat-la -> don nha)
+    let order = await Order.findOne({ orderId: oid }).lean().catch(() => null);
+    let collection = order ? "orders" : null;
+    let module = order?.module || null;
+    if (!order && mongoose.models.LaundryOrder) {
+      order = await mongoose.models.LaundryOrder.findOne({ orderId: oid }).lean().catch(() => null);
+      if (order) { collection = "laundryorders"; module = "laundry"; }
+    }
+    if (!order && mongoose.models.CleaningOrder) {
+      order = await mongoose.models.CleaningOrder.findOne({ orderId: oid }).lean().catch(() => null);
+      if (order) { collection = "cleaningorders"; module = "cleaning"; }
+    }
+    if (!order) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+    if (module) order.module = order.module || module;
+
+    // 2. So du kien nhan (calc hien tai, uu tien phan bo voucher da luu)
+    const calc = await calcEarnings(order).catch((e) => ({ error: e.message }));
+    const expShip = Math.round(calc.shipperEarn || 0);
+    const expPart = Math.round(calc.partnerEarn || 0);
+
+    // 3. Queue + lich su credit thuc te theo ref
+    const queue = await WalletQueue.find({ orderId: oid }).sort({ createdAt: 1 }).lean().catch(() => []);
+    const credited = await WalletTx.aggregate([
+      { $match: { ref: oid, type: { $in: ["credit", "refund", "topup"] } } },
+      { $group: { _id: { ownerId: "$ownerId", ownerType: "$ownerType" }, total: { $sum: "$amount" }, n: { $sum: 1 } } },
+    ]).catch(() => []);
+    const creditedSum = (id, type) => {
+      const r = credited.find((x) => String(x._id.ownerId) === String(id) && x._id.ownerType === type);
+      return r ? r.total : 0;
+    };
+    const queueOf = (id, type) => queue.filter((q) => String(q.recipientId) === String(id) && q.recipientType === type)
+      .map((q) => ({ status: q.status, amount: q.amount, paymentMethod: q.paymentMethod, approvedBy: q.approvedBy || null, createdAt: q.createdAt }));
+
+    // 4. So du vi hien tai cua cac ben
+    const wallets = {};
+    if (order.shipperId) {
+      const s = await Shipper.findById(order.shipperId).select("walletBalance fullName phone").lean().catch(() => null);
+      if (s) wallets["shipper_" + String(s._id).slice(-6)] = { balance: s.walletBalance || 0, name: s.fullName || "", phone: s.phone || "" };
+    }
+    if (order.partnerId) {
+      const pModels = [FoodPartner, GiatLa, GiupViec, ChinaShop].filter(Boolean);
+      for (const m of pModels) {
+        const p = await m.findById(order.partnerId).select("walletBalance bizName fullName phone").lean().catch(() => null);
+        if (p) {
+          wallets["partner_" + String(p._id).slice(-6)] = {
+            balance: p.walletBalance || 0,
+            name: p.bizName || [p.lastName, p.firstName].filter(Boolean).join(" ") || "",
+            phone: p.phone || "",
+          };
+          break;
+        }
+      }
+    }
+
+    // 5. Doi soat tien mat (neu co)
+    const settlement = await CashSettlement.findOne({ orderId: oid }).lean().catch(() => null);
+
+    // 6. Ket luan tung ben
+    const verdict = [];
+    const judge = (label, id, type, expected) => {
+      const got = creditedSum(id, type);
+      const qs = queueOf(id, type);
+      const pend = qs.filter((q) => q.status === "pending");
+      const appr = qs.filter((q) => q.status === "approved");
+      let state, reason;
+      if (!id) { state = "none"; reason = "Đơn không gắn " + label; }
+      else if (expected <= 0) { state = "zero"; reason = label + " được 0đ theo công thức (kiểm tra commission/voucher)"; }
+      else if (got >= expected) { state = "ok"; reason = `${label} đã vào ví đủ ${got.toLocaleString("vi-VN")}đ`; }
+      else if (appr.length && got < expected) {
+        state = "BUG_APPROVED_NO_CASH";
+        reason = `${label} ĐÃ DUYỆT ${appr.map((q) => q.amount.toLocaleString("vi-VN") + "đ").join(",")} nhưng ví chỉ +${got.toLocaleString("vi-VN")}đ — duyệt mà không cộng tiền, cần bù tay (compensate)`;
+      } else if (pend.length) {
+        const pm = String(order.paymentMethod || "");
+        const waitWhy = order.paymentStatus === "paid" ? "chờ admin/cron duyệt"
+          : pm === "cash" ? "tiền mặt chờ shipper đối soát về công ty"
+          : "khách chưa thanh toán (" + (order.paymentStatus || "unpaid") + ") — webhook chưa chạy";
+        state = "pending"; reason = `${label} chờ ${pend.map((q) => q.amount.toLocaleString("vi-VN") + "đ").join(",")}: ${waitWhy}`;
+      } else if (got > 0) { state = "partial"; reason = `${label} mới vào ${got.toLocaleString("vi-VN")}/${expected.toLocaleString("vi-VN")}đ — thiếu ${ (expected - got).toLocaleString("vi-VN")}đ, cần bù (compensate)`; }
+      else { state = "missing"; reason = `${label} chưa có queue/ ví +0đ — webhook delivered chưa xử lý hoặc đơn chưa tới bước cộng tiền`; }
+      verdict.push({ who: label, expected, credited: got, queue: qs, state, reason });
+    };
+    judge("shipper", order.shipperId, "shipper", expShip);
+    judge("partner", order.partnerId, "partner", expPart);
+
+    res.json({
+      success: true, orderId: oid, collection, module,
+      order: {
+        status: order.status, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus,
+        finalTotal: order.finalTotal ?? order.estimatedTotal ?? order.total ?? 0,
+        shipFee: order.shipFee || 0, discount: order.discount || 0, voucherCode: order.voucherCode || null,
+        sePayRef: order.sePayRef || null, payosOrderCode: order.payosOrderCode || null,
+        shipperId: order.shipperId || null, partnerId: order.partnerId || null,
+        voucherShipperBear: order.voucherShipperBear ?? null, voucherPartnerBear: order.voucherPartnerBear ?? null,
+        createdAt: order.createdAt, deliveredAt: order.deliveredAt || null, paidAt: order.paidAt || null,
+      },
+      expected: { shipperEarn: expShip, partnerEarn: expPart, commissionPct: calc.commissionPct ?? null },
+      queue: queue.map((q) => ({ to: String(q.recipientId).slice(-6), type: q.recipientType, amount: q.amount, status: q.status, pm: q.paymentMethod, by: q.approvedBy || null })),
+      wallets, settlement: settlement ? { status: settlement.status, total: settlement.total, amountPaid: settlement.amountPaid, earningsReleased: !!settlement.earningsReleased } : null,
+      verdict,
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // ── PAYMENT 1 CHẠM — chuẩn bị (khi có tài khoản DN) ─────────
 // Các API này để trống đến khi tích hợp MoMo/ZaloPay/VNPay thật
 // Cấu trúc đã sẵn sàng — chỉ cần điền credentials
