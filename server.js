@@ -10805,9 +10805,12 @@ app.get("/api/partner/stats", async (req, res) => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Doanh thu hom nay = don GIAO hom nay (deliveredAt), khong phai don TAO hom nay:
+    // don tao hom truoc giao hom nay truoc day rot khoi hom nay -> card nhu tranh tinh
+    const deliveredSince = (start) => ({ $or: [{ deliveredAt: { $gte: start } }, { deliveredAt: null, createdAt: { $gte: start } }] });
     const [todayOrders, monthOrders, allOrders, recentOrders] = await Promise.all([
-      Order.find({ partnerId:pid, createdAt:{$gte:todayStart}, status:"delivered" }),
-      Order.find({ partnerId:pid, createdAt:{$gte:monthStart}, status:"delivered" }),
+      Order.find({ partnerId:pid, status:"delivered", ...deliveredSince(todayStart) }),
+      Order.find({ partnerId:pid, status:"delivered", ...deliveredSince(monthStart) }),
       Order.find({ partnerId:pid, status:"delivered" }).limit(500),
       Order.find({ partnerId:pid }).sort({ createdAt:-1 }).limit(30),
     ]);
@@ -10826,9 +10829,10 @@ app.get("/api/partner/stats", async (req, res) => {
           gids.push(new mongoose.Types.ObjectId(String(req.session.partnerId)));
         }
         if (gids.length) {
+          const lauDeliveredSince = (start) => ({ $or: [{ deliveredAt: { $gte: start } }, { deliveredAt: null, createdAt: { $gte: start } }] });
           [lauToday, lauMonth, lauAll, lauRecent] = await Promise.all([
-            LaundryOrder.find({ partnerId:{ $in: gids }, createdAt:{ $gte: todayStart }, status:"delivered" }),
-            LaundryOrder.find({ partnerId:{ $in: gids }, createdAt:{ $gte: monthStart }, status:"delivered" }),
+            LaundryOrder.find({ partnerId:{ $in: gids }, status:"delivered", ...lauDeliveredSince(todayStart) }),
+            LaundryOrder.find({ partnerId:{ $in: gids }, status:"delivered", ...lauDeliveredSince(monthStart) }),
             LaundryOrder.find({ partnerId:{ $in: gids }, status:"delivered" }).limit(500),
             LaundryOrder.find({ partnerId:{ $in: gids } }).sort({ createdAt:-1 }).limit(30),
           ]);
