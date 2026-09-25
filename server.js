@@ -1818,6 +1818,9 @@ function getPartnerModel(mod) {
 // Resolve FoodPartner theo session — hỗ trợ 1 tài khoản đăng ký nhiều module (giặt là + đồ ăn cùng phone)
 // Ưu tiên tìm theo phone để luôn lấy đúng quán đồ ăn, không phụ thuộc session.partnerId (chỉ trỏ 1 module)
 async function getSessionFoodPartner(req) {
+  // Mobile (Expo fetch) hay mat cookie connect.sid -> nap tu X-Session-ID truoc,
+  // neu khong moi endpoint partner dung ham nay deu 401 trang so lieu tren app
+  try { await loadSessionFromHeader(req, null); } catch (_) {}
   if (req.session?.userPhone) {
     const fp = await FoodPartner.findOne({ phone: normalizePhone(req.session.userPhone) }).catch(() => null);
     if (fp) return fp;
@@ -3839,6 +3842,16 @@ app.get("/api/partner/revenue-chart", async (req, res) => {
     const partner = await getSessionFoodPartner(req);
     if (!partner) return res.status(401).json({ success: false });
     const pid = partner._id;
+    // Gom ca giat-la cung SDT de bieu do khong trang khi o mode giat-la
+    let lauIds = [];
+    try {
+      const GiatLa = mongoose.models.GiatLa;
+      const LaundryOrder = mongoose.models.LaundryOrder;
+      if (GiatLa && LaundryOrder && req.session?.userPhone) {
+        const rows = await GiatLa.find({ phone: req.session.userPhone }).select("_id").lean();
+        lauIds = rows.map(r => r._id);
+      }
+    } catch (_) {}
     const days = [];
     const labels = [];
     const now = new Date();
@@ -3849,7 +3862,17 @@ app.get("/api/partner/revenue-chart", async (req, res) => {
         { $match: { partnerId: pid, status:"delivered", deliveredAt:{$gte:d,$lte:end} }},
         { $group: { _id:null, total:{$sum:"$finalTotal"}, count:{$sum:1} }}
       ]);
-      days.push({ revenue: agg[0]?.total||0, orders: agg[0]?.count||0 });
+      let lauTotal = 0, lauCount = 0;
+      if (lauIds.length) {
+        try {
+          const lauAgg = await mongoose.models.LaundryOrder.aggregate([
+            { $match: { partnerId:{ $in: lauIds }, status:"delivered", deliveredAt:{ $gte:d, $lte:end } } },
+            { $group: { _id:null, total:{ $sum:"$finalTotal" }, count:{ $sum:1 } } },
+          ]);
+          lauTotal = lauAgg[0]?.total || 0; lauCount = lauAgg[0]?.count || 0;
+        } catch (_) {}
+      }
+      days.push({ revenue: (agg[0]?.total||0) + lauTotal, orders: (agg[0]?.count||0) + lauCount });
       labels.push(d.toLocaleDateString('vi-VN',{weekday:'short'}));
     }
     res.json({ success:true, labels, days });
@@ -10790,18 +10813,66 @@ app.get("/api/partner/stats", async (req, res) => {
     ]);
     const cancelled = await Order.countDocuments({ partnerId:pid, status:"cancelled" });
 
+    // GOP DON GIAT-LA cung SDT: 1 SDT co the co 2 quan (food + giat-la),
+    // man Stats hien gop de khong trang so khi o mode giat-la
+    let lauToday = [], lauMonth = [], lauAll = [], lauRecent = [], lauCancelled = 0;
+    try {
+      const LaundryOrder = mongoose.models.LaundryOrder;
+      if (LaundryOrder && req.session?.userPhone) {
+        const GiatLa = mongoose.models.GiatLa;
+        const gidRows = GiatLa ? await GiatLa.find({ phone: req.session.userPhone }).select("_id").lean() : [];
+        const gids = gidRows.map(r => r._id);
+        if (partner && String(partner._id || "") && gids.length === 0 && req.session?.partnerModule === "giat_la" && mongoose.isValidObjectId(String(req.session.partnerId || ""))) {
+          gids.push(new mongoose.Types.ObjectId(String(req.session.partnerId)));
+        }
+        if (gids.length) {
+          [lauToday, lauMonth, lauAll, lauRecent] = await Promise.all([
+            LaundryOrder.find({ partnerId:{ $in: gids }, createdAt:{ $gte: todayStart }, status:"delivered" }),
+            LaundryOrder.find({ partnerId:{ $in: gids }, createdAt:{ $gte: monthStart }, status:"delivered" }),
+            LaundryOrder.find({ partnerId:{ $in: gids }, status:"delivered" }).limit(500),
+            LaundryOrder.find({ partnerId:{ $in: gids } }).sort({ createdAt:-1 }).limit(30),
+          ]);
+          lauCancelled = await LaundryOrder.countDocuments({ partnerId:{ $in: gids }, status:"cancelled" });
+        }
+      }
+    } catch (_) {}
+
     const sumEarnings = async (orders) => {
       let s = 0;
       for (const o of orders) { try { s += (await calcEarnings(o)).partnerEarn; } catch(e) { s += 0; } }
       return s;
     };
-    const todayRevenue = await sumEarnings(todayOrders);
-    const monthRevenue = await sumEarnings(monthOrders);
-    const avgOrderValue = allOrders.length ? allOrders.reduce((s,o)=>s+(o.total||0),0)/allOrders.length : 0;
+    const todayRevenue = await sumEarnings(todayOrders) + await sumEarnings(lauToday);
+    const monthRevenue = await sumEarnings(monthOrders) + await sumEarnings(lauMonth);
+    const allCombined = [...allOrders, ...lauAll];
+    const avgOrderValue = allCombined.length ? allCombined.reduce((s,o)=>s+((o.total ?? o.finalTotal ?? o.estimatedTotal) || 0),0)/allCombined.length : 0;
 
-    // Lịch sử đơn kèm chi tiết phí — KHÔNG hiển thị phí ship
+    // Lịch sử đơn kèm chi tiết phí — KHÔNG hiển thị phí ship (gộp food + giặt-là, mới nhất trước)
     const recentOrdersOut = [];
-    for (const o of recentOrders) {
+    const mergedRecent = [...recentOrders.map(o => ({ _o: o, _lau: false })), ...lauRecent.map(o => ({ _o: o, _lau: true }))]
+      .sort((a, b) => new Date(b._o.createdAt) - new Date(a._o.createdAt)).slice(0, 30);
+    for (const { _o: o, _lau: isLau } of mergedRecent) {
+      if (isLau) {
+        const e = await calcEarnings({ ...o.toObject(), module: "laundry" }).catch(() => null);
+        const lauTotal = Math.max(0, (o.finalTotal ?? o.estimatedTotal ?? 0) - (o.shipFee || 0) + (o.discount || 0));
+        const commissionPct = e?.commissionPct ?? 30;
+        const platformFee = Math.round(lauTotal * commissionPct / 100);
+        recentOrdersOut.push({
+          _id: o._id, orderId: o.orderId, module: "laundry", status: o.status,
+          createdAt: o.createdAt, deliveredAt: o.deliveredAt,
+          total: lauTotal, discount: o.discount || 0, finalTotal: o.finalTotal || o.estimatedTotal || 0,
+          items: [{ name: o.packageName || "Giặt là", qty: 1, quantity: 1, price: lauTotal }],
+          customerName: o.customerName, customerPhone: o.customerPhone,
+          address: o.pickupAddress, note: o.note,
+          paymentMethod: o.paymentMethod || "cash",
+          paymentStatus: o.paymentStatus || "unpaid",
+          shipFee: o.shipFee || 0, serviceFee: 0,
+          partnerEarn: e?.partnerEarn ?? Math.round(lauTotal * (1 - commissionPct / 100)),
+          platformFee,
+          commissionPct,
+        });
+        continue;
+      }
       const e = await calcEarnings(o).catch(() => null);
       const shipFee = o.shipFee || 0;
       const serviceFee = o.serviceFee || 0;
@@ -10827,7 +10898,7 @@ app.get("/api/partner/stats", async (req, res) => {
 
     res.json({
       success:true, todayRevenue, monthRevenue,
-      todayOrders:todayOrders.length, cancelledOrders:cancelled,
+      todayOrders:todayOrders.length + lauToday.length, cancelledOrders:cancelled + lauCancelled,
       avgOrderValue, avgRating:"5.0",
       recentOrders: recentOrdersOut,
     });
