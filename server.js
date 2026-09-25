@@ -3245,11 +3245,11 @@ async function walletCredit(ownerId, ownerType, amount, ref, note) {
 }
 async function walletDebit(ownerId, ownerType, amount, type='debit', ref, note) {
   if (ownerType === 'partner') {
-    const { doc, Model } = await findPartnerDoc(ownerId);
-    if (!doc || (doc.walletBalance||0) < amount) throw new Error('Số dư không đủ');
-    const updated = await Model.findByIdAndUpdate(ownerId, { $inc: { walletBalance: -amount } }, { new: true });
-    await WalletTx.create({ ownerId, ownerType, type, amount, balance: updated.walletBalance, ref, note });
-    return updated.walletBalance;
+    // VI GOP: 1 SDT co the co nhieu quan (food + giat-la) nhung xai chung 1 pool.
+    // Tru tien lan luot: doc session truoc, thieu thi tru tiep cac quan cung SDT.
+    // Moi doc bi tru deu co WalletTx rieng nen lich su gop van khop so du gop.
+    const span = await partnerPoolDebit(ownerId, amount, type, ref, note);
+    return span.remaining;
   }
   const Model = ownerType==='user' ? User : Shipper;
   const doc = await Model.findById(ownerId);
@@ -3257,6 +3257,58 @@ async function walletDebit(ownerId, ownerType, amount, type='debit', ref, note) 
   const updated = await Model.findByIdAndUpdate(ownerId, { $inc: { walletBalance: -amount } }, { new: true });
   await WalletTx.create({ ownerId, ownerType, type, amount, balance: updated.walletBalance, ref, note });
   return updated.walletBalance;
+}
+
+// ── Tru tien tren pool vi chung cua moi quan cung SDT (food + giat-la + ...) ──
+// Tra ve { debited: [{id, take, balance}], remaining } — remaining la so du GOP con lai.
+// Tenant nao thu tien rieng (credit) van cong dung doc kinh doanh de giu ke toan,
+// nhung rut/tra phi thi dung pool chung nhu 1 vi duy nhat.
+async function partnerPoolDebit(primaryId, amount, type = 'debit', ref = null, note = '') {
+  const pModels = [FoodPartner, GiatLa, GiupViec, ChinaShop].filter(Boolean);
+  let phone = null;
+  for (const m of pModels) {
+    const d = await m.findById(primaryId).select('phone walletBalance').lean().catch(() => null);
+    if (d) { phone = d.phone; break; }
+  }
+  const targets = [];
+  const seen = new Set();
+  const pushRow = (Model, r) => {
+    if (!r || !r._id) return;
+    const id = String(r._id);
+    if (seen.has(id)) return;
+    seen.add(id);
+    targets.push({ Model, id: r._id, balance: r.walletBalance || 0 });
+  };
+  if (phone) {
+    for (const m of pModels) {
+      const rows = await m.find({ phone }).select('walletBalance').lean().catch(() => []);
+      rows.forEach(r => pushRow(m, r));
+    }
+  }
+  if (!targets.length) {
+    for (const m of pModels) {
+      const d = await m.findById(primaryId).select('walletBalance').lean().catch(() => null);
+      if (d) { pushRow(m, d); break; }
+    }
+  }
+  if (!targets.length) throw new Error('Không tìm thấy đối tác');
+  // Doc session tru truoc, cac quan con lai sau
+  const pidStr = String(primaryId);
+  targets.sort((a, b) => (String(b.id) === pidStr ? 1 : 0) - (String(a.id) === pidStr ? 1 : 0));
+  const total = targets.reduce((s, t) => s + t.balance, 0);
+  if (total < amount) throw new Error('Số dư không đủ');
+  let need = amount;
+  const debited = [];
+  for (const t of targets) {
+    if (need <= 0) break;
+    const take = Math.min(t.balance, need);
+    if (take <= 0) continue;
+    const upd = await t.Model.findByIdAndUpdate(t.id, { $inc: { walletBalance: -take } }, { new: true });
+    await WalletTx.create({ ownerId: t.id, ownerType: 'partner', type, amount: take, balance: upd.walletBalance, ref, note });
+    debited.push({ id: t.id, take, balance: upd.walletBalance });
+    need -= take;
+  }
+  return { debited, remaining: total - amount };
 }
 
 // ── Helper: mô tả nguồn tiền cho giao dịch ví ─────────────────
@@ -10861,6 +10913,11 @@ app.get("/api/partner/stats", async (req, res) => {
         const lauTotal = Math.max(0, (o.finalTotal ?? o.estimatedTotal ?? 0) - (o.shipFee || 0) + (o.discount || 0));
         const commissionPct = e?.commissionPct ?? 30;
         const platformFee = Math.round(lauTotal * commissionPct / 100);
+        // Giong food: uu tien voucherPartnerBear DA LUU (VD don LAU-MUG1JFIW luu 0 -> 58800,
+        // calc live lai luc voucher da xoa ra 11053 -> 47747 lech vi)
+        const lauRaw = Math.round(lauTotal * (1 - commissionPct / 100));
+        const lauBear = typeof o.voucherPartnerBear === "number" ? o.voucherPartnerBear : null;
+        const lauEarn = lauBear != null ? Math.max(0, lauRaw - lauBear) : (e?.partnerEarn ?? lauRaw);
         recentOrdersOut.push({
           _id: o._id, orderId: o.orderId, module: "laundry", status: o.status,
           createdAt: o.createdAt, deliveredAt: o.deliveredAt,
@@ -10871,7 +10928,7 @@ app.get("/api/partner/stats", async (req, res) => {
           paymentMethod: o.paymentMethod || "cash",
           paymentStatus: o.paymentStatus || "unpaid",
           shipFee: o.shipFee || 0, serviceFee: 0,
-          partnerEarn: e?.partnerEarn ?? Math.round(lauTotal * (1 - commissionPct / 100)),
+          partnerEarn: lauEarn,
           platformFee,
           commissionPct,
         });
@@ -10885,6 +10942,11 @@ app.get("/api/partner/stats", async (req, res) => {
       const partnerBase = Math.max(0, o.total || 0);
       const commissionPct = e?.commissionPct || 0;
       const platformFee = Math.round(partnerBase * commissionPct / 100);
+      // Uu tien phan bo voucher DA LUU tren don (khop so da cong vi):
+      // voucher cu bi xoa doc thi calc live chia ti le lai -> lech voi lich su vi (VD 47747 vs 58800)
+      const rawEarn = Math.round(partnerBase * (1 - commissionPct / 100));
+      const storedBear = typeof o.voucherPartnerBear === "number" ? o.voucherPartnerBear : null;
+      const orderEarn = storedBear != null ? Math.max(0, rawEarn - storedBear) : (e?.partnerEarn ?? rawEarn);
       recentOrdersOut.push({
         _id: o._id, orderId: o.orderId, module: o.module, status: o.status,
         createdAt: o.createdAt, deliveredAt: o.deliveredAt,
@@ -10894,7 +10956,7 @@ app.get("/api/partner/stats", async (req, res) => {
         paymentMethod: o.paymentMethod || "cash",
         paymentStatus: o.paymentStatus || (o.isPaid ? "paid" : "unpaid"),
         shipFee, serviceFee: o.serviceFee || 0,
-        partnerEarn: e?.partnerEarn || Math.round(partnerBase * (1 - commissionPct/100)),
+        partnerEarn: orderEarn,
         platformFee,
         commissionPct,
       });
@@ -18618,16 +18680,18 @@ app.post("/api/partner/fee/pay-wallet", async (req, res) => {
     if (!partner) return res.status(404).json({ success: false });
     const feeOwed = (partner.feeAmount || 0) - (partner.feePaid || 0);
     if (feeOwed <= 0) return res.json({ success: true, message: "Không có phí cần thanh toán" });
-    if ((partner.walletBalance || 0) < feeOwed)
-      return res.status(400).json({ success: false, message: `Ví không đủ tiền. Cần ${feeOwed.toLocaleString()}đ` });
+    // Vi gop: tru phi tren pool chung moi quan cung SDT (khong rieng doc session)
+    let span;
+    try {
+      span = await partnerPoolDebit(req.session.partnerId, feeOwed, 'debit', null, 'Thanh toan phi dich vu CRABOR');
+    } catch (err) {
+      return res.status(400).json({ success: false, message: err.message || `Ví không đủ tiền. Cần ${feeOwed.toLocaleString()}đ` });
+    }
     await usedModel.findByIdAndUpdate(req.session.partnerId, {
-      $inc: { walletBalance: -feeOwed, feePaid: feeOwed },
+      $inc: { feePaid: feeOwed },
       feeStatus: 'paid',
     });
-    try {
-      await WalletTx.create({ ownerId: req.session.partnerId, ownerType: "partner", type: "debit", amount: feeOwed, balance: (partner.walletBalance || 0) - feeOwed, note: "Thanh toán phí dịch vụ CRABOR" });
-    } catch (_) {}
-    res.json({ success: true, feeAmount: feeOwed, message: `Đã thanh toán phí ${feeOwed.toLocaleString()}đ từ ví` });
+    res.json({ success: true, feeAmount: feeOwed, remaining: span.remaining, message: `Đã thanh toán phí ${feeOwed.toLocaleString()}đ từ ví` });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
