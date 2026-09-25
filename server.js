@@ -7266,6 +7266,113 @@ async function processSePayPayment(payload, ioRef, force = false) {
     }
   }
 
+  // ── 6c. Cleaning delivery payment (CRCLN) — đơn dọn nhà ──
+  const clnMatch = rawRef.match(/CRCLN([A-Z0-9]{6,10})/);
+  if (clnMatch && !handled) {
+    const suffix = clnMatch[1];
+    const clnIdPat = new RegExp(suffix.split("").join("-?") + "$", "i");
+    let cln = null;
+    if (mongoose.models.CleaningOrder) {
+      cln = await CleaningOrder.findOne({
+        paymentStatus: { $in: ["unpaid", "pending_review"] },
+        $or: [
+          { sePayRef: { $regex: suffix, $options: "i" } },
+          { orderId: { $regex: clnIdPat } },
+        ],
+      });
+      // Fallback: quét đuôi orderId không quan trọng dấu gạch
+      if (!cln) {
+        const all = await CleaningOrder.find({ paymentStatus: { $in: ["unpaid", "pending_review"] } })
+          .select("orderId paymentStatus").lean().catch(() => []);
+        cln = all.find(o => o.orderId && o.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase() === suffix) || null;
+        if (cln) cln = await CleaningOrder.findById(cln._id);
+      }
+    }
+    if (cln && amount >= (cln.finalTotal ?? Math.max(0, (cln.price || 0) - (cln.discount || 0))) - 1000) {
+      cln.paymentStatus = "paid";
+      cln.paidAt = new Date();
+      cln.sePayRef = cln.sePayRef || rawRef;
+      cln.statusHistory.push({ status: "payment_confirmed_sepay", by: "system", time: new Date() });
+      await cln.save();
+
+      // Tính tiền shipper (dọn nhà không có partner — shipper giữ 70%, trừ voucher shipper gánh)
+      const { shipperEarn } = await calcEarnings(cln);
+
+      // SePay xác nhận → AUTO DUYỆT, cộng thẳng vào ví shipper
+      await WalletQueue.deleteMany({ orderId: cln.orderId, status: "pending" });
+      if (cln.shipperId && shipperEarn > 0) {
+        const already = await WalletQueue.findOne({
+          orderId: cln.orderId, recipientId: cln.shipperId, recipientType: "shipper",
+          amount: shipperEarn, status: "approved",
+        }).lean().catch(() => null);
+        if (!already) {
+          await creditWalletDirect(cln.shipperId, "shipper", shipperEarn, cln.orderId, `Don don nha ${cln.orderId} — SePay auto duyet`);
+          await WalletQueue.create({
+            orderId: cln.orderId, recipientId: cln.shipperId,
+            recipientType: "shipper", amount: shipperEarn,
+            paymentMethod: "bank_transfer",
+            note: `Đơn dọn nhà ${cln.orderId} — SePay auto duyệt`,
+            status: "approved", approvedBy: "sepay_auto", approvedAt: new Date(),
+          });
+        }
+      }
+
+      // Notify shipper + customer + admin
+      if (cln.shipperId) {
+        ioInstance.to(`shipper_${cln.shipperId}`).emit("sepay_payment_confirmed", {
+          orderId: cln.orderId,
+          amount,
+          message: `Khách đã thanh toán ${amount.toLocaleString("vi-VN")}đ qua SePay!`,
+        });
+      }
+      if (cln.customerId) {
+        ioInstance.to(`customer_${cln.customerId}`).emit("order_status_update", {
+          orderId: cln.orderId, status: "payment_confirmed",
+          message: "Thanh toán dọn nhà thành công! Cảm ơn bạn đã dùng CRABOR 🧹",
+        });
+      }
+      ioInstance.to("admin").emit("wallet_pending_approval", {
+        orderId: cln.orderId, shipperEarn, partnerEarn: 0,
+        paymentMethod: "bank_transfer", source: "sepay_auto_cleaning",
+      });
+
+      console.log(`[SEPAY] Cleaning payment confirmed: ${cln.orderId} — ${amount.toLocaleString("vi-VN")}đ · shipper +${shipperEarn.toLocaleString("vi-VN")}đ`);
+      handled = true;
+    }
+    // Tìm thấy đơn dọn nhà nhưng thiếu tiền → ghi chú admin
+    if (!handled && cln && txId) {
+      const need = Math.round(cln.finalTotal ?? Math.max(0, (cln.price || 0) - (cln.discount || 0)));
+      if (amount < need - 1000) {
+        await SePayTx.updateOne({ txId }, { $set: { note: `short: ${cln.orderId} need ${need} got ${amount}` } }).catch(() => {});
+        console.log(`[SEPAY] Short: ${rawRef} need ${need} got ${amount} (${cln.orderId})`);
+      }
+    }
+    // Khớp đơn đã paid → re-mark matched / duplicate (giống nhánh khác)
+    if (!handled && !cln && txId) {
+      const dupC = await CleaningOrder.findOne({
+        $or: [
+          { sePayRef: { $regex: suffix, $options: "i" } },
+          { orderId: { $regex: clnIdPat } },
+        ],
+      }).select("orderId paymentStatus sePayRef").lean().catch(() => null);
+      if (dupC && dupC.paymentStatus === "paid") {
+        const codeInTx = dupC.sePayRef && rawRef && (rawRef.includes(dupC.sePayRef) || dupC.sePayRef.includes(rawRef));
+        let otherMatched = null;
+        if (codeInTx) {
+          otherMatched = await SePayTx.findOne({ txId: { $ne: String(txId) }, ref: { $regex: suffix, $options: "i" }, note: "matched" }).select("txId").lean().catch(() => null);
+        }
+        if (codeInTx && !otherMatched) {
+          await SePayTx.updateOne({ txId }, { $set: { handled: true, note: 'matched' } }).catch(() => {});
+          console.log(`[SEPAY] Re-mark matched: ${rawRef} (${dupC.orderId})`);
+          handled = true;
+        } else {
+          await SePayTx.updateOne({ txId }, { $set: { note: `duplicate: ${dupC.orderId} already paid` } }).catch(() => {});
+          console.log(`[SEPAY] Duplicate: ${rawRef} (${dupC.orderId} already paid)`);
+        }
+      }
+    }
+  }
+
   // ── 7. Featured request (CRFTR) — quán nổi bật ───────────
   const ftrMatch = rawRef.match(/CRFTR([A-Z0-9]{6,10})/);
   if (ftrMatch && !handled) {
@@ -12099,6 +12206,32 @@ async function handleDeliveryQR(req, res) {
   try {
     await loadSessionFromHeader(req, res);
     if (!req.session?.shipperId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    // ── ĐƠN DỌN NHÀ (cleaning): bảng CleaningOrder riêng, prefix CRCLN ──
+    if (req.path.includes('/cleaning/')) {
+      const cln = await CleaningOrder.findOne({
+        orderId: req.params.orderId || req.params.id,
+        shipperId: req.session.shipperId,
+      });
+      if (!cln) return res.status(404).json({ success: false, message: "Không tìm thấy đơn" });
+
+      const amount   = cln.finalTotal ?? Math.max(0, (cln.price || 0) - (cln.discount || 0));
+      const sePayRef = "CRCLN" + cln.orderId.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase();
+      await CleaningOrder.findByIdAndUpdate(cln._id, { sePayRef });
+
+      const qrUrl = sepayQrUrl(amount, sePayRef);
+      return res.json({
+        success: true,
+        qrUrl,
+        sePayRef,
+        amount,
+        bankName:    SEPAY_CONFIG.bankName,
+        bankCode:    SEPAY_CONFIG.bankCode,
+        accountNo:   SEPAY_CONFIG.accountNo,
+        accountName: SEPAY_CONFIG.accountName,
+        message:     `Chuyển khoản ${amount.toLocaleString("vi-VN")}đ · Nội dung: ${sePayRef}`,
+      });
+    }
 
     const order = await Order.findOne({
       orderId: req.params.orderId || req.params.id,
