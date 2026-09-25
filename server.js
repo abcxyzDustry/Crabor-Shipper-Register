@@ -6957,7 +6957,7 @@ async function processSePayPayment(payload, ioRef, force = false) {
           amount: shipperEarn, status: "approved",
         }).lean().catch(() => null);
         if (!already) {
-          await creditWalletDirect(order.shipperId, "shipper", shipperEarn);
+          await creditWalletDirect(order.shipperId, "shipper", shipperEarn, order.orderId, `Don ${order.orderId} — SePay auto duyet`);
           await WalletQueue.create({
             orderId: order.orderId, recipientId: order.shipperId,
             recipientType: "shipper", amount: shipperEarn,
@@ -6973,7 +6973,7 @@ async function processSePayPayment(payload, ioRef, force = false) {
           amount: partnerEarn, status: "approved",
         }).lean().catch(() => null);
         if (!already) {
-          await creditWalletDirect(order.partnerId, "partner", partnerEarn);
+          await creditWalletDirect(order.partnerId, "partner", partnerEarn, order.orderId, `Don ${order.orderId} — SePay auto duyet`);
           await WalletQueue.create({
             orderId: order.orderId, recipientId: order.partnerId,
             recipientType: "partner", amount: partnerEarn,
@@ -7093,7 +7093,7 @@ async function processSePayPayment(payload, ioRef, force = false) {
           amount: shipperEarn, status: "approved",
         }).lean().catch(() => null);
         if (!already) {
-          await creditWalletDirect(lau.shipperId, "shipper", shipperEarn);
+          await creditWalletDirect(lau.shipperId, "shipper", shipperEarn, lau.orderId, `Giat la ${lau.orderId} — SePay auto duyet`);
           await WalletQueue.create({
             orderId: lau.orderId, recipientId: lau.shipperId,
             recipientType: "shipper", amount: shipperEarn,
@@ -7109,7 +7109,7 @@ async function processSePayPayment(payload, ioRef, force = false) {
           amount: partnerEarn, status: "approved",
         }).lean().catch(() => null);
         if (!already) {
-          await creditWalletDirect(lau.partnerId, "partner", partnerEarn);
+          await creditWalletDirect(lau.partnerId, "partner", partnerEarn, lau.orderId, `Giat la ${lau.orderId} — SePay auto duyet`);
           await WalletQueue.create({
             orderId: lau.orderId, recipientId: lau.partnerId,
             recipientType: "partner", amount: partnerEarn,
