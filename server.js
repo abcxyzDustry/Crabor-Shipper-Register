@@ -11614,39 +11614,48 @@ app.post("/api/cleaning/order", async (req, res) => {
         return failBnpl(500, { message: "Không ghi nhận được giao dịch trả sau. Đơn chưa thanh toán — vui lòng đặt lại." });
       }
     }
+    // ── ĐIỀU PHỐI THEO GIỜ HẸN: nếu còn >1h trước giờ dọn (bookingAt) thì KHÔNG gửi đơn
+    // ngay — đơn nằm pending, cron AutoDispatch sẽ tự gửi khi tới mốc "trước giờ hẹn 1h".
+    const nowMs = Date.now();
+    const bookingAtMs = order.bookingAt ? order.bookingAt.getTime() : null;
+    const dispatchableNow = bookingAtMs == null || bookingAtMs <= nowMs + 3600 * 1000;
     let nearbyShippers = [];
-    try {
-      // Dọn nhà: ưu tiên shipper online + đã mở khoá/nhận đơn dọn nhà
-      // Có GPS → mở rộng bán kính dần; không có GPS → tìm trong lệnh chung
-      const cleaningQ = {
-        status: { $in: ["approved", "active"] },
-        online: true,
-        isAccepting: true,
-        $or: [
-          { "preferences.acceptCleaning": true },
-          { "preferences.cleaningRegistered": true },
-        ],
-      };
-      if (addressLat && addressLng) {
-        nearbyShippers = await findCleaningShippers(addressLat, addressLng, 5, 10);
-      } else {
-        const all = await Shipper.find(cleaningQ).select("_id phone fullName location pushToken walletBalance rating totalOrders").limit(20);
-        nearbyShippers = all;
-      }
-      // Fallback: không có shipper dọn nhà online → gửi cho mọi shipper online để không sót đơn
-      if (!nearbyShippers.length) {
-        const anyQ = {
+    if (dispatchableNow) {
+      try {
+        // Dọn nhà: ưu tiên shipper online + đã mở khoá/nhận đơn dọn nhà
+        // Có GPS → mở rộng bán kính dần; không có GPS → tìm trong lệnh chung
+        const cleaningQ = {
           status: { $in: ["approved", "active"] },
           online: true,
           isAccepting: true,
+          $or: [
+            { "preferences.acceptCleaning": true },
+            { "preferences.cleaningRegistered": true },
+          ],
         };
-        const any = await Shipper.find(anyQ).select("_id phone fullName location pushToken walletBalance rating totalOrders").limit(10);
-        nearbyShippers = any;
-        console.log(`[Cleaning] No cleaning-registered shipper online, fallback dispatch to ${any.length} online shippers`);
-      }
-      const blockedIds = await getCashBlockedShipperIds(nearbyShippers.map(s => s._id));
-      if (blockedIds.size) nearbyShippers = nearbyShippers.filter(s => !blockedIds.has(String(s._id)));
-    } catch(e) { console.error('[Cleaning] dispatch error:', e.message); }
+        if (addressLat && addressLng) {
+          nearbyShippers = await findCleaningShippers(addressLat, addressLng, 5, 10);
+        } else {
+          const all = await Shipper.find(cleaningQ).select("_id phone fullName location pushToken walletBalance rating totalOrders").limit(20);
+          nearbyShippers = all;
+        }
+        // Fallback: không có shipper dọn nhà online → gửi cho mọi shipper online để không sót đơn
+        if (!nearbyShippers.length) {
+          const anyQ = {
+            status: { $in: ["approved", "active"] },
+            online: true,
+            isAccepting: true,
+          };
+          const any = await Shipper.find(anyQ).select("_id phone fullName location pushToken walletBalance rating totalOrders").limit(10);
+          nearbyShippers = any;
+          console.log(`[Cleaning] No cleaning-registered shipper online, fallback dispatch to ${any.length} online shippers`);
+        }
+        const blockedIds = await getCashBlockedShipperIds(nearbyShippers.map(s => s._id));
+        if (blockedIds.size) nearbyShippers = nearbyShippers.filter(s => !blockedIds.has(String(s._id)));
+      } catch(e) { console.error('[Cleaning] dispatch error:', e.message); }
+    } else {
+      console.log(`[Cleaning] Đơn ${order.orderId} chờ tới giờ hẹn — chưa dispatch (bookingAt=${order.bookingAt?.toISOString()}, còn ${Math.round((bookingAtMs - nowMs) / 60000)}phút)`);
+    }
     const payload = {
       type: "cleaning_request",
       orderId: order.orderId,
@@ -11657,20 +11666,29 @@ app.post("/api/cleaning/order", async (req, res) => {
         duration: order.duration, address: order.address,
         addressLat: order.addressLat, addressLng: order.addressLng,
         bookingDate: order.bookingDate, bookingTime: order.bookingTime,
+        bookingAt: order.bookingAt,   // mốc giờ hẹn — app shipper countdown + khoá bước
         note: order.note, customerName: order.customerName,
         customerPhone: order.customerPhone || "",
       },
       timeout: 30,
     };
-    for (const shipper of nearbyShippers) {
-      req.io.to(`shipper_${shipper._id}`).emit("order_request", payload);
-      console.log(`[Cleaning] Dispatched to shipper ${shipper._id}`);
+    if (dispatchableNow) {
+      for (const shipper of nearbyShippers) {
+        req.io.to(`shipper_${shipper._id}`).emit("order_request", payload);
+        console.log(`[Cleaning] Dispatched to shipper ${shipper._id}`);
+      }
     }
+    // Đánh dấu đã dispatch lần này — AutoDispatch chỉ retry sau 35s và chỉ khi tới mốc 1h
+    await CleaningOrder.findByIdAndUpdate(order._id, { $set: { dispatchedAt: new Date() } }).catch(() => {});
     res.status(201).json({
       success: true, orderId: order.orderId,
       discount: order.discount || 0,
       finalTotal: order.finalTotal ?? finalPrice,
-      message: cleaningDiscount > 0 ? `Đã áp voucher tiết kiệm ${cleaningDiscount.toLocaleString("vi-VN")}đ` : undefined,
+      bookingAt: order.bookingAt || null,
+      dispatchScheduled: !dispatchableNow,
+      message: !dispatchableNow
+        ? `Đã nhận đơn. Chúng tôi sẽ gửi đơn cho đối tác dọn nhà gần nhất trước giờ hẹn ${order.bookingTime} khoảng 1 tiếng.`
+        : (cleaningDiscount > 0 ? `Đã áp voucher tiết kiệm ${cleaningDiscount.toLocaleString("vi-VN")}đ` : undefined),
     });
   } catch (err) {
     console.error('[Cleaning Order] Error:', err);
@@ -11793,6 +11811,20 @@ app.patch("/api/cleaning/orders/:id/status", async (req, res) => {
       // Shipper thua cuộc sẽ nhận order_taken riêng qua 409 ở trên.
     }
     const prevStatus = order.status;
+    // ── KHOÁ BƯỚC THEO GIỜ HẸN: đối tác dọn nhà nhận đơn sớm (trong vòng 1h trước giờ hẹn)
+    // phải chờ tới đúng giờ hẹn (bookingAt) mới được chuyển bước tiếp theo (calling/arrived/...).
+    // Trả bookingLock để app hiển thị đồng hồ đếm ngược tới giờ hẹn.
+    if (order.bookingAt && order.status === 'accepted' && !['cancelled','completed'].includes(status)) {
+      const bookingMs = order.bookingAt.getTime();
+      if (bookingMs > Date.now()) {
+        return res.status(400).json({
+          success: false,
+          bookingLock: true,
+          bookingAt: order.bookingAt,
+          message: `Chưa tới giờ dọn hẹn (${order.bookingAt.toLocaleString('vi-VN')}). Vui lòng chờ tới giờ hẹn để mở khoá các bước tiếp theo.`,
+        });
+      }
+    }
     order.status = status;
     order.statusHistory.push({ status, by: "shipper", time: new Date() });
     // Notify customer on status change
@@ -18145,14 +18177,25 @@ setInterval(async () => {
     }
 
     // ── Cleaning orders (pending, chưa có shipper nhận) ──
+    // Điều phối theo giờ hẹn: chỉ dispatch khi đã tới mốc "trước giờ hẹn 1h" (bookingAt - 1h <= now).
+    // Đơn chưa tới giờ vẫn pending nhưng KHÔNG được emit — tránh shipper nhận quá sớm.
     let pendingCleaning = [];
     if (mongoose.models.CleaningOrder) {
+      const cleaningDeadline = new Date(Date.now() + 3600 * 1000); // now + 1h
       pendingCleaning = await mongoose.models.CleaningOrder.find({
         status: "pending",
         shipperId: null,
         $or: [
-          { dispatchedAt: { $exists: false } },
-          { dispatchedAt: { $lt: retryThreshold } }
+          // Đơn cũ chưa có bookingAt (không chọn giờ / dữ liệu test) → dispatch bình thường
+          { bookingAt: { $exists: false } },
+          // Đơn có giờ hẹn: chỉ dispatch khi bookingAt <= now + 1h (đã tới mốc chuẩn bị)
+          { bookingAt: { $lte: cleaningDeadline } },
+        ],
+        $and: [
+          { $or: [
+            { dispatchedAt: { $exists: false } },
+            { dispatchedAt: { $lt: retryThreshold } }
+          ] }
         ]
       }).limit(10).lean();
     }
@@ -18312,6 +18355,7 @@ setInterval(async () => {
           duration: order.duration, address: order.address,
           addressLat: order.addressLat, addressLng: order.addressLng,
           bookingDate: order.bookingDate, bookingTime: order.bookingTime,
+          bookingAt: order.bookingAt,   // mốc giờ hẹn — app shipper countdown + khoá bước
           note: order.note, customerName: order.customerName,
           customerPhone: order.customerPhone || "",
         },
@@ -18322,7 +18366,7 @@ setInterval(async () => {
         global._io?.to(room).emit("order_request", payload);
         await notifyUser('shipper', s._id, {
           type: 'new_order', title: '🧹 Đơn dọn nhà mới!',
-          body: `Đơn #${order.orderId?.slice(-6)}`,
+          body: order.bookingTime ? `Đơn #${order.orderId?.slice(-6)} — dọn lúc ${order.bookingTime}` : `Đơn #${order.orderId?.slice(-6)}`,
           ref: String(order._id), refModule: 'cleaning',
         });
       }
@@ -18663,6 +18707,10 @@ const cleaningOrderSchema = new mongoose.Schema({
   note:          String,
   bookingDate:   Date,
   bookingTime:   String,
+  // Mốc giờ hẹn dọn dẹp (Date đầy đủ giờ/phút theo giờ VN, UTC+7) — dùng để
+  // khoá dispatch (chỉ gửi đơn khi còn ≤1h tới giờ hẹn) và khoá bước trên app shipper
+  // (countdown tới giờ hẹn mới mở khoá các bước tiếp theo)
+  bookingAt:     Date,
   paymentMethod: { type: String, default: "cash" },
   paymentStatus: { type: String, default: "unpaid" },
   paidAt:        Date,
@@ -18693,6 +18741,18 @@ const cleaningOrderSchema = new mongoose.Schema({
 cleaningOrderSchema.pre("save", function(next) {
   if (!this.orderId) this.orderId = "CLN-" + Date.now().toString(36).toUpperCase();
   this.finalTotal = Math.max(0, (this.price||0) - (this.discount||0));
+  // Tính bookingAt: gộp ngày (bookingDate, lưu dạng UTC midnight) + giờ khách chọn (bookingTime "HH:mm")
+  // theo giờ VN (UTC+7) để app shipper/customer countdown chuẩn, không lệch múi.
+  if (!this.bookingAt && this.bookingDate && this.bookingTime) {
+    try {
+      const dateStr = this.bookingDate.toISOString().slice(0, 10);
+      const t = String(this.bookingTime).trim();
+      const m = t.match(/^(\d{1,2}):(\d{2})/);
+      if (m) {
+        this.bookingAt = new Date(`${dateStr}T${m[1].padStart(2,'0')}:${m[2]}:00+07:00`);
+      }
+    } catch (_) {}
+  }
   next();
 });
 const CleaningOrder = mongoose.models.CleaningOrder || mongoose.model("CleaningOrder", cleaningOrderSchema);
